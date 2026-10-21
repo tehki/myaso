@@ -2,7 +2,7 @@
 
 **Decision:** NPC-/town-operated banks first. No global account or instant bank transfer; no player-operated deposit banks. Players may eventually own **private vaults for their own property** (future phase, not implemented). Chartered, regulated player-operated banks are a later design question, **not** currently approved.
 
-**Project:** [myaso.io](https://github.com/tehki/myaso) · **Department:** #7 Economics · **Priority:** P2 post–First Playable Alpha · **Status:** EXPERIMENTAL / offline-only.  
+**Project:** [myaso.io](https://github.com/tehki/myaso) · **Department:** #7 Economics · **Priority:** P2 post–First Playable Alpha · **Status:** EXPERIMENTAL / offline-only.
 **First Playable boundary:** Do **not** integrate B0 into the initial 2–4 player browser city, sword pickup, unarmed combat, death/respawn and networking path. Preserve [small P0 perimeter PR #482](https://github.com/tehki/myaso/pull/482) and the Main Orchestrator's integration authority. B0 does not depend on or modify #482 or the larger [E2d–E2j economy research PR #385](https://github.com/tehki/myaso/pull/385).
 
 ## Rules decided
