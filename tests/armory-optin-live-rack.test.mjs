@@ -44,16 +44,22 @@ test("P0 immutable original source art bytes and authored four-rack sockets unch
   "assets/environment/greyhaven/armory-p0/armory_sword.webp":
    "795874620d07652e55f5e8a76952d2075f17196fc892eff88d46b165638a3b31",
   "src/world/alpha-armory.mjs":
-   "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+   "f9d68a6750784cbe5fce2dd9c2969d479b3394162ebc20900c9cdf4ab91e797a",
   "src/world/authored-maps.mjs":
-   "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+   "d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987",
   "src/browser/armory-rack-visual.mjs":
-   "3eec34073d4056411df063677e4b435bafa9ad0c684bed450e8c319f91cf5fdc",
+   "14bc471634c80c4ad4e417af05641b75df5cf5ea73340edad38de30f98c323a4",
   "src/browser/armory-world493-visual-bridge.mjs":
-   "f7862e3931a150c5b8ac2e11054183d8de12ef498ab22be5cca192f819d46f69"
+   "6906db7ec1748eb8f3a2f1cae5e45e0a0cee79c42c0dc25b867211c24af7f55d"
  };
- for(const [file,digest] of Object.entries(hashes))
-  assert.equal(createHash("sha256").update(read(file)).digest("hex"),digest,file);
+ for(const [file,digest] of Object.entries(hashes)){
+  // Git checks out source text with LF on Linux, often CRLF on Windows.
+  // Compare exact Git-canonical source bytes, NEVER normalize binary WebP.
+  const original=read(file);
+  const canonical=file.endsWith(".mjs")
+   ?Buffer.from(original.toString("utf8").replaceAll("\r\n","\n")):original;
+  assert.equal(createHash("sha256").update(canonical).digest("hex"),digest,file);
+ }
 });
 
 test("P0 explicit world and art flags gate optional real game import to LOOPBACK only",()=>{
