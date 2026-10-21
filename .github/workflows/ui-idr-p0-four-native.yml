@@ -1,0 +1,37 @@
+name: UI IDR P0 real four-browser anonymous Greyhaven preview
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui_idr_four_native_greyhaven_privacy.mjs"
+      - ".github/workflows/ui-idr-p0-four-native.yml"
+      - "src/browser/identity-visibility.mjs"
+      - "web/online-game.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-four-browser-identity-preview:
+    name: Four genuine Chrome Firefox Greyhaven clients conceal provisional IDs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact draft source
+        uses: actions/checkout@v4
+      - name: Verify source and browsers
+        run: |
+          node --check scripts/ui_idr_four_native_greyhaven_privacy.mjs
+          node --test tests/identity-disguise-ui.test.mjs
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build real Rust authoritative Greyhaven and chat server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Native four-browser preview — one shared city and anonymous chat
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,firefox
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/ui_idr_four_native_greyhaven_privacy.mjs
