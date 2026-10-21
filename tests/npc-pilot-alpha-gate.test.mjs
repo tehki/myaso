@@ -197,6 +197,12 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     assert.equal(history.children.length, 1);
     assert.match(history.children[0].textContent, /Tomas: New session draft/);
     assert.equal(input.value, "");
+    npc.receive({ id: 3, text: "Rowan did not answer Tomas’s question" });
+    assert.equal(history.children.length, 1, "wrong NPC cannot consume queued reply");
+    npc.receive({ id: 5, text: "Tomas responds" });
+    assert.equal(history.children.length, 2);
+    npc.receive({ id: 5, text: "Unsolicited duplicate" });
+    assert.equal(history.children.length, 2, "duplicate is not an authorized pending response");
 
     input.value = "Pending old failure";
     const third = submit();
@@ -210,9 +216,9 @@ test("pilot roster generation fences stale async sends and recycled UI state", a
     assert.equal(sendButton.disabled, false);
     assert.equal(history.children.length, 0,
       "an old failed request cannot leak error text into a new roster");
-    npc.receive({ text: "Current uncorrelated server response" });
-    assert.equal(history.children.length, 1,
-      "server replies after a newly active roster are still possible without a wire request epoch");
+    npc.receive({ id: 3, text: "Old/unsolicited server response" });
+    assert.equal(history.children.length, 0,
+      "without a locally submitted message, a reply cannot appear in the new conversation");
   } finally {
     restore();
   }
@@ -242,6 +248,9 @@ test("pilot chat releases its one-flight gate after same-roster send failure", a
       "failure should not discard the player's draft");
     assert.equal(history.children.length, 1);
     assert.equal(history.children[0].textContent, "Unable to send your message.");
+    npc.receive({ id: 2, text: "Rejected write cannot authorize a reply" });
+    assert.equal(history.children.length, 1,
+      "send failure must release any pending reply entitlement");
 
     fail = false;
     await submit();
@@ -249,6 +258,71 @@ test("pilot chat releases its one-flight gate after same-roster send failure", a
     assert.equal(button.disabled, false);
     assert.equal(input.value, "");
     assert.match(history.children[1].textContent, /Marta: Are swords available/);
+    npc.receive({ id: 2, text: "Marta confirms" });
+    assert.equal(history.children[2].textContent, "Marta confirms");
+    npc.receive({ id: 2, text: "Duplicate after successful reply" });
+    assert.equal(history.children.length, 3);
+  } finally {
+    restore();
+  }
+});
+
+test("pilot replies require matching sent NPC and bounded outstanding queue", async () => {
+  const { stage, restore } = installDocument();
+  try {
+    const actual = [];
+    const npc = createNpcChatPanel({
+      async onSend(id, text) { actual.push([id, text]); },
+      onFocus() {},
+    });
+    const panel = stage.children[0];
+    const [,, roster,,, history, form] = panel.children;
+    const [input] = form.children;
+    const submit = () => form.listeners.get("submit")({ preventDefault() {} });
+    const names = [
+      { id: 3, x: 155, y: 205, name: "Rowan", role: "Guard" },
+      { id: 5, x: 270, y: 220, name: "Tomas", role: "Laborer" },
+    ];
+    npc.setRoster(names);
+    assert.equal(roster.value, "3");
+    npc.receive({ id: 3, text: "Forged old reply" });
+    assert.equal(history.children.length, 0, "unsolicited reply cannot appear");
+
+    input.value = "First question";
+    await submit();
+    npc.receive({ id: 5, text: "Wrong NPC" });
+    assert.equal(history.children.length, 1);
+    npc.receive({ id: 3, text: "Expected Rowan reply" });
+    assert.equal(history.children.length, 2);
+    npc.receive({ id: 3, text: "Duplicate reply" });
+    assert.equal(history.children.length, 2);
+
+    // A silent server must not grow a local unbounded reply backlog.
+    for (let i = 0; i < 12; i += 1) {
+      input.value = "Queued " + i;
+      await submit();
+    }
+    assert.equal(actual.length, 13);
+    input.value = "Overflow";
+    await submit();
+    assert.equal(actual.length, 13, "one roster cannot enqueue an unbounded backlog");
+    assert.match(history.children.at(-1).textContent, /Waiting for NPC replies/);
+    npc.receive({ id: 5, text: "Wrong ID must not release cap" });
+    await submit();
+    assert.equal(actual.length, 13);
+    npc.receive({ id: 3, text: "Reply to queued 0" });
+    input.value = "Capacity restored";
+    await submit();
+    assert.equal(actual.length, 14);
+
+    // A new authoritative roster resets the pending reply obligations.
+    npc.setRoster([{ id: 5, x: 270, y: 220, name: "Tomas", role: "Laborer" }]);
+    npc.receive({ id: 3, text: "Stale Rowan answer" });
+    assert.equal(history.children.length, 0);
+    input.value = "Hello Tomas";
+    await submit();
+    npc.receive({ id: 5, text: "Welcome" });
+    assert.equal(history.children.at(-1).textContent, "Welcome");
   } finally {
     restore();
   }

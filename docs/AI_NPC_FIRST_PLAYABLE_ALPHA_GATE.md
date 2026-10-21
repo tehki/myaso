@@ -243,3 +243,44 @@ outside the optional NPC panel was changed.
 **P0 status:** NPC pilot remains disabled on the first-playable
 four-player release. A real Core session epoch and one-reader
 reliable dispatcher are still required for eventual NPC integration.
+
+## LW-2B — Optional NPC replies require an actual locally sent question
+
+The prior optional pilot UI accepted any decoded NPC response whenever a
+nonempty roster was visible, even if no player had asked that NPC a
+question. A wrong-NPC response or duplicate packet could therefore
+appear as authentic conversation and survive until the next roster
+replacement.
+
+The pilot now records **bounded FIFO reply expectations** when a real
+locally selected NPC conversation is submitted: an incoming server reply
+must match the **oldest queued recipient NPC ID** and an NPC still in the
+current authoritative roster before its text can be displayed.
+Unsolicited, wrong-NPC, duplicate, hidden-panel and no-current-roster
+replies do not generate visible chat or consume another NPC's expected
+reply. An explicit roster replacement/revocation clears pending
+expectations; a locally failed reliable send removes its expectation.
+Pending expectations are bounded to **12 per active roster**; if a
+silent server never replies, the form refuses further sends and tells
+the player it is waiting rather than growing an unbounded backlog.
+A trusted reply releases capacity for further messages.
+
+These constraints are intentionally **presentation-only** and use
+the existing decoded \`{ id, denied, text }\` response and original
+wire message types. No new NPC opcodes, speculative ACK, item
+operation, server state, NPC AI decisions, or player movement control
+is created. The actual optional panel and minimal Node DOM fixture
+now test wrong-ID, unsolicited, duplicate and stale replies, queue
+backpressure, cleared state upon roster changes, failed-send
+rejection, and successful retry.
+
+**Important limitation:** the server response contains no unique
+request ID, session epoch or generation. A late reply for the *same
+NPC ID* from an older connection could still look like a current
+response if a new question to that ID is outstanding. Correlation,
+secure reconnect admission and a single stream reader are **Core
+8A-owned prerequisites**, not inferred from this FIFO. This test
+does not prove real-browser/4-player sword acceptance.
+
+**First Playable:** continue with the NPC pilot flags OFF; do not
+merge experimental #353 into \`main\` without central coordination.

@@ -42,6 +42,11 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   // Invalidates in-flight chat send completions after roster replacement.
   // Old drafts and conversation text must not survive a revoked pilot roster.
   let rosterGeneration = 0;
+  // Only show replies to actual locally submitted pilot messages. The
+  // reliable stream preserves their ordering; do not invent request IDs.
+  // This is local UI containment, not a substitute for Core session epochs.
+  const pendingReplies = [];
+  const MAX_PENDING_REPLIES = 12;
 
   function appendLine(text) {
     const li = document.createElement("li");
@@ -54,6 +59,7 @@ export function createNpcChatPanel({ onSend, onFocus }) {
   function setRoster(entries) {
     rosterGeneration += 1;
     npcs = entries;
+    pendingReplies.length = 0;
     history.replaceChildren();
     input.value = "";
     submit.disabled = false;
@@ -119,7 +125,13 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     const id = Number(roster.value);
     const target = npcs.find((npc) => npc.id === id);
     if (!target) return;
+    if (pendingReplies.length >= MAX_PENDING_REPLIES) {
+      appendLine("Waiting for NPC replies before sending more messages.");
+      return;
+    }
     const requestGeneration = rosterGeneration;
+    const expected = { id };
+    pendingReplies.push(expected);
     submit.disabled = true;
     try {
       await onSend(id, text);
@@ -128,6 +140,8 @@ export function createNpcChatPanel({ onSend, onFocus }) {
       // Preserve a newer draft entered while the send was pending.
       if (input.value.trim() === text) input.value = "";
     } catch {
+      const index = pendingReplies.indexOf(expected);
+      if (index !== -1) pendingReplies.splice(index, 1);
       if (requestGeneration === rosterGeneration && !panel.hidden) {
         appendLine("Unable to send your message.");
       }
@@ -170,8 +184,13 @@ export function createNpcChatPanel({ onSend, onFocus }) {
     setRoster,
     updateState,
     updateSupplies,
-    receive({ text }) {
-      if (!panel.hidden) appendLine(text);
+    receive({ id, text }) {
+      if (panel.hidden || !pendingReplies.length) return;
+      // A wrong-NPC or duplicate unsolicited reply must not consume the
+      // expected answer for the player’s real current message.
+      if (pendingReplies[0].id !== id || !npcs.some((npc) => npc.id === id)) return;
+      pendingReplies.shift();
+      appendLine(text);
     },
     focus() { if (!panel.hidden) { onFocus(); input.focus(); } },
     get enabled() { return !panel.hidden; },
