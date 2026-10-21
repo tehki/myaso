@@ -16,3 +16,18 @@ export function nativeRackArrived(current,target,tolerance=18){
     &&Number.isFinite(tolerance)&&tolerance>=0&&tolerance<=18
     &&Math.hypot(current.x-target.x,current.y-target.y)<=tolerance;
 }
+
+/** Provisional World #639 standing target, not a server-authorized item click. */
+export function proposedNativeRackReachPoint(slot){
+  if(!slot||!Number.isFinite(slot.x)||!Number.isFinite(slot.y)
+    ||!slot.approach||slot.approach.x!==slot.x
+    ||slot.approach.y-slot.y!==50)
+    throw Error("unreviewed authored Blacksmith socket/stand fixture");
+  return Object.freeze({x:slot.x,y:slot.y+30});
+}
+/** Conservative OFFLINE prototype radius only. Not current item or LOS authority. */
+export function nativeRackWithinProposedReach(position,slot,limit=56){
+  if(!position||!slot||![position.x,position.y,slot.x,slot.y,limit].every(Number.isFinite)
+    ||limit!==56)return false;
+  return Math.hypot(position.x-slot.x,position.y-slot.y)<=limit;
+}
