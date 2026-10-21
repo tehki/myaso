@@ -127,9 +127,29 @@ test("M155 original real W3C pointer and M206 authoritative hit gates remain man
   const section=source.slice(source.indexOf("async function runOnlineUiKickKnockdownFfaHitFlight("),
     source.indexOf("async function runOnlineUiMultiKnockdownFfaFlight("));
   assert.match(section, /punishDowns\.length !== 1 \|\| punishUps\.length !== 1/);
-  assert.match(section, /verifyM155RealCueBeforeNativePunish\(observed/);
+  assert.match(section, /nativeCueObservation: observed/);
+  assert.match(section, /verifyM155RealCueBeforeNativePunish\(conversion\.nativeCueObservation/);
+  assert.doesNotMatch(section, /verifyM155RealCueBeforeNativePunish\(observed/);
   assert.match(section, /verifyM206ServerKnockdownPunish\(m201ServerOutput\(\)/);
   assert.match(section, /defenderState\?\.playerHp === 66/);
   assert.doesNotMatch(section, /punishDown\.epochMs < conversion\.knockdownTransition\.epochMs/);
   assert.doesNotMatch(section, /new MouseEvent\(|dispatchEvent\(/);
+});
+
+// Repro #39655184307: a real attacker3→victim2 34HP HIT occurred at
+// tick341, well inside knockdown ticks330..352. The runner crashed with
+// ReferenceError because “observed” was scoped to the one-attempt loop while
+// the final cue verification was outside it. Keep provenance from that SAME
+// lease+cue; a separate browser timestamp cannot replace it.
+test("M155 retains original one-shot cue across conversion scope before strict HIT proof", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function runOnlineUiKickKnockdownFfaHitFlight(");
+  const end = source.indexOf("async function ", start + 10);
+  assert.ok(start >= 0 && end > start);
+  const section = source.slice(start, end);
+  assert.match(section, /const observed = await dispatchM147CuePunish\(/);
+  assert.match(section, /conversion = \{[\s\S]*?nativeCueObservation: observed,/);
+  assert.match(section, /verifyM155RealCueBeforeNativePunish\(conversion\.nativeCueObservation/);
+  assert.match(section, /verifyM206ServerKnockdownPunish\(/);
+  assert.doesNotMatch(section, /verifyM155RealCueBeforeNativePunish\(observed/);
 });
