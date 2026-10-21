@@ -9,7 +9,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const root = process.cwd();
-const deadlineMs = 120_000;
+const deadlineMs = 155_000;
 const expiry = Date.now() + deadlineMs;
 const children = new Set();
 const sessions = [];
@@ -165,7 +165,7 @@ async function driver(browser) {
   const id=created.sessionId ?? created.value?.sessionId;
   assert(id, browser.name+" no real WebDriver session ID");
   await webdriver(base,"POST",`/session/${id}/timeouts`,{script:15000,pageLoad:30000,implicit:0});
-  return {name:browser.name,base,id};
+  return {name:browser.name,base,id,driverChild:child};
 }
 async function openGame(s,game,staticPort) {
   const u=new URL(`http://127.0.0.1:${staticPort}/web/index.html`);
@@ -203,6 +203,68 @@ async function moveGenuinely(s) {
     return {ok:!!after && Math.hypot(after.x-before.x,after.y-before.y)>4 && value.tick>initial.tick,value};
   },"authoritative native WebDriver D movement",8000);
   return {before,after:fighter(own,initial.id),tick:own.tick};
+}
+// P0 R2: kill an actual Firefox browser *process group* (no WebDriver DELETE,
+// no WebTransport.close()) while three Chrome/Firefox peers remain alive.
+// This proves same-host browser crash/authoritative admission recovery only,
+// NOT an independent-host network partition or Greyhaven/sword continuity.
+async function crashAndRejoin(game, staticPort) {
+  assert(process.platform === "linux", "process-group crash acceptance requires isolated Linux CI");
+  const lost = sessions.splice(1, 1)[0];
+  assert(lost?.driverChild?.pid && lost.name === "firefox-2", "expected live second Firefox driver");
+  const surviving = [...sessions];
+  const expectedBefore = [1, 3, 4];
+  const crashedAt = Date.now();
+  terminate(lost.driverChild, "SIGKILL");
+  await waitFor(async () => ({
+    ok: lost.driverChild.exitCode !== null || lost.driverChild.signalCode !== null,
+    value: {exitCode:lost.driverChild.exitCode,signalCode:lost.driverChild.signalCode},
+  }), "abrupt Firefox process-group SIGKILL", 5_000);
+  console.log("ALPHA_M1_CRASH_PROCESS_KILLED " + JSON.stringify({
+    formerPlayerId:2, formerBrowser:lost.name, mechanism:"SIGKILL process group, no W3C DELETE",
+  }));
+  const afterRemoval = await Promise.all(surviving.map(s => waitFor(async () => {
+    const state = await snapshot(s);
+    const ids = state.fighters.map(f=>f.netId).sort((a,b)=>a-b);
+    const ok = ids.join(",") === expectedBefore.join(",")
+      && expectedBefore.every(id => state.scoreboard.some(row=>row.startsWith("#"+id)))
+      && !state.scoreboard.some(row=>row.startsWith("#2"));
+    return {ok,value:state};
+  }, s.name + " authoritative ghost removal and three-survivor roster", 38_000)));
+  const removalMs = Date.now()-crashedAt;
+  assert(removalMs <= 38_000, "abandoned Firefox ghost cleanup exceeded 38 seconds: "+removalMs);
+  console.log("ALPHA_M1_THREE_SURVIVORS_NO_GHOST " + JSON.stringify({
+    crashedPlayerId:2, removalMs, survivingIds:expectedBefore,
+    observedBy:surviving.map((s,i)=>({browser:s.name,tick:afterRemoval[i].tick})),
+  }));
+  const replacement = await driver({name:"firefox-rejoin-5",family:"firefox",port:9655});
+  sessions.push(replacement);
+  const joined = await openGame(replacement,game,staticPort);
+  assert(joined.id === 5, "replacement must receive a fresh server-issued ID #5, got "+joined.id);
+  const expectedAfter = [1,3,4,5];
+  const validRoster = state => state.id > 0 && state.tick > 0
+    && state.fighters.map(f=>f.netId).sort((a,b)=>a-b).join(",") === expectedAfter.join(",")
+    && expectedAfter.every(id => state.scoreboard.some(row=>row.startsWith("#"+id)))
+    && !state.scoreboard.some(row=>row.startsWith("#2"));
+  const views = await Promise.all(sessions.map(s=>waitFor(async()=>{
+    const state=await snapshot(s);return {ok:validRoster(state),value:state};
+  },s.name+" authoritative replacement roster 1,3,4,5",15_000)));
+  await saveScreenshot(replacement,"rejoin-no-ghost");
+  await saveScreenshot(surviving[0],"rejoin-observed");
+  const before = await Promise.all(surviving.map(snapshot));
+  const movement = await moveGenuinely(replacement);
+  const observed = await Promise.all(surviving.map((s,i)=>waitFor(async()=>{
+    const state=await snapshot(s), prior=fighter(before[i],5), later=fighter(state,5);
+    const ok=validRoster(state) && !!prior && !!later && state.tick>before[i].tick
+      && Math.hypot(later.x-prior.x,later.y-prior.y)>4;
+    return {ok,value:state};
+  },s.name+" authoritative movement replicated from new Firefox player 5",12_000)));
+  console.log("ALPHA_M1_FOUR_BROWSER_CRASH_REJOIN_PASS " + JSON.stringify({
+    noGracefulClose:true,crashedId:2,replacementId:5,ghostRemovedWithinMs:removalMs,
+    authoritativeFourRoster:expectedAfter,realFirefoxMovement:movement,
+    independentSurvivorObservations:surviving.map((s,i)=>({browser:s.name,tick:observed[i].tick,player5:fighter(observed[i],5)})),
+    exactClientSource:true,scope:"isolated localhost CI only; not WAN, city, armory, or Combat release",
+  }));
 }
 async function run() {
   await mkdir(evidenceDir,{recursive:true});
@@ -281,6 +343,7 @@ async function run() {
     firefoxObserved,postActionFourPlayerLiveness:finalStates.map(s=>s.tick),
     scope:"single GitHub-hosted localhost arena, NOT Greyhaven or independent network",
   }));
+  await crashAndRejoin(game,staticServer.address().port);
 }
 try {await run();}
 catch(error){console.error("ALPHA_M1_FOUR_REAL_BROWSER_FAIL "+(error.stack??error));process.exitCode=1;}
