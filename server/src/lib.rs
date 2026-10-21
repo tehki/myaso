@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod combat_hit_journal;
 pub mod combat_hit_receipt;
 pub mod kill_event;
 pub mod reliable;
