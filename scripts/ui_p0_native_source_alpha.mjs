@@ -86,7 +86,9 @@ try{
   window.addEventListener("pointerup",e=>input(e,"up"),true);
   window.__uiSourceAudit=()=>({traces:[...traces],realServerItems:false});
   window.__uiSourceStale=()=>{scene.lastPresentedFrameId=0;};
-  return {first:vis.swordRects[0],opaque:vis.swordAlphaTestPixel};
+  window.__uiSourceRestore=()=>{scene.lastPresentedFrameId=scene.frameId;};
+  return {first:vis.swordRects[0],third:vis.swordRects[2],
+    opaque:vis.swordAlphaTestPixel};
  });
  const click=async(x,y)=>{
   const r=await page.$eval("#armory",el=>{
@@ -113,6 +115,29 @@ try{
  await click(x,y);
  a=await page.evaluate(()=>window.__uiSourceAudit());
  assert.deepEqual(a.traces.slice(6).map(z=>z.handled),[false,false]);
+ // A genuine pressed LMB gesture started on one sword cannot retarget to
+ // another sword while held: it must consume the gesture without an item.
+ await page.evaluate(()=>window.__uiSourceRestore());
+ const rect=await page.$eval("#armory",el=>{
+  const b=el.getBoundingClientRect();return {left:b.left,top:b.top,
+   width:b.width,height:b.height};});
+ const px=sx=>rect.left+sx*rect.width/640;
+ const py=sy=>rect.top+sy*rect.height/640;
+ await page.mouse.move(px(x),py(y));
+ await page.mouse.down();
+ const third=fixture.third,tx=third.x+fixture.opaque.x+.5,
+  ty=third.y+fixture.opaque.y+.5;
+ await page.mouse.move(px(tx),py(ty),{steps:6});
+ await page.mouse.up();
+ a=await page.evaluate(()=>window.__uiSourceAudit());
+ assert.deepEqual(a.traces.slice(8).map(z=>z.handled),[true,true]);
+ assert.equal(a.traces[9].itemId,null,"drag must never change sword target");
+ // A fresh genuine down/up, by contrast, may select the now-visible third.
+ await click(tx,ty);
+ a=await page.evaluate(()=>window.__uiSourceAudit());
+ assert.deepEqual(a.traces.slice(10).map(z=>z.handled),[true,true]);
+ assert.equal(a.traces[11].itemId,third.itemId);
+ assert.ok(a.traces.every(z=>z.isTrusted));
  const art=await page.evaluate(()=>window.__armoryReview());
  assert.equal(art.serverConnected,false);
  assert.equal(art.serverPickupCommitted,false);
