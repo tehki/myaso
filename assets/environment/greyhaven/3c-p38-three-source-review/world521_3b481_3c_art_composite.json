@@ -1,0 +1,113 @@
+{
+  "purpose": "Graphics 3C fixed off-line P0 three-source Red Lion art attachment QA",
+  "pins": {
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "art": "c107f613c2f646e99693bc0af0f76ba4795c5364",
+    "graphics3cAtCapture": "efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac"
+  },
+  "sourceHashes": {
+    "/src/browser/authored-world-renderer.mjs": "14290d457a0d6bedc0c3d5b98334b9964007130190b7a8881bd3e2bd7fb2cb06",
+    "/src/browser/greyhaven-terrain-materials.mjs": "cfc22bbf2c5ab9847ba40ef85773efe7b382041ed27784cd7eee3cc4fdb59a58",
+    "/src/browser/greyhaven-atmosphere.mjs": "452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+    "/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33",
+    "/src/browser/red-lion-alpha-art-attachment.mjs": "03030aa1d336c26b9a78430be28a9f91e83c80694b85d645a3201121d4586f10",
+    "/src/browser/arena-viewport.mjs": "bfe67165fe9fc6a1dd847bb98320a2f0d6dcf64637e960600c761c38dd23669c",
+    "/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp": "f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0",
+    "/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp": "4b7d58f1dc3469ec612c3ac861089ed6665c2118fa27eb7b2fbb1914f55776c3",
+    "/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1"
+  },
+  "runs": [
+    {
+      "browser": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "originalVsFallbackPixels": 0,
+      "originalVsDayPixels": 63223,
+      "dayVsDuskPixels": 24061,
+      "originallyCachedTiles": 6,
+      "replacedCachedTiles": 6,
+      "defaultIds": [],
+      "replacedIds": [
+        "red-lion"
+      ],
+      "fallbackIds": [],
+      "actorCount": 0,
+      "pickupRequests": 0,
+      "worldDoor": {
+        "x": 4365,
+        "y": 4060
+      },
+      "artistDoor": {
+        "x": 4365,
+        "y": 4075
+      },
+      "threeCLantern": {
+        "x": 4365,
+        "y": 4045
+      },
+      "originalAssetNaturalSize": {
+        "facade": [
+          228,
+          297
+        ],
+        "roof": [
+          238,
+          197
+        ]
+      },
+      "screenshot": "red_lion_3c_world521_3b481_chrome.png",
+      "pageErrors": [],
+      "realGameProven": false
+    },
+    {
+      "browser": "firefox",
+      "version": "firefox/153.4.0",
+      "originalVsFallbackPixels": 0,
+      "originalVsDayPixels": 63367,
+      "dayVsDuskPixels": 24062,
+      "originallyCachedTiles": 6,
+      "replacedCachedTiles": 6,
+      "defaultIds": [],
+      "replacedIds": [
+        "red-lion"
+      ],
+      "fallbackIds": [],
+      "actorCount": 0,
+      "pickupRequests": 0,
+      "worldDoor": {
+        "x": 4365,
+        "y": 4060
+      },
+      "artistDoor": {
+        "x": 4365,
+        "y": 4075
+      },
+      "threeCLantern": {
+        "x": 4365,
+        "y": 4045
+      },
+      "originalAssetNaturalSize": {
+        "facade": [
+          228,
+          297
+        ],
+        "roof": [
+          238,
+          197
+        ]
+      },
+      "screenshot": "red_lion_3c_world521_3b481_firefox.png",
+      "pageErrors": [],
+      "realGameProven": false
+    }
+  ],
+  "limitations": {
+    "originalGameRunning": false,
+    "networkPlayers": 0,
+    "realDoorPortal": false,
+    "rendererFallbackWiredInOnlineGame": false,
+    "actorOcclusionAccepted": false,
+    "realFacadeAuthoringChanged": false
+  },
+  "status": "THREE_ORIGINAL_SOURCES_FIXED_CANVAS_ART_PASS"
+}

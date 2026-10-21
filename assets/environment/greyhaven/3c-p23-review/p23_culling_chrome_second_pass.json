@@ -1,0 +1,266 @@
+{
+  "browser": "Chrome/154.0.8037.99",
+  "referenceHead": "73ca332cdaab123bd9c75a3321ff5b3dea6f2c7f",
+  "viewport": {
+    "width": 960,
+    "height": 600,
+    "deviceScaleFactor": 1
+  },
+  "scenario": "Offline authored overworld, no multiplayer, eight fixed cameras",
+  "samples": {
+    "baseline": {
+      "status": 200,
+      "pageErrors": [],
+      "results": {
+        "greyhaven": {
+          "coldMs": 27.2,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            1287280777,
+            4206281544
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "bridge": {
+          "coldMs": 12.8,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            1246196530,
+            4110307628
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "grove": {
+          "coldMs": 12.6,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            3260398106,
+            1817588425
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "briarford": {
+          "coldMs": 12.7,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            2215458230,
+            3382869946
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "stonebrook": {
+          "coldMs": 30.8,
+          "created": 9,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 9,
+          "rgbaHash": [
+            855836529,
+            3199416253
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "farmland": {
+          "coldMs": 26.9,
+          "created": 8,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 8,
+          "rgbaHash": [
+            1154323039,
+            912083252
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "wilderness": {
+          "coldMs": 21.8,
+          "created": 8,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 8,
+          "rgbaHash": [
+            2067260341,
+            194732776
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "city-north": {
+          "coldMs": 11.9,
+          "created": 4,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 4,
+          "rgbaHash": [
+            2398954566,
+            3193858695
+          ],
+          "size": [
+            960,
+            600
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "status": 200,
+      "pageErrors": [],
+      "results": {
+        "greyhaven": {
+          "coldMs": 19.2,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            1287280777,
+            4206281544
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "bridge": {
+          "coldMs": 10.8,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            1246196530,
+            4110307628
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "grove": {
+          "coldMs": 10.4,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            3260398106,
+            1817588425
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "briarford": {
+          "coldMs": 10.9,
+          "created": 6,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 6,
+          "rgbaHash": [
+            2215458230,
+            3382869946
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "stonebrook": {
+          "coldMs": 15,
+          "created": 9,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 9,
+          "rgbaHash": [
+            855836529,
+            3199416253
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "farmland": {
+          "coldMs": 17.7,
+          "created": 8,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 8,
+          "rgbaHash": [
+            1154323039,
+            912083252
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "wilderness": {
+          "coldMs": 12.6,
+          "created": 8,
+          "newFrames": 3,
+          "frames": 4,
+          "cache": 8,
+          "rgbaHash": [
+            2067260341,
+            194732776
+          ],
+          "size": [
+            960,
+            600
+          ]
+        },
+        "city-north": {
+          "coldMs": 15.6,
+          "created": 4,
+          "newFrames": 2,
+          "frames": 4,
+          "cache": 4,
+          "rgbaHash": [
+            2398954566,
+            3193858695
+          ],
+          "size": [
+            960,
+            600
+          ]
+        }
+      }
+    }
+  },
+  "notes": "Cold cached Canvas tile generation only; NOT multiplayer frame-rate evidence",
+  "pixelHashParity": true
+}

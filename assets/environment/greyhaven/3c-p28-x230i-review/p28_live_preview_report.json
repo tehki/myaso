@@ -1,0 +1,324 @@
+{
+  "date": "2026-10-21",
+  "chrome": "Chrome/152.0.7977.82",
+  "host": {
+    "platform": "linux",
+    "release": "7.2.3-arch1-3",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i3-2370M CPU @ 2.40GHz"
+  },
+  "comparison": {
+    "world336": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+    "graphics3c": "f59bbcb34136ad96e0890a2d887fb7b250d7e02a"
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 960,
+    "deviceScaleFactor": 1
+  },
+  "method": "Unmodified /web/world-preview.html interactive requestAnimationFrame loop; keyboard events, Canvas, HUD. Unmodified /web/world-preview.html?room=tavern interior.",
+  "limitations": "Local design preview. Not authoritative multiplayer, GPU full-load, live game network FPS, real 3A sprites, or 3B Blender composite.",
+  "capture": {
+    "world336": {
+      "outside": {
+        "http": 200,
+        "title": "myaso.io — Moonvale Village & Buildings Preview",
+        "phases": [
+          {
+            "input": "idle",
+            "requestedMs": 1450,
+            "before": "Moonvale · 4365,4150 · cached 6/24",
+            "after": "Moonvale · 4365,4150 · cached 6/24",
+            "frames": {
+              "count": 87,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 33.4,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 1,
+              "intervalsAbove50": 0,
+              "observedFps": 59.3
+            }
+          },
+          {
+            "input": "d",
+            "requestedMs": 2600,
+            "before": "Moonvale · 4365,4150 · cached 6/24",
+            "after": "Moonvale · 4971,4150 · cached 8/24",
+            "frames": {
+              "count": 157,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "a",
+            "requestedMs": 2600,
+            "before": "Moonvale · 4971,4150 · cached 8/24",
+            "after": "Moonvale · 4365,4150 · cached 8/24",
+            "frames": {
+              "count": 155,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 33.4,
+              "intervalsAbove25": 2,
+              "intervalsAbove33_4": 2,
+              "intervalsAbove50": 0,
+              "observedFps": 59.2
+            }
+          },
+          {
+            "input": "w",
+            "requestedMs": 2250,
+            "before": "Moonvale · 4365,4150 · cached 8/24",
+            "after": "Moonvale · 4365,3625 · cached 11/24",
+            "frames": {
+              "count": 135,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 33.4,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 59.6
+            }
+          },
+          {
+            "input": "s",
+            "requestedMs": 2250,
+            "before": "Moonvale · 4365,3625 · cached 11/24",
+            "after": "Moonvale · 4365,4154 · cached 11/24",
+            "frames": {
+              "count": 135,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 33.4,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 1,
+              "intervalsAbove50": 0,
+              "observedFps": 59.6
+            }
+          },
+          {
+            "input": "idle",
+            "requestedMs": 1100,
+            "before": "Moonvale · 4365,4154 · cached 11/24",
+            "after": "Moonvale · 4365,4154 · cached 11/24",
+            "frames": {
+              "count": 45,
+              "medianMs": 16.7,
+              "p95Ms": 83.4,
+              "maxMs": 116.6,
+              "intervalsAbove25": 5,
+              "intervalsAbove33_4": 5,
+              "intervalsAbove50": 4,
+              "observedFps": 40.3
+            }
+          }
+        ],
+        "lastPlace": "Moonvale · 4365,4154 · cached 11/24",
+        "lastDoor": "",
+        "portal": {
+          "approach": "Moonvale · 4365,4066 · cached 11/24",
+          "nearPortal": "Press E — Enter The Red Lion Inn",
+          "afterEnter": "The Red Lion Inn · 390,480 · cached 11/24"
+        }
+      },
+      "inside": {
+        "http": 200,
+        "phases": [
+          {
+            "input": "idle",
+            "requestedMs": 1100,
+            "before": "The Red Lion Inn · 390,480 · cached 0/24",
+            "after": "The Red Lion Inn · 390,480 · cached 0/24",
+            "frames": {
+              "count": 66,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "d",
+            "requestedMs": 1500,
+            "before": "The Red Lion Inn · 390,480 · cached 0/24",
+            "after": "The Red Lion Inn · 735,480 · cached 0/24",
+            "frames": {
+              "count": 90,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          }
+        ],
+        "place": "The Red Lion Inn · 735,480 · cached 0/24"
+      },
+      "errors": []
+    },
+    "graphics3c": {
+      "outside": {
+        "http": 200,
+        "title": "myaso.io — Moonvale Village & Buildings Preview",
+        "phases": [
+          {
+            "input": "idle",
+            "requestedMs": 1450,
+            "before": "Moonvale · 4365,4150 · cached 6/24",
+            "after": "Moonvale · 4365,4150 · cached 6/24",
+            "frames": {
+              "count": 87,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 33.4,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 1,
+              "intervalsAbove50": 0,
+              "observedFps": 59.3
+            }
+          },
+          {
+            "input": "d",
+            "requestedMs": 2600,
+            "before": "Moonvale · 4365,4150 · cached 6/24",
+            "after": "Moonvale · 4967,4150 · cached 8/24",
+            "frames": {
+              "count": 156,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "a",
+            "requestedMs": 2600,
+            "before": "Moonvale · 4967,4150 · cached 8/24",
+            "after": "Moonvale · 4357,4150 · cached 8/24",
+            "frames": {
+              "count": 156,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 33.3,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 59.6
+            }
+          },
+          {
+            "input": "w",
+            "requestedMs": 2250,
+            "before": "Moonvale · 4357,4150 · cached 8/24",
+            "after": "Moonvale · 4357,3629 · cached 11/24",
+            "frames": {
+              "count": 135,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "s",
+            "requestedMs": 2250,
+            "before": "Moonvale · 4357,3629 · cached 11/24",
+            "after": "Moonvale · 4357,4158 · cached 11/24",
+            "frames": {
+              "count": 136,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "idle",
+            "requestedMs": 1100,
+            "before": "Moonvale · 4357,4158 · cached 11/24",
+            "after": "Moonvale · 4357,4158 · cached 11/24",
+            "frames": {
+              "count": 66,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 33.3,
+              "intervalsAbove25": 1,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 59.1
+            }
+          }
+        ],
+        "lastPlace": "Moonvale · 4357,4158 · cached 11/24",
+        "lastDoor": "",
+        "portal": {
+          "approach": "Moonvale · 4357,4073 · cached 11/24",
+          "nearPortal": "Press E — Enter The Red Lion Inn",
+          "afterEnter": "The Red Lion Inn · 390,480 · cached 11/24"
+        }
+      },
+      "inside": {
+        "http": 200,
+        "phases": [
+          {
+            "input": "idle",
+            "requestedMs": 1100,
+            "before": "The Red Lion Inn · 390,480 · cached 0/24",
+            "after": "The Red Lion Inn · 390,480 · cached 0/24",
+            "frames": {
+              "count": 66,
+              "medianMs": 16.7,
+              "p95Ms": 16.8,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          },
+          {
+            "input": "d",
+            "requestedMs": 1500,
+            "before": "The Red Lion Inn · 390,480 · cached 0/24",
+            "after": "The Red Lion Inn · 735,480 · cached 0/24",
+            "frames": {
+              "count": 91,
+              "medianMs": 16.7,
+              "p95Ms": 16.7,
+              "maxMs": 16.8,
+              "intervalsAbove25": 0,
+              "intervalsAbove33_4": 0,
+              "intervalsAbove50": 0,
+              "observedFps": 60
+            }
+          }
+        ],
+        "place": "The Red Lion Inn · 735,480 · cached 0/24"
+      },
+      "errors": []
+    }
+  },
+  "status": "completed"
+}

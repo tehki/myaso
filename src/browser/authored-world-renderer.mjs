@@ -1,10 +1,32 @@
 // Visual-only renderer for designer-authored fixed maps.
 // Loading an interior in the offline preview does not grant a network zone transfer.
 import { AUTHORED_MAPS, MAP_IDS, getAuthoredMap } from "../world/authored-maps.mjs";
+import { paintGreyhavenGroundDetails } from "./greyhaven-terrain-materials.mjs";
+import { paintGreyhavenLightingPools, paintGreyhavenLightingFixtures } from "./greyhaven-atmosphere.mjs";
 
 export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
 const TAU = Math.PI * 2;
+
+// Graphics 3C P2.3: conservative chunk-only culling of authored visual props.
+// The padding contains painted shadows, stroke widths and tree crowns.
+// This is render presentation only: world placements and physics are unchanged.
+function visibleBounds(tile, x, y, width, height, padding=0) {
+  return x - padding <= tile.x + tile.width
+    && y - padding <= tile.y + tile.height
+    && x + width + padding >= tile.x
+    && y + height + padding >= tile.y;
+}
+
+function visiblePath(tile, points, padding) {
+  // Authored polylines retain their original vertices and stroke widths.
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const [x,y] of points) {
+    if(x<minX)minX=x;if(x>maxX)maxX=x;
+    if(y<minY)minY=y;if(y>maxY)maxY=y;
+  }
+  return visibleBounds(tile,minX,minY,maxX-minX,maxY-minY,padding);
+}
 
 function strokePolyline(ctx, points, width, color) {
   ctx.beginPath();
@@ -83,26 +105,43 @@ function paintCityWalls(ctx,city) {
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
 
-function paintOverworld(ctx,map) {
+function paintOverworld(ctx,map,tileBounds,replacedBuildings) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
+    if(!visibleBounds(tileBounds,f.x,f.y,f.w,f.h,12))continue;
     ctx.fillStyle=f.color;ctx.fillRect(f.x,f.y,f.w,f.h);
     ctx.strokeStyle="rgba(49,74,39,.22)";ctx.lineWidth=8;
     for(let y=f.y+34;y<f.y+f.h;y+=45){
       ctx.beginPath();ctx.moveTo(f.x+14,y);ctx.lineTo(f.x+f.w-14,y);ctx.stroke();
     }
   }
-  strokePolyline(ctx,map.river.points,map.river.width+24,"#3b5c59");
-  strokePolyline(ctx,map.river.points,map.river.width,"#669b9c");
-  strokePolyline(ctx,map.river.points,map.river.width*.42,"rgba(184,216,207,.25)");
+  // Skip long river strokes when the water cannot touch this 512-unit tile.
+  if(visiblePath(tileBounds,map.river.points,(map.river.width+24)/2+4)){
+    strokePolyline(ctx,map.river.points,map.river.width+24,"#3b5c59");
+    strokePolyline(ctx,map.river.points,map.river.width,"#669b9c");
+    strokePolyline(ctx,map.river.points,map.river.width*.42,"rgba(184,216,207,.25)");
+  } else {
+    // The old unconditional stroke also set shared Canvas pen state. Later
+    // authored shapes rely on it; retain that state without drawing water.
+    ctx.lineJoin="round";ctx.lineCap="round";
+    ctx.lineWidth=map.river.width*.42;
+    ctx.strokeStyle="rgba(184,216,207,.25)";
+  }
   // Road layout is explicit: no per-session random placement.
   for(const road of map.roads){
+    if(!visiblePath(tileBounds,road.points,(road.width+15)/2+4))continue;
     strokePolyline(ctx,road.points,road.width+15,"rgba(75,62,43,.38)");
     strokePolyline(ctx,road.points,road.width,"#b7a17d");
     strokePolyline(ctx,road.points,road.width*.58,"#c4ae8c");
   }
+  // Static, bounded Graphics 3C material layer on the same cached Canvas tiles.
+  paintGreyhavenGroundDetails(ctx,map,tileBounds);
+  // Warm practical spill is baked into the SAME cached terrain tile.
+  // Cosmetic only; does not change any gameplay visibility or lighting rule.
+  paintGreyhavenLightingPools(ctx,map,tileBounds);
   for(const bridge of map.bridges){
+    if(!visibleBounds(tileBounds,bridge.x-bridge.w/2,bridge.y-bridge.h/2,bridge.w,bridge.h,12))continue;
     ctx.fillStyle="#766e5c";
     ctx.fillRect(bridge.x-bridge.w/2,bridge.y-bridge.h/2-5,bridge.w,bridge.h+10);
     ctx.fillStyle="#c3b096";
@@ -114,10 +153,20 @@ function paintOverworld(ctx,map) {
     }
   }
   for(const grove of map.groves)
-    for(const [dx,dy] of grove.trees)paintTree(ctx,grove.x+dx,grove.y+dy);
-  paintCityWalls(ctx,map.city);
-  for(const b of map.buildings)paintBuilding(ctx,b);
+    for(const [dx,dy] of grove.trees){
+      const x=grove.x+dx,y=grove.y+dy;
+      if(visibleBounds(tileBounds,x,y,0,0,40))paintTree(ctx,x,y);
+    }
+  if(visibleBounds(tileBounds,map.city.x,map.city.y,map.city.w,map.city.h,100))
+    paintCityWalls(ctx,map.city);
+  // Only World-validated opt-in IDs may suppress a baked placeholder.
+  // Never erase a cached building using a post-paint rectangle: keep the
+  // authentic terrain/road/facade depth unchanged under replacement art.
+  for(const b of map.buildings)
+    if(!replacedBuildings.has(b.id) && visibleBounds(tileBounds,b.x,b.y,b.w,b.h,45))paintBuilding(ctx,b);
+  paintGreyhavenLightingFixtures(ctx,map,tileBounds);
   for(const p of map.portals){
+    if(!visibleBounds(tileBounds,p.x,p.y,0,0,23))continue;
     ctx.strokeStyle="#e9cf7c";ctx.lineWidth=4;
     ctx.beginPath();ctx.arc(p.x,p.y,17,Math.PI*.05,Math.PI*.95);ctx.stroke();
   }
@@ -182,10 +231,30 @@ export function visibleWorldTiles(camera,width,height,zoom,tileSize=WORLD_TILE_S
 }
 
 export function createAuthoredWorldRenderer({makeCanvas=()=>document.createElement("canvas"),
-  cacheCap=WORLD_CACHE_CAP,buildLimit=3}={}) {
+  cacheCap=WORLD_CACHE_CAP,buildLimit=3,replacedBuildingIds=[],worldReplacementValidator=null}={}) {
   if(!Number.isInteger(cacheCap)||cacheCap<1||cacheCap>64
     ||!Number.isInteger(buildLimit)||buildLimit<0||buildLimit>8)
     throw new RangeError("invalid authored world cache");
+  // This 3C branch is stacked on World #336: World #521's canonical
+  // presentation validator is NOT in our parent source. Require it to be
+  // explicitly injected for any nonempty replacement request. No World-owned
+  // Red Lion allowlist or facade coordinates are replicated into Graphics 3C.
+  if(!Array.isArray(replacedBuildingIds) ||
+     (worldReplacementValidator!==null && typeof worldReplacementValidator!=="function"))
+    throw new RangeError("invalid World building replacement options");
+  if(replacedBuildingIds.length && !worldReplacementValidator)
+    throw new RangeError("World building replacement validator required");
+  const approved=worldReplacementValidator
+    ?worldReplacementValidator(MAP_IDS.overworld,replacedBuildingIds)
+    :Object.freeze([]);
+  const authored=getAuthoredMap(MAP_IDS.overworld);
+  if(!Array.isArray(approved)||approved.length!==replacedBuildingIds.length ||
+     new Set(approved).size!==approved.length ||
+     approved.some((id,i)=>id!==replacedBuildingIds[i] ||
+       typeof id!=="string" || !authored.buildings.some(b=>b.id===id)))
+    throw new RangeError("World building replacement validator returned invalid IDs");
+  const normalizedReplacements=Object.freeze([...approved]);
+  const replacedBuildings=new Set(normalizedReplacements);
   const cache=new Map();
   const stats={cached:0,created:0,visible:0};
   function makeTile(map,x,y){
@@ -194,11 +263,15 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     const c=texture.getContext("2d",{alpha:false});
     if(!c)throw new Error("2D world canvas unavailable");
     c.save();c.translate(-x*WORLD_TILE_SIZE,-y*WORLD_TILE_SIZE);
-    paintOverworld(c,map);c.restore();
+    paintOverworld(c,map,{x:x*WORLD_TILE_SIZE,y:y*WORLD_TILE_SIZE,
+      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE},replacedBuildings);c.restore();
     return texture;
   }
   return {
     stats,
+    // Replacement identity is fixed when the Canvas cache is built. Changing
+    // World facade options requires a fresh renderer/cache, not cache reuse.
+    replacedBuildingIds:normalizedReplacements,
     clear(){cache.clear();stats.cached=0;},
     draw(ctx,mapId,camera,width,height,zoom){
       const map=getAuthoredMap(mapId);

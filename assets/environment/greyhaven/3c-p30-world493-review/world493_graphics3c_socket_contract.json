@@ -1,0 +1,140 @@
+{
+  "status": "source_contract_pass_only",
+  "graphicsSource": "Graphics 3C cached static authored environment",
+  "worldHead": "07060f981b8a1dac89184b621b6893dd970a08ae",
+  "worldArmoryId": "greyhaven-smith-open-front",
+  "camera": {
+    "x": 3800,
+    "y": 4050
+  },
+  "viewport": {
+    "width": 1100,
+    "height": 688,
+    "zoom": 0.84
+  },
+  "sockets": [
+    {
+      "socketId": "greyhaven-rack-1",
+      "anchor": {
+        "x": 3740,
+        "y": 4038
+      },
+      "approach": {
+        "x": 3740,
+        "y": 4088
+      },
+      "screenAnchor": {
+        "x": 499.6,
+        "y": 333.92
+      },
+      "screenApproach": {
+        "x": 499.6,
+        "y": 375.92
+      },
+      "nearestSmithLampWorldUnits": 68.43,
+      "staticGroundWithin16": {
+        "pavers": 0,
+        "soil": 0,
+        "grass": 0
+      },
+      "providesWorldItemId": false,
+      "liveRenderedSword": false,
+      "actualPickGeometry": false
+    },
+    {
+      "socketId": "greyhaven-rack-2",
+      "anchor": {
+        "x": 3780,
+        "y": 4038
+      },
+      "approach": {
+        "x": 3780,
+        "y": 4088
+      },
+      "screenAnchor": {
+        "x": 533.2,
+        "y": 333.92
+      },
+      "screenApproach": {
+        "x": 533.2,
+        "y": 375.92
+      },
+      "nearestSmithLampWorldUnits": 37.44,
+      "staticGroundWithin16": {
+        "pavers": 0,
+        "soil": 1,
+        "grass": 1
+      },
+      "providesWorldItemId": false,
+      "liveRenderedSword": false,
+      "actualPickGeometry": false
+    },
+    {
+      "socketId": "greyhaven-rack-3",
+      "anchor": {
+        "x": 3820,
+        "y": 4038
+      },
+      "approach": {
+        "x": 3820,
+        "y": 4088
+      },
+      "screenAnchor": {
+        "x": 566.8,
+        "y": 333.92
+      },
+      "screenApproach": {
+        "x": 566.8,
+        "y": 375.92
+      },
+      "nearestSmithLampWorldUnits": 36.36,
+      "staticGroundWithin16": {
+        "pavers": 0,
+        "soil": 0,
+        "grass": 0
+      },
+      "providesWorldItemId": false,
+      "liveRenderedSword": false,
+      "actualPickGeometry": false
+    },
+    {
+      "socketId": "greyhaven-rack-4",
+      "anchor": {
+        "x": 3860,
+        "y": 4038
+      },
+      "approach": {
+        "x": 3860,
+        "y": 4088
+      },
+      "screenAnchor": {
+        "x": 600.4,
+        "y": 333.92
+      },
+      "screenApproach": {
+        "x": 600.4,
+        "y": 375.92
+      },
+      "nearestSmithLampWorldUnits": 66.65,
+      "staticGroundWithin16": {
+        "pavers": 0,
+        "soil": 0,
+        "grass": 0
+      },
+      "providesWorldItemId": false,
+      "liveRenderedSword": false,
+      "actualPickGeometry": false
+    }
+  ],
+  "tests": {
+    "pinnedWorldHead": true,
+    "mapCompatibility": true,
+    "immutableUniqueFixtures": true,
+    "correctlyProjectedDistinctPixels": true,
+    "staticLampClearance": true,
+    "noItemAuthorityOrSpriteClaim": true,
+    "actualRenderedSwordPickTest": false,
+    "realMultiplayerPickupTest": false
+  },
+  "releaseGate": "BLOCKED: World, Core/Items, UI, Graphics 3B and Combat must integrate real server-owned rack sword art and pickup"
+}

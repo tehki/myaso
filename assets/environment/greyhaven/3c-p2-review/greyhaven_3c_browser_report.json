@@ -1,0 +1,107 @@
+{
+  "chrome": "Chrome/154.0.8037.99",
+  "viewport": {
+    "width": 1120,
+    "height": 720,
+    "deviceScaleFactor": 1
+  },
+  "baselineHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+  "scenario": "offline Greyhaven Red Lion at 4365,4150 zoom 0.86, no gameplay network",
+  "samples": {
+    "baseline": {
+      "httpStatus": 200,
+      "pageErrors": [],
+      "perf": {
+        "rows": [
+          {
+            "buildMs": 29.6,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 26.4,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 26.4,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 25.6,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 27,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 28.8,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 25.7,
+            "created": 6,
+            "frames": 2
+          }
+        ],
+        "canvasSize": [
+          1120,
+          720
+        ]
+      }
+    },
+    "candidate": {
+      "httpStatus": 200,
+      "pageErrors": [],
+      "perf": {
+        "rows": [
+          {
+            "buildMs": 30.1,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 21.4,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 28,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 24.2,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 18.8,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 27.4,
+            "created": 6,
+            "frames": 2
+          },
+          {
+            "buildMs": 45.5,
+            "created": 6,
+            "frames": 2
+          }
+        ],
+        "canvasSize": [
+          1120,
+          720
+        ]
+      }
+    }
+  },
+  "notes": "Seven runs of cold authored-world tile builds; not multiplayer FPS."
+}

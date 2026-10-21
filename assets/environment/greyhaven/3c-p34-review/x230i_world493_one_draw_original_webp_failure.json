@@ -1,0 +1,71 @@
+{
+  "status": "INSTRUMENTED_TIMEOUT",
+  "variant": "world493",
+  "maxWarmups": 1,
+  "heads": {
+    "world": "07060f981b8a1dac89184b621b6893dd970a08ae",
+    "art": "2a11b923591a682bbae3cffe6d9f70b0d2036de8"
+  },
+  "host": {
+    "platform": "linux",
+    "cpu": "Intel(R) Core(TM) i3-2370M CPU @ 2.40GHz"
+  },
+  "injectedLogsInMemory": true,
+  "productionEdited": false,
+  "realItemOwnershipTested": false,
+  "screenshotAttempted": false,
+  "pixelsRead": false,
+  "frameBudgetClaim": false,
+  "trace": [
+    "P0_TRACE image:begin 240.19999980926514",
+    "html HTTP 200"
+  ],
+  "served": [
+    {
+      "path": "/web/armory-p0-world493-review.html",
+      "at": 1792585858891
+    },
+    {
+      "path": "/web/armory-p0-world493-review.mjs",
+      "at": 1792585858991
+    },
+    {
+      "path": "/__world493__/src/browser/authored-world-renderer.mjs",
+      "at": 1792585859011
+    },
+    {
+      "path": "/__world493__/src/world/alpha-armory.mjs",
+      "at": 1792585859023
+    },
+    {
+      "path": "/__world493__/src/world/authored-maps.mjs",
+      "at": 1792585859024
+    },
+    {
+      "path": "/src/browser/armory-world493-visual-bridge.mjs",
+      "at": 1792585859025
+    },
+    {
+      "path": "/src/browser/armory-rack-visual.mjs",
+      "at": 1792585859027
+    },
+    {
+      "path": "/src/browser/arena-viewport.mjs",
+      "at": 1792585859077
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_rack.webp",
+      "at": 1792585859111
+    },
+    {
+      "path": "/assets/environment/greyhaven/armory-p0/armory_sword.webp",
+      "at": 1792585859113
+    }
+  ],
+  "errors": [
+    "request failed: http://127.0.0.1:37913/assets/environment/greyhaven/armory-p0/armory_sword.webp net::ERR_INSUFFICIENT_RESOURCES",
+    "wait: Waiting failed: 20000ms exceeded",
+    "status: Runtime.callFunctionOn timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed."
+  ],
+  "chrome": "Chrome/152.0.7977.82"
+}

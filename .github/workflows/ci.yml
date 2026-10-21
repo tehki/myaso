@@ -34,6 +34,24 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      - name: Validate Graphics 3C Greyhaven environment materials
+        run: |
+          node --check src/browser/greyhaven-terrain-materials.mjs
+          node --check src/browser/greyhaven-atmosphere.mjs
+          node --check src/browser/authored-world-renderer.mjs
+          node --check tools/art/verify_greyhaven_3c_live_preview_browser.mjs
+          node --check tools/art/verify_alpha_blacksmith_approach_browser.mjs
+          node --check tools/art/verify_world493_graphics3c_armory_contract.mjs
+          node --check tools/art/verify_p0_armory_actual_art_seam.mjs
+          node --check tools/art/verify_p0_armory_graphics3c_composite_browser.mjs
+          node --check tools/art/diagnose_armory_world_first_frame_p0.mjs
+          node --check tools/art/verify_lowend_armory_webp_load_p0.mjs
+          node --check tools/art/verify_p0_world521_3c_building_replacement_browser.mjs
+          node --check tools/art/verify_p0_world521_3b481_3c_facade_browser.mjs
+          node --check tools/art/benchmark_p0_world521_3b481_3c_moving_camera_browser.mjs
+          node --check tools/art/profile_p0_world521_3c_cold_tile_phases_browser.mjs
+          node --test tests/greyhaven-environment-3c.test.mjs tests/greyhaven-environment-3c-culling.test.mjs tests/greyhaven-atmosphere-3c.test.mjs tests/authored-world.test.mjs tests/graphics3c-first-playable-alpha-contract.test.mjs tests/graphics3c-alpha-armory-approach.test.mjs tests/graphics3c-world521-replacement.test.mjs
+
       - name: Validate combat JavaScript
         run: |
           node --version

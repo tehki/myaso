@@ -1,0 +1,728 @@
+{
+  "chrome": "Chrome/152.0.7977.82",
+  "baselineHead": "ff74af212d606f4fb8aa11336cc5633dd54fe181",
+  "viewport": {
+    "width": 960,
+    "height": 600,
+    "dpr": 1
+  },
+  "device": {
+    "platform": "linux",
+    "release": "7.2.3-arch1-3",
+    "arch": "x64",
+    "cpu": "Intel(R) Core(TM) i3-2370M CPU @ 2.40GHz",
+    "browserGpuDisabled": true
+  },
+  "method": "Offline Canvas world.draw only; 72 sequential camera positions per route, forward then reverse (144 draw calls); includes synthetic city tile hops for worst-case cache churn; 3 fresh renderer runs per version in alternating order; NOT full game frame time",
+  "runs": [
+    {
+      "trial": 0,
+      "variant": "baseline",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 5.4,
+            "p95Ms": 14.2,
+            "maxMs": 14.2,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0,
+            "p95Ms": 0.2,
+            "maxMs": 0.3,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0,
+            "p95Ms": 0.2,
+            "maxMs": 14.2,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 11.2,
+            "p95Ms": 15.5,
+            "maxMs": 15.5,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.5,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 15.5,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 9.3,
+            "p95Ms": 10.6,
+            "maxMs": 10.6,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.2,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 10.6,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 7.8,
+            "p95Ms": 16.5,
+            "maxMs": 16.5,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0,
+            "p95Ms": 0.1,
+            "maxMs": 0.4,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0,
+            "p95Ms": 2.1,
+            "maxMs": 16.5,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    },
+    {
+      "trial": 0,
+      "variant": "candidate",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 7.8,
+            "p95Ms": 15.1,
+            "maxMs": 15.1,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.2,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 15.1,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 10.4,
+            "p95Ms": 18,
+            "maxMs": 18,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.6,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 18,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 7.5,
+            "p95Ms": 9,
+            "maxMs": 9,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.5,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 9,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 6.4,
+            "p95Ms": 13.6,
+            "maxMs": 13.6,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0.1,
+            "p95Ms": 0.1,
+            "maxMs": 0.3,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 1.6,
+            "maxMs": 13.6,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "candidate",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 5.6,
+            "p95Ms": 14.4,
+            "maxMs": 14.4,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0.1,
+            "p95Ms": 0.1,
+            "maxMs": 0.4,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 14.4,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 13.1,
+            "p95Ms": 21.5,
+            "maxMs": 21.5,
+            "drawCallsOver16_7": 2
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.7,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.3,
+            "maxMs": 21.5,
+            "drawCallsOver16_7": 2
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 5.9,
+            "p95Ms": 8.7,
+            "maxMs": 8.7,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.1,
+            "maxMs": 0.4,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 8.7,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 10.9,
+            "p95Ms": 19.8,
+            "maxMs": 19.8,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.6,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 3.1,
+            "maxMs": 19.8,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    },
+    {
+      "trial": 1,
+      "variant": "baseline",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 9.8,
+            "p95Ms": 28.2,
+            "maxMs": 28.2,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.4,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 28.2,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 19.5,
+            "p95Ms": 24.7,
+            "maxMs": 24.7,
+            "drawCallsOver16_7": 3
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.2,
+            "p95Ms": 0.3,
+            "maxMs": 2.5,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.2,
+            "p95Ms": 1,
+            "maxMs": 24.7,
+            "drawCallsOver16_7": 3
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 15.8,
+            "p95Ms": 24.3,
+            "maxMs": 24.3,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.3,
+            "maxMs": 1,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.3,
+            "maxMs": 24.3,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 7.5,
+            "p95Ms": 17,
+            "maxMs": 17,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.5,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 2.6,
+            "maxMs": 17,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "baseline",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 7.6,
+            "p95Ms": 11.5,
+            "maxMs": 11.5,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.2,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 11.5,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 15.2,
+            "p95Ms": 24.8,
+            "maxMs": 24.8,
+            "drawCallsOver16_7": 2
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 2.4,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.7,
+            "maxMs": 24.8,
+            "drawCallsOver16_7": 2
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 6.2,
+            "p95Ms": 9.9,
+            "maxMs": 9.9,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.7,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 9.9,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 12.3,
+            "p95Ms": 20.6,
+            "maxMs": 20.6,
+            "drawCallsOver16_7": 2
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.2,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 2.5,
+            "maxMs": 20.6,
+            "drawCallsOver16_7": 2
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    },
+    {
+      "trial": 2,
+      "variant": "candidate",
+      "status": 200,
+      "pageErrors": [],
+      "routes": {
+        "greyhaven-street": {
+          "cold": {
+            "n": 5,
+            "medianMs": 10.2,
+            "p95Ms": 15.7,
+            "maxMs": 15.7,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 139,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.6,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.3,
+            "maxMs": 15.7,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 5,
+          "totalTilesBuilt": 10,
+          "maxNew": 3,
+          "maxCached": 10
+        },
+        "greyhaven-market-chapel": {
+          "cold": {
+            "n": 4,
+            "medianMs": 10.5,
+            "p95Ms": 15.9,
+            "maxMs": 15.9,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 140,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.6,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 15.9,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 4,
+          "totalTilesBuilt": 12,
+          "maxNew": 3,
+          "maxCached": 12
+        },
+        "distant-grove": {
+          "cold": {
+            "n": 3,
+            "medianMs": 8.2,
+            "p95Ms": 8.9,
+            "maxMs": 8.9,
+            "drawCallsOver16_7": 0
+          },
+          "warm": {
+            "n": 141,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.3,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 8.9,
+            "drawCallsOver16_7": 0
+          },
+          "newFrames": 3,
+          "totalTilesBuilt": 8,
+          "maxNew": 3,
+          "maxCached": 8
+        },
+        "greyhaven-tile-hops": {
+          "cold": {
+            "n": 9,
+            "medianMs": 9.8,
+            "p95Ms": 17.9,
+            "maxMs": 17.9,
+            "drawCallsOver16_7": 1
+          },
+          "warm": {
+            "n": 135,
+            "medianMs": 0.1,
+            "p95Ms": 0.2,
+            "maxMs": 0.7,
+            "drawCallsOver16_7": 0
+          },
+          "all": {
+            "n": 144,
+            "medianMs": 0.1,
+            "p95Ms": 1.9,
+            "maxMs": 17.9,
+            "drawCallsOver16_7": 1
+          },
+          "newFrames": 9,
+          "totalTilesBuilt": 20,
+          "maxNew": 3,
+          "maxCached": 20
+        }
+      }
+    }
+  ],
+  "limits": {
+    "maxNewTilesPerDraw": 3,
+    "maxCacheTiles": 24
+  },
+  "status": "completed",
+  "acceptance": {
+    "targetDrawMs": 16.7,
+    "baselineDrawsOverBudget": 10,
+    "candidateDrawsOverBudget": 5,
+    "fullGameValidated": false,
+    "note": "Benchmark completion is not budget acceptance; any candidate draw over target keeps performance HOLD.",
+    "canvasBudgetMet": false
+  }
+}
