@@ -1,3 +1,4 @@
+import "./alpha-practice-link.test.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, statSync } from "node:fs";

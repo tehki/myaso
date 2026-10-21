@@ -1,1 +1,19 @@
 :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#171411;color:#e6ddce}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 78% 32%,#66341c66 0,transparent 40%),linear-gradient(130deg,#171411,#292018 70%,#13120f)}.page{width:min(1180px,calc(100% - 64px));margin:auto}.topbar{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff29;padding:28px 0}.brand{font-size:25px;font-weight:1000;letter-spacing:-1.5px}.brand span{color:#f38250}.phase,.eyebrow,.small{font-size:11px;font-weight:800;letter-spacing:.18em;color:#d9a97b}.hero{padding:8vh 0 11vh;max-width:900px}.hero h1{margin:24px 0 22px;font-size:clamp(68px,11vw,160px);font-weight:1000;letter-spacing:-.085em;line-height:.86}.hero h1 em{font-style:normal;color:#ed8a58}.intro{max-width:590px;font-size:clamp(16px,2vw,21px);line-height:1.65;color:#c8bcad}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}button{border:0;background:#f28c59;color:#1e1610;padding:19px 24px;font:800 13px inherit;font-weight:850;letter-spacing:.05em;cursor:pointer;min-height:57px}button span{margin-left:12px}button:focus-visible,a:focus-visible{outline:3px solid #ffe3ae;outline-offset:3px}button:hover:not(:disabled){filter:brightness(1.14)}button:disabled{opacity:.4;cursor:not-allowed}.secondary{background:transparent;color:#e6ddce;border:1px solid #766052}.status,.share-status{color:#ddaa81;font-size:13px;min-height:1.2em}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;border-top:1px solid #ffffff29;padding-top:26px}.details article{padding:18px 0}.details strong{display:block;font-size:20px;margin:18px 0 8px}.details p{font-size:14px;color:#baab9b;line-height:1.7;max-width:280px}footer{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:26px 0;border-top:1px solid #ffffff29;color:#a99c8c;font-size:12px}footer a{color:#efa577;text-decoration:none;white-space:nowrap}@media(max-width:720px){.page{width:calc(100% - 32px)}.hero{padding:12vh 0}.hero h1{font-size:clamp(65px,13vw,95px)}.details{grid-template-columns:1fr}.details article{border-bottom:1px solid #ffffff18}.topbar{gap:12px}.phase{font-size:9px;text-align:right}footer{align-items:flex-start;flex-direction:column}}
+/* U2: a visible, always-available practice path when multiplayer is gated. */
+.actions .practice-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 57px;
+  padding: 15px 24px;
+  border: 1px solid #d49b70;
+  color: #f6e1cc;
+  background: #2d211b;
+  text-decoration: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .05em;
+}
+.actions .practice-link:hover { background: #473025; }
+.actions .practice-link:focus-visible { outline: 3px solid #ffe3ae; outline-offset: 3px; }
