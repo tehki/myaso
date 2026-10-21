@@ -5,6 +5,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod alpha_armory_mapping_preflight;
 pub mod alpha_mainhand_snapshot;
 pub mod alpha_pickup_ack_proof;
 pub mod identity;
