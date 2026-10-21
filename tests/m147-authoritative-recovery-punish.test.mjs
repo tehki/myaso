@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyM147AuthoritativeRecoveryPunish } from "../scripts/m147-authoritative-recovery-punish.mjs";
@@ -54,4 +55,21 @@ test("M147 server tick-window proof survives genuine u32 wrap and rejects overlo
   assert.equal(verify(wrap, { ...valid, recoveryTick: 4294967294, cueTick: 4294967294, idleTick: 15 }).hitTick, 2);
   const longWindow = wrap.replace("tick=15 fighter=1", "tick=100 fighter=1");
   assert.throws(() => verify(longWindow, { ...valid, recoveryTick: 4294967294, cueTick: 4294967294, idleTick: 100 }), /outside server-owned/);
+});
+
+// Source-order regression: maintain genuine single native W3C input AFTER
+// the current rendered recovery cue, not a synthetic client/server hit.
+test("M147 uses one genuine sub-heavy 45ms Firefox light from rendered cue with server HIT proof", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = runner.indexOf("async function runOnlineUiJumpRecoveryFfaPunishFlight(");
+  const end = runner.indexOf("async function runOnlineUiMultiRecoveryFfaFocusFlight(", start);
+  assert.ok(start >= 0 && end > start);
+  const flight = runner.slice(start, end);
+  assert.match(flight, /performPunish: \(\) => performArenaM221GuardBreakClick\(observer, 45\)/);
+  assert.doesNotMatch(flight, /performArenaM221GuardBreakClick\(observer, 90\)/);
+  assert.match(flight, /const recoveryCue = observed\.cue/);
+  assert.match(flight, /verifyM147AuthoritativeRecoveryPunish\(/);
+  assert.match(flight, /const punishDowns = punishPointers\.filter/);
+  assert.match(flight, /real Firefox light did not damage selected jump-recovery target/);
+  assert.doesNotMatch(flight, /dispatchEvent\(|\.click\(\)/);
 });

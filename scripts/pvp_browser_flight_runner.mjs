@@ -11236,7 +11236,14 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
         args: [cueLease.token, jumpId, observerRecoveryOffset],
       }),
       performJump: () => performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
-      performPunish: () => performArenaM221GuardBreakClick(observer, 90),
+      // M147 strict server-tick acceptance on #39639154965 attempt2 and
+      // joint #39642622311 proved the 90ms LMB first upgrades to heavy
+      // windup (action 9), then only later enters light windup (action 1).
+      // Its 34HP hit therefore landed AFTER the 18-tick jump recovery.
+      // One authentic 45ms W3C short click (proven under the M144 <80ms
+      // classifier) avoids the unintended heavy and preserves enough actual
+      // hold for the 30Hz input sampler. Do not change the server window.
+      performPunish: () => performArenaM221GuardBreakClick(observer, 45),
     });
   } catch (error) {
     throw new Error(`${milestone}: ${error.message}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`,
