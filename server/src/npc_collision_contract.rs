@@ -46,11 +46,15 @@ pub struct Collider {
 
 impl Collider {
     fn expanded_contains(self, x: i32, y: i32, clearance: i32) -> bool {
-        // Constructor validates 32-bit coordinate/width constraints before use.
-        x >= self.x - clearance
-            && x <= self.x + self.width + clearance
-            && y >= self.y - clearance
-            && y <= self.y + self.height + clearance
+        // A valid bounded pilot window can still approach i32::MAX. Expand
+        // collider edges in i64 so a near-edge obstacle can never panic or
+        // wrap through the opposite side of the navigation window.
+        let (x, y) = (i64::from(x), i64::from(y));
+        let clearance = i64::from(clearance);
+        x >= i64::from(self.x) - clearance
+            && x <= i64::from(self.x) + i64::from(self.width) + clearance
+            && y >= i64::from(self.y) - clearance
+            && y <= i64::from(self.y) + i64::from(self.height) + clearance
     }
 }
 
@@ -260,15 +264,23 @@ impl CollisionWindow {
             }
             let (x, y) = self.grid_position(index);
             for (dx, dy, step) in STEPS {
-                let (next_x, next_y) = (x + dx * GRID_STEP, y + dy * GRID_STEP);
+                // Bounds are validated, but stepping *outside* a valid
+                // window near i32::MAX must not overflow before the grid
+                // bounds check has a chance to reject the candidate.
+                let (Some(next_x), Some(next_y)) = (
+                    x.checked_add(dx * GRID_STEP),
+                    y.checked_add(dy * GRID_STEP),
+                ) else {
+                    continue;
+                };
                 let Some(neighbor) = self.grid_index(next_x, next_y) else {
                     continue;
                 };
                 if self.contains_obstacle(next_x, next_y)
                     || (dx != 0
                         && dy != 0
-                        && (self.contains_obstacle(x + dx * GRID_STEP, y)
-                            || self.contains_obstacle(x, y + dy * GRID_STEP)))
+                        && (self.contains_obstacle(next_x, y)
+                            || self.contains_obstacle(x, next_y)))
                 {
                     continue;
                 }
@@ -558,6 +570,50 @@ mod tests {
             nav.plan((4250, 4050), (4400, 4050)).unwrap_err(),
             NavigationError::Unreachable
         );
+    }
+
+    #[test]
+    fn pilot_extreme_valid_coordinates_are_panic_free_and_never_wrap() {
+        // Valid 11x11-cell pilot windows may sit at i32::MAX even though
+        // the actual opt-in NPC fixture currently uses small coordinates.
+        // Constructor validity must imply safe collision checks and routes.
+        let bounds = NavBounds {
+            min_x: i32::MAX - 50,
+            min_y: i32::MAX - 50,
+            max_x: i32::MAX,
+            max_y: i32::MAX,
+        };
+        let edge_wall = Collider {
+            x: i32::MAX - 25,
+            y: i32::MAX - 25,
+            width: 25,
+            height: 25,
+        };
+        let blocked = CollisionWindow::pilot(bounds, &[edge_wall]).unwrap();
+        assert!(blocked.contains_obstacle(i32::MAX - 20, i32::MAX - 20));
+        assert!(!blocked.contains_obstacle(i32::MAX - 40, i32::MAX - 40));
+        assert_eq!(
+            blocked
+                .plan(
+                    (i32::MAX - 20, i32::MAX - 20),
+                    (i32::MAX - 50, i32::MAX - 50)
+                )
+                .unwrap_err(),
+            NavigationError::BlockedEndpoint
+        );
+
+        let open = CollisionWindow::pilot(bounds, &[]).unwrap();
+        let from = (i32::MAX, i32::MAX);
+        let goal = (i32::MAX - 50, i32::MAX - 50);
+        let route = open.plan(from, goal).unwrap();
+        assert_eq!(route.first().copied(), Some(from));
+        assert_eq!(route.last().copied(), Some(goal));
+        assert!(route
+            .iter()
+            .all(|&(x, y)| x >= bounds.min_x && y >= bounds.min_y
+                && x <= bounds.max_x && y <= bounds.max_y));
+        // The upper boundary is valid; a north/east expansion from it
+        // must simply be rejected rather than overflowing an i32.
     }
 
     #[test]
