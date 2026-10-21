@@ -14,12 +14,15 @@ use crate::magic::{EmberEffectStatus, MagicAuthority};
 use crate::magic_checkpoint::{
     resolve_ember_without_damage, EmberNoEffectDecision, JointCheckpointError,
 };
-use crate::simulation::{Action, Fighter};
+use crate::simulation::{Action, Fighter, World};
 use crate::zone::ZoneAuthority;
 
 #[derive(Debug)]
 pub enum CombatInterruptionError {
     UnverifiedSession,
+    StaleWorldTick,
+    InvalidWorldTime,
+    MissingWorldFighter,
     WrongFighter,
     MissingInventory,
     MissingIntent,
@@ -116,6 +119,56 @@ pub fn record_ember_combat_interruption(
     Ok(outcome)
 }
 
+/// A narrow, non-activated Combat-to-Magic handoff. A trusted Core
+/// world-writer must provide the exact completed World tick and serialized
+/// session/zone/loot snapshot. These fields are never sourced from packets.
+pub struct WorldCombatInterruption<'a> {
+    pub lease: SessionLease,
+    pub sequence: u64,
+    pub world: &'a World,
+    pub completed_tick: u32,
+}
+
+/// Resolve the Fighter from the actual completed World, never an externally
+/// constructed Fighter snapshot. Only a Combat-produced stun, knockdown or
+/// death may close a paid Ember intent; reading the World grants no damage.
+/// Core's world epoch fencing and durable Combat/HP transaction are still
+/// mandatory before this can be called from a live multiplayer handler.
+pub fn record_world_ember_combat_interruption(
+    path: &Path,
+    loot: &LootAuthority,
+    magic: &mut MagicAuthority,
+    identity: &SessionIdentityRegistry,
+    zones: &ZoneAuthority,
+    tick: WorldCombatInterruption<'_>,
+) -> Result<EmberEffectStatus, CombatInterruptionError> {
+    if tick.completed_tick == 0 || tick.world.tick != tick.completed_tick {
+        return Err(CombatInterruptionError::StaleWorldTick);
+    }
+    if !tick.world.now_ms.is_finite()
+        || tick.world.now_ms < 0.0
+        || tick.world.now_ms >= u64::MAX as f32
+    {
+        return Err(CombatInterruptionError::InvalidWorldTime);
+    }
+    let fighter = tick
+        .world
+        .fighter(tick.lease.server_session())
+        .ok_or(CombatInterruptionError::MissingWorldFighter)?;
+    record_ember_combat_interruption(
+        path,
+        loot,
+        magic,
+        identity,
+        zones,
+        CombatInterruption {
+            lease: tick.lease,
+            sequence: tick.sequence,
+            fighter,
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,6 +237,172 @@ mod tests {
             sequence: 30,
             fighter,
         }
+    }
+
+    #[test]
+    fn real_combat_kick_interrupts_pending_ember_without_refunding_on_replay() {
+        use crate::simulation::InputIntent;
+
+        let (loot, mut magic, identity, zones, hero, _) = fixture();
+        magic.spend_mana(hero, 15).unwrap();
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 241.0, 200.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                kick: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..7 {
+            world.step_by(35.0);
+            if world.fighter(1).unwrap().action == Action::Knockdown {
+                break;
+            }
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::Knockdown);
+        let checkpoint = path();
+        let result = record_world_ember_combat_interruption(
+            &checkpoint,
+            &loot,
+            &mut magic,
+            &identity,
+            &zones,
+            WorldCombatInterruption {
+                lease: SessionLease::new(1, 1).unwrap(),
+                sequence: 30,
+                world: &world,
+                completed_tick: world.tick,
+            },
+        );
+        assert!(matches!(result, Ok(EmberEffectStatus::Interrupted)));
+        assert_eq!(magic.mana(hero), 85);
+        let (_, recovered) = load_joint(&checkpoint).unwrap();
+        assert_eq!(recovered.mana(hero), 85);
+        assert_eq!(recovered.pending_ember_intents().count(), 0);
+        assert_eq!(
+            recovered.ember_intent(hero, 30).unwrap().status,
+            EmberEffectStatus::Interrupted
+        );
+        assert!(matches!(
+            record_world_ember_combat_interruption(
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldCombatInterruption {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 30,
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(CombatInterruptionError::IntentAlreadyResolved)
+        ));
+        let _ = fs::remove_file(&checkpoint);
+    }
+
+    #[test]
+    fn world_interruption_rejects_untrusted_tick_and_never_cancels_idle_cast() {
+        let (loot, mut magic, identity, zones, hero, _) = fixture();
+        let mut world = World::new(800.0, 600.0);
+        world.add_player_at(1, 200.0, 200.0, 0.0);
+        world.step();
+        let checkpoint = path();
+        for completed_tick in [0, world.tick + 1] {
+            assert!(matches!(
+                record_world_ember_combat_interruption(
+                    &checkpoint,
+                    &loot,
+                    &mut magic,
+                    &identity,
+                    &zones,
+                    WorldCombatInterruption {
+                        lease: SessionLease::new(1, 1).unwrap(),
+                        sequence: 30,
+                        world: &world,
+                        completed_tick,
+                    },
+                ),
+                Err(CombatInterruptionError::StaleWorldTick)
+            ));
+        }
+        let mut missing = World::new(800.0, 600.0);
+        missing.step();
+        assert!(matches!(
+            record_world_ember_combat_interruption(
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldCombatInterruption {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 30,
+                    world: &missing,
+                    completed_tick: missing.tick,
+                },
+            ),
+            Err(CombatInterruptionError::MissingWorldFighter)
+        ));
+        for invalid in [f32::NAN, -1.0, f32::INFINITY, f32::MAX] {
+            let mut bad = world.clone();
+            bad.now_ms = invalid;
+            assert!(matches!(
+                record_world_ember_combat_interruption(
+                    &checkpoint,
+                    &loot,
+                    &mut magic,
+                    &identity,
+                    &zones,
+                    WorldCombatInterruption {
+                        lease: SessionLease::new(1, 1).unwrap(),
+                        sequence: 30,
+                        world: &bad,
+                        completed_tick: bad.tick,
+                    },
+                ),
+                Err(CombatInterruptionError::InvalidWorldTime)
+            ));
+        }
+        assert!(matches!(
+            record_world_ember_combat_interruption(
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldCombatInterruption {
+                    lease: SessionLease::new(1, 2).unwrap(),
+                    sequence: 30,
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(CombatInterruptionError::UnverifiedSession)
+        ));
+        assert!(matches!(
+            record_world_ember_combat_interruption(
+                &checkpoint,
+                &loot,
+                &mut magic,
+                &identity,
+                &zones,
+                WorldCombatInterruption {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 30,
+                    world: &world,
+                    completed_tick: world.tick,
+                },
+            ),
+            Err(CombatInterruptionError::NotInterrupted)
+        ));
+        assert!(magic.ember_intent(hero, 30).is_some());
+        assert_eq!(magic.pending_ember_intents().count(), 1);
+        assert!(!checkpoint.exists());
     }
 
     #[test]
