@@ -2,6 +2,11 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
+    living_world::{self, DialogueSession},
+    npc_navigation,
+    npc_routines::{NpcRoutines, STATE_INTERVAL_TICKS},
+    npc_supply::NpcSupplyWorld,
+    npc_worksites,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -108,6 +113,8 @@ struct GameState {
     flight_background_ids: Vec<u32>,
     kill_events: VecDeque<KillEventPacket>,
     next_kill_event_sequence: u32,
+    npc_routines: Option<NpcRoutines>,
+    npc_supply: Option<NpcSupplyWorld>,
 }
 
 impl GameState {
@@ -139,6 +146,8 @@ impl GameState {
             flight_background_ids,
             kill_events: VecDeque::with_capacity(MAX_KILL_EVENT_HISTORY),
             next_kill_event_sequence: 0,
+            npc_routines: None,
+            npc_supply: None,
         }
     }
 
@@ -178,6 +187,11 @@ impl GameState {
                 victim: *fighter,
             };
             self.next_kill_event_sequence = self.next_kill_event_sequence.wrapping_add(1);
+            if let (Some(routines), Some(victim)) =
+                (self.npc_routines.as_mut(), self.world.fighter(*fighter))
+            {
+                routines.witness_death(self.world.tick, victim.x, victim.y);
+            }
             self.kill_events.push_back(packet);
             while self.kill_events.len() > MAX_KILL_EVENT_HISTORY {
                 self.kill_events.pop_front();
@@ -205,18 +219,25 @@ struct SharedGame {
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    npc_pilot_enabled: bool,
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, npc_pilot_enabled: bool) -> Arc<Self> {
         Arc::new(Self {
-            state: Mutex::new(GameState::new(
-                flight.background_players,
-                flight.near_pressure_players,
-            )),
+            state: Mutex::new({
+                let mut state =
+                    GameState::new(flight.background_players, flight.near_pressure_players);
+                if npc_pilot_enabled {
+                    state.npc_routines = Some(NpcRoutines::default());
+                    state.npc_supply = Some(NpcSupplyWorld::default());
+                }
+                state
+            }),
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            npc_pilot_enabled,
         })
     }
 
@@ -280,7 +301,44 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
+    // The pilot is deliberately loopback-only until stable identities,
+    // retention, moderation and verified world-state actions are available.
+    let npc_pilot_enabled = match env::var("MYASO_NPC_PILOT") {
+        Ok(value) => parse_npc_pilot(Some(&value), bind)?,
+        Err(env::VarError::NotPresent) => parse_npc_pilot(None, bind)?,
+        Err(error) => bail!("MYASO_NPC_PILOT is invalid: {error}"),
+    };
+    // The maintenance fixture is a separate explicit flag. Never allow it
+    // without the existing loopback-only pilot gate.
+    let npc_maintenance_enabled = match env::var("MYASO_NPC_MAINTENANCE") {
+        Ok(value) => parse_npc_maintenance(Some(&value), npc_pilot_enabled)?,
+        Err(env::VarError::NotPresent) => parse_npc_maintenance(None, npc_pilot_enabled)?,
+        Err(error) => bail!("MYASO_NPC_MAINTENANCE is invalid: {error}"),
+    };
+    let npc_detour_enabled = match env::var("MYASO_NPC_GUARD_DETOUR") {
+        Ok(value) => parse_guard_detour(Some(&value), npc_pilot_enabled, npc_maintenance_enabled)?,
+        Err(env::VarError::NotPresent) => {
+            parse_guard_detour(None, npc_pilot_enabled, npc_maintenance_enabled)?
+        }
+        Err(error) => bail!("MYASO_NPC_GUARD_DETOUR is invalid: {error}"),
+    };
+    let game = SharedGame::new(flight, npc_pilot_enabled);
+    if npc_detour_enabled {
+        let mut state = game.state.lock().await;
+        state
+            .npc_routines
+            .as_mut()
+            .expect("pilot required for detours")
+            .enable_pilot_guard_detours();
+    }
+    if npc_maintenance_enabled {
+        let mut state = game.state.lock().await;
+        state
+            .npc_supply
+            .as_mut()
+            .expect("pilot required for maintenance")
+            .enable_pilot_maintenance();
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -370,6 +428,42 @@ fn parse_player_cap(raw: Option<&str>) -> Result<usize> {
     }
     Ok(count)
 }
+fn parse_npc_pilot(raw: Option<&str>, bind: SocketAddr) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_PILOT must be 0 or 1"),
+    };
+    if enabled && !bind.ip().is_loopback() {
+        bail!("NPC pilot is loopback-only and cannot be enabled on a public bind");
+    }
+    Ok(enabled)
+}
+
+fn parse_npc_maintenance(raw: Option<&str>, npc_pilot_enabled: bool) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_MAINTENANCE must be 0 or 1"),
+    };
+    if enabled && !npc_pilot_enabled {
+        bail!("NPC maintenance requires an enabled loopback NPC pilot");
+    }
+    Ok(enabled)
+}
+
+fn parse_guard_detour(raw: Option<&str>, pilot: bool, maintenance: bool) -> Result<bool> {
+    let enabled = match raw {
+        None | Some("0") => false,
+        Some("1") => true,
+        Some(_) => bail!("MYASO_NPC_GUARD_DETOUR must be 0 or 1"),
+    };
+    if enabled && !(pilot && maintenance) {
+        bail!("NPC guard detour requires loopback pilot and maintenance fixture");
+    }
+    Ok(enabled)
+}
+
 fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig> {
     let background_players = env::var("MYASO_FLIGHT_BACKGROUND_PLAYERS")
         .ok()
@@ -512,6 +606,35 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
             }
         }
         state.record_combat_events(&events);
+        let tick = state.world.tick;
+        if let Some(supply) = state.npc_supply.as_mut() {
+            supply.advance(tick);
+        }
+        // NPC movement consumes the exact committed stock/worksite revision
+        // from this authoritative tick, before proximity-based social checks.
+        {
+            let GameState {
+                npc_routines,
+                npc_supply,
+                ..
+            } = &mut *state;
+            if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
+                routines.advance_pilot_movement(tick, supply);
+            }
+        }
+        if let Some(routines) = state.npc_routines.as_mut() {
+            routines.advance_social(tick);
+        }
+        {
+            let GameState {
+                npc_routines,
+                npc_supply,
+                ..
+            } = &mut *state;
+            if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref()) {
+                routines.advance_worksite_social(tick, supply);
+            }
+        }
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
         }
@@ -533,7 +656,7 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
+    let (mut reliable_send, mut reliable_recv) = connection
         .accept_bi()
         .await
         .context("accept reliable game stream")?;
@@ -573,10 +696,86 @@ async fn handle_connection(
         &initial_baseline.bytes,
     )
     .await?;
+    let mut last_worksite_revision = 0_u32;
+    if game.npc_pilot_enabled {
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &living_world::roster_packet(),
+        )
+        .await?;
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &npc_navigation::obstacle_packet(),
+        )
+        .await?;
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &npc_worksites::packet(),
+        )
+        .await?;
+        let initial_worksite_status = {
+            let state = game.state.lock().await;
+            state
+                .npc_supply
+                .as_ref()
+                .expect("pilot supply initialized")
+                .worksite_status_packet()
+        };
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &initial_worksite_status,
+        )
+        .await?;
+        // Save the *exact* revision sent on this connection. A future
+        // server update during connection setup must not be silently skipped.
+        last_worksite_revision = u32::from_le_bytes(
+            initial_worksite_status[4..8]
+                .try_into()
+                .expect("four revision bytes"),
+        );
+        let initial_npc_frame = {
+            let state = game.state.lock().await;
+            state
+                .npc_routines
+                .as_ref()
+                .expect("pilot routines initialized")
+                .state_packet_with_supply(
+                    state.world.tick,
+                    state.npc_supply.as_ref().expect("pilot supply initialized"),
+                )
+        };
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &initial_npc_frame,
+        )
+        .await?;
+        let initial_supply = {
+            let state = game.state.lock().await;
+            state
+                .npc_supply
+                .as_ref()
+                .expect("pilot supply initialized")
+                .packet(state.world.tick)
+        };
+        send_reliable_frame(
+            &mut reliable_send,
+            &mut reliable_frame_buffer,
+            &initial_supply,
+        )
+        .await?;
+    }
     let initial_baseline_sequence = initial_baseline.sequence;
     let mut acknowledged_snapshot = u16::MAX;
     let mut realtime_ready = false;
     let mut last_reliable_background_tick = initial_frame.server_tick();
+    let mut last_npc_state_tick = initial_frame.server_tick();
+    let mut last_npc_supply_tick = initial_frame.server_tick();
+    let mut last_worksite_status_check_tick = initial_frame.server_tick();
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
@@ -594,11 +793,197 @@ async fn handle_connection(
         }
         Ok::<(), anyhow::Error>(())
     });
+    // The reliable reader owns framing, independent of snapshot ticks. Reading
+    // a partial frame inside select! would be cancellation-unsafe.
+    let mut npc_reader = if game.npc_pilot_enabled {
+        let world = Arc::clone(&game);
+        let reply_tx = reliable_tx.clone();
+        Some(tokio::spawn(async move {
+            let mut dialogue = DialogueSession::default();
+            let mut last_spoken = None;
+            loop {
+                let mut header = [0_u8; 2];
+                reliable_recv
+                    .read_exact(&mut header)
+                    .await
+                    .context("read NPC frame header")?;
+                let length = usize::from(u16::from_le_bytes(header));
+                if !(6..=living_world::MAX_WIRE_BYTES).contains(&length) {
+                    bail!("invalid NPC frame length");
+                }
+                let mut payload = vec![0_u8; length];
+                reliable_recv
+                    .read_exact(&mut payload)
+                    .await
+                    .context("read NPC frame body")?;
+                let (npc_id, utterance) = match living_world::decode_request(&payload) {
+                    Ok(request) => request,
+                    Err(_) => bail!("invalid NPC request"),
+                };
+                let now = tokio::time::Instant::now();
+                let throttled = last_spoken.is_some_and(|last: tokio::time::Instant| {
+                    now.duration_since(last) < Duration::from_millis(850)
+                });
+                // No chat bodies, nicknames or prompts are written to logs or disk.
+                let reply = if throttled {
+                    living_world::response_packet(npc_id, 1, "Please allow me a moment.")
+                } else {
+                    last_spoken = Some(now);
+                    let viewer = {
+                        let state = world.state.lock().await;
+                        let report = state
+                            .npc_supply
+                            .as_ref()
+                            .and_then(|stock| stock.report(npc_id));
+                        let completed_work = state
+                            .npc_supply
+                            .as_ref()
+                            .and_then(|supply| supply.recent_completed_work(state.world.tick));
+                        let worksite_report = state
+                            .npc_supply
+                            .as_ref()
+                            .map(|supply| supply.worksite_report(state.world.tick));
+                        let settlement_needs = state
+                            .npc_supply
+                            .as_ref()
+                            .map(|supply| supply.needs_report());
+                        let planned_work = state
+                            .npc_supply
+                            .as_ref()
+                            .filter(|_| matches!(npc_id, 2 | 4 | 5))
+                            .map(|supply| supply.decision(npc_id).description());
+                        let context = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.context_with_supply(npc_id, state.world.tick, supply)
+                            })
+                        });
+                        let heard_from = state
+                            .npc_routines
+                            .as_ref()
+                            .and_then(|routines| routines.rumor_source(npc_id, state.world.tick));
+                        let acquaintance = state.npc_routines.as_ref().and_then(|routines| {
+                            routines.recent_acquaintance(npc_id, state.world.tick)
+                        });
+                        let guard_watch = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.guard_watch_report(npc_id, state.world.tick, supply)
+                            })
+                        });
+                        let worksite_hearsay = state.npc_routines.as_ref().and_then(|routines| {
+                            state.npc_supply.as_ref().and_then(|supply| {
+                                routines.worksite_social_report(
+                                    npc_id,
+                                    state.world.tick,
+                                    supply.worksite_revision(),
+                                )
+                            })
+                        });
+                        state.world.fighter(player_id).map(|fighter| {
+                            let npc = state.npc_routines.as_ref().and_then(|routines| {
+                                routines
+                                    .speaking_target(
+                                        npc_id,
+                                        state.world.tick,
+                                        fighter.x,
+                                        fighter.y,
+                                        fighter.action != myaso_server::simulation::Action::Dead,
+                                    )
+                                    .ok()
+                            });
+                            (
+                                npc,
+                                context,
+                                report,
+                                completed_work,
+                                worksite_report,
+                                settlement_needs,
+                                planned_work,
+                                heard_from,
+                                acquaintance,
+                                worksite_hearsay,
+                                guard_watch,
+                            )
+                        })
+                    };
+                    match viewer {
+                        Some((
+                            npc,
+                            context,
+                            report,
+                            completed_work,
+                            worksite_report,
+                            settlement_needs,
+                            planned_work,
+                            heard_from,
+                            acquaintance,
+                            worksite_hearsay,
+                            guard_watch,
+                        )) => match npc {
+                            Some(npc) => {
+                                let (activity, witnessed) = context.unwrap_or(("working", false));
+                                living_world::response_packet(
+                                    npc_id,
+                                    0,
+                                    &living_world::answer_with_relations(
+                                        &mut dialogue,
+                                        npc,
+                                        utterance,
+                                        activity,
+                                        witnessed,
+                                        report.as_deref(),
+                                        living_world::SocialFacts {
+                                            heard_from,
+                                            acquaintance,
+                                            completed_work: completed_work.as_deref(),
+                                            worksite_report: worksite_report.as_deref(),
+                                            settlement_needs: settlement_needs.as_deref(),
+                                            planned_work,
+                                            worksite_hearsay: worksite_hearsay.as_deref(),
+                                            guard_watch: guard_watch.as_deref(),
+                                        },
+                                    ),
+                                )
+                            }
+                            None => living_world::response_packet(
+                                npc_id,
+                                1,
+                                "Move closer with a clear line of sight to this NPC.",
+                            ),
+                        },
+                        None => living_world::response_packet(npc_id, 1, "Player unavailable."),
+                    }
+                };
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    reply_tx.send(ReliablePayload::Bytes(reply)),
+                )
+                .await
+                .context("NPC reply send timed out")?
+                .map_err(|_| anyhow::anyhow!("NPC reply writer unavailable"))?;
+            }
+            #[allow(unreachable_code)]
+            Ok::<(), anyhow::Error>(())
+        }))
+    } else {
+        None
+    };
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
+            reader_result = async {
+                match &mut npc_reader {
+                    Some(task) => task.await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                match reader_result {
+                    Ok(Ok(())) => bail!("NPC reader ended unexpectedly"),
+                    Ok(Err(error)) => return Err(error),
+                    Err(error) => bail!("NPC reader task failed: {error}"),
+                }
+            }
             writer_result = &mut reliable_writer => {
                 match writer_result {
                     Ok(Ok(())) => bail!("reliable writer ended unexpectedly"),
@@ -793,6 +1178,68 @@ async fn handle_connection(
                         }
                     }
                 }
+                // Best effort, only after combat kill notifications and reliable
+                // snapshot recovery had first opportunity to reserve the queue.
+                if game.npc_pilot_enabled
+                    && server_tick.wrapping_sub(last_npc_state_tick) >= STATE_INTERVAL_TICKS
+                {
+                    let npc_frame = {
+                        let state = game.state.lock().await;
+                        state.npc_routines.as_ref().expect("pilot routines initialized")
+                            .state_packet_with_supply(
+                            state.world.tick,
+                            state.npc_supply.as_ref().expect("pilot supply initialized"),
+                        )
+                    };
+                    match try_enqueue_reliable(&reliable_tx, || {
+                        ReliablePayload::Bytes(npc_frame)
+                    }) {
+                        Ok(true) => last_npc_state_tick = server_tick,
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => bail!("NPC state writer unavailable"),
+                    }
+                }
+                // Supply snapshots are point-in-time, low-priority and small.
+                // If a combat/recovery/NPC frame occupies the bounded queue,
+                // retry the next snapshot tick, never block combat simulation.
+                if game.npc_pilot_enabled
+                    && !kill_event_queued
+                    && server_tick.wrapping_sub(last_npc_supply_tick) >= STATE_INTERVAL_TICKS
+                {
+                    let supply_frame = {
+                        let state = game.state.lock().await;
+                        state.npc_supply.as_ref().expect("pilot supply initialized")
+                            .packet(state.world.tick)
+                    };
+                    match try_enqueue_reliable(&reliable_tx, || {
+                        ReliablePayload::Bytes(supply_frame)
+                    }) {
+                        Ok(true) => last_npc_supply_tick = server_tick,
+                        Ok(false) => {}
+                        Err(ReliableQueueError::Closed) => bail!("NPC supply writer unavailable"),
+                    }
+                }
+                // Low-priority pilot-only site availability changes. Only check
+                // once per second, after combat recovery and supply frames have
+                // had first chance to reserve the bounded reliable queue.
+                // Retry a changed revision on backpressure; never roll back.
+                if game.npc_pilot_enabled && !kill_event_queued
+                    && server_tick.wrapping_sub(last_worksite_status_check_tick) >= STATE_INTERVAL_TICKS
+                {
+                    last_worksite_status_check_tick = server_tick;
+                    let status = {
+                        let state = game.state.lock().await;
+                        let supply = state.npc_supply.as_ref().expect("pilot supply initialized");
+                        (supply.worksite_revision(), supply.worksite_status_packet())
+                    };
+                    if status.0 > last_worksite_revision {
+                        match try_enqueue_reliable(&reliable_tx, || ReliablePayload::Bytes(status.1.to_vec())) {
+                            Ok(true) => last_worksite_revision = status.0,
+                            Ok(false) => {}
+                            Err(ReliableQueueError::Closed) => bail!("NPC worksite status writer unavailable"),
+                        }
+                    }
+                }
                 if let Some(client_tick) = safe_input_ack {
                     connection
                         .send_datagram(encode_input_ack(client_tick, server_tick, player_id))
@@ -911,6 +1358,377 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn first_playable_alpha_has_no_npc_state_without_explicit_loopback_opt_in() {
+        let public_v4: SocketAddr = "0.0.0.0:4433".parse().unwrap();
+        let public_v6: SocketAddr = "[::]:4433".parse().unwrap();
+        let loopback_v4: SocketAddr = "127.0.0.1:4433".parse().unwrap();
+        let loopback_v6: SocketAddr = "[::1]:4433".parse().unwrap();
+        // Real First Playable multiplayer uses non-loopback addressing;
+        // no NPC-related variable should be needed for normal operation.
+        for bind in [public_v4, public_v6, loopback_v4, loopback_v6] {
+            assert!(!parse_npc_pilot(None, bind).unwrap());
+            assert!(!parse_npc_pilot(Some("0"), bind).unwrap());
+        }
+        for bind in [public_v4, public_v6] {
+            assert!(parse_npc_pilot(Some("1"), bind).is_err());
+        }
+        assert!(parse_npc_pilot(Some("1"), loopback_v4).unwrap());
+        assert!(parse_npc_pilot(Some("1"), loopback_v6).unwrap());
+        assert!(!parse_npc_maintenance(None, false).unwrap());
+        assert!(!parse_guard_detour(None, false, false).unwrap());
+        assert!(parse_npc_maintenance(Some("1"), false).is_err());
+        assert!(parse_guard_detour(Some("1"), false, false).is_err());
+        assert!(parse_guard_detour(Some("1"), true, false).is_err());
+
+        let baseline = SharedGame::new(
+            LoopbackFlightConfig {
+                background_players: 0,
+                near_pressure_players: 0,
+                reliable_write_delay: Duration::ZERO,
+                drop_new_action_datagrams: false,
+            },
+            false,
+        );
+        assert!(!baseline.npc_pilot_enabled);
+        let state = baseline.state.lock().await;
+        assert!(state.npc_routines.is_none());
+        assert!(state.npc_supply.is_none());
+        assert_eq!(state.world.fighters().len(), 0);
+        assert_eq!(state.replication_frame.server_tick(), 0);
+    }
+
+    #[tokio::test]
+    async fn first_playable_combat_and_replication_are_identical_with_npc_pilot_off() {
+        assert_first_playable_npc_combat_isolation(2).await;
+    }
+
+    #[tokio::test]
+    async fn first_playable_four_players_stay_authoritative_with_npc_pilot_off() {
+        // The first integrated alpha targets four independent player slots,
+        // with optional NPCs incapable of claiming a fighter identity.
+        assert_first_playable_npc_combat_isolation(4).await;
+    }
+
+    async fn assert_first_playable_npc_combat_isolation(player_count: usize) {
+        assert!(player_count == 2 || player_count == 4);
+        // A direct alpha compatibility comparison: identical real server
+        // player inputs with an NPC pilot disabled/enabled locally must
+        // produce identical combat events, fighters, and replication ticks.
+        // No fake NPC fighter may appear on either side.
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let baseline = SharedGame::new(flight, false);
+        let pilot = SharedGame::new(flight, true);
+        let mut normal = baseline.state.lock().await;
+        let mut npc = pilot.state.lock().await;
+        for state in [&mut *normal, &mut *npc] {
+            assert!(state.world.add_player_at(11, 130.0, 120.0, 0.0));
+            assert!(state.world.add_player_at(12, 162.0, 120.0, 0.0));
+            if player_count == 4 {
+                assert!(state.world.add_player_at(13, 430.0, 280.0, 0.0));
+                assert!(state
+                    .world
+                    .add_player_at(14, 462.0, 280.0, std::f32::consts::PI));
+            }
+        }
+        let mut normal_events = Vec::new();
+        let mut npc_events = Vec::new();
+        for step in 0..600 {
+            let move_x = if step % 240 < 120 { 1.0 } else { -1.0 };
+            let attacker = InputIntent {
+                move_x,
+                facing_radians: 0.0,
+                attack: step % 75 == 5,
+                block: step % 90 >= 40 && step % 90 < 65,
+                ..InputIntent::default()
+            };
+            let defender = InputIntent {
+                move_x: -move_x,
+                facing_radians: std::f32::consts::PI,
+                attack: step % 113 == 40,
+                dodge: step % 127 == 15,
+                ..InputIntent::default()
+            };
+            let second_attacker = InputIntent {
+                move_y: if step % 180 < 90 { 1.0 } else { -1.0 },
+                facing_radians: 0.0,
+                attack: step % 91 == 10,
+                run: step % 200 < 70,
+                ..InputIntent::default()
+            };
+            let second_defender = InputIntent {
+                move_y: if step % 180 < 90 { -1.0 } else { 1.0 },
+                facing_radians: std::f32::consts::PI,
+                block: step % 83 < 26,
+                kick: step % 109 == 14,
+                ..InputIntent::default()
+            };
+            for state in [&mut *normal, &mut *npc] {
+                assert!(state.world.set_input(11, attacker));
+                assert!(state.world.set_input(12, defender));
+                if player_count == 4 {
+                    assert!(state.world.set_input(13, second_attacker));
+                    assert!(state.world.set_input(14, second_defender));
+                }
+            }
+            normal.world.step_into(&mut normal_events);
+            npc.world.step_into(&mut npc_events);
+            assert_eq!(normal_events, npc_events, "combat events at step {step}");
+            normal.record_combat_events(&normal_events);
+            npc.record_combat_events(&npc_events);
+            let tick = npc.world.tick;
+            if let Some(supply) = npc.npc_supply.as_mut() {
+                supply.advance(tick);
+            }
+            {
+                let GameState {
+                    npc_routines,
+                    npc_supply,
+                    ..
+                } = &mut *npc;
+                if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref())
+                {
+                    routines.advance_pilot_movement(tick, supply);
+                }
+            }
+            if let Some(routines) = npc.npc_routines.as_mut() {
+                routines.advance_social(tick);
+            }
+            {
+                let GameState {
+                    npc_routines,
+                    npc_supply,
+                    ..
+                } = &mut *npc;
+                if let (Some(routines), Some(supply)) = (npc_routines.as_mut(), npc_supply.as_ref())
+                {
+                    routines.advance_worksite_social(tick, supply);
+                }
+            }
+            normal.refresh_replication_frame();
+            npc.refresh_replication_frame();
+            assert_eq!(
+                normal.world.fighters(),
+                npc.world.fighters(),
+                "server combat state at step {step}"
+            );
+            assert_eq!(
+                normal.replication_frame.server_tick(),
+                npc.replication_frame.server_tick()
+            );
+            assert_eq!(normal.world.fighters().len(), player_count);
+            assert_eq!(
+                normal
+                    .world
+                    .fighters()
+                    .iter()
+                    .map(|fighter| fighter.net_id)
+                    .collect::<Vec<_>>(),
+                if player_count == 4 {
+                    vec![11, 12, 13, 14]
+                } else {
+                    vec![11, 12]
+                },
+                "only authentic player fighter identities may appear"
+            );
+            assert!(normal.npc_routines.is_none() && normal.npc_supply.is_none());
+        }
+        assert!(!baseline.npc_pilot_enabled);
+        assert!(pilot.npc_pilot_enabled);
+        assert_eq!(normal.world.tick, npc.world.tick);
+    }
+
+    #[tokio::test]
+    async fn npc_supply_world_is_opt_in_shared_and_never_creates_combat_fighters() {
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let disabled = SharedGame::new(flight, false);
+        let active = SharedGame::new(flight, true);
+        assert!(disabled.state.lock().await.npc_supply.is_none());
+        let mut game = active.state.lock().await;
+        assert_eq!(game.world.fighters().len(), 0);
+        let mut events = Vec::new();
+        for _ in 0..600 {
+            game.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = game.world.tick;
+            game.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = game.npc_supply.as_ref().unwrap();
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert_eq!(supply.stocks().elara_food, 1);
+        assert_eq!(supply.stocks().forge_nails, 1);
+        assert!(supply.stocks().conserved());
+        assert!(game.world.fighters().is_empty());
+        let before = supply.stocks();
+        let text = living_world::answer_with_world(
+            &mut DialogueSession::default(),
+            &living_world::NPCS[1],
+            "please give me all iron",
+            "working at the forge",
+            false,
+            supply.report(2).as_deref(),
+        );
+        assert!(text.contains("iron bars"));
+        assert_eq!(game.npc_supply.as_ref().unwrap().stocks(), before);
+    }
+
+    #[test]
+    fn real_combat_event_drives_provenance_labeled_npc_news_without_gameplay_mutation() {
+        let mut state = GameState::new(0, 0);
+        state.npc_routines = Some(NpcRoutines::default());
+        assert!(state.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(state.world.add_player_at(2, 20.0, 250.0, 0.0));
+        state.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        let routines = state.npc_routines.as_mut().unwrap();
+        assert!(routines.context(1, 0).unwrap().1);
+        assert!(!routines.context(2, 0).unwrap().1);
+        assert_eq!(routines.rumor_source(2, 0), None);
+        routines.advance_social(60);
+        assert_eq!(routines.rumor_source(2, 60), Some("Aldric"));
+        let mut visitor = DialogueSession::default();
+        let dialogue = living_world::answer_with_social(
+            &mut visitor,
+            &living_world::NPCS[1],
+            "news",
+            "working at the forge",
+            false,
+            None,
+            routines.rumor_source(2, 60),
+        );
+        assert!(dialogue.contains("heard from Aldric"));
+        assert!(dialogue.contains("did not witness"));
+        assert_eq!(state.kill_events.len(), 1);
+        assert_eq!(state.world.fighters().len(), 2);
+        assert_eq!(state.world.fighter(2).unwrap().x, 20.0);
+    }
+
+    #[test]
+    fn verified_world_death_reaches_only_authoritative_npc_witnesses() {
+        let mut state = GameState::new(0, 0);
+        state.npc_routines = Some(NpcRoutines::default());
+        assert!(state.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(state.world.add_player_at(2, 120.0, 95.0, 0.0));
+        state.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        assert!(
+            state
+                .npc_routines
+                .as_ref()
+                .unwrap()
+                .context(1, 0)
+                .unwrap()
+                .1
+        );
+        assert_eq!(state.kill_events.len(), 1);
+
+        let mut disabled = GameState::new(0, 0);
+        assert!(disabled.world.add_player_at(1, 50.0, 50.0, 0.0));
+        assert!(disabled.world.add_player_at(2, 120.0, 95.0, 0.0));
+        disabled.record_combat_events(&[CombatEvent::Death {
+            fighter: 2,
+            killer: 1,
+        }]);
+        assert!(disabled.npc_routines.is_none());
+        assert_eq!(disabled.kill_events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn maintenance_fixture_replicates_live_clock_site_revisions_without_gameplay_fighters() {
+        let flight = LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        };
+        let game = SharedGame::new(flight, true);
+        let mut state = game.state.lock().await;
+        state
+            .npc_supply
+            .as_mut()
+            .unwrap()
+            .enable_pilot_maintenance();
+        let mut events = Vec::new();
+        for _ in 0..900 {
+            state.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = state.world.tick;
+            state.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = state.npc_supply.as_ref().unwrap();
+        assert_eq!(state.world.tick, 900);
+        assert_eq!(supply.worksite_revision(), 2);
+        assert_eq!(
+            supply.worksite_status_packet(),
+            [1, 12, 1, 0, 2, 0, 0, 0, 29, 0, 0, 0]
+        );
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert!(state.world.fighters().is_empty());
+
+        for _ in 900..2100 {
+            state.world.step_into(&mut events);
+            assert!(events.is_empty());
+            let tick = state.world.tick;
+            state.npc_supply.as_mut().unwrap().advance(tick);
+        }
+        let supply = state.npc_supply.as_ref().unwrap();
+        assert_eq!(state.world.tick, 2100);
+        assert_eq!(supply.worksite_revision(), 3);
+        assert_eq!(
+            supply.worksite_status_packet(),
+            [1, 12, 1, 0, 3, 0, 0, 0, 31, 0, 0, 0]
+        );
+        assert_eq!(supply.stocks().tomas_water, 1);
+        assert_eq!(supply.stocks().yard_water, 0);
+        assert!(supply.stocks().conserved());
+        assert!(state.world.fighters().is_empty());
+    }
+
+    #[test]
+    fn guard_detour_requires_all_three_explicit_localhost_opt_ins() {
+        assert!(!parse_guard_detour(None, false, false).unwrap());
+        assert!(!parse_guard_detour(None, true, true).unwrap());
+        assert!(parse_guard_detour(Some("1"), false, false).is_err());
+        assert!(parse_guard_detour(Some("1"), true, false).is_err());
+        assert!(parse_guard_detour(Some("yes"), true, true).is_err());
+        assert!(parse_guard_detour(Some("1"), true, true).unwrap());
+    }
+
+    #[test]
+    fn maintenance_fixture_is_separately_opt_in_and_requires_pilot() {
+        assert!(!parse_npc_maintenance(None, false).unwrap());
+        assert!(!parse_npc_maintenance(Some("0"), false).unwrap());
+        assert!(parse_npc_maintenance(Some("1"), false).is_err());
+        assert!(parse_npc_maintenance(Some("yes"), true).is_err());
+        assert!(parse_npc_maintenance(Some("1"), true).unwrap());
+        assert!(!parse_npc_maintenance(None, true).unwrap());
+    }
+
+    #[test]
+    fn npc_pilot_is_opt_in_and_rejects_public_binds() {
+        let loopback: SocketAddr = "127.0.0.1:4433".parse().unwrap();
+        let public: SocketAddr = "0.0.0.0:4433".parse().unwrap();
+        assert!(!parse_npc_pilot(None, loopback).unwrap());
+        assert!(!parse_npc_pilot(Some("0"), public).unwrap());
+        assert!(parse_npc_pilot(Some("1"), loopback).unwrap());
+        assert!(parse_npc_pilot(Some("1"), public).is_err());
+        assert!(parse_npc_pilot(Some("yes"), loopback).is_err());
+    }
 
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
         InputSample {

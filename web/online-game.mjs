@@ -14,6 +14,7 @@ import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mj
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { createNpcChatPanel } from "./npc-chat.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -167,6 +168,19 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+let npcUI = null;
+function ensureNpcUI() {
+  // Do not touch the DOM or combat input paths unless a gated server
+  // explicitly advertises the pilot roster over the reliable channel.
+  npcUI ??= createNpcChatPanel({
+    onSend(id, message) {
+      if (!networkClient) throw new Error("NPC session is not connected");
+      return networkClient.sendNpcChat(id, message);
+    },
+    onFocus() { releaseInputs(); },
+  });
+  return npcUI;
+}
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -301,6 +315,11 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  if (event.code === "Enter" && npcUI?.enabled) {
+    event.preventDefault();
+    npcUI.focus();
+    return;
+  }
   const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
@@ -357,6 +376,27 @@ networkClient = await connectAuthoritativeClient({
   },
   onKillEvent(event) {
     recordKillEvent(event);
+  },
+  onNpcRoster(roster) {
+    ensureNpcUI().setRoster(roster);
+  },
+  onNpcState(snapshot) {
+    npcUI?.updateState(snapshot);
+  },
+  onNpcSupplies(snapshot) {
+    npcUI?.updateSupplies(snapshot);
+  },
+  onNpcObstacles(barriers) {
+    npcUI?.setObstacles(barriers);
+  },
+  onNpcWorksites(sites) {
+    npcUI?.setWorksites(sites);
+  },
+  onNpcWorksiteStatus(status) {
+    npcUI?.updateWorksiteStatus(status);
+  },
+  onNpcReply(reply) {
+    npcUI?.receive(reply);
   },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
@@ -911,6 +951,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   }
   if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   ctx.restore();
+  drawNpcPilotMarkers();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
   // while placing them above their zoom-projected remote fighter positions.
@@ -1058,6 +1099,57 @@ function drawThreatMarker(bearing, secondary) {
     ctx.lineTo(x + 7, y + 6);
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+// Pilot-only NPC navigation geometry, separate from player combat collision.
+function drawNpcPilotMarkers() {
+  if (!local.initialized || !npcUI?.enabled) return;
+  ctx.save();
+  for (const wall of npcUI.obstacles) {
+    const near = projectArenaPoint(wall.x, wall.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    const far = projectArenaPoint(wall.x + wall.width, wall.y + wall.height,
+      visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
+    const width = far.x - near.x, height = far.y - near.y;
+    if (near.x > canvas.width || near.y > canvas.height
+      || far.x < 0 || far.y < 0) continue;
+    ctx.fillStyle = "rgba(113, 85, 52, 0.27)";
+    ctx.strokeStyle = "rgba(239, 193, 105, 0.72)";
+    ctx.setLineDash([4, 3]);
+    ctx.fillRect(near.x, near.y, width, height);
+    ctx.strokeRect(near.x, near.y, width, height);
+  }
+  ctx.setLineDash([]);
+  ctx.textAlign = "center";
+  ctx.font = "10px sans-serif";
+  for (const site of npcUI.worksites) {
+    const p = projectArenaPoint(site.x, site.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    if (p.x < -80 || p.x > canvas.width + 80
+      || p.y < -50 || p.y > canvas.height + 50) continue;
+    const closed = site.active === false;
+    ctx.fillStyle = closed ? "#735c5b" : "#668f98";
+    ctx.beginPath();
+    ctx.rect(p.x - 4, p.y - 4, 8, 8);
+    ctx.fill();
+    ctx.fillStyle = closed ? "#dd9991" : "#a6d1d2";
+    ctx.fillText(closed ? `${site.name} (closed)` : site.name, p.x, p.y + 18);
+  }
+  ctx.font = "bold 11px sans-serif";
+  for (const npc of npcUI.npcs) {
+    const p = projectArenaPoint(npc.x, npc.y, visualCameraPosition.x,
+      visualCameraPosition.y, canvas.width, canvas.height);
+    if (p.x < -90 || p.x > canvas.width + 90 || p.y < -80 || p.y > canvas.height + 80) continue;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "#cba56a";
+    ctx.fill();
+    ctx.fillStyle = "#12110f";
+    ctx.fillText("!", p.x, p.y + 4);
+    ctx.fillStyle = "#f1dbaf";
+    ctx.fillText(npc.name, p.x, p.y - 17);
+  }
   ctx.restore();
 }
 

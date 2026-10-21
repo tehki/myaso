@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NETWORK } from "../src/network/constants.mjs";
+import { NETWORK, PACKET_TYPE } from "../src/network/constants.mjs";
+import { NPC_WIRE, encodeNpcRequest, decodeNpcRoster, decodeNpcResponse, decodeNpcState, decodeNpcSupplies, decodeNpcObstacles, decodeNpcWorksites, decodeNpcWorksiteStatus } from "../src/network/npc-chat-codec.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
 import { SpatialInterestGrid } from "../src/network/interest-grid.mjs";
 import { InputIngressWindow } from "../src/network/input-ingress.mjs";
@@ -551,4 +552,162 @@ test("512-player dense-map replication still produces a bounded datagram", () =>
   const packet = encodeSnapshot({ sequence: 100, baselineSequence: 99, serverTick: 900, records: plan.records, maxBytes: 1100 });
   assert.ok(packet.byteLength <= 1100);
   assert.ok(plan.selected.length < candidates.length, "dense crowd should be priority-limited rather than fragmenting");
+});
+
+test("P0 alpha packet namespace keeps fighter frames distinct from optional NPC traffic", () => {
+  // The reliable channel dispatches by payload[1], not by an outer owner
+  // namespace. Item pickup/receipt MUST receive centrally allocated,
+  // disjoint IDs before being wired. This test checks only existing
+  // v1 tags and MUST NOT be interpreted as reserving future IDs for NPCs.
+  const core = Object.entries(PACKET_TYPE);
+  const optionalPilot = Object.entries(NPC_WIRE)
+    .filter(([name]) => name !== "maxTextBytes");
+  const tags = [...core, ...optionalPilot];
+  assert.equal(NETWORK.protocolVersion, 1);
+  assert.equal(core.length, 4);
+  assert.equal(optionalPilot.length, 8);
+  assert.equal(new Set(tags.map(([, id]) => id)).size, tags.length,
+    "a reliable frame type cannot be both fighter and NPC traffic");
+  assert.ok(tags.every(([, id]) => Number.isInteger(id) && id >= 1 && id <= 255));
+  assert.deepEqual(core.map(([, id]) => id).sort((a, b) => a - b), [1, 2, 3, 4]);
+  assert.deepEqual(optionalPilot.map(([, id]) => id).sort((a, b) => a - b),
+    [5, 6, 7, 8, 9, 10, 11, 12]);
+  const npcRequest = encodeNpcRequest(2, "No sword is gated by NPC dialogue");
+  assert.equal(npcRequest[0], NETWORK.protocolVersion);
+  assert.equal(npcRequest[1], NPC_WIRE.request);
+  assert.ok(!Object.values(PACKET_TYPE).includes(npcRequest[1]));
+});
+
+test("NPC pilot request matches Rust v1 reliable framing without changing combat packets", () => {
+  assert.deepEqual([...encodeNpcRequest(1, "hi")], [1, 5, 1, 0, 2, 0, 104, 105]);
+  assert.equal(encodeNpcRequest(2, "Привет")[4], 12);
+  assert.throws(() => encodeNpcRequest(1, "\nadmin"), /single-line/);
+  assert.throws(() => encodeNpcRequest(1, "a".repeat(241)), /240/);
+  assert.throws(() => encodeNpcRequest(0, "hi"), /identifier/);
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC reliable responses and roster are bounded, strict UTF-8, and reject duplicate IDs", () => {
+  const msg = new TextEncoder().encode("Rowan: Greetings");
+  const response = new Uint8Array([1, 6, 3, 0, msg.length, 0, ...msg]);
+  assert.deepEqual(decodeNpcResponse(response), { id: 3, denied: false, text: "Rowan: Greetings" });
+  assert.throws(() => decodeNpcResponse(response.subarray(0, response.length - 1)), /response body/);
+
+  const name = new TextEncoder().encode("Aldric");
+  const role = new TextEncoder().encode("Innkeeper");
+  const item = [1, 120, 0, 95, 0, name.length, ...name, role.length, ...role];
+  const roster = new Uint8Array([1, 7, 1, 0, ...item]);
+  assert.deepEqual(decodeNpcRoster(roster), [{ id: 1, x: 120, y: 95, name: "Aldric", role: "Innkeeper" }]);
+  assert.throws(() => decodeNpcRoster(new Uint8Array([1, 7, 2, 0, ...item, ...item])), /identifier/);
+  assert.throws(() => decodeNpcRoster(roster.subarray(0, roster.length - 1)), /occupation/);
+});
+
+test("NPC deterministic schedule updates are strict, compact and separate from combat packets", () => {
+  const make = (tick, records) => new Uint8Array([
+    1, 8, 5, 0, tick & 255, (tick >>> 8) & 255, (tick >>> 16) & 255, tick >>> 24,
+    ...records.flatMap(({ id, x, y, activity }) => [
+      id, x & 255, x >>> 8, y & 255, y >>> 8, activity,
+    ]),
+  ]);
+  const records = [
+    { id: 1, x: 120, y: 95, activity: 1 },
+    { id: 2, x: 210, y: 65, activity: 1 },
+    { id: 3, x: 275, y: 190, activity: 2 },
+    { id: 4, x: 395, y: 150, activity: 2 },
+    { id: 5, x: 340, y: 255, activity: 2 },
+  ];
+  const packet = make(600, records);
+  assert.equal(packet.length, 38);
+  assert.deepEqual(decodeNpcState(packet), { tick: 600, states: records });
+  assert.throws(() => decodeNpcState(packet.subarray(0, packet.length - 1)), /length/);
+  assert.throws(() => decodeNpcState(make(600, [...records.slice(0, 4), records[0]])), /duplicate/);
+  assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, activity: 3 }))), /state value/);
+  assert.throws(() => decodeNpcState(make(600, records.map((s, i) => i ? s : { ...s, x: 8200 }))), /state value/);
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC supply snapshots preserve exact finite totals and reject forged provenance", () => {
+  const baseline = new Uint8Array([
+    1, 9, 0, 0, 0,0,0,0, 0,0,0,0, 8,0,0,8,0,0,6,0, 0,0,
+  ]);
+  assert.deepEqual(decodeNpcSupplies(baseline), {
+    tick: 0, sequence: 0,
+    stocks: {
+      wellWater: 8, tomasWater: 0, yardWater: 0,
+      depotFood: 8, elaraFood: 0, stallFood: 0,
+      forgeIron: 6, forgeNails: 0,
+    },
+    lastActor: 0, lastOperation: 0,
+  });
+  const atForge = new Uint8Array([
+    1, 9, 0, 0, 44,1,0,0, 1,0,0,0, 8,0,0,8,0,0,5,1, 2,5,
+  ]);
+  assert.deepEqual(decodeNpcSupplies(atForge).stocks, {
+    wellWater: 8, tomasWater: 0, yardWater: 0,
+    depotFood: 8, elaraFood: 0, stallFood: 0,
+    forgeIron: 5, forgeNails: 1,
+  });
+  for (const invalid of [
+    atForge.subarray(0, 21),
+    Uint8Array.from(atForge, (n, i) => i === 2 ? 1 : n),
+    Uint8Array.from(atForge, (n, i) => i === 12 ? 9 : n),
+    Uint8Array.from(atForge, (n, i) => i === 20 ? 4 : n),
+    Uint8Array.from(baseline, (n, i) => i === 21 ? 5 : n),
+  ]) {
+    assert.throws(() => decodeNpcSupplies(invalid), /NPC supply|NPC supplies/);
+  }
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC pilot navigation barriers are server-advertised, bounded and fail closed", () => {
+  const packet = new Uint8Array([1,10,3,0,
+    195,0,180,0,35,0,35,0,
+    89,1,105,0,30,0,45,0,
+    38,1,216,0,24,0,31,0,
+  ]);
+  assert.deepEqual(decodeNpcObstacles(packet), [
+    { x: 195, y: 180, width: 35, height: 35 },
+    { x: 345, y: 105, width: 30, height: 45 },
+    { x: 294, y: 216, width: 24, height: 31 },
+  ]);
+  assert.throws(() => decodeNpcObstacles(packet.subarray(0, 27)), /obstacle geometry/);
+  assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===2 ? 2 : n)), /obstacle geometry/);
+  assert.throws(() => decodeNpcObstacles(Uint8Array.from(packet, (n,i) => i===8 ? 0 : n)), /obstacle bounds/);
+  assert.equal(NETWORK.protocolVersion, 1);
+});
+
+test("NPC pilot resource sites use exact immutable server site identities", () => {
+  const packet = Uint8Array.from([
+    1,11,5,0,
+    1,5,84,1,255,0,
+    2,5,14,1,220,0,
+    3,4,139,1,150,0,
+    4,4,59,1,110,0,
+    5,2,210,0,65,0,
+  ]);
+  const sites = decodeNpcWorksites(packet);
+  assert.equal(sites.length, 5);
+  assert.deepEqual(sites.map(s => s.name), ["Well","Work yard","Supply depot","Market","Forge"]);
+  assert.ok(Object.isFrozen(sites) && Object.isFrozen(sites[0]));
+  assert.throws(() => decodeNpcWorksites(packet.subarray(0, 33)), /worksite header/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 1 ? 9 : b)), /worksite header/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 4 ? 2 : b)), /worksite registry/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 29 ? 3 : b)), /worksite registry/);
+  assert.throws(() => decodeNpcWorksites(Uint8Array.from(packet, (b,i) => i === 8 ? 0 : b)), /worksite registry/);
+});
+
+test("revisioned NPC worksite availability snapshots reject malformed masks and replayable revisions", () => {
+  const baseline = Uint8Array.from([1,12,1,0,1,0,0,0,31,0,0,0]);
+  const all = decodeNpcWorksiteStatus(baseline);
+  assert.equal(all.revision, 1);
+  assert.deepEqual(all.active, [true,true,true,true,true]);
+  assert.ok(Object.isFrozen(all.active));
+  const changed = decodeNpcWorksiteStatus(Uint8Array.from([1,12,1,0,2,0,0,0,22,0,0,0]));
+  assert.equal(changed.revision, 2);
+  assert.deepEqual(changed.active, [false,true,true,false,true]);
+  assert.throws(() => decodeNpcWorksiteStatus(baseline.subarray(0,11)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===8 ? 255 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===9 ? 1 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===2 ? 2 : b)), /status header/);
+  assert.throws(() => decodeNpcWorksiteStatus(Uint8Array.from(baseline,(b,i)=> i===4 ? 0 : b)), /status revision/);
 });
