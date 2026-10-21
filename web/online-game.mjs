@@ -1049,8 +1049,12 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   }
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && recoveryTell) drawRecoveryTell();
+  // The active multiplayer snapshot roster contains authenticated human
+  // fighters only. Core/AI has not supplied an authoritative NPC feed.
+  // Remote is a drawing viewpoint, never an NPC classification.
   const drewKnight = knightSprites?.draw(ctx, fighter,
-    { remote, rotation: presentationRotation, nowMs: performance.now() }) ?? false;
+    { remote, actorKind: "player", rotation: presentationRotation,
+      nowMs: performance.now() }) ?? false;
   if (!drewKnight) {
     ctx.fillStyle = shadow;
     ctx.beginPath();

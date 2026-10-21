@@ -1,0 +1,258 @@
+{
+  "engine": "firefox",
+  "browser": "firefox/153.4.0",
+  "cases": 48,
+  "errors": [],
+  "decodedAtlasCount": 9,
+  "screenshots": [
+    "alpha_role_firefox_idle.png",
+    "alpha_role_firefox_roll.png",
+    "alpha_role_firefox_attack.png"
+  ],
+  "actualMultiplayer": false,
+  "authoritativeNpcFeed": false,
+  "originalCombatFallback": true,
+  "activatedDefault": false,
+  "casesProved": [
+    {
+      "scenario": "idle",
+      "direction": 0,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 1,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 2,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 3,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 4,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 5,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 6,
+      "drawCount": 4
+    },
+    {
+      "scenario": "idle",
+      "direction": 7,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 0,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 1,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 2,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 3,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 4,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 5,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 6,
+      "drawCount": 4
+    },
+    {
+      "scenario": "roll",
+      "direction": 7,
+      "drawCount": 4
+    },
+    {
+      "scenario": "attack",
+      "direction": 0,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 1,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 2,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 3,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 4,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 5,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 6,
+      "drawCount": 1
+    },
+    {
+      "scenario": "attack",
+      "direction": 7,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 0,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 1,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 2,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 3,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 4,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 5,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 6,
+      "drawCount": 1
+    },
+    {
+      "scenario": "block",
+      "direction": 7,
+      "drawCount": 1
+    },
+    {
+      "scenario": "stun",
+      "direction": 0,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 1,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 2,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 3,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 4,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 5,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 6,
+      "drawCount": 0
+    },
+    {
+      "scenario": "stun",
+      "direction": 7,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 0,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 1,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 2,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 3,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 4,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 5,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 6,
+      "drawCount": 0
+    },
+    {
+      "scenario": "dead",
+      "direction": 7,
+      "drawCount": 0
+    }
+  ]
+}
