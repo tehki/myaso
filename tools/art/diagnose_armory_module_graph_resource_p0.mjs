@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {readFile,writeFile,mkdir} from "node:fs/promises";
-import {resolve,relative,join,extname} from "node:path";
+import {resolve,relative,join,extname,dirname} from "node:path";
 import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
@@ -180,7 +180,7 @@ try{
  await new Promise(ok=>server.close(ok));
  report.completedRuns=results.filter(r=>r.probe?.phase==="DONE"&&r.errors.length===0).length;
  report.successfulOnTestedHost=report.completedRuns===engines.length*repeat*variants.length;
- await mkdir(resolve(out,".."),{recursive:true});
+ await mkdir(dirname(out),{recursive:true});
  await writeFile(out,JSON.stringify(report,null,2)+"\n");
 }
 console.log("GRAPH_RESOURCE_DIAG="+JSON.stringify({

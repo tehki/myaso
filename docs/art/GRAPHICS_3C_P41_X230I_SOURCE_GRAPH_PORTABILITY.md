@@ -14,7 +14,7 @@ Proof from original World #493 at exact `07060f981b8a1dac89184b621b6893dd970a08a
 | `src/world/authored-maps.mjs` | `d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987` | `21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144` |
 | World #493 Canvas painter | `e05a02812be04ae9a5c1fc0cddd1e2c2b6e54ab55a85950be6d10fa81dbbe4a6` | `db5274b9ad3ea8e28f4a2ef44358cfed247d0625785dc353577a3ee6d136f9e9` |
 
-The new **Node-only** helper accepts ONLY exact complete LF or complete CRLF bytes. It calculates the original **unchanged** Windows-CRLF SHA256 pin, and rejects mixed newlines, bare CR, binary/invalid UTF-8 or any semantic edit that alters that digest. Raw native source hashes and newline styles are also recorded to avoid misrepresenting on-disk bytes. Browser-imported source is **never rewritten**. Original World, 3B WebPs, server, networking, Combat and 3C painter remain unmodified.
+The new **Node-only** helper accepts ONLY exact complete LF or complete CRLF bytes. It calculates the original **unchanged** Windows-CRLF SHA256 pin, and rejects mixed newlines, bare CR, binary/invalid UTF-8 or any semantic edit that alters that digest. Raw native source hashes and newline styles are also recorded to avoid misrepresenting on-disk bytes. Browser-imported source is **never rewritten**. The optional diagnostic also creates report directories using `dirname(out)` rather than the Windows-invalid `resolve(out,"..")`; this fixes a real Windows `EPERM mkdir D:\\` report-persistence failure without changing any browser or game code. Original World, 3B WebPs, server, networking, Combat and 3C painter remain unmodified.
 
 ## Actual low-end browser evidence
 

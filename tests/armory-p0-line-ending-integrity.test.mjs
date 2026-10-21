@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
+import {readFileSync} from "node:fs";
+import {win32,posix} from "node:path";
 import {pinnedSourceLineEndingDigests} from "../tools/art/pinned-source-line-endings-p0.mjs";
 
 const sha=(x)=>createHash("sha256").update(x).digest("hex");
@@ -32,4 +34,12 @@ test("mixed line endings and bare CR fail closed",()=>{
 test("non-UTF8 source bytes fail rather than bypass the pin",()=>{
  assert.throws(()=>pinnedSourceLineEndingDigests(Buffer.from([0xff,0xfe,10])),
   /Unexpected or mixed/);
+});
+
+test("QA report directory is derived from report parent across platforms",()=>{
+ const code=readFileSync(new URL("../tools/art/diagnose_armory_module_graph_resource_p0.mjs",import.meta.url),"utf8");
+ assert.match(code,/await mkdir\(dirname\(out\),\{recursive:true\}\)/);
+ assert.doesNotMatch(code,/await mkdir\(resolve\(out,"\.\."\)/);
+ assert.equal(win32.dirname("D:\\myaso\\qa\\report.json"),"D:\\myaso\\qa");
+ assert.equal(posix.dirname("/tmp/myaso/report.json"),"/tmp/myaso");
 });
