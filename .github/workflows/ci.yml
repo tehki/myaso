@@ -243,6 +243,12 @@ jobs:
           node scripts/audit-world-portals.mjs
           node --test tests/world-portal-reachability.test.mjs
 
+      - name: Validate D19 real Chrome Red Lion E-key portal round trip
+        run: |
+          node --check scripts/world-portal-browser-flight.mjs
+          node --test tests/world-portal-browser-flight.test.mjs
+          node scripts/world-portal-browser-flight.mjs
+
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
           # Three fresh Chrome/Firefox sessions for each real defensive read.
