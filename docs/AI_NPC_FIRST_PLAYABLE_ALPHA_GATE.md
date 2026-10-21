@@ -151,3 +151,30 @@ pilot type values are disjoint and in the same byte-sized namespace.
 It intentionally **does not allocate or reserve a future Items tag**.
 The actual integrated protocol type registry remains **BLOCKED on
 Core ownership**, not made ready by this test.
+
+## P0 client-side NPC-off gate — disabled UI/inputs without roster
+
+The existing optional browser module \`web/npc-chat.mjs\` already
+creates its panel **hidden by default**, activates it only when the
+server roster contains entries, and rejects submission without a
+matching roster target. The P0 alpha regression now directly exercises
+this module in a small isolated DOM fixture rather than inferring
+client behavior from code review alone.
+
+An empty initial roster, snapshot updates, supplies, obstacles,
+worksite reports and unsolicited NPC text **do not** reveal the
+pilot panel, divert keyboard focus, or trigger any reliable chat
+send. An explicit nonempty roster activates the panel and permits
+only an actual selected NPC target; receiving an empty roster again
+disables future submissions and focus interception. This tests
+client-side containment and protects the four-player sword/punch
+input experience from optional NPC controls when the pilot is off.
+
+**Scope:** this Node-based DOM fixture is not a browser engine,
+does not prove that real Chrome/Firefox hit-testing, pointer
+priority, four independent connections or reliable opcode
+arbitration works. It adds no production source changes and does
+not solve Core 8A's one-reader/type-allocation integration blocker.
+Real WebTransport sword ownership/receipt acceptance is mandatory
+and remains separate. First Playable still ships with all three
+NPC opt-in flags unset.
