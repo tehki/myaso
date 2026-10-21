@@ -42,3 +42,19 @@ Existing `src/network/input-codec.mjs` and `server/src/lib.rs` use **16-byte hea
 **Decision requested from Main Orchestrator:** approve a small versioned input-provenance protocol extension or specify an equally unambiguous authoritative alternative. Without this, restoring instantaneous pointerDOWN via the existing 34-byte flags alone is **RELEASE BLOCKED**. Do not label the narrow Rust improvement an instant-light fix or a playable release.
 
 No merges, protected-test waivers, service restarts, or deployment rights are implied.
+
+## Review-only codec prototype (child candidate, no runtime use)
+
+The separately pinned child defines a **proposal-only**, explicitly non-negotiated v2 16-byte envelope for genuine LMB gesture *messages*; it does NOT yet prove browser gesture truth, guaranteed transport or safe gameplay. The old 34-byte v1 input datagrams remain byte-identical, current server rejects v2 there, and no active player/client imports this proposal.
+
+| Byte offsets | Input event | Server ACK |
+| --- | --- | --- |
+| 0 | Protocol proposal version 2 | Version 2 |
+| 1 | Type 0x11 | Type 0x12 |
+| 2 | PRESS=1, UPGRADE=2, RELEASE=3, CANCEL=4 | ACCEPTED=1, DUPLICATE=2, STALE=3, REJECTED=4 |
+| 3 | Reserved, required zero | Reserved, required zero |
+| 4–7 | Nonzero event sequence, little-endian u32 | Correlated event sequence |
+| 8–11 | Nonzero lease-scoped gesture ID, little-endian u32 | Correlated gesture ID |
+| 12–15 | Client tick for diagnostics only, **never charge authority** | Authoritative Rust server tick |
+
+**Unimplemented gates:** authenticated lease-binding at ingress (never client-selected actor), reliable ordered event delivery with de-duplication/ACK/backpressure, handshake to negotiate v2, event sequencing across reconnect/death/cancel, rate limits, press→release-before-30Hz preservation, binding event state to actual World simulation timing, session-epoch fencing, and native Chrome+Firefox integration. Sequence wrap requires a new lease or defined safe rollover; do not silently allow it. The proposal is only a portable serialization and validation contract to review jointly with Core 8A/8C, not permission to change either live packet format or production behavior.
