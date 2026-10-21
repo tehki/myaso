@@ -366,6 +366,71 @@ mod tests {
     }
 
     #[test]
+    fn world_p0_greyhaven_open_front_four_swords_match_server_los() {
+        // Cross-department snapshot ONLY from World #493 / v1:
+        // smith at (3710,3850) 182x162; four rack sockets y=4038,
+        // walkable pickup stands y=4088. The authoritative server must
+        // still ingest a complete, revision-fenced World solid manifest.
+        let smith = SolidRect {
+            min_x: 3710.0,
+            min_y: 3850.0,
+            max_x: 3892.0,
+            max_y: 4012.0,
+        };
+        let bounds = SolidRect {
+            min_x: 3650.0,
+            min_y: 3800.0,
+            max_x: 4000.0,
+            max_y: 4200.0,
+        };
+        let fixture = GeometryWindow {
+            fence: CURRENT,
+            complete: true,
+            bounds,
+            solids: &[smith],
+        };
+        let socket_x = [3740.0, 3780.0, 3820.0, 3860.0];
+        for x in socket_x {
+            let stand = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x,
+                y: 4088.0,
+            };
+            let item_anchor = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x,
+                y: 4038.0,
+            };
+            assert_eq!(
+                verify_pickup_geometry(stand, item_anchor, &fixture, CURRENT, 64.0),
+                Ok(()),
+                "World #493 intended open-front sword must be physically reachable"
+            );
+            // An actor *inside* the solid smith footprint must not grab
+            // the identical sword through a wall, even at short range.
+            let invalid_inside_smith = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x,
+                y: 4000.0,
+            };
+            assert_eq!(
+                verify_pickup_geometry(
+                    invalid_inside_smith,
+                    item_anchor,
+                    &fixture,
+                    CURRENT,
+                    64.0,
+                ),
+                Err(PickupGeometryReject::Occluded)
+            );
+        }
+        // A test fixture does NOT establish a live authoritative collision map.
+        assert_eq!(socket_x[1] - socket_x[0], 40.0);
+        assert_eq!(socket_x[2] - socket_x[1], 40.0);
+        assert_eq!(socket_x[3] - socket_x[2], 40.0);
+    }
+
+    #[test]
     fn legacy_zone_zero_and_new_world_revision_zero_are_supported() {
         let legacy = GeometryFence {
             zone_id: 0,
