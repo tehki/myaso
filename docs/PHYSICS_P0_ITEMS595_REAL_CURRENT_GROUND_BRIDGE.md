@@ -33,3 +33,12 @@ A live physical-sword click requires current World actor, exact CURRENT ground e
 - M1–M5 four **real** independently connected browser gameplay + physical sword ownership + combat/reconnect remains **NOT PLAYABLE** until proved.
 
 Run \`cargo test --locked --manifest-path server/Cargo.toml --test alpha_physics_items595_current_sword_parity\`, then full server Cargo tests, \`cargo fmt --check\`, strict \`cargo clippy --all-targets -- -D warnings\`, and \`git diff --check\`.
+
+## Additional fail-closed current-source counterexamples
+
+The integration suite now has **four** test cases, including two new explicit negative proofs that a Physics LOS success does NOT grant ownership:
+
+- **Dynamic blocker:** the current Items ground sword has a clear 50-unit ray through the original 23 Core static AABBs when a test incorrectly claims static-only geometry is complete. Adding a synthetic closed dynamic door to the test window yields `Occluded`, and a non-complete window yields `IncompleteGeometry`. This is a regression of the Physics predicate; production Core 8C does NOT yet supply authenticated dynamic coverage.
+- **Taken/expired ground item:** after offline Items `take_ground` removes the exact selected entity, current Items rack projection is empty for that socket, duplicate pickup is `NotFound`, yet the geometry-only predicate still returns `Ok(())` for remembered coordinates and fabricated equal ticks. After item expiry, the time-filtered source is empty even if a stale geometric ray remains clear. Production must re-read exact canonical item/current physical source and expiry inside the single signed epoch/tick mutation lock.
+
+These source tests deliberately demonstrate what geometry **cannot** authorize. No dynamic-door runtime, secure source lease, canonical Core u128 writer, network TryPickup, observer outbox, live player interaction or complete current map has been implemented.

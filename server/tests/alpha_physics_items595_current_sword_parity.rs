@@ -280,3 +280,155 @@ fn domain_only_pickup_removes_exact_selected_item_and_preserves_unselected() {
         Err(LootError::NotFound)
     );
 }
+#[test]
+fn known_current_dynamic_door_blocks_selected_live_sword_despite_valid_range() {
+    let (world, loot, _, current) = create_real_items_world();
+    let buyer = world.fighter(5).unwrap();
+    let selected = current[0];
+    let ground = loot.ground().get(&selected.ground_entity_id).unwrap();
+    assert_eq!(ground.item.id, selected.item_id);
+    let actor = p(buyer.x, buyer.y);
+    let sword = p(ground.at.x, ground.at.y);
+
+    // The exact original 23 authored STATIC solids do not include this
+    // closed dynamic door. A caller claiming "complete" based on only the
+    // static table returns OK: this is why static hashes never prove pickup.
+    let static_solids = core_solids();
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            sword,
+            &test_window(&static_solids, true),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(())
+    );
+
+    // The new blocker intersects the 50-unit actor→actual-item ray, but no
+    // current source-owned item identity, reach, tick or revision changed.
+    let mut current_with_door = static_solids;
+    current_with_door.push(SolidRect {
+        min_x: 3738.0,
+        min_y: 4058.0,
+        max_x: 3742.0,
+        max_y: 4068.0,
+    });
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            sword,
+            &test_window(&current_with_door, true),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Err(PickupGeometryReject::Occluded),
+        "a current blocker must override apparently valid live sword reach"
+    );
+
+    // Unknown dynamic coverage is NOT an empty blocker list. Keep DENIED
+    // even though the static geometry contains a fully clear ray.
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor,
+            sword,
+            &test_window(&core_solids(), false),
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Err(PickupGeometryReject::IncompleteGeometry)
+    );
+}
+
+#[test]
+fn previously_taken_or_expired_sword_cannot_be_authorized_by_stale_geometry() {
+    let (world, mut loot, sockets, initial) = create_real_items_world();
+    let selected = initial[1];
+    let actor = world.fighter(6).unwrap();
+    let original_ground = loot
+        .ground()
+        .get(&selected.ground_entity_id)
+        .unwrap()
+        .clone();
+    let actor_point = p(actor.x, actor.y);
+    let stale_sword_point = p(original_ground.at.x, original_ground.at.y);
+    let static_solids = core_solids();
+    let static_fixture = test_window(&static_solids, true);
+
+    // Before actual removal, Items' CURRENT selected rack binding exists.
+    assert_eq!(
+        loot.proposed_current_rack_swords(ZoneId::Moonvale, sockets, 11)
+            .unwrap()[1],
+        Some(selected)
+    );
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor_point,
+            stale_sword_point,
+            &static_fixture,
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(())
+    );
+
+    let taken = loot
+        .take_ground(6, actor, ZoneId::Moonvale, selected.ground_entity_id, 20)
+        .unwrap();
+    assert_eq!(taken.id, selected.item_id);
+
+    // The attacker still remembers valid old coordinates, and the geometry
+    // helper correctly remains READ-ONLY: it cannot detect an absent item.
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            actor_point,
+            stale_sword_point,
+            &static_fixture,
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(()),
+        "geometry-only YES is explicitly NOT an ownership authorization"
+    );
+
+    // A trusted ONE-TRANSACTION consumer MUST re-read the selected current
+    // ground entity/physical item/mutation sequence while holding its writer
+    // fence. That source is now absent; an old successful LOS must not grant.
+    let current = loot
+        .proposed_current_rack_swords(ZoneId::Moonvale, sockets, 21)
+        .unwrap();
+    assert_eq!(current[1], None);
+    assert_ne!(current[1], Some(selected));
+    assert_eq!(
+        loot.take_ground(6, actor, ZoneId::Moonvale, selected.ground_entity_id, 22),
+        Err(LootError::NotFound)
+    );
+
+    // Independently, an untouched source item can expire while its old
+    // coordinates are still LOS-clear; caller time is not signed authority.
+    assert_eq!(
+        loot.proposed_current_rack_swords(ZoneId::Moonvale, sockets, u64::MAX)
+            .unwrap(),
+        [None; 4]
+    );
+    assert_eq!(
+        verify_pickup_geometry_at_completed_tick(
+            p(3740.0, 4088.0),
+            p(3740.0, 4038.0),
+            &static_fixture,
+            TEST_FENCE,
+            PICKUP_REACH,
+            TEST_TICKS
+        ),
+        Ok(())
+    );
+    assert!(
+        loot.ground().get(&initial[0].ground_entity_id).is_some(),
+        "expired data can exist physically in storage and MUST be filtered at query"
+    );
+}
