@@ -10,6 +10,7 @@ import {resolve,extname,sep,join} from "node:path";
 import {
  P0_CONTENT_VIEWPORT,nativeContentViewportMatches,nextNativeW3cWindowRect
 } from "./graphics3b_native_viewport_parity.mjs";
+import {measureGameplayCanvasFoldBudget} from "./graphics3b_gameplay_fold_budget.mjs";
 
 const root=process.cwd();
 const output=join(root,"alpha-p0-graphics3b-native-page-parity-evidence");
@@ -110,13 +111,17 @@ async function inspect(browser,url){
   throw Error(browser.name+" content viewport changed after CSS page load");
  if(!metrics.hasOriginalCss||metrics.controlsItems<10)
   throw Error(browser.name+" did not use original authored myaso UI");
+ const foldBudget=measureGameplayCanvasFoldBudget({viewportHeight:metrics.innerHeight,
+  canvasTop:metrics.canvas.top,canvasHeight:metrics.canvas.height});
+ if(Math.abs(foldBudget.visibleCanvasFraction-metrics.visibleCanvasFraction)>0.000002)
+  throw Error(browser.name+" browser DOM fold and source budget mismatch");
  const screenshot=await w3c(browser,"GET","/session/"+browser.id+"/screenshot");
  const pixels=Buffer.from(screenshot,"base64");
  if(pixels.length<1000||!pixels.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")))
   throw Error(browser.name+" screenshot unavailable");
  const name=browser.name+"-real-myaso-page-1280x720.png";
  await writeFile(join(output,name),pixels);
- return {browser:browser.name,dimensions,metrics,screenshot:name,
+ return {browser:browser.name,dimensions,metrics,foldBudget,screenshot:name,
   screenshotSha256:createHash("sha256").update(pixels).digest("hex")};
 }
 async function main(){
@@ -135,6 +140,10 @@ async function main(){
   silverKnightVisibilityCertified:false,worldOrItemWriterTouched:false,result};
  await writeFile(join(output,"layout-parity-report.json"),JSON.stringify(report,null,2));
  console.log("GRAPHICS3B_P0_ACTUAL_BROWSER_LAYOUT_PARITY_PASS "+JSON.stringify(report));
+ console.log("GRAPHICS3B_P0_LAYOUT_RECLAIM_REQUIRED "+JSON.stringify(result.map(v=>({
+  browser:v.browser,minimumUpwardLayoutReclaimPx:v.foldBudget.minimumUpwardLayoutReclaimPx,
+  canvasFullyInPage:v.foldBudget.canvasFullyInPage,
+  canvasCenterInsidePage:v.foldBudget.canvasCenterInsidePage}))));
 }
 let error;
 try{await main()}catch(e){error=e;console.error("GRAPHICS3B_P0_ACTUAL_BROWSER_LAYOUT_PARITY_FAIL "+String(e.stack||e))}
