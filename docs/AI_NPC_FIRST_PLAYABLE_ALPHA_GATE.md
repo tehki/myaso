@@ -404,3 +404,23 @@ receipt, live NPC avatar, or production spawn was exercised.
 The Main Orchestrator's #480 P0 native Core/World/Items/Combat
 acceptance still applies separately, and the optional NPC pilot
 stays OFF for First Playable.
+
+
+## P0 focus containment — roster selector and Speak button revocation
+
+The optional pilot previously restored the game canvas keyboard focus when
+its text input was active and the server removed the NPC roster, but not when
+the focused control was the NPC dropdown or Speak button. A server roster
+revoke could therefore leave gameplay keyboard focus off the arena.
+
+The panel now restores arena focus when **any of its three interactive
+controls** (input, selector, submit button) holds focus as the roster becomes
+empty. The isolated real-module DOM regression covers both newly protected
+controls across independent roster enable/revoke cycles, without sending chat.
+This is a minimal browser-presentation fix only: it does not authorize NPC
+actions, wire messages, item pickup, Core session epochs or Combat changes.
+
+**Evidence scope:** The new test is a Node DOM-fixture regression. Native
+Chrome/Firefox and four independent WebTransport clients still require real
+browser acceptance. NPC pilot remains disabled by default; this stacked
+change must not promote experimental PR #353 into First Playable.
