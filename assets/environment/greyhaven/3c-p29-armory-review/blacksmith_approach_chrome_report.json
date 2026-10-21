@@ -1,0 +1,92 @@
+{
+  "chrome": "Chrome/154.0.8037.99",
+  "baselineWorldHead": "260a7b85a33b7a51663a70af8d410e0d33e0e236",
+  "graphicsHead": "1491903fad1ff6029b02d10225731671738232b8",
+  "purpose": "Observe authored Blacksmith approach in genuine interactive World design preview",
+  "constraints": "No real rack swords or world-item IDs in World #336; no server, transaction, collision, pointer pickup, PvP or live multiplayer",
+  "screenshotWidth": 1100,
+  "screenshotHeight": 688,
+  "visits": {
+    "world336": {
+      "http": 200,
+      "authored": {
+        "smith": {
+          "id": "smith",
+          "name": "Blacksmith",
+          "x": 3710,
+          "y": 3850,
+          "w": 182,
+          "h": 162,
+          "color": "#6d6460",
+          "kind": "smith"
+        },
+        "serverRackSlots": null,
+        "authoredItemCount": 0
+      },
+      "steps": [
+        {
+          "key": "a",
+          "durationMs": 2380,
+          "before": "Moonvale · 4365,4150 · cached 6/24",
+          "after": "Moonvale · 3809,4150 · cached 8/24"
+        },
+        {
+          "key": "w",
+          "durationMs": 420,
+          "before": "Moonvale · 3809,4150 · cached 8/24",
+          "after": "Moonvale · 3809,4050 · cached 8/24"
+        }
+      ],
+      "finalHud": "Moonvale · 3809,4050 · cached 8/24",
+      "position": {
+        "x": 3809,
+        "y": 4050
+      },
+      "errors": [],
+      "visualEvidence": true,
+      "swordPickupTested": false,
+      "armedModeTested": false
+    },
+    "graphics3c": {
+      "http": 200,
+      "authored": {
+        "smith": {
+          "id": "smith",
+          "name": "Blacksmith",
+          "x": 3710,
+          "y": 3850,
+          "w": 182,
+          "h": 162,
+          "color": "#6d6460",
+          "kind": "smith"
+        },
+        "serverRackSlots": null,
+        "authoredItemCount": 0
+      },
+      "steps": [
+        {
+          "key": "a",
+          "durationMs": 2380,
+          "before": "Moonvale · 4365,4150 · cached 6/24",
+          "after": "Moonvale · 3813,4150 · cached 8/24"
+        },
+        {
+          "key": "w",
+          "durationMs": 420,
+          "before": "Moonvale · 3813,4150 · cached 8/24",
+          "after": "Moonvale · 3813,4050 · cached 8/24"
+        }
+      ],
+      "finalHud": "Moonvale · 3813,4050 · cached 8/24",
+      "position": {
+        "x": 3813,
+        "y": 4050
+      },
+      "errors": [],
+      "visualEvidence": true,
+      "swordPickupTested": false,
+      "armedModeTested": false
+    }
+  },
+  "status": "completed_visual_only"
+}
