@@ -1125,8 +1125,7 @@ mod tests {
             loot.register(id).unwrap();
         }
         let physical_id = loot.grant(1, ItemKind::RustySword, 1).unwrap();
-        loot.equip(1, physical_id, EquipmentSlot::MainHand)
-            .unwrap();
+        loot.equip(1, physical_id, EquipmentSlot::MainHand).unwrap();
 
         // Deliberately staged in a dormant server-side test fixture, NOT a
         // real spell cast or an authorization to activate Ember in gameplay.
@@ -1138,14 +1137,7 @@ mod tests {
             .grant_lesson(award(12, character(1), Lesson::Spell(Spell::Ember)))
             .unwrap();
         magic
-            .stage_ember_intent(
-                character(1),
-                7,
-                ZoneId::Moonvale,
-                200.0,
-                200.0,
-                0.0,
-            )
+            .stage_ember_intent(character(1), 7, ZoneId::Moonvale, 200.0, 200.0, 0.0)
             .unwrap();
         let pending = *magic.ember_intent(character(1), 7).unwrap();
         assert_eq!(pending.status, EmberEffectStatus::Pending);
@@ -1176,7 +1168,9 @@ mod tests {
         // future damage intent with no durable command provenance.
         assert!(matches!(
             commit_verified_equipped_sword_drop_checked(authority!(1, 1), |_, _| Ok(())),
-            Err(PickupCommitError::JointCheckpoint(JointCheckpointError::Corrupt))
+            Err(PickupCommitError::JointCheckpoint(
+                JointCheckpointError::Corrupt
+            ))
         ));
         assert!(!path.exists());
         assert!(loot.ground().is_empty());
@@ -1197,7 +1191,10 @@ mod tests {
         loot.record_operation(character(1), 7).unwrap();
         save_joint(&path, &loot, &identity, &magic).unwrap();
         let (prior_loot, prior_magic) = load_joint(&path).unwrap();
-        assert_eq!(prior_loot.committed_operation_sequence(character(1)), Some(7));
+        assert_eq!(
+            prior_loot.committed_operation_sequence(character(1)),
+            Some(7)
+        );
         assert_eq!(prior_magic.ember_intent(character(1), 7), Some(&pending));
         assert_eq!(prior_magic.encode_progression().unwrap(), progression);
 
@@ -1211,7 +1208,10 @@ mod tests {
             })
             .unwrap();
         assert_eq!(dropped.expected_item_id, physical_id);
-        assert_eq!(loot.ground()[&dropped.ground_entity_id].item.id, physical_id);
+        assert_eq!(
+            loot.ground()[&dropped.ground_entity_id].item.id,
+            physical_id
+        );
         assert_eq!(magic.encode_progression().unwrap(), progression);
 
         let claimed = commit_verified_ground_sword_equip_checked(
@@ -1247,11 +1247,20 @@ mod tests {
 
         let (recovered, recovered_magic) = load_joint(&path).unwrap();
         assert_eq!(recovered_magic.encode_progression().unwrap(), progression);
-        assert_eq!(recovered_magic.ember_intent(character(1), 7), Some(&pending));
+        assert_eq!(
+            recovered_magic.ember_intent(character(1), 7),
+            Some(&pending)
+        );
         assert!(recovered_magic.ember_intent(character(2), 7).is_none());
         assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
-        assert_eq!(recovered.committed_operation_sequence(character(1)), Some(8));
-        assert_eq!(recovered.committed_operation_sequence(character(2)), Some(1));
+        assert_eq!(
+            recovered.committed_operation_sequence(character(1)),
+            Some(8)
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(character(2)),
+            Some(1)
+        );
         assert!(recovered.ground().is_empty());
         assert_eq!(
             recovered
