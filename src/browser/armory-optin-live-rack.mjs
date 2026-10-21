@@ -79,8 +79,18 @@ export async function loadOriginalBlacksmithRackPreview({
       ctx,plan,rackImage,swordImage,alphaSampler,frameId:frame+1
     });
     frame++;
+    // Read-only original source projected rack rect, NOT a pixel-visibility
+    // claim. Drawing off-canvas is still counted by the Canvas painter.
+    const rackRect=Object.freeze({x:plan.rack.x,y:plan.rack.y,
+      width:plan.rack.width,height:plan.rack.height});
+    const rackIntersectsViewport=rackRect.x<width && rackRect.y<height
+      && rackRect.x+rackRect.width>0 && rackRect.y+rackRect.height>0;
+    const rackFullyWithinViewport=rackRect.x>=0&&rackRect.y>=0
+      &&rackRect.x+rackRect.width<=width
+      &&rackRect.y+rackRect.height<=height;
     last=Object.freeze({
       renderedFrames:frame,drawnRackCount:presented.drawnRackCount,
+      rackScreenRect:rackRect,rackIntersectsViewport,rackFullyWithinViewport,
       drawnSwordCount:presented.drawnSwordCount,
       originalWorldSockets:WORLD_ALPHA_ARMORY.rackSockets.length,
       actualGameRender:true,canonicalItemFeedConnected:false,

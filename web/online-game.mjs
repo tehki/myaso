@@ -126,6 +126,7 @@ const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
 // work in normal games/Combat acceptance. Core has NO approved item feed yet.
 const armoryRackReviewEnabled = fixedWorldEnabled
   && params.get("armoryart") === "1"
+  && !params.has("scenario")
   && ["localhost","127.0.0.1","[::1]"].includes(window.location.hostname);
 let armoryRackReview = null;
 let armoryRackReviewFailure = false;
@@ -135,6 +136,14 @@ if (armoryRackReviewEnabled) {
     failure:armoryRackReviewFailure,
     painted:armoryRackReview?.status()?.renderedFrames ?? 0,
     drawnSwords:armoryRackReview?.status()?.drawnSwordCount ?? 0,
+    rackScreenRect:armoryRackReview?.status()?.rackScreenRect ?? null,
+    rackIntersectsViewport:armoryRackReview?.status()?.rackIntersectsViewport ?? false,
+    rackFullyWithinViewport:armoryRackReview?.status()?.rackFullyWithinViewport ?? false,
+    // Localhost-only read of genuine replicated Rust server fighter state.
+    // Never supplied as World/Items authority or used to alter movement.
+    observedReplicatedFighters:networkClient?.state
+      ?[...networkClient.state.values()].map(v=>({netId:v.netId,x:v.x,y:v.y}))
+      :[],
     actualCanvas:!!armoryRackReview?.status()?.actualGameRender,
     canonicalItems:false,serverTryPickup:false,productionApproved:false
   });

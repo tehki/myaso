@@ -1,0 +1,47 @@
+name: Graphics 3B P0 four live browsers stand at the original Blacksmith rack
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/armory-optin-live-rack.mjs"
+      - "web/online-game.mjs"
+      - "scripts/alpha_p0_four_native_rack_at_approaches.mjs"
+      - "scripts/alpha_p0_rack_walk_math.mjs"
+      - "tests/armory-optin-four-at-rack.test.mjs"
+      - ".github/workflows/graphics3b-p0-real-rack-approaches.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  four-actual-greyhaven-players-and-one-source-rack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate exact source contract and native WebDriver route
+        run: |
+          node --check src/browser/armory-optin-live-rack.mjs
+          node --check web/online-game.mjs
+          node --check scripts/alpha_p0_four_native_rack_at_approaches.mjs
+          node --test tests/armory-optin-live-rack.test.mjs tests/armory-optin-native-flight-contract.test.mjs tests/armory-optin-four-at-rack.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Verify all four real Chrome/Firefox W3C driver binaries
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build original authenticated WebTransport/Rust authority
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four REAL WebDriver browsers walk west-first then north to four World racks
+        run: timeout --signal=TERM --kill-after=5s 320s node scripts/alpha_p0_four_native_rack_at_approaches.mjs
+      - name: Retain actual four first-party rack approaches, screenshots and server positions
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-four-real-browsers-at-blacksmith-rack
+          path: alpha-p0-real-greyhaven-rack-approach-evidence/*
+          if-no-files-found: ignore
+          retention-days: 3
