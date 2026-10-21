@@ -606,6 +606,54 @@ physics, protocol, client UIs, game equipment, account persistence,
 or default-OFF / loopback-only staging network configuration. It
 does NOT claim physical clicked swords or a multi-host browser playtest.
 
+## Core 8C — dead fighter cannot damage a real in-range opponent
+
+This child extends the genuine four-QUIC Dead-state input test with a
+**directionally valid forbidden hit**. Previous dead-input proof
+required that fighter #5 never enter attack state or move before its
+server-controlled respawn. An east-facing heavy attack on empty space,
+however, could not by itself prove that the server suppressed potential
+damage to another player.
+
+The existing same-session scenario already has original fighter #1
+alive and physically near defeated net ID #5: #1 previously approached
+#5 through ordinary gameplay movement to engage within the server's
+unchanged **130-unit heavy reach**. All four real certificate-pinned
+QUIC sessions (#1,#3,#4 and the defeated fighter #5) observe #5's
+genuine **0HP / Dead**, and all four receive server-authored reliable
+kill event sequence 1. While still Dead, #5 sends an ordinary,
+well-formed **heavy+east-movement** INPUT packet using its authentic
+Dead snapshot ACK sequence and server tick, but sets normal quantized
+facing to **west / PI** — directly toward living #1. The server
+acknowledges the packet as a valid transport input.
+
+All four independently connected observer streams must then decode
+authoritative snapshots for at least **28 additional server ticks**
+after the real death and fail if any server VITALS update reduces
+fighter #1's **100 HP**, if defeated #5 gains HP prematurely, or if
+#5 transitions to a non-Dead action. #5's own stream additionally
+requires **no server-authored position delta** while Dead; other
+spectators are permitted to receive repeated old position fields from
+unacknowledged delta baselines, not mistakenly interpreted as new
+movement. This is a meaningful real melee-range negative control:
+a wrongly executed west-facing heavy strike would be capable of
+damaging nearby #1 after its original 320ms windup. The proof requires
+the real world to keep advancing; packet acceptance alone cannot pass.
+
+The same test then releases #5's attempted action, moves living #1
+clear of the respawn anchor by normal INPUT, confirms the exact
+server-timed **100HP / Idle** respawn with all four current sessions,
+then has revived #5 walk east and perform a fresh valid west-facing
+heavy strike. **All four** subsequently observe the actual committed
+heavy attack by #5 and #1's server-owned **100→54HP** result. Thus
+the paired checks show a real in-range attack is harmless while Dead,
+but causes the unchanged **46HP** damage after actual respawn,
+without changing runtime Combat, network protocol, or staging bind.
+
+The test is still only a loopback real-QUIC network acceptance;
+it does not validate real native-browser controls on two hosts,
+persistent accounts, equipped swords, or full dynamic World/Physics.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
