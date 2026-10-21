@@ -1266,7 +1266,161 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     println!(
         "ALPHA_8C_QUIC_RELIABLE_KILL_JOIN_SCOPE_PASS event=0 original_peers=4          late_join_id=5 replayed_events=0 current_roster=1,3,4,5"
     );
+
+    // A newly joined client's feed must also deliver NEW server events.
+    // After spawn admission the attacker may safely move back into close
+    // melee range. Doing so is necessary because genuine heavy knockback
+    // otherwise pushes #5 outside the server's attack reach by hit three.
+    // This is ordinary client movement, never a privileged World teleport.
+    send_held_direction(&sessions[0].0, sessions[0].3, 69_001, (127, 0))?;
+    let approach_deadline = Instant::now() + Duration::from_secs(4);
+    let second_fight_position = loop {
+        let position = next_authoritative_position(&sessions[0].0, 1, approach_deadline).await?;
+        if position.0 >= 4160.0 {
+            break position;
+        }
+    };
+    send_held_direction(&sessions[0].0, sessions[0].3, 69_002, (0, 0))?;
+    if !(4160.0..=4175.0).contains(&second_fight_position.0)
+        || (second_fight_position.1 - SPAWNS[1].1).abs() > 5.0
+    {
+        bail!("attacker did not reapproach new fighter through real movement: {second_fight_position:?}");
+    }
+    println!(
+        "ALPHA_8C_QUIC_NEW_TARGET_APPROACH x={:.1} y={:.1} original_victim=5",
+        second_fight_position.0, second_fight_position.1
+    );
+    for (round, target_hp) in [54_u8, 8].into_iter().enumerate() {
+        let tick = 70_000 + 100 * round as u32;
+        send_quic_heavy_fist(&sessions[0].0, sessions[0].3, tick)?;
+        require_quic_input_ack(&sessions[0].0, tick, 1).await?;
+        send_held_direction(&sessions[0].0, sessions[0].3, tick + 1, (0, 0))?;
+        let deadline = Instant::now() + Duration::from_secs(4);
+        let mut committed = false;
+        let mut hit_tick = None;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!("newcomer #5 real heavy strike {} did not settle: target={target_hp}, committed={committed}, hit_tick={hit_tick:?}", round + 1);
+            }
+            let incoming = timeout(remaining, sessions[0].0.receive_datagram())
+                .await
+                .context("fresh post-join heavy result timeout")??;
+            let bytes = incoming.as_ref();
+            if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(bytes)
+                .map_err(|e| anyhow::anyhow!("fresh post-join heavy snapshot invalid: {e:?}"))?;
+            for record in snapshot.records {
+                if record.net_id == 1
+                    && record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_ACTION != 0
+                    && [9, 10, 11].contains(&record.action)
+                {
+                    committed = true;
+                }
+                if record.net_id == 5
+                    && record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_VITALS != 0
+                {
+                    if record.hp < target_hp {
+                        bail!(
+                            "post-join heavy strike overdamaged newcomer: {} < {target_hp}",
+                            record.hp
+                        );
+                    }
+                    if record.hp == target_hp {
+                        hit_tick.get_or_insert(snapshot.server_tick);
+                    }
+                }
+            }
+            if committed && hit_tick.is_some_and(|start| snapshot.server_tick >= start + 40) {
+                break;
+            }
+        }
+        println!(
+            "ALPHA_8C_QUIC_FRESH_KILL_WINDUP round={} victim=5 hp={target_hp}",
+            round + 1
+        );
+    }
+    let second_kill_tick = 70_200;
+    send_quic_heavy_fist(&sessions[0].0, sessions[0].3, second_kill_tick)?;
+    require_quic_input_ack(&sessions[0].0, second_kill_tick, 1).await?;
+    send_held_direction(&sessions[0].0, sessions[0].3, second_kill_tick + 1, (0, 0))?;
+
+    // Both old survivors and the NEW spectator must independently observe
+    // the new fighter's real 0HP/Dead state, from their own datagram stream.
+    let (dead1, dead3, dead4, dead5) = tokio::try_join!(
+        observe_real_quic_dead_target(&sessions[0].0, 1, 5),
+        observe_real_quic_dead_target(&sessions[1].0, 3, 5),
+        observe_real_quic_dead_target(&sessions[2].0, 4, 5),
+        observe_real_quic_dead_target(&replacement, 5, 5)
+    )?;
+    println!("ALPHA_8C_QUIC_SECOND_DEATH_TICKS [{dead1},{dead3},{dead4},{dead5}]");
+    for (index, session) in sessions.iter_mut().enumerate() {
+        let observer = [1, 3, 4][index];
+        let event = receive_real_quic_kill_event(&mut session.2, observer).await?;
+        if event.sequence != 1 || event.killer != 1 || event.victim != 5 {
+            bail!("survivor {observer} failed next historical kill sequence: {event:?}");
+        }
+        println!("ALPHA_8C_QUIC_NEW_KILL observer={observer} sequence=1 killer=1 victim=5");
+    }
+    let next = receive_real_quic_kill_event(&mut replacement_recv, 5).await?;
+    if next.sequence != 1 || next.killer != 1 || next.victim != 5 {
+        bail!("new spectator replayed a stale kill or missed fresh kill: {next:?}");
+    }
+    println!("ALPHA_8C_QUIC_NEW_KILL observer=5 sequence=1 killer=1 victim=5");
+    println!(
+        "ALPHA_8C_QUIC_KILL_HISTORY_FENCE_PASS old_seq=0 new_seq=1          late_join_id=5 old_replays=0 new_event_fanout=4"
+    );
     Ok(())
+}
+
+/// Match a *new* authenticated attack against actual network-published
+/// target death; no fabricated damage or inferred kill-feed result.
+async fn observe_real_quic_dead_target(
+    connection: &wtransport::Connection,
+    observer: u32,
+    target: u32,
+) -> Result<u32> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut hp = 100_u8;
+    let mut action = 0_u8;
+    let mut seen_frames = 0_usize;
+    let mut last_tick = 0_u32;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("observer {observer} never saw real network Dead for target {target}: hp={hp} action={action}");
+        }
+        let incoming = match timeout(remaining, connection.receive_datagram()).await {
+            Ok(Ok(incoming)) => incoming,
+            Ok(Err(error)) => bail!("observer {observer} lost QUIC during second kill: {error:#}"),
+            Err(_) => bail!("observer {observer} never received second Dead target={target}: hp={hp}, action={action}, frames={seen_frames}, last_server_tick={last_tick}"),
+        };
+        let bytes = incoming.as_ref();
+        if bytes.len() < 14 || bytes[0] != 1 || bytes[1] != 2 {
+            continue;
+        }
+        let snapshot = decode_snapshot(bytes)
+            .map_err(|e| anyhow::anyhow!("post-join combat snapshot invalid: {e:?}"))?;
+        seen_frames += 1;
+        last_tick = snapshot.server_tick;
+        for record in snapshot.records.iter().filter(|r| r.net_id == target) {
+            if record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_VITALS != 0 {
+                hp = record.hp;
+            }
+            if record.mask & myaso_server::snapshot::SNAPSHOT_FIELD_ACTION != 0 {
+                action = record.action;
+            }
+        }
+        if hp == 0 && action == 8 {
+            println!(
+                "ALPHA_8C_QUIC_SECOND_DEATH observer={observer} target={target} tick={}",
+                snapshot.server_tick
+            );
+            return Ok(snapshot.server_tick);
+        }
+    }
 }
 
 /// Prove the real authoritative World advanced by at least 60 ticks after

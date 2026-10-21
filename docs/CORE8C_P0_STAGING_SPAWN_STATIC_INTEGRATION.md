@@ -388,6 +388,45 @@ browser-rendered notifications. It retains the explicit default-OFF
 loopback-only reviewed-static staging profile without any server-side
 logic, protocol, release control or production exposure changes.
 
+## Core 8C — new live kill delivery after late join (no silent feed)
+
+The child acceptance extends the preceding kill-feed join-history
+isolation with a **positive post-join delivery control**. Merely not
+receiving a historical event can be a false success if the newcomer has
+a broken or silent reliable stream. After event sequence 0 was delivered
+to all original four sessions (killer #1, victim #2), departed #2 is
+removed, a previously occupied spawn is physically cleared using
+ordinary movement, and a genuine fresh client joins as #5, its
+authenticated reliable stream is checked for 1.25 seconds to reject
+old event zero. Its live snapshot stream separately advances at least
+60 authoritative ticks with the correct new roster {1,3,4,5}.
+
+The original attacker #1 then approaches newcomer #5 via ordinary
+client movement until the real server confirms a close east-facing
+melee position. This is required because heavy-attack knockback can
+push opponents beyond range if the attacker stays at its spawn after
+the previous 44-unit admission-clearance step. There is **no teleport
+or range/collision exemption**. The original server accepts three
+separately committed unarmed heavy attack input edges on the new
+fighter, and server snapshots confirm **100 -> 54 -> 8 -> 0 HP**
+with >=40 server ticks of genuine recovery between committed blows.
+All four **current** QUIC observers (#1, #3, #4, #5) must independently
+see **0HP / Dead** for net ID #5. Each authenticated original
+bidirectional reliable stream must independently deliver the same
+**next** 16-byte binary kill event, with sequence **1**, killer **1**
+and victim **5**. Any duplicate sequence 0, missing stream, wrong
+victim, wrong sender or absent server-owned death makes the test fail.
+
+This provides a true real-transport paired claim: a brand-new player's
+stream does not replay kill sequence 0 from before joining, yet does
+receive the subsequent legitimate kill sequence 1 that occurred
+after joining, along with the same new kill viewed by every survivor.
+It does not claim browser kill-feed rendering, adversarial packet-loss
+testing, equipped swords, item grants, persistent identity recovery,
+or a two-physical-host browser run. The server remains a disposable
+loopback-only explicitly opted-in reviewed-static fixture. No runtime
+Combat, reliable-stream implementation or release gate was changed.
+
 ## Nonclaims and release HOLD
 
 This is **not** full geometry authority. World #509's 23 static AABBs omit
