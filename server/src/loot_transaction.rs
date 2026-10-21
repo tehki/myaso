@@ -228,6 +228,9 @@ pub fn commit_verified_pickup(
     Ok(item)
 }
 
+/// OFFLINE TEST-ONLY LEGACY PATH — intentionally not compiled in production.
+/// A live handler must never bypass the required authoritative Physics/Core
+/// line-of-sight witness by using an always-OK geometry callback.
 /// P0 armory domain primitive: physically take ONE nearby server-owned ground
 /// sword and equip MainHand as ONE staged, checkpointed operation. A client may
 /// select a visible ground entity but cannot choose actor, zone, origin, time,
@@ -238,7 +241,8 @@ pub fn commit_verified_pickup(
 /// authoritative server collision/LOS, canonical Core 8B item IDs, fencing,
 /// atomic durable receipt/outbox and post-commit-ACK recovery BEFORE exposure.
 /// Caller holds the common World/Zone/Identity/Loot/Magic writer lock.
-pub fn commit_verified_ground_sword_equip(
+#[cfg(test)]
+pub(crate) fn commit_verified_ground_sword_equip(
     path: &Path,
     loot: &mut LootAuthority,
     magic: &MagicAuthority,
@@ -872,29 +876,65 @@ mod tests {
             zones: &zones,
         };
 
-        // At 40-unit horizontal socket spacing, an actor at one approach
-        // cannot grab the adjacent socket 50 units away in the vertical axis.
-        assert!(matches!(
-            commit_verified_ground_sword_equip(
-                &path,
-                &mut loot,
-                &magic,
-                &identity,
-                tick(),
-                op(1, 1),
-                202
-            ),
-            Err(PickupCommitError::Loot(LootError::OutOfReach))
-        ));
+        // All 12 other-player sword intents fail *before* geometry validation:
+        // World #493 has 40 horizontal and 50 vertical unit offsets.
+        // This test uses Items' existing authoritative reach of 56 units;
+        // Physics/Core must separately approve and enforce their current
+        // complete same-tick LOS window for production.
+        for viewer in 1_u32..=4 {
+            for target in 1_u32..=4 {
+                if viewer == target {
+                    continue;
+                }
+                let wrong_socket = GroundSwordSelection {
+                    ground_entity_id: 200 + u64::from(target),
+                    expected_item_id: 100 + u64::from(target),
+                };
+                assert!(matches!(
+                    commit_verified_ground_sword_equip_checked(
+                        GroundSwordAuthority {
+                            path: &path,
+                            loot: &mut loot,
+                            magic: &magic,
+                            identity: &identity,
+                            tick: tick(),
+                            operation: op(viewer, 1),
+                        },
+                        wrong_socket,
+                        |_, _, _| panic!("out-of-reach selection must not reach Physics"),
+                    ),
+                    Err(PickupCommitError::Loot(LootError::OutOfReach))
+                ));
+                assert_eq!(
+                    loot.committed_operation_sequence(CharacterId::new(u64::from(viewer)).unwrap()),
+                    None
+                );
+            }
+        }
+        assert!(!path.exists());
         for id in 1_u32..=4 {
-            let item = commit_verified_ground_sword_equip(
-                &path,
-                &mut loot,
-                &magic,
-                &identity,
-                tick(),
-                op(id, 1),
-                200 + u64::from(id),
+            let item = commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: tick(),
+                    operation: op(id, 1),
+                },
+                GroundSwordSelection {
+                    ground_entity_id: 200 + u64::from(id),
+                    expected_item_id: 100 + u64::from(id),
+                },
+                |fighter, ground, zone| {
+                    assert_eq!(fighter.net_id, id);
+                    assert_eq!(ground.entity_id, 200 + u64::from(id));
+                    assert_eq!(ground.item.id, 100 + u64::from(id));
+                    assert_eq!(ground.zone, zone);
+                    // Synthetic fixture prerequisite only, not a Physics
+                    // #494 real window or Core epoch/LOS authority.
+                    Ok(())
+                },
             )
             .unwrap();
             assert_eq!(item.id, 100 + u64::from(id));
@@ -956,14 +996,25 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            commit_verified_ground_sword_equip(
-                &path,
-                &mut loot,
-                &magic,
-                &identity,
-                tick(),
-                op(2, 3),
-                dropped_entity
+            commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: tick(),
+                    operation: op(2, 3),
+                },
+                GroundSwordSelection {
+                    ground_entity_id: dropped_entity,
+                    expected_item_id: 101,
+                },
+                |fighter, ground, zone| {
+                    assert_eq!(fighter.net_id, 2);
+                    assert_eq!(ground.item.id, 101);
+                    assert_eq!(ground.zone, zone);
+                    Ok(())
+                },
             )
             .unwrap()
             .id,
