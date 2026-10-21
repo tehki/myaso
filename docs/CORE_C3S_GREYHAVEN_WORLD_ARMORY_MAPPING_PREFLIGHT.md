@@ -50,3 +50,47 @@ The tests do not import the World JavaScript source at runtime (the P0 World bra
 **8C + World + Physics** must decide actual 8192-world geometry to authoritative Core zone location representation, zone identity/epoch, LOS and pickup reach semantics; **Items 2B** must nominate four unique source ground entity/item IDs and the ONE approved live sword transaction writer; **8B** must verify the complete active+retired canonical ID inventory, collision-safe deterministic mapping, and receipt durability; **8A** must provide authenticated player/session to item intent and the authoritative ACK/outbox. **Graphics/UI** must hit-test the physical sword image and reject old visual frames under a verified monotone epoch/revision.
 
 Only the Main Orchestrator may integrate and stage once protected CI and 4 independent-browser M1–M5 acceptance passes. Leave MYTX and MYWLD003 prototypes isolated: never dual-write the same sword, downcast `u128→u64`, or guess centimeter scale. No production migration, gameplay switch, wallet or MOCMP activation.
+
+## Cross-department source-parity doctor (integration-only)
+
+New `scripts/verify_armory_source_parity.mjs` tests the **actual
+imported World JavaScript authoring module** against Core's frozen
+four-row Rust `GREYHAVEN_RACK_V1` source constant. It validates
+`WORLD_ALPHA_ARMORY_VERSION===1`, runs World's own
+`validateWorldAlphaArmoryLayout()` and requires exactly four identical
+ordered socket names and exact integer world x/y values.
+
+This doctor requires **two explicit file paths** and runs only when
+both exact source trees are available, e.g. in the Main Orchestrator's
+temporary Core+World integration checkout:
+
+```sh
+node scripts/verify_armory_source_parity.mjs --self-test \
+  src/world/alpha-armory.mjs \
+  server/src/alpha_armory_mapping_preflight.rs
+```
+
+If World is still on its separate branch, provide its exact checked-out
+path rather than silently using a different branch or fetching
+`main`. Missing World source, invalid layout, changed authoring
+version, wrong Core manifest, any coordinate drift, repeated/missing
+socket ID or mismatched ordering **fails closed**.
+
+`--self-test` also tests four mutations **in memory**—wrong socket-3
+coordinate, duplicated socket-2 ID, omitted fourth socket and
+renamed Core review constant—requiring each to be rejected without
+changing either actual source file or requiring writable temporary
+fixture files. This does **not** imply network or asset validation,
+real click collision, approved coordinate scaling or World PR merge.
+
+**Executed on Serj Linux with World #493 exact
+`07060f981b8a1dac89184b621b6893dd970a08ae` and Core C3s code
+source `279e1fdf3953842ad1917cc352d3d47e2fe83f74`:**
+**4/4 source socket parity PASS; 4/4 negative corruption checks PASS**;
+`node --check` PASS. The parser is an integration helper, not a new
+protected CI bypass; run it again at the final combined exact source
+revisions.
+
+This source-only doctor does **not** select the single live item
+authority, establish a journal/MYWLD003 writer cutover, import
+real item IDs, validate signed zone/epoch or generate observer ACKs.
