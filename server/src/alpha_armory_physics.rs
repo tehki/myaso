@@ -516,6 +516,156 @@ mod tests {
     }
 
     #[test]
+    fn items_p0_56_unit_pickup_reach_and_explicit_sword_targeting() {
+        // Items #522/#533 uses PICKUP_REACH = 56.0. This test-only mirror
+        // documents cross-branch parity; the integrated caller MUST pass the
+        // actual Items reach constant, not the generic 96-unit Physics ceiling.
+        // All fixtures are World #493 authored candidates, NOT live authority.
+        let reach = 56.0;
+        let xs = [3740.0, 3780.0, 3820.0, 3860.0];
+        let smith = SolidRect {
+            min_x: 3710.0,
+            min_y: 3850.0,
+            max_x: 3892.0,
+            max_y: 4012.0,
+        };
+        let bounds = SolidRect {
+            min_x: 3650.0,
+            min_y: 3800.0,
+            max_x: 4000.0,
+            max_y: 4200.0,
+        };
+        let fixture = GeometryWindow {
+            fence: CURRENT,
+            complete: true,
+            bounds,
+            solids: &[smith],
+        };
+        let ticks = PickupTickFence {
+            operation_tick: 900,
+            actor_tick: 900,
+            sword_tick: 900,
+            geometry_tick: 900,
+        };
+        for (i, x) in xs.iter().copied().enumerate() {
+            let stand = WorldPoint {
+                zone_id: CURRENT.zone_id,
+                x,
+                y: 4088.0,
+            };
+            for (j, sword_x) in xs.iter().copied().enumerate() {
+                let candidate = WorldPoint {
+                    zone_id: CURRENT.zone_id,
+                    x: sword_x,
+                    y: 4038.0,
+                };
+                assert_eq!(
+                    verify_pickup_geometry_at_completed_tick(
+                        stand, candidate, &fixture, CURRENT, reach, ticks
+                    ),
+                    if i == j {
+                        Ok(())
+                    } else {
+                        Err(PickupGeometryReject::OutOfRange)
+                    },
+                    "stand {i} / explicit sword {j}: no cross-socket pickup at 56"
+                );
+            }
+        }
+        let sword = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: xs[0],
+            y: 4038.0,
+        };
+        let on_boundary = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: xs[0],
+            y: 4094.0,
+        };
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                on_boundary,
+                sword,
+                &fixture,
+                CURRENT,
+                reach,
+                ticks
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                WorldPoint {
+                    y: 4094.125,
+                    ..on_boundary
+                },
+                sword,
+                &fixture,
+                CURRENT,
+                reach,
+                ticks
+            ),
+            Err(PickupGeometryReject::OutOfRange)
+        );
+        // Midway between two stands, TWO distinct swords satisfy geometry at
+        // 56 units (sqrt(20^2 + 50^2) < 56). Geometry MUST NOT choose a
+        // nearest object or infer an item ID. Items must check the selected,
+        // authenticated canonical sword ID under its exclusive commit fence.
+        let midpoint = WorldPoint {
+            zone_id: CURRENT.zone_id,
+            x: 3760.0,
+            y: 4088.0,
+        };
+        for x in [xs[0], xs[1]] {
+            assert_eq!(
+                verify_pickup_geometry_at_completed_tick(
+                    midpoint,
+                    WorldPoint {
+                        zone_id: CURRENT.zone_id,
+                        x,
+                        y: 4038.0
+                    },
+                    &fixture,
+                    CURRENT,
+                    reach,
+                    ticks
+                ),
+                Ok(())
+            );
+        }
+        // Even a close actor inside the smith footprint cannot reach through
+        // the wall; the 56-unit threshold does not override line of sight.
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                WorldPoint {
+                    y: 4000.0,
+                    ..on_boundary
+                },
+                sword,
+                &fixture,
+                CURRENT,
+                reach,
+                ticks
+            ),
+            Err(PickupGeometryReject::Occluded)
+        );
+        assert_eq!(
+            verify_pickup_geometry_at_completed_tick(
+                on_boundary,
+                sword,
+                &fixture,
+                CURRENT,
+                reach,
+                PickupTickFence {
+                    sword_tick: 899,
+                    ..ticks
+                }
+            ),
+            Err(PickupGeometryReject::StaleWorldTick)
+        );
+    }
+
+    #[test]
     fn world_p0_greyhaven_west_gate_remains_open_without_phasing_through_wall() {
         // Two exact authored wall spans from World #502 (static design).
         // This is NOT a complete authoritative city/river/dynamic manifest.
