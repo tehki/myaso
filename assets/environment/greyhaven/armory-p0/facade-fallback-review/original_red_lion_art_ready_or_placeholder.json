@@ -1,0 +1,226 @@
+{
+  "heads": {
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "threeC": "efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac",
+    "threeB": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5"
+  },
+  "sourceHashes": {
+    "/__world521__/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33",
+    "/__world521__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__3cp37__/src/browser/authored-world-renderer.mjs": "14290d457a0d6bedc0c3d5b98334b9964007130190b7a8881bd3e2bd7fb2cb06",
+    "/__3cp37__/src/browser/greyhaven-atmosphere.mjs": "ddd5b8ea3111107a8786bc890baec9f740f2fe9de4c8fdd392fe82b227597600",
+    "/__3cp37__/src/browser/greyhaven-terrain-materials.mjs": "cfc22bbf2c5ab9847ba40ef85773efe7b382041ed27784cd7eee3cc4fdb59a58",
+    "/__3cp37__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp": "f45ca685364666e7911128b75180eb1dea5636b48ab2ae5538cc37523ec2dfd0",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp": "4b7d58f1dc3469ec612c3ac861089ed6665c2118fa27eb7b2fbb1914f55776c3",
+    "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+    "/web/armory-p0-facade-failclosed-review.html": "55ab79a69cfb6ee99d50a4441297b3ee7b81f7b985038e9ebc25039fe6bb4f5b",
+    "/web/armory-p0-facade-failclosed-review.mjs": "4f56c1960138b9a83b786941b4c7706ac4ff497456c31515bc00bb63ed036e1e",
+    "/src/browser/red-lion-original-art-readiness.mjs": "a9a37c2826a47f477fc04e0dfc977ff197e9c35886cd335639c498581fb95247",
+    "/src/browser/arena-viewport.mjs": "bfe67165fe9fc6a1dd847bb98320a2f0d6dcf64637e960600c761c38dd23669c"
+  },
+  "trials": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "situation": "normal",
+      "data": {
+        "ready": true,
+        "artReady": true,
+        "actualBrowserImageDecode": true,
+        "fallbackDefaultPlaceholder": false,
+        "replacementApplied": true,
+        "replacedBuildingIds": [
+          "red-lion"
+        ],
+        "originalFacadePixelsDifferentFromPlaceholder": 63162,
+        "fallbackPixelsIdenticalToOriginal": false,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_chrome_normal.png",
+      "simulatedFailure": false
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "situation": "fail-day",
+      "data": {
+        "ready": true,
+        "artReady": false,
+        "actualBrowserImageDecode": false,
+        "fallbackDefaultPlaceholder": true,
+        "replacementApplied": false,
+        "replacedBuildingIds": [],
+        "originalFacadePixelsDifferentFromPlaceholder": 0,
+        "fallbackPixelsIdenticalToOriginal": true,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [
+        {
+          "status": 503,
+          "path": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp"
+        }
+      ],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_chrome_fail-day.png",
+      "simulatedFailure": true
+    },
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "situation": "fail-roof",
+      "data": {
+        "ready": true,
+        "artReady": false,
+        "actualBrowserImageDecode": false,
+        "fallbackDefaultPlaceholder": true,
+        "replacementApplied": false,
+        "replacedBuildingIds": [],
+        "originalFacadePixelsDifferentFromPlaceholder": 0,
+        "fallbackPixelsIdenticalToOriginal": true,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [
+        {
+          "status": 503,
+          "path": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        }
+      ],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_chrome_fail-roof.png",
+      "simulatedFailure": true
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "situation": "normal",
+      "data": {
+        "ready": true,
+        "artReady": true,
+        "actualBrowserImageDecode": true,
+        "fallbackDefaultPlaceholder": false,
+        "replacementApplied": true,
+        "replacedBuildingIds": [
+          "red-lion"
+        ],
+        "originalFacadePixelsDifferentFromPlaceholder": 63305,
+        "fallbackPixelsIdenticalToOriginal": false,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_firefox_normal.png",
+      "simulatedFailure": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "situation": "fail-day",
+      "data": {
+        "ready": true,
+        "artReady": false,
+        "actualBrowserImageDecode": false,
+        "fallbackDefaultPlaceholder": true,
+        "replacementApplied": false,
+        "replacedBuildingIds": [],
+        "originalFacadePixelsDifferentFromPlaceholder": 0,
+        "fallbackPixelsIdenticalToOriginal": true,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [
+        {
+          "status": 503,
+          "path": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp"
+        }
+      ],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_firefox_fail-day.png",
+      "simulatedFailure": true
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "situation": "fail-roof",
+      "data": {
+        "ready": true,
+        "artReady": false,
+        "actualBrowserImageDecode": false,
+        "fallbackDefaultPlaceholder": true,
+        "replacementApplied": false,
+        "replacedBuildingIds": [],
+        "originalFacadePixelsDifferentFromPlaceholder": 0,
+        "fallbackPixelsIdenticalToOriginal": true,
+        "browserSourcePaths": {
+          "day": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_day_dimensional.webp",
+          "dusk": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_dusk_dimensional.webp",
+          "roof": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        },
+        "actorDepthVerified": false,
+        "gameRendererIntegrated": false,
+        "originalAssetsMutated": false,
+        "lowEndChromiumIssueResolved": false,
+        "releaseApproved": false
+      },
+      "httpErrors": [
+        {
+          "status": 503,
+          "path": "/__3ba231__/assets/environment/greyhaven/a231-review/red_lion_a231_roof_unchanged.webp"
+        }
+      ],
+      "pageErrors": [],
+      "screenshot": "red_lion_art_gating_firefox_fail-roof.png",
+      "simulatedFailure": true
+    }
+  ],
+  "liveGame": false,
+  "serverItems": false,
+  "actualLowEndTest": false,
+  "productionApproved": false
+}
