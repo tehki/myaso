@@ -414,13 +414,7 @@ mod tests {
                 y: 4000.0,
             };
             assert_eq!(
-                verify_pickup_geometry(
-                    invalid_inside_smith,
-                    item_anchor,
-                    &fixture,
-                    CURRENT,
-                    64.0,
-                ),
+                verify_pickup_geometry(invalid_inside_smith, item_anchor, &fixture, CURRENT, 64.0,),
                 Err(PickupGeometryReject::Occluded)
             );
         }
