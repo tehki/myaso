@@ -14,6 +14,9 @@ test("P43 probe pins original online opaque target and separates timed contexts 
  assert.match(code,/buildLimit:3/);
  assert.match(code,/phase:"timing"/);
  assert.match(code,/phase:"pixel"/);
+ assert.match(code,/P43_BROWSER_ENGINE/);
+ assert.match(code,/completeTwoBrowserMatrix:selectedEngines.length===2/);
+ assert.match(code,/selectedEngines.every/);
  assert.doesNotMatch(readFileSync(new URL("web/online-game.mjs",root),"utf8"),/probe_p43_shipping_canvas_context_browser/);
 });
 for(const file of reports){

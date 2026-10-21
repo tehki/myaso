@@ -35,13 +35,19 @@ const server=createServer(async(req,res)=>{
  catch{res.writeHead(500);res.end("source unavailable");}
 });
 await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+const selectedEngines=process.env.P43_BROWSER_ENGINE
+ ?[process.env.P43_BROWSER_ENGINE]:["chrome","firefox"];
+assert.ok(selectedEngines.every(e=>e==="chrome"||e==="firefox"),
+ "P43_BROWSER_ENGINE must be chrome or firefox");
 const report={
+ browserEngineSelection:selectedEngines,
+ completeTwoBrowserMatrix:selectedEngines.length===2,
  purpose:"P43 shipping alpha:false vs prior willReadFrequently:true original Canvas timing",
  sources:{gfx3cParent:pinnedParent,world:head(world)},
  onlineGameContextPinned:true,gameClientRunning:false,noSourceEdits:true,runs:[]
 };
 try{
- for(const engine of ["chrome","firefox"]){
+ for(const engine of selectedEngines){
   const options={headless:true,executablePath:engine==="chrome"?process.env.CHROME_EXECUTABLE:process.env.FIREFOX_EXECUTABLE};
   assert.ok(options.executablePath);
   if(engine==="chrome")options.args=["--no-sandbox","--disable-gpu-sandbox"];
