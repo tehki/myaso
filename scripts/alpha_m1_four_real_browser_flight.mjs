@@ -342,6 +342,10 @@ async function pressActualMovementKey(s,key,holdMs) {
   try{await sleep(holdMs)}
   finally{await webdriver(s.base,"POST",url,{actions:[{type:"key",id:"rack-walk-"+s.name,
     actions:[{type:"keyUp",value:key}]}]});}
+  // Server processes real browser key-up on its next 30Hz input packet;
+  // wait for a bounded post-release fence before sampling a new direction.
+  // Never overwrite fighter coordinates or ignore an obstructing solid.
+  await sleep(220);
 }
 async function walkActualBrowserAxis(s,playerId,axis,target) {
   assert(axis==="x"||axis==="y","unauthorized walk axis");
@@ -361,6 +365,7 @@ async function walkActualBrowserAxis(s,playerId,axis,target) {
     },s.name+" server-authoritative "+axis+" rack approach tick",2800);
     const newPosition=fighter(after,playerId),gain=Math.abs(p[axis]-target)-Math.abs(newPosition[axis]-target);
     samples.push({attempt,key,holdMs:step.holdMs,before:p[axis],after:newPosition[axis],
+      actualPoint:{x:newPosition.x,y:newPosition.y},
       target,tick:after.tick,gain});
     if(gain<=1)noProgress++;
     else noProgress=0;
@@ -387,8 +392,12 @@ async function nativeFourRackApproaches(views) {
     // Original click focuses canvas and may initiate unarmed swing. Allow the
     // actual server to finish recovery; never set synthetic action/position.
     await sleep(750);
-    const vertical=await walkActualBrowserAxis(s,id,"y",slot.approach.y);
+    // Stay SOUTH of Smith's actual building AABB (bottom y=4012) while
+    // traversing west, then approach the four racks from outside the wall.
+    // Old north-first sequence intermittently clipped the actual Smith
+    // east boundary at x=3914 as key-up packet delivery lagged.
     const horizontal=await walkActualBrowserAxis(s,id,"x",slot.approach.x);
+    const vertical=await walkActualBrowserAxis(s,id,"y",slot.approach.y);
     const at=await waitFor(async()=>{
       const state=await snapshot(s),p=fighter(state,id);
       return {ok:fourVisible(state)&&nativeRackArrived(p,slot.approach),value:state};
