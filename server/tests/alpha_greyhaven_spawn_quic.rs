@@ -1113,6 +1113,28 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
     }
     println!("ALPHA_8C_QUIC_KILL_RESPAWN_SERVER_TICKS {server_ticks:?}");
 
+    // The server's KillEvent packet is carried on each authenticated
+    // RELIABLE bidirectional stream, not the best-effort snapshot datagrams.
+    // All four clients must independently read the genuine server's same
+    // ordered, framed kill event after its 3rd heavy hit. This proves the
+    // shared-world kill-feed fanout, not just replicated 0HP/Dead state.
+    let mut kill_event_sequences = [None; 4];
+    for (index, session) in sessions.iter_mut().enumerate() {
+        let observer = index as u32 + 1;
+        let kill = receive_real_quic_kill_event(&mut session.2, observer).await?;
+        if kill.killer != 1 || kill.victim != 2 {
+            bail!("observer {observer} received incorrect reliable kill event: {kill:?}");
+        }
+        kill_event_sequences[index] = Some(kill.sequence);
+        println!(
+            "ALPHA_8C_QUIC_RELIABLE_KILL observer={observer} sequence={} killer=1 victim=2",
+            kill.sequence
+        );
+    }
+    if kill_event_sequences != [Some(0); 4] {
+        bail!("all four clients did not see same first sequenced kill: {kill_event_sequences:?}");
+    }
+
     // Critically, all FOUR old connections must remain authorized and live
     // after death and respawn: no session swap or position spoofing occurs.
     for (index, session) in sessions.iter().enumerate() {
@@ -1124,6 +1146,56 @@ async fn four_real_quic_players_observe_kill_and_immutable_greyhaven_respawn() -
         "ALPHA_8C_FOUR_QUIC_KILL_RESPAWN_PASS players=4 killer=1 victim=2          death_hp=0 respawn_hp=100 spawn_x=4206 spawn_y=4160 same_sessions=4"
     );
     Ok(())
+}
+
+/// Read real length-prefixed server reliable frames, rather than forging
+/// an event from a fighter snapshot or querying Rust World state. Reliable
+/// background catch-up frames (type=2) are legitimate and are skipped.
+async fn receive_real_quic_kill_event(
+    receiver: &mut wtransport::RecvStream,
+    observer_id: u32,
+) -> Result<myaso_server::kill_event::KillEventPacket> {
+    use myaso_server::kill_event::{KillEventPacket, KILL_EVENT_BYTES, KILL_EVENT_PACKET_TYPE};
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            bail!("observer {observer_id} did not receive server reliable kill event");
+        }
+        let mut length = [0_u8; 2];
+        timeout(remaining, receiver.read_exact(&mut length))
+            .await
+            .context("reliable kill-feed frame length timed out")??;
+        let bytes = u16::from_le_bytes(length) as usize;
+        if !(14..=4096).contains(&bytes) {
+            bail!("observer {observer_id} received impossible reliable frame size {bytes}");
+        }
+        let mut body = vec![0_u8; bytes];
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout(remaining, receiver.read_exact(&mut body))
+            .await
+            .context("reliable kill-feed frame body timed out")??;
+        if body[0] != 1 {
+            bail!("observer {observer_id} received wrong reliable protocol version");
+        }
+        if body[1] == 2 {
+            // Background reliable state catch-up is distinct from kill feed.
+            decode_snapshot(&body)
+                .map_err(|e| anyhow::anyhow!("invalid reliable background snapshot: {e:?}"))?;
+            continue;
+        }
+        if body[1] != KILL_EVENT_PACKET_TYPE || bytes != KILL_EVENT_BYTES {
+            bail!("observer {observer_id} received invalid reliable kill-feed frame kind={}, size={bytes}", body[1]);
+        }
+        if body[2] != 0 || body[3] != 0 {
+            bail!("observer {observer_id} received invalid reserved kill-feed bytes");
+        }
+        return Ok(KillEventPacket {
+            sequence: u32::from_le_bytes(body[4..8].try_into().unwrap()),
+            killer: u32::from_le_bytes(body[8..12].try_into().unwrap()),
+            victim: u32::from_le_bytes(body[12..16].try_into().unwrap()),
+        });
+    }
 }
 
 fn send_quic_heavy_fist(
