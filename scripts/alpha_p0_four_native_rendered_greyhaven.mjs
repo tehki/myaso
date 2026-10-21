@@ -92,14 +92,15 @@ const snapshotCode=[
  "const p=ctx.getImageData(x,y,1,1).data;",
  "if(p[1]>p[0]+8&&p[1]>p[2]+8&&p[1]>=55&&p[1]<=195)green++;}",
  "const search=new URL(location.href).searchParams;",
- "return {own:own.length===1?id(own[0]):0,ownCount:own.length,ids:rows.map(id).sort((a,b)=>a-b),tick:Number(status.match(/server tick (\\d+)/)?.[1]??0),telemetry,green,width:c?.width??0,height:c?.height??0,world:search.get('world')==='1',scenario:search.has('scenario'),acceptance:!!window.__MYASO_ACCEPTANCE_STATE__};"
+ "const liveness=window.__MYASO_WORLD_LIVENESS__?.snapshot(Date.now())??null;",
+ "return {liveness,own:own.length===1?id(own[0]):0,ownCount:own.length,ids:rows.map(id).sort((a,b)=>a-b),tick:Number(status.match(/server tick (\\d+)/)?.[1]??0),telemetry,green,width:c?.width??0,height:c?.height??0,world:search.get('world')==='1',scenario:search.has('scenario'),acceptance:!!window.__MYASO_ACCEPTANCE_STATE__};"
 ].join("\n");
 async function snapshot(s){
  const values=await execute(s,snapshotCode);
  return {...values,...parseNativeWorldLiveness(values.telemetry)};
 }
 function valid(s,id){
- return s.own===id&&s.ownCount===1&&s.ids.join(",")==="1,2,3,4"&&s.valid===true&&s.green>=8&&s.width>=800&&s.height>=500&&s.world&&!s.scenario&&!s.acceptance;
+ return s.own===id&&s.ownCount===1&&s.ids.join(",")==="1,2,3,4"&&s.valid===true&&s.tick>0&&s.green>=8&&s.width>=800&&s.height>=500&&s.world&&!s.scenario&&!s.acceptance;
 }
 async function screenshot(s){
  const raw=await w3c(s,"GET","/session/"+s.id+"/screenshot");
@@ -125,7 +126,9 @@ async function run(){
  for(let i=0;i<browsers.length;i++){
   const s=await driver(browsers[i]);
   const u=new URL("http://127.0.0.1:"+http.address().port+"/web/index.html");
-  u.searchParams.set("server",game.url);u.searchParams.set("cert",game.hash);u.searchParams.set("world","1");u.searchParams.set("netstats","1");
+  u.searchParams.set("server",game.url);u.searchParams.set("cert",game.hash);u.searchParams.set("world","1");
+  u.searchParams.set("netstats","1");
+  u.searchParams.set("uiLivenessProbe","1");
   check(!u.searchParams.has("scenario"),"must render genuine world without acceptance scenario");
   await w3c(s,"POST","/session/"+s.id+"/url",{url:u.href},30000);
   await poll(async()=>{const x=await snapshot(s);return{ok:x.own===i+1&&x.valid===true,value:x}},s.name+" authentic QUIC roster",19000);
@@ -135,13 +138,26 @@ async function run(){
  },s.name+" full real painted city and 4-player roster",26000)));
  const captures=[];
  for(let i=0;i<clients.length;i++)captures.push({browser:clients[i].name,playerId:before[i].own,greenSamples:before[i].green,image:await screenshot(clients[i])});
+ console.log("ALPHA_P0_WORLD_LIVENESS_BEFORE "+JSON.stringify(before.map((value,i)=>({browser:clients[i].name,uiTick:value.tick,probe:value.liveness}))));
  await move(clients[0]);
- // Require >=2 genuinely received authoritative snapshots AND >=2 input ACKs
- // for every native browser; the combat HUD status label is NOT a monotonic clock.
- const after=await Promise.all(clients.map((s,i)=>poll(async()=>{
-  const v=await snapshot(s);
-  return {ok:valid(v,i+1)&&nativeWorldLivenessAdvanced(before[i],v),value:v};
- },s.name+" living city after actual W3C gesture",12000)));
+ let after;
+ try {
+  after=await Promise.all(clients.map((s,i)=>poll(async()=>{
+   const v=await snapshot(s);
+   return {ok:valid(v,i+1)&&nativeWorldLivenessAdvanced(before[i],v)&&v.tick>before[i].tick,value:v};
+  },s.name+" living city after actual W3C gesture",12000)));
+ } catch(error) {
+  // Preserve the original strict HUD/tick requirement. Never accept a newer
+  // snapshot as a substitute for a stale on-screen tick or missing canvas.
+  const checked=await Promise.allSettled(clients.map(snapshot));
+  console.error("ALPHA_P0_WORLD_LIVENESS_FAILURE "+JSON.stringify(checked.map((result,i)=>({
+   browser:clients[i].name,baselineTick:before[i].tick,
+   value:result.status==="fulfilled"?{uiTick:result.value.tick,probe:result.value.liveness}:null,
+   captureError:result.status==="rejected"?String(result.reason):null,
+  }))));
+  throw error;
+ }
+ console.log("ALPHA_P0_WORLD_LIVENESS_AFTER "+JSON.stringify(after.map((value,i)=>({browser:clients[i].name,uiTick:value.tick,probe:value.liveness}))));
  const proof={realRustAuthority:true,sourceAuthoredWorldRenderer:true,
   trueWorldQueryWithoutScenario:true,genuineFourChromeFirefoxW3cClients:true,
   allFourSharedAuthoritativeRoster:[1,2,3,4],
