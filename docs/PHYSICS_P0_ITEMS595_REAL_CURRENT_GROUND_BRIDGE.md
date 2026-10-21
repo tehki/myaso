@@ -33,3 +33,18 @@ A live physical-sword click requires current World actor, exact CURRENT ground e
 - M1–M5 four **real** independently connected browser gameplay + physical sword ownership + combat/reconnect remains **NOT PLAYABLE** until proved.
 
 Run \`cargo test --locked --manifest-path server/Cargo.toml --test alpha_physics_items595_current_sword_parity\`, then full server Cargo tests, \`cargo fmt --check\`, strict \`cargo clippy --all-targets -- -D warnings\`, and \`git diff --check\`.
+
+## Additional fail-closed current-source counterexamples
+
+The integration suite now has **four** test cases, including two new explicit negative proofs that a Physics LOS success does NOT grant ownership:
+
+- **Dynamic blocker:** the current Items ground sword has a clear 50-unit ray through the original 23 Core static AABBs when a test incorrectly claims static-only geometry is complete. Adding a synthetic closed dynamic door to the test window yields `Occluded`, and a non-complete window yields `IncompleteGeometry`. This is a regression of the Physics predicate; production Core 8C does NOT yet supply authenticated dynamic coverage.
+- **Taken/expired ground item:** after offline Items `take_ground` removes the exact selected entity, current Items rack projection is empty for that socket, duplicate pickup is `NotFound`, yet the geometry-only predicate still returns `Ok(())` for remembered coordinates and fabricated equal ticks. After item expiry, the time-filtered source is empty even if a stale geometric ray remains clear. Production must re-read exact canonical item/current physical source and expiry inside the single signed epoch/tick mutation lock.
+
+These source tests deliberately demonstrate what geometry **cannot** authorize. No dynamic-door runtime, secure source lease, canonical Core u128 writer, network TryPickup, observer outbox, live player interaction or complete current map has been implemented.
+
+## Dense actual Items-versus-Physics reach equivalence
+
+A fifth Rust integration case performs 6,667 deterministic southern Blacksmith approach samples (`dx=-56..56`, `dy=0..58`) plus 81 f32 ULP-adjacent original sword boundary samples. For every sample, it restores a fresh Items `LootAuthority` state containing four real generated sword ground/item identities, invokes actual `LootAuthority::take_ground` on exact item ID with a local World fighter position, and compares success/denial with the existing Physics `verify_pickup_geometry_at_completed_tick` using the real imported `PICKUP_REACH=56` and generated Core static source.
+
+The source fixture is artificially marked static-complete ONLY because it samples the open southern approach, where all 23 static solids are known. This is numerical reach parity, not runtime geometry completeness, session authentication, canonical u128 item writer approval or a four-browser acceptance. Any future fused multiplication, altered f32 operation order or inclusive threshold drift must cause this test to fail.
