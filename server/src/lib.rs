@@ -9,6 +9,7 @@ pub mod identity;
 pub mod item_journal;
 pub mod item_ownership;
 pub mod kill_event;
+pub mod legacy_gear_preflight;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
