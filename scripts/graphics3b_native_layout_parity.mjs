@@ -115,6 +115,28 @@ async function inspect(browser,target){
   canvasTop:metrics.canvas.top,canvasHeight:metrics.canvas.height});
  if(Math.abs(foldBudget.visibleCanvasFraction-metrics.visibleCanvasFraction)>0.000002)
   throw Error(browser.name+" browser DOM fold and source budget mismatch");
+ if(process.env.MYASO_P0_GAME_FIRST_LAYOUT==="1"){
+  if(!foldBudget.canvasFullyInPage)
+   throw Error(browser.name+" original Canvas still falls below the real browser fold "+JSON.stringify({target,foldBudget}));
+  const expectedRatio=16/9;
+  if(Math.abs(metrics.canvas.width/metrics.canvas.height-expectedRatio)>0.02)
+   throw Error(browser.name+" game Canvas CSS aspect distorted");
+  const before=await execute(browser, "const d=document.querySelector('.controls-disclosure'),s=d?.querySelector('summary');return {closed:d?.open===false,summary:s?.textContent,controls:d?.querySelector('.controls')?.children.length};");
+  if(!before.closed||!before.summary?.includes("Controls")||before.controls!==14)
+   throw Error(browser.name+" keyboard-accessible original 14 controls unavailable "+JSON.stringify(before));
+  const element=await w3c(browser,"POST","/session/"+browser.id+"/element",{using:"css selector",value:".controls-disclosure summary"});
+  const id=element["element-6066-11e4-a52e-4f735466cecf"];
+  if(!id)throw Error(browser.name+" W3C control disclosure missing");
+  await w3c(browser,"POST","/session/"+browser.id+"/element/"+id+"/click",{});
+  const opened=await execute(browser,"return {open:document.querySelector('.controls-disclosure')?.open,items:document.querySelector('.controls-disclosure .controls')?.children.length};");
+  if(opened.open!==true||opened.items!==14)
+   throw Error(browser.name+" original combat instructions did not expand");
+  await w3c(browser,"POST","/session/"+browser.id+"/element/"+id+"/click",{});
+  const closed=await execute(browser,"return {open:document.querySelector('.controls-disclosure')?.open,scrollY:window.scrollY};");
+  if(closed.open!==false||closed.scrollY!==0)
+   throw Error(browser.name+" control disclosure blocked source game window");
+  console.log("GRAPHICS3B_P0_GAME_FIRST_LAYOUT_ACCEPT "+JSON.stringify({browser:browser.name,viewport:target,canvas:metrics.canvas,foldBudget,controlsNative:true,controlsCount:14,noArtificialScroll:true}));
+ }
  const screenshot=await w3c(browser,"GET","/session/"+browser.id+"/screenshot");
  const pixels=Buffer.from(screenshot,"base64");
  if(pixels.length<1000||!pixels.subarray(0,8).equals(Buffer.from("89504e470d0a1a0a","hex")))
