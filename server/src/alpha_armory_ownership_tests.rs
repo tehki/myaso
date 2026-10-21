@@ -305,3 +305,270 @@ fn two_independent_intents_for_same_rack_sword_have_one_commit_winner() {
     assert_eq!(reopened.item_count(), 4);
     assert_eq!(reopened.location(id(201)), Some(equipped(winner.0)));
 }
+/// Scratch-only TWO WRITER COUNTEREXAMPLE. This is deliberately NOT a valid
+/// gameplay transaction or a candidate for production: it proves why Core
+/// journal receipts and Items memory/checkpoints cannot both claim to own
+/// live swords until one globally fenced committed writer is selected.
+#[test]
+fn actual_items_rack_source_proves_dual_writer_split_brain_requires_one_authority() {
+    use crate::{
+        alpha_armory_mapping_preflight::{
+            preflight_greyhaven_rack_v1, ProposedRackSource, ProposedWorldToCentimeter,
+            GREYHAVEN_RACK_V1,
+        },
+        alpha_current_rack_bindings::read_proposed_current_four_rack_items,
+        legacy_gear_preflight::{LegacyDomain, LegacyImportPreflight, ProposedLegacyNamespaces},
+        loot::{ItemKind, LootAuthority, ProposedRackSocket},
+        simulation::World,
+        zone::ZoneId as ItemsZoneId,
+    };
+    // Source: four genuine Items-domain grants and physically placed server
+    // ground entities. Unlike synthetic manifest fixtures these IDs are read
+    // back from actual LootAuthority ground objects after drop_backpack.
+    let mut loot = LootAuthority::new();
+    let mut seed_world = World::new(8192.0, 8192.0);
+    for (i, (_, x, y)) in GREYHAVEN_RACK_V1.iter().enumerate() {
+        let actor = (i + 1) as u32;
+        assert!(seed_world.add_player_at(actor, *x as f32, *y as f32, 0.0));
+        loot.register(actor).unwrap();
+        let item = loot
+            .grant(
+                actor,
+                if i % 2 == 0 {
+                    ItemKind::RustySword
+                } else {
+                    ItemKind::IronSword
+                },
+                1,
+            )
+            .unwrap();
+        loot.drop_backpack(
+            actor,
+            seed_world.fighter(actor).unwrap(),
+            ItemsZoneId::Moonvale,
+            item,
+            1,
+        )
+        .unwrap();
+    }
+    let sockets = GREYHAVEN_RACK_V1.map(|(_, x, y)| ProposedRackSocket {
+        at: crate::loot::Point {
+            x: x as f32,
+            y: y as f32,
+        },
+    });
+    let original = loot
+        .proposed_current_rack_swords(ItemsZoneId::Moonvale, sockets, 2)
+        .unwrap();
+    assert_eq!(original.iter().filter(|slot| slot.is_some()).count(), 4);
+    let source = std::array::from_fn(|i| {
+        let (socket_id, x, y) = GREYHAVEN_RACK_V1[i];
+        let physical = original[i].expect("actual current ground sword");
+        ProposedRackSource {
+            socket_id,
+            world_x: x,
+            world_y: y,
+            ground_entity_id: physical.ground_entity_id,
+            legacy_item_id: physical.item_id,
+        }
+    });
+    // Explicit collision-checked proposed namespace and rational transform
+    // for fixture use only. x100 and ZoneId(1) are NOT approved runtime data.
+    let namespaces = ProposedLegacyNamespaces::new([
+        0x4D59_4153_0000_0001,
+        0x4D59_4153_0000_0002,
+        0x4D59_4153_0000_0003,
+        0x4D59_4153_0000_0004,
+        0x4D59_4153_0000_0005,
+    ])
+    .unwrap();
+    let mut imported = LegacyImportPreflight::new(namespaces, []).unwrap();
+    for s in source {
+        imported
+            .stage_owner(LegacyDomain::GroundEntity, s.ground_entity_id)
+            .unwrap();
+        imported
+            .stage_owner(LegacyDomain::Item, s.legacy_item_id)
+            .unwrap();
+    }
+    let mapping = ProposedWorldToCentimeter {
+        zone: ZoneId::new(1).unwrap(),
+        numerator_cm: 100,
+        denominator_world_units: 1,
+        offset_x_cm: 0,
+        offset_y_cm: 0,
+    };
+    let canonical = preflight_greyhaven_rack_v1(source, &imported, mapping).unwrap();
+    let root = IsolatedJournal::new();
+    let mut journal = root.open();
+    let created: Vec<_> = canonical
+        .iter()
+        .map(|row| OwnershipOp::Create {
+            item: row.canonical_item,
+            at: row.ground,
+        })
+        .collect();
+    journal.apply(txn(90_000), &created).unwrap();
+    let before =
+        read_proposed_current_four_rack_items(&journal, source, &imported, mapping).unwrap();
+    assert_eq!(
+        before.slots().iter().filter(|slot| slot.is_some()).count(),
+        4
+    );
+    for (i, row) in before.slots().into_iter().enumerate() {
+        let core = row.unwrap();
+        let physical = original[i].unwrap();
+        assert_eq!(
+            core.canonical_item(),
+            imported.core_item(physical.item_id).unwrap()
+        );
+        assert_eq!(
+            core.canonical_ground_entity(),
+            imported
+                .resolve_registered(LegacyDomain::GroundEntity, physical.ground_entity_id)
+                .unwrap()
+        );
+    }
+
+    // Counterexample, NOT a permitted production sequence: Core commits
+    // owner #1's claim, but Items has not participated in that same writer.
+    let first_core = before.slots()[0].unwrap();
+    let core_pickup = [OwnershipOp::Move {
+        item: first_core.canonical_item(),
+        from: first_core.ground(),
+        to: equipped(1),
+    }];
+    // EVEN the more stringent V2 single-record envelope+receipt cannot
+    // fence a second, independent Items writer. The values here are only
+    // explicitly synthetic World/session witnesses; the physical IDs are
+    // derived from the actual Items ground and its checked namespace import.
+    let proposed = crate::alpha_bound_pickup::ProposedRackPickupEnvelope {
+        rack_socket: 1,
+        ground_entity: first_core.canonical_ground_entity(),
+        character: CharacterId::new(1).unwrap(),
+        session_generation: 1,
+        world_authority_epoch: 1,
+        completed_world_tick: 1,
+        world_map_revision: 1,
+        observed_item_mutation_sequence: 1,
+    };
+    let committed = journal
+        .apply_proposed_bound_rack_pickup(txn(90_001), core_pickup[0], proposed)
+        .unwrap();
+    assert_eq!(committed.sequence, 2);
+    let initial_event = journal.proposed_bound_pickup_observer_page(0, 3).unwrap();
+    assert_eq!(initial_event.events.len(), 1);
+    assert_eq!(initial_event.events[0].transaction, txn(90_001));
+    assert_eq!(initial_event.events[0].envelope, proposed);
+    assert_eq!(initial_event.events[0].operation, core_pickup[0]);
+    assert!(
+        read_proposed_current_four_rack_items(&journal, source, &imported, mapping)
+            .unwrap()
+            .slots()[0]
+            .is_none()
+    );
+
+    // Items still advertises the *same* ground instance as available. Both
+    // reads are internally valid but globally contradictory; reading both
+    // independently is not one ownership transaction.
+    let stale_items = loot
+        .proposed_current_rack_swords(ItemsZoneId::Moonvale, sockets, 3)
+        .unwrap();
+    assert_eq!(stale_items[0], original[0]);
+
+    // If another Items path separately moves the physical sword to actor #2,
+    // each ledger now independently claims a DIFFERENT owner for the SAME ID.
+    let mut pickup_world = World::new(8192.0, 8192.0);
+    assert!(pickup_world.add_player_at(2, 3740.0, 4088.0, 0.0));
+    let obtained = loot
+        .take_ground(
+            2,
+            pickup_world.fighter(2).unwrap(),
+            ItemsZoneId::Moonvale,
+            original[0].unwrap().ground_entity_id,
+            3,
+        )
+        .unwrap();
+    assert_eq!(obtained.id, original[0].unwrap().item_id);
+    assert_eq!(
+        loot.inventory(2)
+            .unwrap()
+            .backpack()
+            .iter()
+            .filter(|s| s.id == obtained.id)
+            .count(),
+        1
+    );
+    assert_eq!(
+        journal.location(first_core.canonical_item()),
+        Some(equipped(1))
+    );
+    assert!(loot
+        .proposed_current_rack_swords(ItemsZoneId::Moonvale, sockets, 4)
+        .unwrap()[0]
+        .is_none());
+
+    // Stronger negative control: both stores can persist and independently
+    // reopen the contradictory ownership histories. A restart alone cannot
+    // reconcile two writers or infer the missing cross-store transaction.
+    use crate::character_identity::{
+        CharacterId as LegacyCharacterId, SessionIdentityRegistry, SessionLease,
+    };
+    let mut identities = SessionIdentityRegistry::new();
+    for actor in 1..=4 {
+        let lease = SessionLease::new(actor, 1).unwrap();
+        let character = LegacyCharacterId::new(u64::from(actor)).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+    }
+    let legacy_checkpoint = root.0.with_extension("items-mywld03-separate-checkpoint");
+    crate::loot_persistence::save_quiescent(&legacy_checkpoint, &loot).unwrap();
+    drop(journal);
+    let recovered_items = crate::loot_persistence::load_quiescent(&legacy_checkpoint).unwrap();
+    let recovered_core = root.open();
+    // V2 is locally durable and internally consistent even while the other
+    // autonomous writer owns the same physical imported sword differently.
+    // This is precisely why neither independent success licenses live ACK.
+    let recovered_event = recovered_core
+        .proposed_bound_pickup_observer_page(0, 2)
+        .unwrap();
+    assert_eq!(recovered_event.events.len(), 1);
+    assert_eq!(recovered_event.events[0], initial_event.events[0]);
+    assert_eq!(
+        recovered_core
+            .verified_bound_rack_pickup(txn(90_001), core_pickup[0], proposed)
+            .unwrap(),
+        Some(committed)
+    );
+    assert_eq!(
+        recovered_items
+            .parked_inventory(LegacyCharacterId::new(2).unwrap())
+            .unwrap()
+            .backpack()
+            .iter()
+            .filter(|stack| stack.id == original[0].unwrap().item_id)
+            .count(),
+        1,
+        "legacy storage durably claims same sword for character #2"
+    );
+    assert_eq!(
+        recovered_core.location(first_core.canonical_item()),
+        Some(equipped(1)),
+        "Core journal durably claims same sword for character #1"
+    );
+    assert_eq!(recovered_core.item_count(), 4);
+    std::fs::remove_file(&legacy_checkpoint).unwrap();
+    assert_eq!(
+        recovered_items
+            .proposed_current_rack_swords(ItemsZoneId::Moonvale, sockets, 4)
+            .unwrap()
+            .iter()
+            .filter(|slot| slot.is_some())
+            .count(),
+        3
+    );
+
+    // These facts together are unacceptable for release; there is no
+    // implied reconciliation, signed client ACK or single-writer proof here.
+    // One canonical atomic owner+receipt+outbox commit is a hard P0 gate.
+}
