@@ -1,0 +1,70 @@
+name: Core C3k atomic two-item corpse loot PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/sql/006_two_item_corpse_loot.sql"
+      - "scripts/verify_two_item_corpse_loot_pg.py"
+      - ".github/workflows/core-c3k-corpse-loot.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/sql/006_two_item_corpse_loot.sql"
+      - "scripts/verify_two_item_corpse_loot_pg.py"
+      - ".github/workflows/core-c3k-corpse-loot.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fenced-corpse-loot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myaso_c3k_test
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: myaso_c3k_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U myaso_c3k_test -d myaso_c3k_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: myaso_c3k_test
+      PGPASSWORD: ephemeral-test-only
+      PGDATABASE: myaso_c3k_test
+      MYASO_C3K_TEST_ONLY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+      - name: Compile isolated transaction test harnesses
+        run: |
+          python -m py_compile scripts/verify_atomic_item_world_pg.py
+          python -m py_compile scripts/verify_atomic_equipment_swaps_pg.py
+          python -m py_compile scripts/verify_two_item_corpse_loot_pg.py
+      - name: Install C4c C4d C3g/C3h C3i C3j and C3k schema
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/001_zone_authority_postgres.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/002_fenced_world_mutations.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/003_atomic_item_world_mutations.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/004_atomic_equipment_swaps.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/005_global_item_operation_ids.sql
+          psql -X -v ON_ERROR_STOP=1 -f server/sql/006_two_item_corpse_loot.sql
+      - name: Prove source CAS handoff concurrent claims and crash recovery
+        run: python scripts/verify_two_item_corpse_loot_pg.py
