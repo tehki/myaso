@@ -22,6 +22,50 @@ locally written `r2-two-host-w3c-evidence.json` log.
   **not** show usable host-to-host UDP. There is no two-host gameplay PASS.
   The test listener exited and no route/firewall rules were modified.
 
+## P0 private UDP receive-and-ACK proof (safe staging preflight)
+
+Before starting any QUIC staging service, the network owner may run
+`scripts/r2-private-udp-proof.mjs` on **two authorized nonproduction
+machines**. This uses one short-lived UDP listener; it changes no firewall,
+route, VPN setting or game process. Its CLI rejects all public/loopback
+endpoints, unapproved or absent staging attestation, identical bind/peer
+addresses and ports below 1024. The receiver automatically stops after
+9.5 seconds or its first valid challenge; the sender transmits at most
+three small versioned challenge packets. **The remote receive and the
+sender's matching reply are separate evidence.**
+
+```sh
+# On the approved private server-side host, e.g. Serj:
+export MYASO_R2_PRIVATE_PROBE_ONLY=1
+export MYASO_R2_STAGING_OWNER_ATTESTED=YES
+export MYASO_R2_UDP_BIND='<own-private-IPv4>'
+export MYASO_R2_UDP_PEER='<authorized-client-private-IPv4>'
+export MYASO_R2_UDP_PORT='<approved-temporary-port>'
+node scripts/r2-private-udp-proof.mjs --listen
+
+# On the OTHER approved private client host, e.g. X230i:
+export MYASO_R2_PRIVATE_PROBE_ONLY=1
+export MYASO_R2_STAGING_OWNER_ATTESTED=YES
+export MYASO_R2_UDP_BIND='<own-client-private-IPv4>'
+export MYASO_R2_UDP_PEER='<authorized-listener-private-IPv4>'
+export MYASO_R2_UDP_PORT='<same-approved-temporary-port>'
+node scripts/r2-private-udp-proof.mjs --probe
+```
+
+Record the `MYASO_R2_PRIVATE_UDP_EVIDENCE=` JSON from **both** terminals.
+Only the **client's `ACK_RECEIVED` with `routeProven:true`** demonstrates
+the bounded roundtrip; the receiver's `PING_RECEIVED_ACK_SENT` demonstrates
+only incoming packet receipt and send attempt. A successful
+`socket.send()`, route table entry or absent error alone is **not proof
+of arrival**. A failed probe is a release blocker, not permission to
+disable peer-isolation controls. Valid two-machine ping/ACK still is not
+a browser/WebTransport game acceptance; use the pinned W3C stage test below.
+
+Focused `tests/r2-private-udp-proof.test.mjs` includes a *single-kernel
+loopback* UDP challenge/ACK test, marked strictly as local preflight and
+**not** two-host evidence. The CLI itself does not accept loopback
+addresses.
+
 ## Scope and prerequisites
 
 Only the Development Center or the network/system owner may provision an
@@ -95,7 +139,7 @@ runner. Both run without contacting a remote server:
 
 ```sh
 node --check scripts/r2-remote-abrupt-close-acceptance.mjs
-node --test tests/r2-remote-acceptance-config.test.mjs
+node --test tests/r2-remote-acceptance-config.test.mjs tests/r2-private-udp-proof.test.mjs
 ```
 
 **Production release is not authorized by this fixture.** If private UDP
