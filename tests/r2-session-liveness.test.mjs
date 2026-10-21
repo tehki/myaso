@@ -24,14 +24,27 @@ test("hidden heartbeat is disabled when visible and sends no synthetic DOM actio
   assert.match(src, /networkClient\.sendInput\(neutralBackgroundInput\(clientTick\)\)/);
 });
 
-test("server expiration is input-authoritative and never reset by outbound snapshots", () => {
+test("server expiration is input-authoritative and replayed ticks NEVER renew fighter lease", () => {
   const src = readFileSync(new URL("../server/src/main.rs", import.meta.url), "utf8");
   assert.match(src, /CLIENT_INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs\(30\)/);
-  assert.match(src, /input_idle_timeout\.as_mut\(\)\.reset\(next_client_input_deadline/);
   assert.match(src, /reliable_writer\.abort\(\)/);
-  const resetAt=src.indexOf("input_idle_timeout.as_mut().reset");
+  // Preserve original R2 cleanup guarantee, now rejecting a stronger threat:
+  // syntactically valid QUIC datagrams whose input samples were all replayed.
+  assert.match(src,
+    /fn accepted_gameplay_renews_session\(accepted: &AcceptedInputBatch\) -> bool \{\s*!accepted\.is_empty\(\)\s*\}/);
+  assert.match(src,
+    /if accepted_gameplay_renews_session\(&accepted\) \{\s*input_idle_timeout\s*\.as_mut\(\)\s*\.reset\(next_client_input_deadline/);
+  const reset=/input_idle_timeout\s*\.as_mut\(\)\s*\.reset\(next_client_input_deadline/.exec(src);
+  assert.ok(reset,"input lease reset must remain guarded by nonempty server-ingress acceptance");
   const validPacket=src.indexOf("let packet = match decode_input_packet");
   const rejected=src.indexOf("invalid input datagram:");
+  const ingress=src.indexOf("let accepted = ingress.ingest(&packet)");
   const snapshot=src.indexOf("snapshot_interval.tick()");
-  assert.ok(validPacket < rejected && rejected < resetAt && resetAt < snapshot);
+  assert.ok(validPacket>=0 && rejected>validPacket && ingress>rejected
+    && reset.index>ingress && snapshot>reset.index,
+    "only real accepted input may refresh fighter inactivity before outbound snapshots");
+  // The entire incoming packet-decode, loss-impairment and snapshot ACK
+  // pre-ingress section must never contain a hidden second timeout reset.
+  assert.doesNotMatch(src.slice(validPacket,ingress),
+    /input_idle_timeout\s*\.as_mut\(\)\s*\.reset\(/);
 });
