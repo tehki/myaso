@@ -90,3 +90,9 @@ acceptance-script-only extension; normal users still cannot type 241
 characters past the HTML input limit. It remains a loopback-only, real
 Rust WebTransport test and does not prove combat-under-chat or public
 activation. No mocks, no production protocol or game client change.
+
+The separate, additive opt-in PR CI workflow at
+.github/workflows/chat-c1-ui-browser.yml runs this acceptance on GitHub
+ubuntu-latest with the actual Rust binary, ChromeDriver and three native
+Chrome sessions. It is *not* a production chat feature toggle, does not
+replace Combat quality, and does not prove Firefox/independent-host.
