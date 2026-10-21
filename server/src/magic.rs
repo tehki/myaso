@@ -872,6 +872,187 @@ mod tests {
         assert_eq!(magic.pending_ember_intents().count(), 1);
     }
 
+    /// Optional learned Fire/Ember progression must survive mandatory physical
+    /// sword pickup, while unawakened characters can pick up exactly the same
+    /// class of swords without a Spellbook, reagent, or mana prerequisite.
+    /// Offline Items/World fixture: NOT a live Core u128 ledger or browser hit.
+    #[test]
+    fn mixed_awakened_and_unawakened_four_rack_swords_keep_magic_unchanged() {
+        use crate::loot::{GroundDrop, ItemStack, Point, GROUND_DECAY_MS};
+        use crate::loot_transaction::{
+            commit_verified_ground_sword_equip_checked, inspect_verified_ground_sword_targets,
+            GroundSwordAuthority, PickupWorldTick, VerifiedLootOperation,
+        };
+        use crate::magic_checkpoint::load_joint;
+        use crate::zone::ZoneAuthority;
+        use std::collections::BTreeSet;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static CHECKPOINT_SEQ: AtomicU64 = AtomicU64::new(1);
+        let index = CHECKPOINT_SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "myaso-magic2a-rack-progression-{}-{index}.bin",
+            std::process::id()
+        ));
+
+        let mut world = World::new(8192.0, 8192.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        let xs = [3740.0_f32, 3780.0, 3820.0, 3860.0];
+        for (i, x) in xs.iter().enumerate() {
+            let actor = (i + 1) as u32;
+            assert!(world.add_player_at(actor, *x, 4088.0, 0.0));
+            zones.register(actor).unwrap();
+            identity
+                .bind_verified(lease(actor, 1), character(u64::from(actor)))
+                .unwrap();
+            loot.register(actor).unwrap();
+            assert_eq!(loot.inventory(actor).unwrap().stack_count(), 0);
+        }
+
+        let mut magic = MagicAuthority::new();
+        // A previously awakened caster remains awakened; a second character
+        // knows Water; the other two start with NO magic whatsoever.
+        magic
+            .grant_lesson(award(1, character(1), Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, character(1), Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .grant_lesson(award(3, character(2), Lesson::Rune(Rune::Water)))
+            .unwrap();
+        assert_eq!(magic.mana(character(1)), AWAKENED_MANA);
+        assert_eq!(magic.mana(character(2)), AWAKENED_MANA);
+        for actor in 3_u64..=4 {
+            assert_eq!(magic.mana(character(actor)), 0);
+            assert!(!magic.knows_rune(character(actor), Rune::Fire));
+        }
+        let before = magic.encode_progression().unwrap();
+
+        // Existing Items test-only namespace, using the proposed real World
+        // Blacksmith sockets. Do not infer an item ID from geometry in live
+        // code: the server must commit the exact entity+item selection.
+        let mut snapshot = loot.export_state().unwrap();
+        snapshot.next_id = 2000;
+        for (i, x) in xs.iter().enumerate() {
+            let sword_id = 1101 + i as u64;
+            let entity_id = 1201 + i as u64;
+            assert!(snapshot
+                .ground
+                .insert(
+                    entity_id,
+                    GroundDrop {
+                        entity_id,
+                        zone: ZoneId::Moonvale,
+                        at: Point { x: *x, y: 4038.0 },
+                        expires_at_ms: GROUND_DECAY_MS,
+                        item: ItemStack {
+                            id: sword_id,
+                            kind: if i % 2 == 0 {
+                                ItemKind::RustySword
+                            } else {
+                                ItemKind::IronSword
+                            },
+                            amount: 1,
+                        },
+                    },
+                )
+                .is_none());
+        }
+        loot = LootAuthority::restore_state(snapshot).unwrap();
+
+        let mut sword_ids = BTreeSet::new();
+        for actor in [2_u32, 4, 1, 3] {
+            let candidates = inspect_verified_ground_sword_targets(
+                &loot,
+                &identity,
+                PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                lease(actor, 1),
+            )
+            .unwrap();
+            assert_eq!(candidates.len(), 1);
+            assert_eq!(
+                candidates[0].selection.expected_item_id,
+                1100 + u64::from(actor)
+            );
+            let taken = commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease(actor, 1),
+                        sequence: 1,
+                    },
+                },
+                candidates[0].selection,
+                |fighter, ground, zone| {
+                    assert_eq!(fighter.net_id, actor);
+                    assert_eq!(ground.zone, zone);
+                    assert_eq!(fighter.x, ground.at.x);
+                    assert_eq!(fighter.y - ground.at.y, 50.0);
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert!(sword_ids.insert(taken.id));
+            assert!(loot.inventory(actor).unwrap().backpack().is_empty());
+            assert_eq!(
+                loot.inventory(actor)
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                taken.id
+            );
+            assert!(loot.inventory(actor)
+                .unwrap()
+                .equipped(EquipmentSlot::OffHand)
+                .is_none());
+            assert_eq!(magic.encode_progression().unwrap(), before);
+
+            // Every intermediate Items checkpoint must retain both permanent
+            // earned lessons and still-unawakened character progression.
+            let (saved_loot, saved_magic) = load_joint(&path).unwrap();
+            assert_eq!(saved_magic.encode_progression().unwrap(), before);
+            assert_eq!(
+                saved_loot
+                    .parked_inventory(character(u64::from(actor)))
+                    .unwrap()
+                    .equipped(EquipmentSlot::MainHand)
+                    .unwrap()
+                    .id,
+                taken.id
+            );
+            assert_eq!(
+                saved_loot.committed_operation_sequence(character(u64::from(actor))),
+                Some(1)
+            );
+        }
+        assert_eq!(sword_ids.len(), 4);
+        assert!(loot.ground().is_empty());
+        assert!(magic.knows_rune(character(1), Rune::Fire));
+        assert!(magic.knows_spell(character(1), Spell::Ember));
+        assert!(magic.knows_rune(character(2), Rune::Water));
+        for actor in 3_u64..=4 {
+            assert!(!magic.knows_spell(character(actor), Spell::Ember));
+            assert_eq!(magic.mana(character(actor)), 0);
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn new_character_has_no_magic_and_spells_must_be_earned() {
         let mut magic = MagicAuthority::new();
