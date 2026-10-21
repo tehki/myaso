@@ -116,9 +116,18 @@ function paintOverworld(ctx,map,tileBounds) {
       ctx.beginPath();ctx.moveTo(f.x+14,y);ctx.lineTo(f.x+f.w-14,y);ctx.stroke();
     }
   }
-  strokePolyline(ctx,map.river.points,map.river.width+24,"#3b5c59");
-  strokePolyline(ctx,map.river.points,map.river.width,"#669b9c");
-  strokePolyline(ctx,map.river.points,map.river.width*.42,"rgba(184,216,207,.25)");
+  // Skip long river strokes when the water cannot touch this 512-unit tile.
+  if(visiblePath(tileBounds,map.river.points,(map.river.width+24)/2+4)){
+    strokePolyline(ctx,map.river.points,map.river.width+24,"#3b5c59");
+    strokePolyline(ctx,map.river.points,map.river.width,"#669b9c");
+    strokePolyline(ctx,map.river.points,map.river.width*.42,"rgba(184,216,207,.25)");
+  } else {
+    // The old unconditional stroke also set shared Canvas pen state. Later
+    // authored shapes rely on it; retain that state without drawing water.
+    ctx.lineJoin="round";ctx.lineCap="round";
+    ctx.lineWidth=map.river.width*.42;
+    ctx.strokeStyle="rgba(184,216,207,.25)";
+  }
   // Road layout is explicit: no per-session random placement.
   for(const road of map.roads){
     if(!visiblePath(tileBounds,road.points,(road.width+15)/2+4))continue;
