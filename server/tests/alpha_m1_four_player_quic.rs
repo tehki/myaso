@@ -147,7 +147,8 @@ async fn actual_server_preserves_four_distinct_players_and_denies_fifth() -> Res
         })
         .await
         .context("initial authoritative baseline timeout")??;
-        let snapshot = decode_snapshot(&baseline).context("decode real game baseline")?;
+        let snapshot = decode_snapshot(&baseline)
+            .map_err(|error| anyhow::anyhow!("decode real game baseline: {error:?}"))?;
         if !snapshot.full {
             bail!("player {} did not receive a full baseline", index + 1);
         }
