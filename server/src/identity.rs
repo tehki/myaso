@@ -423,5 +423,4 @@ mod tests {
         assert!(registry.is_current(latest));
         assert!(registry.is_current(other));
     }
-
 }
