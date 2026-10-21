@@ -8,7 +8,9 @@ import {readFile,stat,mkdir,writeFile} from "node:fs/promises";
 import path from "node:path";
 import {setTimeout as sleep} from "node:timers/promises";
 import {parseNativeWorldLiveness,nativeWorldLivenessAdvanced} from "./alpha_p0_native_world_liveness.mjs";
+import {GRAPHICS_RAF_INSTALL_SCRIPT,GRAPHICS_RAF_STOP_SCRIPT,summarizeGraphicsRaf} from "./graphics_p0_four_browser_frame_cadence.mjs";
 const root=process.cwd(),deadline=Date.now()+160000;
+const collectGraphicsRaf=process.env.MYASO_P0_GRAPHICS_RAF_QA==="1";
 const children=new Set(),clients=[];
 let http;
 const dir=path.join(root,"alpha-p0-real-greyhaven-visual-evidence");
@@ -139,6 +141,12 @@ async function run(){
  const captures=[];
  for(let i=0;i<clients.length;i++)captures.push({browser:clients[i].name,playerId:before[i].own,greenSamples:before[i].green,image:await screenshot(clients[i])});
  console.log("ALPHA_P0_WORLD_LIVENESS_BEFORE "+JSON.stringify(before.map((value,i)=>({browser:clients[i].name,uiTick:value.tick,probe:value.liveness}))));
+ // Optional QA samples browser callbacks during real Rust-backed movement;
+ // this leaves the existing real game, Combat and server transport untouched.
+ if(collectGraphicsRaf)for(const s of clients){
+   const installed=await execute(s,GRAPHICS_RAF_INSTALL_SCRIPT);
+   check(installed?.installed===true,s.name+" genuine RAF observer unavailable");
+ }
  await move(clients[0]);
  let after;
  try {
@@ -158,6 +166,15 @@ async function run(){
   throw error;
  }
  console.log("ALPHA_P0_WORLD_LIVENESS_AFTER "+JSON.stringify(after.map((value,i)=>({browser:clients[i].name,uiTick:value.tick,probe:value.liveness}))));
+ let graphicsRaf=null;
+ if(collectGraphicsRaf){
+   graphicsRaf=await Promise.all(clients.map(async s=>({
+     browser:s.name,summary:summarizeGraphicsRaf(await execute(s,GRAPHICS_RAF_STOP_SCRIPT)),
+   })));
+   for(const r of graphicsRaf)
+     check(r.summary.enoughSamplesForDiagnostics,r.browser+" insufficient genuine RAF frames");
+   console.log("ALPHA_P0_GRAPHICS_RAF_QA "+JSON.stringify(graphicsRaf));
+ }
  const proof={realRustAuthority:true,sourceAuthoredWorldRenderer:true,
   trueWorldQueryWithoutScenario:true,genuineFourChromeFirefoxW3cClients:true,
   allFourSharedAuthoritativeRoster:[1,2,3,4],
@@ -168,6 +185,7 @@ async function run(){
     receivedSnapshotsAfter:x.snapshotCount,statusTickForContextOnly:x.tick,
   })),
   renderedGreenSampleCounts:before.map(x=>x.green),captures,
+  ...(graphicsRaf?{graphicsBrowserFrameCadence:graphicsRaf}:{}),
   serverOwnedGreyhavenProfile:true,reviewed23StaticSolids:true,
   scope:"single-host loopback canvas art + real QUIC; NOT sword art, armed PvP, identity gear or independent hosts"};
  console.log("ALPHA_P0_FOUR_REAL_RENDERED_GREYHAVEN_BROWSERS_PASS "+JSON.stringify(proof));
