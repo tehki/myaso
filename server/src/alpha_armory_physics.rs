@@ -163,7 +163,6 @@ pub fn verify_pickup_geometry(
     Ok(())
 }
 
-
 /// Source-tick equality prerequisite from the one trusted Core/Items writer.
 ///
 /// Each tick MUST be sampled from the committed server-owned state while
@@ -734,7 +733,12 @@ mod tests {
         let empty = window(&[]);
         assert_eq!(
             verify_pickup_geometry_at_completed_tick(
-                actor(), sword(), &empty, CURRENT, 64.0, ticks,
+                actor(),
+                sword(),
+                &empty,
+                CURRENT,
+                64.0,
+                ticks,
             ),
             Ok(())
         );
@@ -764,7 +768,12 @@ mod tests {
         ] {
             assert_eq!(
                 verify_pickup_geometry_at_completed_tick(
-                    actor(), sword(), &empty, CURRENT, 64.0, stale,
+                    actor(),
+                    sword(),
+                    &empty,
+                    CURRENT,
+                    64.0,
+                    stale,
                 ),
                 Err(PickupGeometryReject::StaleWorldTick)
             );
@@ -782,7 +791,12 @@ mod tests {
         let blocked = window(&[WALL]);
         assert_eq!(
             verify_pickup_geometry_at_completed_tick(
-                actor(), sword(), &blocked, CURRENT, 64.0, ticks,
+                actor(),
+                sword(),
+                &blocked,
+                CURRENT,
+                64.0,
+                ticks,
             ),
             Err(PickupGeometryReject::Occluded)
         );
@@ -792,7 +806,12 @@ mod tests {
         };
         assert_eq!(
             verify_pickup_geometry_at_completed_tick(
-                actor(), sword(), &incomplete, CURRENT, 64.0, ticks,
+                actor(),
+                sword(),
+                &incomplete,
+                CURRENT,
+                64.0,
+                ticks,
             ),
             Err(PickupGeometryReject::IncompleteGeometry)
         );
@@ -802,7 +821,12 @@ mod tests {
         };
         assert_eq!(
             verify_pickup_geometry_at_completed_tick(
-                actor(), sword(), &window(&[]), previous_revision, 64.0, ticks,
+                actor(),
+                sword(),
+                &window(&[]),
+                previous_revision,
+                64.0,
+                ticks,
             ),
             Err(PickupGeometryReject::StaleAuthority)
         );
