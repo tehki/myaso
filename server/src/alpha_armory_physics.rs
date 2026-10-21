@@ -183,21 +183,35 @@ mod tests {
         max_y: 3980.0,
     };
     fn actor() -> WorldPoint {
-        WorldPoint { zone_id: 7, x: 3700.0, y: 3940.0 }
+        WorldPoint {
+            zone_id: 7,
+            x: 3700.0,
+            y: 3940.0,
+        }
     }
     fn sword() -> WorldPoint {
-        WorldPoint { zone_id: 7, x: 3752.0, y: 3940.0 }
+        WorldPoint {
+            zone_id: 7,
+            x: 3752.0,
+            y: 3940.0,
+        }
     }
     fn window<'a>(solids: &'a [SolidRect]) -> GeometryWindow<'a> {
         GeometryWindow {
-            fence: CURRENT, complete: true, bounds: BOUNDS, solids
+            fence: CURRENT,
+            complete: true,
+            bounds: BOUNDS,
+            solids,
         }
     }
 
     #[test]
     fn same_zone_visible_rack_sword_is_in_reach() {
         let empty = window(&[]);
-        assert_eq!(verify_pickup_geometry(actor(), sword(), &empty, CURRENT, 64.0), Ok(()));
+        assert_eq!(
+            verify_pickup_geometry(actor(), sword(), &empty, CURRENT, 64.0),
+            Ok(())
+        );
         // The kernel only reads positions; pickup / equipment remain unchanged.
         let before = (actor(), sword());
         let _ = verify_pickup_geometry(actor(), sword(), &empty, CURRENT, 64.0);
@@ -214,8 +228,18 @@ mod tests {
 
     #[test]
     fn genuinely_open_doorway_allows_pickup_and_solid_panels_do_not() {
-        let top = SolidRect { min_x: 3724.0, min_y: 3900.0, max_x: 3734.0, max_y: 3922.0 };
-        let bottom = SolidRect { min_x: 3724.0, min_y: 3958.0, max_x: 3734.0, max_y: 3980.0 };
+        let top = SolidRect {
+            min_x: 3724.0,
+            min_y: 3900.0,
+            max_x: 3734.0,
+            max_y: 3922.0,
+        };
+        let bottom = SolidRect {
+            min_x: 3724.0,
+            min_y: 3958.0,
+            max_x: 3734.0,
+            max_y: 3980.0,
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), sword(), &window(&[top, bottom]), CURRENT, 64.0),
             Ok(())
@@ -230,12 +254,20 @@ mod tests {
 
     #[test]
     fn close_corner_touch_and_wall_endpoint_fail_closed() {
-        let tangent = SolidRect { min_x: 3724.0, min_y: 3940.0, max_x: 3734.0, max_y: 3950.0 };
+        let tangent = SolidRect {
+            min_x: 3724.0,
+            min_y: 3940.0,
+            max_x: 3734.0,
+            max_y: 3950.0,
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), sword(), &window(&[tangent]), CURRENT, 64.0),
             Err(PickupGeometryReject::Occluded)
         );
-        let on_wall = WorldPoint { x: 3724.0, ..sword() };
+        let on_wall = WorldPoint {
+            x: 3724.0,
+            ..sword()
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), on_wall, &window(&[WALL]), CURRENT, 64.0),
             Err(PickupGeometryReject::Occluded)
@@ -272,12 +304,18 @@ mod tests {
             verify_pickup_geometry(actor(), sword(), &window(&[]), old, 64.0),
             Err(PickupGeometryReject::StaleAuthority)
         );
-        let wrong = WorldPoint { zone_id: 8, ..sword() };
+        let wrong = WorldPoint {
+            zone_id: 8,
+            ..sword()
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), wrong, &window(&[]), CURRENT, 64.0),
             Err(PickupGeometryReject::StaleAuthority)
         );
-        let zero_epoch = GeometryFence { worker_epoch: 0, ..CURRENT };
+        let zero_epoch = GeometryFence {
+            worker_epoch: 0,
+            ..CURRENT
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), sword(), &window(&[]), zero_epoch, 64.0),
             Err(PickupGeometryReject::StaleAuthority)
@@ -301,17 +339,26 @@ mod tests {
 
     #[test]
     fn malformed_geometry_or_nonfinite_positions_are_rejected() {
-        let bad = SolidRect { max_x: f32::INFINITY, ..WALL };
+        let bad = SolidRect {
+            max_x: f32::INFINITY,
+            ..WALL
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), sword(), &window(&[bad]), CURRENT, 64.0),
             Err(PickupGeometryReject::InvalidGeometry)
         );
-        let nan_actor = WorldPoint { x: f32::NAN, ..actor() };
+        let nan_actor = WorldPoint {
+            x: f32::NAN,
+            ..actor()
+        };
         assert_eq!(
             verify_pickup_geometry(nan_actor, sword(), &window(&[]), CURRENT, 64.0),
             Err(PickupGeometryReject::InvalidInput)
         );
-        let out_of_bounds = WorldPoint { x: 4101.0, ..sword() };
+        let out_of_bounds = WorldPoint {
+            x: 4101.0,
+            ..sword()
+        };
         assert_eq!(
             verify_pickup_geometry(actor(), out_of_bounds, &window(&[]), CURRENT, 64.0),
             Err(PickupGeometryReject::InvalidInput)
@@ -320,11 +367,21 @@ mod tests {
 
     #[test]
     fn legacy_zone_zero_and_new_world_revision_zero_are_supported() {
-        let legacy = GeometryFence { zone_id: 0, worker_epoch: 1, map_revision: 0 };
+        let legacy = GeometryFence {
+            zone_id: 0,
+            worker_epoch: 1,
+            map_revision: 0,
+        };
         let mut empty = window(&[]);
         empty.fence = legacy;
-        let zero_actor = WorldPoint { zone_id: 0, ..actor() };
-        let zero_sword = WorldPoint { zone_id: 0, ..sword() };
+        let zero_actor = WorldPoint {
+            zone_id: 0,
+            ..actor()
+        };
+        let zero_sword = WorldPoint {
+            zone_id: 0,
+            ..sword()
+        };
         assert_eq!(
             verify_pickup_geometry(zero_actor, zero_sword, &empty, legacy, 64.0),
             Ok(())
