@@ -1,4 +1,6 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createInputSendClock } from "../src/browser/input-send-clock.mjs";
+import { inputQueueReplacementEvidence } from "../src/browser/input-queue-evidence.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -169,10 +171,14 @@ const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
 let animationFrameId = 0;
-let predictionStep = 0;
 let clientTick = 0;
 const BACKGROUND_LIVENESS_INTERVAL_MS = 5000;
 let backgroundLivenessTimer = null;
+const inputSendClock = createInputSendClock({
+  send: submitPlayerInput,
+  shouldSend: () => Boolean(networkClient) && !document.hidden,
+  intervalMs: 2000 / NETWORK.clientPredictionHz,
+});
 let attackRequested = false;
 let runningAttackRequested = false;
 let committedLightMove = null;
@@ -763,12 +769,17 @@ function sampleInput() {
 function simulatePrediction(stepMs) {
   sampleInput();
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
-  predictionStep += 1;
-  if (predictionStep % 2 === 0 && networkClient) {
+}
+
+function submitPlayerInput() {
+  if (networkClient && !document.hidden) {
+    sampleInput();
+    const traceInput = acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa";
+    const queuedBeforeSend = traceInput ? networkClient.transport.latestRealtime : null;
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
     // M336/M337: read-only, scenario-scoped input-plane provenance for BOTH
-    // M144 and M145. A real DOM Space+LMB without authoritative action may mean no 30Hz input sampled
+    // M144 and M145. This records the actual independent 60Hz input sample
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
     if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
@@ -799,6 +810,15 @@ function simulatePrediction(stepMs) {
     jumpRequested = false;
     dashRequested = false;
     dashMove = null;
+    if (queuedBeforeSend) {
+      const evidence = inputQueueReplacementEvidence(queuedBeforeSend, networkClient.transport.latestRealtime);
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (evidence && debug) {
+        debug.inputQueueLosses ??= [];
+        debug.inputQueueLosses.push({ epochMs: Date.now(), ...evidence });
+        if (debug.inputQueueLosses.length > 8) debug.inputQueueLosses.shift();
+      }
+    }
   }
 }
 
@@ -1841,6 +1861,7 @@ function sendBackgroundLiveness() {
 function handleVisibilityChange() {
   releaseInputs();
   if (document.hidden) {
+    inputSendClock.stop();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
     frameBudget.reset();
@@ -1861,6 +1882,7 @@ function handleVisibilityChange() {
   snapshotRenderClock.reset();
   if (renderGapTelemetry) renderGapTelemetry.reset();
   visualCamera.reset();
+  inputSendClock.start();
   if (!animationFrameId) animationFrameId = requestAnimationFrame(frame);
 }
 
@@ -1868,6 +1890,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+if (!document.hidden) inputSendClock.start();
 render();
 frameBudget.reset(performance.now());
 animationFrameId = requestAnimationFrame(frame);

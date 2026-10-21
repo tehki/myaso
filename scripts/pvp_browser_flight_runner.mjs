@@ -14060,6 +14060,7 @@ async function readUiEvidence(session) {
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
         clearedInputIntents: (window.__MYASO_ACCEPTANCE_STATE__.clearedInputIntents ?? []).slice(-8).map((entry) => ({ ...entry })),
+        inputQueueLosses: (window.__MYASO_ACCEPTANCE_STATE__.inputQueueLosses ?? []).slice(-8).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
