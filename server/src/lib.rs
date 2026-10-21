@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod alpha_armory_physics;
 pub mod alpha_greyhaven_geometry;
 pub mod kill_event;
 pub mod reliable;
