@@ -123,6 +123,16 @@ fn resolve_inventory_loadout(inventory: &Inventory) -> Result<CombatLoadout, Com
     let head = checked_slot(inventory, EquipmentSlot::Head, &mut seen_ids)?;
     let feet = checked_slot(inventory, EquipmentSlot::Feet, &mut seen_ids)?;
 
+    // Combat may never resolve a wielded sword from an inventory that also
+    // contains the *same physical item ID* in the backpack. The Loot domain
+    // should prevent this state, but fail closed if a corrupted/migrated
+    // snapshot crosses the read-only Combat boundary.
+    for item in inventory.backpack() {
+        if seen_ids.contains(&item.id) {
+            return Err(CombatLoadoutError::DuplicateEquippedItem(item.id));
+        }
+    }
+
     let main_hand = match main.map(|item| (item.kind, item.id)) {
         None => MainHandCombatItem::Unarmed,
         Some((ItemKind::RustySword, id)) => MainHandCombatItem::RustySword(id),
@@ -336,6 +346,33 @@ mod tests {
             MainHandCombatItem::Unarmed
         );
         loot.export_state().unwrap();
+    }
+
+    #[test]
+    fn equipped_sword_cannot_also_exist_in_backpack() {
+        let mut inventory = Inventory::default();
+        inventory.equipment.insert(
+            EquipmentSlot::MainHand,
+            ItemStack {
+                id: 77,
+                kind: ItemKind::IronSword,
+                amount: 1,
+            },
+        );
+        inventory.backpack.push(ItemStack {
+            id: 77,
+            kind: ItemKind::RustySword,
+            amount: 1,
+        });
+        assert_eq!(
+            resolve_inventory_loadout(&inventory),
+            Err(CombatLoadoutError::DuplicateEquippedItem(77))
+        );
+        inventory.backpack.clear();
+        assert_eq!(
+            resolve_inventory_loadout(&inventory).unwrap().main_hand,
+            MainHandCombatItem::IronSword(77)
+        );
     }
 
     #[test]
