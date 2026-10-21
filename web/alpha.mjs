@@ -1,4 +1,7 @@
+import { installLobbyPracticeLink } from "./alpha-practice.mjs";
 import { parseAlphaConfig, alphaPlayPath } from "./alpha-config.mjs";
+
+installLobbyPracticeLink(document);
 
 const play = document.querySelector("#join-arena");
 const status = document.querySelector("#server-status");
