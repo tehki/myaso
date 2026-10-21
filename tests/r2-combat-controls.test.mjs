@@ -164,3 +164,6 @@ test("cancel held charge without attacking, standalone E retains original windup
   stepWorld(world, { a: { heavyAttack: true } }, 1000 / 120);
   assert.equal(f.action, "heavy_attack_windup");
 });
+
+// UI control disclosure is exercised by the protected combat-controls lane.
+import "./ui-control-guide.test.mjs";

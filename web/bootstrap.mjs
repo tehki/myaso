@@ -1,3 +1,6 @@
+import { installControlGuide } from "../src/browser/control-guide.mjs";
+installControlGuide(document);
+
 const params = new URLSearchParams(window.location.search);
 
 if (params.has("server")) {
