@@ -1,0 +1,338 @@
+{
+  "purpose": "3B P0 source-only four actual original 3A Silver Knight sprites at original World521 four sword approaches",
+  "sourceHeads": {
+    "world": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+    "knight": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+    "graphicsAncestor": "755b778cdc328b5ffc3a676824c03d6a1b75a2c9"
+  },
+  "originalSourceHashes": {
+    "/__world521__/src/browser/authored-world-renderer.mjs": "2006dbff24401cc5e262363fb11f89546bbf769cb11bcffddcbeb8819dd4ca7a",
+    "/__world521__/src/world/alpha-armory.mjs": "305a7764d67af9115d85000bde5e922cbae64db2455e15fbf7d3d22b01c5c3bf",
+    "/__world521__/src/world/authored-maps.mjs": "21e7663303b14cc89f7dece7d73fda3b7e1fd4b70cc97b8753cd2c793209e144",
+    "/__world521__/src/world/building-presentation.mjs": "c2e2ad0350fbc5d0c8408a48a151c280b4cc85500c53f4b8e705b21e97147e33",
+    "/__knight326__/web/knight-sprites.mjs": "1a3489220df7fbfa614f986148915e1a89e26a3e215f204386a49b77fa53c4cd",
+    "/__knight326__/src/browser/combat-readability.mjs": "8d868c947fdfe9dc73488819448909c85f1fcbd86c74024931527146cbf4390c",
+    "/__knight326__/src/combat/model.mjs": "881e01d92a47665a08ba76521e7c615ef4b21de47b28335dcd88ade62d359d01",
+    "/__knight326__/web/assets/knights/silver_idle.webp": "828cf05dd873d0c8f35e887f5e46c35af87f084ac321977e358c985e7a2106b4"
+  },
+  "browsers": [
+    {
+      "engine": "chrome",
+      "version": "Chrome/154.0.8037.99",
+      "errors": [],
+      "sourceOutput": {
+        "ready": true,
+        "sourceWorldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "originalSilverSourceHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "actualSourceWorldRenderer": true,
+        "originalSourceSilverAtlas": true,
+        "originalBlenderSwords": true,
+        "sourceKnightsCount": 4,
+        "sourceSwordCount": 4,
+        "actualWorldApproaches": [
+          [
+            3740,
+            4088
+          ],
+          [
+            3780,
+            4088
+          ],
+          [
+            3820,
+            4088
+          ],
+          [
+            3860,
+            4088
+          ]
+        ],
+        "sourceKnightScale": 1.2,
+        "screenKnightRects": [
+          {
+            "id": "ILLUSTRATIVE-SILVER-0",
+            "sourceSocket": "greyhaven-rack-1",
+            "sourceWorldXY": [
+              3740,
+              4088
+            ],
+            "x": 221.60000000000002,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-1",
+            "sourceSocket": "greyhaven-rack-2",
+            "sourceWorldXY": [
+              3780,
+              4088
+            ],
+            "x": 255.2,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-2",
+            "sourceSocket": "greyhaven-rack-3",
+            "sourceWorldXY": [
+              3820,
+              4088
+            ],
+            "x": 288.8,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-3",
+            "sourceSocket": "greyhaven-rack-4",
+            "sourceWorldXY": [
+              3860,
+              4088
+            ],
+            "x": 322.4,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          }
+        ],
+        "silverPairIntersections": [
+          {
+            "pair": [
+              0,
+              1
+            ],
+            "opaqueOverlapPixels": 18
+          },
+          {
+            "pair": [
+              0,
+              2
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              0,
+              3
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              1,
+              2
+            ],
+            "opaqueOverlapPixels": 16
+          },
+          {
+            "pair": [
+              1,
+              3
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              2,
+              3
+            ],
+            "opaqueOverlapPixels": 17
+          }
+        ],
+        "totalPairwiseSilverOpaqueOverlapPixels": 51,
+        "swordVisibility": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "sourceCandidateAlphaPixels": 1019,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1019
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "sourceCandidateAlphaPixels": 1007,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1007
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "sourceCandidateAlphaPixels": 1004,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1004
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "sourceCandidateAlphaPixels": 1031,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1031
+          }
+        ],
+        "worldTilesCached": 6,
+        "swordUiPointerArbitrationIntegrated": false,
+        "serverPlayersAuthenticated": false,
+        "serverItemPresenceAuthenticated": false,
+        "realFourPlayerGameplay": false,
+        "productionApproved": false
+      },
+      "screenshot": "armory_four_original_silvers_chrome.png",
+      "actualGameplayActors": false,
+      "actualGameplayPickup": false,
+      "playerToSwordHitPriorityApproved": false
+    },
+    {
+      "engine": "firefox",
+      "version": "firefox/153.4.0",
+      "errors": [],
+      "sourceOutput": {
+        "ready": true,
+        "sourceWorldHead": "3178b9aad8757ceb3594ff04b9e3099dced6b729",
+        "originalSilverSourceHead": "c74fcf90e227f3bc4788728f000cfe6aa083c7ef",
+        "actualSourceWorldRenderer": true,
+        "originalSourceSilverAtlas": true,
+        "originalBlenderSwords": true,
+        "sourceKnightsCount": 4,
+        "sourceSwordCount": 4,
+        "actualWorldApproaches": [
+          [
+            3740,
+            4088
+          ],
+          [
+            3780,
+            4088
+          ],
+          [
+            3820,
+            4088
+          ],
+          [
+            3860,
+            4088
+          ]
+        ],
+        "sourceKnightScale": 1.2,
+        "screenKnightRects": [
+          {
+            "id": "ILLUSTRATIVE-SILVER-0",
+            "sourceSocket": "greyhaven-rack-1",
+            "x": 221.60000000000002,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-1",
+            "sourceSocket": "greyhaven-rack-2",
+            "x": 255.2,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-2",
+            "sourceSocket": "greyhaven-rack-3",
+            "x": 288.8,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          },
+          {
+            "id": "ILLUSTRATIVE-SILVER-3",
+            "sourceSocket": "greyhaven-rack-4",
+            "x": 322.4,
+            "y": 299.6,
+            "width": 96,
+            "height": 96
+          }
+        ],
+        "silverPairIntersections": [
+          {
+            "pair": [
+              0,
+              1
+            ],
+            "opaqueOverlapPixels": 18
+          },
+          {
+            "pair": [
+              0,
+              2
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              0,
+              3
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              1,
+              2
+            ],
+            "opaqueOverlapPixels": 16
+          },
+          {
+            "pair": [
+              1,
+              3
+            ],
+            "opaqueOverlapPixels": 0
+          },
+          {
+            "pair": [
+              2,
+              3
+            ],
+            "opaqueOverlapPixels": 17
+          }
+        ],
+        "totalPairwiseSilverOpaqueOverlapPixels": 51,
+        "swordVisibility": [
+          {
+            "id": "ART-ONLY-NO-SERVER-0",
+            "sourceCandidateAlphaPixels": 1019,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1019
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-1",
+            "sourceCandidateAlphaPixels": 1007,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1007
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-2",
+            "sourceCandidateAlphaPixels": 1004,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1004
+          },
+          {
+            "id": "ART-ONLY-NO-SERVER-3",
+            "sourceCandidateAlphaPixels": 1031,
+            "obscuredByAnySilverOpaquePixels": 0,
+            "stillUnobscuredCandidatePixels": 1031
+          }
+        ],
+        "worldTilesCached": 6,
+        "swordUiPointerArbitrationIntegrated": false,
+        "serverPlayersAuthenticated": false,
+        "serverItemPresenceAuthenticated": false,
+        "realFourPlayerGameplay": false,
+        "productionApproved": false
+      },
+      "screenshot": "armory_four_original_silvers_firefox.png",
+      "actualGameplayActors": false,
+      "actualGameplayPickup": false,
+      "playerToSwordHitPriorityApproved": false
+    }
+  ],
+  "realFourPlayersConnected": false,
+  "realGameInput": false,
+  "gameplayOcclusionResolved": false,
+  "productionApproved": false
+}
