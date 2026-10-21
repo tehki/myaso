@@ -5,8 +5,8 @@
 //! The three reviewed NPC positions are NOT inserted into any runtime.
 
 use myaso_server::alpha_greyhaven_geometry::{
-    overlaps_known_static_solid, swept_circle_hits_known_static_solid,
-    STATIC_LAYOUT_ID, STATIC_SOLIDS, STATIC_SOLIDS_SHA256,
+    overlaps_known_static_solid, swept_circle_hits_known_static_solid, STATIC_LAYOUT_ID,
+    STATIC_SOLIDS, STATIC_SOLIDS_SHA256,
 };
 
 type Point = (f32, f32);
@@ -59,7 +59,10 @@ fn immutable_world9_source_and_safe_review_only_sentinel_points() {
 
 #[test]
 fn original_blacksmith_has_positive_and_negative_static_observation_rays() {
-    let smith = STATIC_SOLIDS.iter().find(|r| r.id == "building:smith").unwrap();
+    let smith = STATIC_SOLIDS
+        .iter()
+        .find(|r| r.id == "building:smith")
+        .unwrap();
     assert_eq!(
         (smith.min_x, smith.min_y, smith.max_x, smith.max_y),
         (3710.0, 3850.0, 3892.0, 4012.0)
