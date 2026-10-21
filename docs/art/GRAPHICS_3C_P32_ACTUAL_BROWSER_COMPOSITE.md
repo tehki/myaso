@@ -44,7 +44,7 @@ python tools/art/verify_p0_armory_sword_opaque_pixels.py \
   assets/environment/greyhaven/3c-p32-composite-review/p32_opaque_sword_core_review.json
 ```
 
-The browser harness defaults to Chrome+Firefox. Set `P0_QA_BROWSERS=chrome` on an independent Linux machine without Firefox for additional cross-machine Chromium evidence; it still does **not** claim an independently connected game client. The optional Python pixel check uses Pillow and is **not** a mandatory CI/package dependency. Mandatory quality gets only `node --check` for the new harness. All prior World/3C tests and strict Combat/Rust protections remain unchanged.
+The browser harness defaults to Chrome+Firefox. Set `P0_QA_BROWSERS=chrome` on an independent Linux machine without Firefox for additional cross-machine Chromium evidence; it still does **not** claim an independently connected game client. The optional Python pixel check uses installed Pillow or an installed ImageMagick RGBA decoder fallback and is **not** a mandatory CI/package dependency. A single-engine Linux run is labeled separately from the full Windows Chrome+Firefox two-engine acceptance. Mandatory quality gets only `node --check` for the new harness. All prior World/3C tests and strict Combat/Rust protections remain unchanged.
 
 ## Known integration blockers
 

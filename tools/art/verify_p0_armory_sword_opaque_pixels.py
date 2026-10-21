@@ -11,7 +11,38 @@ import math
 import sys
 from pathlib import Path
 
-from PIL import Image
+from subprocess import check_output
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+class RGBAImage:
+    """Read real source WebP/PNG RGBA via Pillow or installed ImageMagick."""
+    def __init__(self, path):
+        if Image is not None:
+            self.image = Image.open(path).convert("RGBA")
+            self.size = self.image.size
+            self.raw = None
+        else:
+            self.image = None
+            self.size = tuple(map(int, check_output(
+                ["magick", "identify", "-format", "%w %h", str(path)],
+                text=True).split()))
+            self.raw = check_output(["magick", str(path), "-alpha", "on",
+                                     "-depth", "8", "rgba:-"])
+            assert len(self.raw) == self.size[0] * self.size[1] * 4
+        self.width, self.height = self.size
+
+    def getpixel(self, pos):
+        if self.image is not None:
+            return self.image.getpixel(pos)
+        x, y = pos
+        w, h = self.size
+        assert 0 <= x < w and 0 <= y < h
+        offset = 4 * (y * w + x)
+        return tuple(self.raw[offset:offset + 4])
 
 if len(sys.argv) != 4:
     raise SystemExit("usage: verify_p0_armory_sword_opaque_pixels.py <3B508-exact-checkout> <browser-report> <out-json>")
@@ -22,7 +53,7 @@ report = json.loads(report_path.read_text(encoding="utf8"))
 sword_path = art_root / "assets/environment/greyhaven/armory-p0/armory_sword.webp"
 digest = hashlib.sha256(sword_path.read_bytes()).hexdigest()
 assert digest == report["sourceHashes"]["graphics3bSword"]
-sword = Image.open(sword_path).convert("RGBA")
+sword = RGBAImage(sword_path)
 assert sword.size == (42, 115)
 
 pairs = []
@@ -30,8 +61,8 @@ for browser in sorted({case["browser"] for case in report["cases"]}):
     baseline = next(r for r in report["cases"] if r["browser"] == browser and r["variant"] == "world493")
     candidate = next(r for r in report["cases"] if r["browser"] == browser and r["variant"] == "graphics3c")
     assert baseline["swordRects"] == candidate["swordRects"], "Original art bounds changed by 3C"
-    a = Image.open(report_path.parent / baseline["screenCaptured"]).convert("RGBA")
-    b = Image.open(report_path.parent / candidate["screenCaptured"]).convert("RGBA")
+    a = RGBAImage(report_path.parent / baseline["screenCaptured"])
+    b = RGBAImage(report_path.parent / candidate["screenCaptured"])
     assert a.size == b.size == (640, 640)
     changed = sum(
         a.getpixel((x, y)) != b.getpixel((x, y))

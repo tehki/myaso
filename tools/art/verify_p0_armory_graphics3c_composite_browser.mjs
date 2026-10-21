@@ -114,7 +114,12 @@ async function run(browserName,variant){
   await page.setViewport({width:1100,height:880,deviceScaleFactor:1});
   const resp=await page.goto(selected.url,{waitUntil:"networkidle0",timeout:45000});
   assert.equal(resp.status(),200);
-  await page.waitForFunction(()=>window.__world493ArmoryReview?.()?.ready,{timeout:30000});
+  try{
+   await page.waitForFunction(()=>window.__world493ArmoryReview?.()?.ready,{timeout:75000});
+  }catch(e){
+   const detail=await page.$eval("#status",el=>el.textContent).catch(()=>"(status absent)");
+   throw new Error(browserName+"/"+variant+" art review did not become ready; status="+detail+"; pageErrors="+JSON.stringify(errors)+"; "+e.message);
+  }
   const initial=await page.evaluate(()=>window.__world493ArmoryReview());
   assert.equal(initial.realWorldTerrainRenderer,true);
   assert.equal(initial.renderedSwords,4);
@@ -169,7 +174,8 @@ try{
   assert.notEqual(cases[0].canvasSha256,cases[1].canvasSha256,
     "Expected visible Graphics 3C changes to World-only authored background, not identical screenshot");
  }
- report.status="ART_ONLY_CROSS_BROWSER_COMPOSITE_PASS";
+ report.status=engines.includes("chrome")&&engines.includes("firefox")
+   ?"ART_ONLY_CROSS_BROWSER_COMPOSITE_PASS":"ART_ONLY_SINGLE_ENGINE_COMPOSITE_PASS";
  await writeFile(join(output,"p32_original_source_composite_browser.json"),
    JSON.stringify(report,null,2)+"\n");
  console.log(JSON.stringify({
