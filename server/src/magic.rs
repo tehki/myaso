@@ -872,6 +872,220 @@ mod tests {
         assert_eq!(magic.pending_ember_intents().count(), 1);
     }
 
+    /// P0 physical sword ownership transfer is independent of earned magic:
+    /// no Fire/Ember prerequisite, cost, wipe or ownership-based spell grant.
+    /// This is only the dormant Items u64 checkpoint prototype, NOT a
+    /// Core-8B u128, authenticated browser or live fencing/Physics proof.
+    #[test]
+    fn spell_progression_survives_checked_sword_drop_and_new_owner_pickup() {
+        use crate::loot::LootError;
+        use crate::loot_transaction::{
+            commit_verified_equipped_sword_drop_checked,
+            commit_verified_ground_sword_equip_checked, GroundSwordAuthority, PickupCommitError,
+            PickupWorldTick, VerifiedLootOperation,
+        };
+        use crate::magic_checkpoint::load_joint;
+        use crate::zone::ZoneAuthority;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static CHECKPOINT_SEQ: AtomicU64 = AtomicU64::new(1);
+        let number = CHECKPOINT_SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "myaso-magic2a-drop-no-spell-transfer-{}-{number}.bin",
+            std::process::id()
+        ));
+
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for (id, x) in [(1, 200.0), (2, 245.0), (3, 212.0), (4, 340.0)] {
+            assert!(world.add_player_at(id, x, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id, 1), character(u64::from(id)))
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+
+        // Fire/Ember are already earned by the former sword owner, while
+        // the eventual receiver has NEVER learned a spell or awakened mana.
+        let mut magic = MagicAuthority::new();
+        magic
+            .grant_lesson(award(91, character(1), Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(92, character(1), Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        magic
+            .grant_lesson(award(93, character(2), Lesson::Rune(Rune::Water)))
+            .unwrap();
+        magic.characters.get_mut(&character(1)).unwrap().mana = 37;
+        let before = magic.encode_progression().unwrap();
+        assert_eq!(magic.mana(character(1)), 37);
+        assert_eq!(magic.mana(character(3)), 0);
+
+        let physical_id = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, physical_id, EquipmentSlot::MainHand)
+            .unwrap();
+        // The Items drop primitive must not require transient backpack space.
+        for _ in 0..crate::loot::BACKPACK_CAPACITY {
+            loot.grant(1, ItemKind::Gold, 1).unwrap();
+        }
+        assert_eq!(
+            loot.inventory(1).unwrap().backpack().len(),
+            crate::loot::BACKPACK_CAPACITY
+        );
+
+        macro_rules! sword_authority {
+            ($actor:expr, $seq:expr) => {
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut loot,
+                    magic: &magic,
+                    identity: &identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: lease($actor, 1),
+                        sequence: $seq,
+                    },
+                }
+            };
+        }
+
+        // Failed trusted geometry must not consume a command or leak a sword.
+        assert!(matches!(
+            commit_verified_equipped_sword_drop_checked(
+                sword_authority!(1, 1),
+                |_, _| Err(PickupCommitError::GeometryRejected)
+            ),
+            Err(PickupCommitError::GeometryRejected)
+        ));
+        assert!(!path.exists());
+        assert!(loot.ground().is_empty());
+        assert_eq!(
+            loot.inventory(1)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(loot.committed_operation_sequence(character(1)), None);
+        assert_eq!(magic.encode_progression().unwrap(), before);
+
+        // The authoritative prototype drops the ORIGINAL physical sword ID,
+        // not an item cloned into a backpack or issued by learned magic.
+        let dropped = commit_verified_equipped_sword_drop_checked(
+            sword_authority!(1, 1),
+            |fighter, zone| {
+                assert_eq!((fighter.x, fighter.y), (200.0, 200.0));
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(dropped.expected_item_id, physical_id);
+        assert!(loot
+            .inventory(1)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(loot.inventory(1).unwrap().backpack().len(), 64);
+        assert_eq!(loot.ground().len(), 1);
+        assert_eq!(
+            loot.ground()[&dropped.ground_entity_id].item.id,
+            physical_id
+        );
+        assert_eq!(magic.encode_progression().unwrap(), before);
+        let (after_drop, saved_magic) = load_joint(&path).unwrap();
+        assert_eq!(saved_magic.encode_progression().unwrap(), before);
+        assert_eq!(after_drop.committed_operation_sequence(character(1)), Some(1));
+        assert!(after_drop
+            .parked_inventory(character(1))
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+
+        // An unawakened receiver must equip the SAME item without Fire,
+        // Ember, mana, a Spellbook, a lesson or a spell debit.
+        let taken = commit_verified_ground_sword_equip_checked(
+            sword_authority!(3, 1),
+            dropped,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 3);
+                assert_eq!(ground.item.id, physical_id);
+                assert_eq!(ground.zone, zone);
+                assert_eq!(fighter.x - ground.at.x, 12.0);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(taken.id, physical_id);
+        assert!(loot.ground().is_empty());
+        assert_eq!(
+            loot.inventory(3)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(magic.encode_progression().unwrap(), before);
+        assert_eq!(magic.mana(character(3)), 0);
+        assert!(!magic.knows_rune(character(3), Rune::Fire));
+        assert!(!magic.knows_spell(character(3), Spell::Ember));
+
+        // Same verified sequence cannot reissue the sword or modify magic.
+        assert!(matches!(
+            commit_verified_ground_sword_equip_checked(
+                sword_authority!(3, 1),
+                dropped,
+                |_, _, _| panic!("replay must not reach geometry"),
+            ),
+            Err(PickupCommitError::Loot(LootError::ReplayOperation))
+        ));
+        assert_eq!(magic.encode_progression().unwrap(), before);
+
+        let (recovered, recovered_magic) = load_joint(&path).unwrap();
+        assert_eq!(recovered_magic.encode_progression().unwrap(), before);
+        assert!(recovered_magic.knows_rune(character(1), Rune::Fire));
+        assert!(recovered_magic.knows_spell(character(1), Spell::Ember));
+        assert!(recovered_magic.knows_rune(character(2), Rune::Water));
+        assert_eq!(recovered_magic.mana(character(1)), 37);
+        assert_eq!(recovered_magic.mana(character(3)), 0);
+        assert!(recovered.ground().is_empty());
+        assert!(recovered
+            .parked_inventory(character(1))
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            recovered
+                .parked_inventory(character(3))
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            physical_id
+        );
+        assert_eq!(recovered.committed_operation_sequence(character(1)), Some(1));
+        assert_eq!(recovered.committed_operation_sequence(character(3)), Some(1));
+        assert_eq!(
+            recovered
+                .parked_inventory(character(1))
+                .unwrap()
+                .backpack()
+                .len(),
+            crate::loot::BACKPACK_CAPACITY
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
     #[test]
     fn new_character_has_no_magic_and_spells_must_be_earned() {
         let mut magic = MagicAuthority::new();
