@@ -86,6 +86,16 @@ For each pair, the route uses city waypoints `(3990,4180)` and
 against the **exact embedded World #509 23-AABB map** and asserts its
 existing `solids_sha256` content pin.
 
+A follow-on **static line-of-sight preflight** now verifies the exact four
+rack sword centers can be seen from their four player approaches without
+intersecting the known 23 solids. It also proves a ray pushed into the
+Blacksmith building at `y=3990` is blocked at all four x coordinates.
+This uses only a radius-0.5 conservative static sweep and is **not** an
+`AllowedPickup` decision: the committed item and actor IDs, actual
+authoritative position, agreed 50-unit pickup range, physics/dynamic
+LOS, zone epoch, durable exclusive owner and server ACK remain outside
+this test.
+
 This only demonstrates *static* clearance for those **specific 16
 corridors**, not autonomous pathfinding, river/bridge safety, dynamic actor
 collisions, a current trusted zone/map epoch, reach/LOS for `TryPickup`,
