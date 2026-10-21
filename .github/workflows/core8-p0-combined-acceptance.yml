@@ -1,0 +1,56 @@
+name: Core 8 P0 combined 8A 8C acceptance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core8-p0-combined-acceptance.yml"
+      - ".github/workflows/ci.yml"
+      - "server/src/**"
+      - "server/tests/**"
+      - "scripts/alpha_m1_four_real_browser_flight.mjs"
+      - "scripts/alpha_p0_host_pair_*.mjs"
+      - "web/online-game.mjs"
+      - "src/world/**"
+      - "assets/world/**"
+      - "docs/CORE8_P0_8A8C_COMBINED_ACCEPTANCE.md"
+
+permissions:
+  contents: read
+
+jobs:
+  combined-authoritative-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate merged source and staging-only preflight
+        run: |
+          node --check scripts/alpha_m1_four_real_browser_flight.mjs
+          node --check scripts/alpha_p0_host_pair_config.mjs
+          node --check scripts/alpha_p0_host_pair_flight.mjs
+          node --check scripts/alpha_p0_host_pair_verify.mjs
+          node --test tests/alpha_p0_host_pair_config.test.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+      - name: Verify native W3C browser dependencies
+        run: |
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build exact merged authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: 8A four real QUIC sessions admission and cleanup
+        run: cargo test --locked --manifest-path server/Cargo.toml --test alpha_m1_four_player_quic -- --nocapture
+      - name: 8C Greyhaven collision routes and QUIC survivor tombstones
+        run: cargo test --locked --manifest-path server/Cargo.toml --test alpha_greyhaven_spawn_quic -- --nocapture
+      - name: 8A four Chrome Firefox sessions and crash rejoin on merged source
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/alpha_m1_four_real_browser_flight.mjs
+      - name: Retain genuine browser screenshots when available
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8-merged-browser-evidence
+          path: alpha-m1-four-browser-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
