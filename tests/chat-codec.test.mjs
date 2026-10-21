@@ -278,3 +278,62 @@ test("fragmented and coalesced chat frames still reject invalid length prefixes"
   assert.equal(results[0].correlation, 77);
   assert.equal(chat.closed, true);
 });
+
+test("server EOF inside a chat frame rejects only the optional channel", async () => {
+  const valid = frame(makeReceived({ text: "full payload" }));
+  for (const prefixBytes of [1, 2, 7, valid.length - 1]) {
+    let gameplayClosed = 0;
+    const reply = new ReadableStream({
+      start(controller) {
+        controller.enqueue(valid.subarray(0, prefixBytes));
+        controller.close();
+      },
+    });
+    const transport = {
+      createUnidirectionalStream: async () => new WritableStream(),
+      incomingUnidirectionalStreams: new ReadableStream({
+        start(controller) { controller.enqueue(reply); controller.close(); },
+      }),
+      close() { gameplayClosed++; },
+    };
+    const events = [];
+    const chat = await openLocalChat({ kind: "webtransport", transport }, {
+      onReceived(event) { events.push(event); },
+    });
+    await assert.rejects(chat.reading, /truncated chat frame at stream end/);
+    assert.equal(chat.closed, true);
+    assert.equal(events.length, 0, "a truncated frame cannot be shown as a delivered message");
+    assert.equal(gameplayClosed, 0, "chat errors must not close the game transport");
+  }
+});
+
+test("closing chat during one coalesced chunk suppresses subsequent callbacks", async () => {
+  let controller, gameplayClosed = 0;
+  const reply = new ReadableStream({ start(c) { controller = c; } });
+  const transport = {
+    createUnidirectionalStream: async () => new WritableStream(),
+    incomingUnidirectionalStreams: new ReadableStream({
+      start(c) { c.enqueue(reply); c.close(); },
+    }),
+    close() { gameplayClosed++; },
+  };
+  let chat;
+  const events = [];
+  chat = await openLocalChat({ kind: "webtransport", transport }, {
+    onReceived(event) {
+      events.push(event);
+      void chat.close();
+    },
+  });
+  const first = frame(makeReceived({ messageId: 101n }));
+  const second = frame(makeReceived({ messageId: 102n }));
+  const chunk = new Uint8Array(first.length + second.length);
+  chunk.set(first, 0);
+  chunk.set(second, first.length);
+  controller.enqueue(chunk);
+  await chat.reading;
+  assert.equal(events.length, 1, "a closed chat channel cannot emit queued follow-up events");
+  assert.equal(events[0].messageId, 101n);
+  assert.equal(chat.closed, true);
+  assert.equal(gameplayClosed, 0);
+});
