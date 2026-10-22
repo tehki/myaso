@@ -52,7 +52,8 @@ fn fast_press_and_release_same_client_tick_are_two_server_accepted_ordered_edges
 
 #[test]
 fn real_out_of_order_release_waits_for_press_without_speculative_server_ack() {
-    let l=lease(2,4,222),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(2,4,222);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     assert_eq!(gate.review_ingest(l,&event(GestureAction::Release,2,8,222),40),IngressResult::Deferred);
     assert_eq!(gate.buffered_count(),1);
     accepted(gate.review_ingest(l,&event(GestureAction::Press,1,8,222),41),&[(1,8),(2,8)]);
@@ -61,7 +62,8 @@ fn real_out_of_order_release_waits_for_press_without_speculative_server_ack() {
 
 #[test]
 fn accepted_retransmit_acks_duplicate_not_second_combat_edge() {
-    let l=lease(1,2,3),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,2,3);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     let p=event(GestureAction::Press,1,1,1);
     accepted(gate.review_ingest(l,&p,5),&[(1,1)]);
     let reply=gate.review_ingest(l,&p,6);
@@ -108,14 +110,16 @@ fn buffered_duplicate_keeps_one_edge_and_equivocal_payload_closes_fail_closed() 
 
 #[test]
 fn unknown_missing_prefix_or_large_gap_is_never_skipped_into_release() {
-    let l=lease(1,1,2),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,2);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     assert!(matches!(gate.review_ingest(l,&event(GestureAction::Release,50,1,0),1),IngressResult::Rejected(Some(_))));
     assert!(gate.is_closed());
 }
 
 #[test]
 fn orphan_release_is_rejected_and_does_not_claim_attack_hit() {
-    let l=lease(1,1,9),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,9);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     assert!(matches!(gate.review_ingest(l,&event(GestureAction::Release,1,1,0),1),IngressResult::Rejected(Some(_))));
     assert_eq!(gate.accepted_count(),0);
     assert!(gate.is_closed());
@@ -123,7 +127,8 @@ fn orphan_release_is_rejected_and_does_not_claim_attack_hit() {
 
 #[test]
 fn one_held_gesture_upgrades_and_releases_in_exact_order_and_new_id_increases() {
-    let l=lease(1,1,10),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,10);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     accepted(gate.review_ingest(l,&event(GestureAction::Press,1,101,1),9),&[(1,101)]);
     accepted(gate.review_ingest(l,&event(GestureAction::Upgrade,2,101,2),10),&[(2,101)]);
     accepted(gate.review_ingest(l,&event(GestureAction::Release,3,101,3),20),&[(3,101)]);
@@ -133,7 +138,8 @@ fn one_held_gesture_upgrades_and_releases_in_exact_order_and_new_id_increases() 
 
 #[test]
 fn late_upgrade_after_terminal_is_rejected_no_revival() {
-    let l=lease(1,1,11),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,11);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     accepted(gate.review_ingest(l,&event(GestureAction::Press,1,1,0),1),&[(1,1)]);
     accepted(gate.review_ingest(l,&event(GestureAction::Cancel,2,1,0),2),&[(2,1)]);
     assert!(matches!(gate.review_ingest(l,&event(GestureAction::Upgrade,3,1,0),4),IngressResult::Rejected(Some(_))));
@@ -142,7 +148,8 @@ fn late_upgrade_after_terminal_is_rejected_no_revival() {
 
 #[test]
 fn new_gesture_with_reused_or_lower_monotonic_id_is_rejected() {
-    let l=lease(1,1,12),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,12);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     accepted(gate.review_ingest(l,&event(GestureAction::Press,1,10,0),1),&[(1,10)]);
     accepted(gate.review_ingest(l,&event(GestureAction::Release,2,10,0),2),&[(2,10)]);
     assert!(matches!(gate.review_ingest(l,&event(GestureAction::Press,3,9,0),3),IngressResult::Rejected(Some(_))));
@@ -151,7 +158,8 @@ fn new_gesture_with_reused_or_lower_monotonic_id_is_rejected() {
 
 #[test]
 fn buffered_invalid_future_transition_prevents_partial_earlier_event_dispatch() {
-    let l=lease(1,1,13),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,13);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     // Simultaneous RED scenario: pending future unmatched upgrade after release.
     assert_eq!(gate.review_ingest(l,&event(GestureAction::Upgrade,3,1,0),1),IngressResult::Deferred);
     assert_eq!(gate.review_ingest(l,&event(GestureAction::Release,2,1,0),1),IngressResult::Deferred);
@@ -162,7 +170,8 @@ fn buffered_invalid_future_transition_prevents_partial_earlier_event_dispatch() 
 
 #[test]
 fn invalid_v1_or_alternative_8c_wire_cannot_activate_review_v2_gate() {
-    let l=lease(1,1,14),mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
+    let l=lease(1,1,14);
+    let mut gate=ReviewLmbIngress::new_from_trusted_admission(l);
     let mut bad=event(GestureAction::Press,1,1,1);
     bad[0]=1;
     assert_eq!(gate.review_ingest(l,&bad,2),IngressResult::Rejected(None));
