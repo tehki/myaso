@@ -49,6 +49,10 @@ const PRIORITY = Object.freeze({
 export function createCombatReadabilityTracker() {
   const previous = new Map();
   let pendingDodge = null;
+  // Presentation-only contact history for one committed attack. A late roll
+  // cannot turn an already-confirmed 46HP hit or -38 guard block into "evaded".
+  // Never infer this from HP=100: a previously injured 54HP fighter may dodge.
+  const committedContacts = new Map();
   return {
     observe(state, ownId) {
       if (!(state instanceof Map) || !ownId) return null;
@@ -78,8 +82,14 @@ export function createCombatReadabilityTracker() {
           }
         }
       }
+      if (own && beforeOwn && peer && beforePeer) {
+        rememberCommittedAttackContact(committedContacts, peer, beforePeer, own, beforeOwn);
+        rememberCommittedAttackContact(committedContacts, own, beforeOwn, peer, beforePeer);
+      } else {
+        committedContacts.clear();
+      }
       pendingDodge = own && peer
-        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer)
+        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer, committedContacts)
         : null;
 
       previous.clear();
@@ -87,7 +97,7 @@ export function createCombatReadabilityTracker() {
       candidates.sort((a, b) => b.priority - a.priority);
       return candidates[0] ?? null;
     },
-    reset() { previous.clear(); pendingDodge = null; },
+    reset() { previous.clear(); pendingDodge = null; committedContacts.clear(); },
   };
 }
 
@@ -786,7 +796,26 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
-function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null, beforePeer = null) {
+// The authoritative HP/guard delta belongs to the attack that was active or
+// recovering when it was observed. Retire it at the next attack's windup (or
+// idle): a new legitimate dodge at 54HP must still be credited.
+function rememberCommittedAttackContact(contacts, attacker, beforeAttacker, defender, beforeDefender) {
+  const committed = isAttackActive(attacker.action) || isAttackRecovery(attacker.action);
+  const startingNewAttack = isAttackWindup(attacker.action)
+    && !isAttackWindup(beforeAttacker.action);
+  const crossedRecoveryToActive = isAttackActive(attacker.action)
+    && isAttackRecovery(beforeAttacker.action);
+  if ((!committed && !isAttackWindup(attacker.action))
+    || startingNewAttack || crossedRecoveryToActive) {
+    contacts.delete(attacker.netId);
+  }
+  if ((committed || isAttackActive(beforeAttacker.action))
+    && (defender.hp < beforeDefender.hp || defender.guard < beforeDefender.guard)) {
+    contacts.set(attacker.netId, defender.netId);
+  }
+}
+
+function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null, beforePeer = null, contacts = new Map()) {
   if (pending) {
     const attacker = pending.attackerId === own.netId ? own : pending.attackerId === peer.netId ? peer : null;
     const defender = pending.defenderId === own.netId ? own : pending.defenderId === peer.netId ? peer : null;
@@ -819,7 +848,9 @@ function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null,
     && attackThreatens(beforePeer, beforeOwn);
   const ownJustRolled = own.action === COMBAT_ACTION.dodge
     && beforeOwn?.action !== COMBAT_ACTION.dodge;
-  if (own.action === COMBAT_ACTION.dodge && (ownThreatenedNow || (ownJustRolled && ownThreatenedBefore))) {
+  if (own.action === COMBAT_ACTION.dodge
+    && contacts.get(peer.netId) !== own.netId
+    && (ownThreatenedNow || (ownJustRolled && ownThreatenedBefore))) {
     return {
       attackerId: peer.netId,
       defenderId: own.netId,
@@ -836,7 +867,9 @@ function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null,
     && attackThreatens(beforeOwn, beforePeer);
   const peerJustRolled = peer.action === COMBAT_ACTION.dodge
     && beforePeer?.action !== COMBAT_ACTION.dodge;
-  if (peer.action === COMBAT_ACTION.dodge && (peerThreatenedNow || (peerJustRolled && peerThreatenedBefore))) {
+  if (peer.action === COMBAT_ACTION.dodge
+    && contacts.get(own.netId) !== peer.netId
+    && (peerThreatenedNow || (peerJustRolled && peerThreatenedBefore))) {
     return {
       attackerId: own.netId,
       defenderId: peer.netId,
