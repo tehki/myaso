@@ -148,6 +148,7 @@ pub enum LegacyMigrationError {
     ReusedNamespace,
     ZeroLegacyId,
     ZeroExistingCanonicalId,
+    DuplicateExistingCanonicalId,
     CanonicalIdCollision,
     DuplicateSourceIdentity,
     UnregisteredSourceIdentity,
@@ -155,6 +156,9 @@ pub enum LegacyMigrationError {
     InvalidKindCode,
     NonSwordRackItem,
     DuplicateRackItem,
+    TooManyEquippedSlots,
+    DuplicateEquippedSlot,
+    DuplicateEquippedItem,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -205,7 +209,9 @@ impl LegacyImportPreflight {
             if id == 0 {
                 return Err(LegacyMigrationError::ZeroExistingCanonicalId);
             }
-            existing.insert(id);
+            if !existing.insert(id) {
+                return Err(LegacyMigrationError::DuplicateExistingCanonicalId);
+            }
         }
         Ok(Self {
             namespaces,
@@ -281,6 +287,63 @@ impl LegacyImportPreflight {
     pub fn staged_count(&self) -> usize {
         self.staged.len()
     }
+}
+
+/// An extracted equipment entry from an independently validated legacy
+/// snapshot. Its provenance and current ownership MUST be validated by the
+/// Magic/Items source-owner; this Core preflight is only a proposed mapping.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LegacyEquippedRow {
+    pub checkpoint_slot_code: u8,
+    pub legacy_item_id: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposedCanonicalEquippedRow {
+    pub item_id: ItemId,
+    pub location: ItemLocation,
+}
+
+/// Preflight at most five DISTINCT legacy slot/item bindings. Historic
+/// snapshots with 0..3 occupied slots and expanded 4..5 layouts use the
+/// SAME recorded slot codes (0 MainHand, 1 OffHand, 2 Body, 3 Head,
+/// 4 Feet), never positional reinterpretation or implicit empty-slot fill.
+/// This is not a live equipment owner, disk parser, or migration writer.
+pub fn preflight_equipment_manifest<const N: usize>(
+    import: &LegacyImportPreflight,
+    legacy_character_id: u64,
+    rows: [LegacyEquippedRow; N],
+) -> Result<[ProposedCanonicalEquippedRow; N], LegacyMigrationError> {
+    if N > 5 {
+        return Err(LegacyMigrationError::TooManyEquippedSlots);
+    }
+    let character_id = import.core_character(legacy_character_id)?;
+    let mut seen_slots = BTreeSet::new();
+    let mut seen_items = BTreeSet::new();
+    let mut canonical = Vec::with_capacity(N);
+    for row in rows {
+        let slot = LegacyEquipmentSlot::from_checkpoint_code(row.checkpoint_slot_code)
+            .ok_or(LegacyMigrationError::InvalidSlotCode)?;
+        if !seen_slots.insert(slot.checkpoint_code()) {
+            return Err(LegacyMigrationError::DuplicateEquippedSlot);
+        }
+        if row.legacy_item_id == 0 {
+            return Err(LegacyMigrationError::ZeroLegacyId);
+        }
+        if !seen_items.insert(row.legacy_item_id) {
+            return Err(LegacyMigrationError::DuplicateEquippedItem);
+        }
+        canonical.push(ProposedCanonicalEquippedRow {
+            item_id: import.core_item(row.legacy_item_id)?,
+            location: ItemLocation::Equipped {
+                character_id,
+                slot: slot.proposed_core_slot(),
+            },
+        });
+    }
+    canonical
+        .try_into()
+        .map_err(|_| LegacyMigrationError::TooManyEquippedSlots)
 }
 
 /// An offline, owner-reviewed item row extracted from a trusted legacy
@@ -370,6 +433,149 @@ mod tests {
         assert_eq!(
             preflight.stage_owner(LegacyDomain::Character, 0),
             Err(LegacyMigrationError::ZeroLegacyId)
+        );
+    }
+
+    #[test]
+    fn duplicate_active_or_retired_canonical_inventory_fails_before_any_import() {
+        assert!(matches!(
+            LegacyImportPreflight::new(namespaces(), [42, 42]),
+            Err(LegacyMigrationError::DuplicateExistingCanonicalId)
+        ));
+        assert!(LegacyImportPreflight::new(namespaces(), [42, 43]).is_ok());
+        // A raw concatenation of active and retired inventories is not a
+        // proven distinct canonical inventory unless duplicates are rejected.
+        let collided_import = (0x4D59_4153_0000_0002_u128 << 64) | 201;
+        assert!(matches!(
+            LegacyImportPreflight::new(namespaces(), [collided_import, collided_import]),
+            Err(LegacyMigrationError::DuplicateExistingCanonicalId)
+        ));
+    }
+
+    #[test]
+    fn real_five_slot_codes_preserve_four_and_five_equipped_items() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        for item in 201..=205 {
+            import.stage_owner(LegacyDomain::Item, item).unwrap();
+        }
+        let rows = [
+            LegacyEquippedRow {
+                checkpoint_slot_code: 0,
+                legacy_item_id: 201,
+            },
+            LegacyEquippedRow {
+                checkpoint_slot_code: 1,
+                legacy_item_id: 202,
+            },
+            LegacyEquippedRow {
+                checkpoint_slot_code: 2,
+                legacy_item_id: 203,
+            },
+            LegacyEquippedRow {
+                checkpoint_slot_code: 3,
+                legacy_item_id: 204,
+            },
+            LegacyEquippedRow {
+                checkpoint_slot_code: 4,
+                legacy_item_id: 205,
+            },
+        ];
+        let character_id = import.core_character(101).unwrap();
+        for count in [3, 4, 5] {
+            let actual = match count {
+                3 => preflight_equipment_manifest(&import, 101, [rows[0], rows[1], rows[2]])
+                    .unwrap()
+                    .to_vec(),
+                4 => {
+                    preflight_equipment_manifest(&import, 101, [rows[0], rows[1], rows[2], rows[3]])
+                        .unwrap()
+                        .to_vec()
+                }
+                _ => preflight_equipment_manifest(&import, 101, rows)
+                    .unwrap()
+                    .to_vec(),
+            };
+            assert_eq!(actual.len(), count);
+            for (index, row) in actual.iter().enumerate() {
+                assert_eq!(row.item_id, import.core_item(201 + index as u64).unwrap());
+                assert_eq!(
+                    row.location,
+                    ItemLocation::Equipped {
+                        character_id,
+                        slot: index as u8
+                    }
+                );
+            }
+        }
+        assert!(preflight_equipment_manifest(&import, 101, [])
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn proposed_equipment_import_rejects_duplicate_slots_items_and_missing_ids() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        import.stage_owner(LegacyDomain::Item, 201).unwrap();
+        import.stage_owner(LegacyDomain::Item, 202).unwrap();
+        let hand = LegacyEquippedRow {
+            checkpoint_slot_code: 0,
+            legacy_item_id: 201,
+        };
+        assert_eq!(
+            preflight_equipment_manifest(&import, 101, [hand, hand]),
+            Err(LegacyMigrationError::DuplicateEquippedSlot)
+        );
+        assert_eq!(
+            preflight_equipment_manifest(
+                &import,
+                101,
+                [
+                    hand,
+                    LegacyEquippedRow {
+                        checkpoint_slot_code: 1,
+                        legacy_item_id: 201
+                    }
+                ]
+            ),
+            Err(LegacyMigrationError::DuplicateEquippedItem)
+        );
+        for (bad_row, expected) in [
+            (
+                LegacyEquippedRow {
+                    checkpoint_slot_code: 5,
+                    legacy_item_id: 202,
+                },
+                LegacyMigrationError::InvalidSlotCode,
+            ),
+            (
+                LegacyEquippedRow {
+                    checkpoint_slot_code: 1,
+                    legacy_item_id: 0,
+                },
+                LegacyMigrationError::ZeroLegacyId,
+            ),
+            (
+                LegacyEquippedRow {
+                    checkpoint_slot_code: 1,
+                    legacy_item_id: 203,
+                },
+                LegacyMigrationError::UnregisteredSourceIdentity,
+            ),
+        ] {
+            assert_eq!(
+                preflight_equipment_manifest(&import, 101, [hand, bad_row]),
+                Err(expected)
+            );
+        }
+        assert_eq!(
+            preflight_equipment_manifest(&import, 102, [hand]),
+            Err(LegacyMigrationError::UnregisteredSourceIdentity)
+        );
+        assert_eq!(
+            preflight_equipment_manifest(&import, 101, [hand; 6]),
+            Err(LegacyMigrationError::TooManyEquippedSlots)
         );
     }
 
