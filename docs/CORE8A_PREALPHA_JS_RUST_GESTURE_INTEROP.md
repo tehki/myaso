@@ -15,3 +15,11 @@ The dedicated exact-head workflow requires both language tests, original Rust in
 **Limitations:** All tokens/leases are synthetic in tests; an opaque token is NOT real QUIC authentication. The gate doesn't transmit packets, bind a current World actor, validate combat action legality, commit HP, or deliver network ACKs. These require Main/Combat-approved canonical version negotiation, Core8C actor and death/rejoin authority fencing, real reliable QUIC ingress and server ACK writer, UI trusted DOM input, four real browsers and strict Combat acceptance before activation.
 
 **Release HOLD:** No main merge, production or firewall change, server restart, v2 activation, test waiver or release GO.
+
+## Core8A unscheduled-ACK fence (review-only child)
+
+An enqueued PRESS/UPGRADE/RELEASE/CANCEL exists only in an in-memory pending buffer until a future trusted transport owner requests it through `nextSendBatch`. Before this correction, `receiveAck` settled any correlated pending sequence+gesture on the correct opaque lease token **even if the event had never been included in any send batch**. It therefore conferred a false transport-edge-settled status on a never-scheduled event.
+
+The outbox now rejects an ACK when that exact pending event has `attempts === 0`, without deleting it or closing the proposal lease. A batch containing PRESS but not RELEASE cannot settle the later RELEASE. After `nextSendBatch` includes that event, the existing same-lease, exact sequence+gesture, typed status and anti-replay conditions still apply. An actual STALE/REJECTED ACK for a scheduled event retains its existing fail-closed behavior. Four dedicated negative tests cover all these boundaries and confirm default live v1 remains unmodified.
+
+**Critical trust limit:** `attempts > 0` means only that bytes were **offered to the future transport owner**, never that real QUIC sent, received, delivered or accepted them. No current live session is wired; no source of actual server authentication, World hit or durable outcome is supplied. Main+Core8C+Combat must separately approve the live secure v2 negotiation, ordered stream and authoritative attack/tick contract; public Pre-Alpha remains HOLD.
