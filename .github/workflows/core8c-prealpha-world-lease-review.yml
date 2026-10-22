@@ -1,0 +1,35 @@
+name: Core 8C dormant World actor lease and death retirement gate
+
+on:
+  pull_request:
+    paths:
+      - "server/src/prealpha_core8c_world_lease_review.rs"
+      - "server/tests/prealpha_core8c_world_lease_review.rs"
+      - "server/src/lib.rs"
+      - "docs/CORE8C_PREALPHA_WORLD_LEASE_RETIREMENT_REVIEW.md"
+      - ".github/workflows/core8c-prealpha-world-lease-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dormant-world-lease-retirement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail closed if review modules are invoked by live server or browser
+        run: |
+          ! grep -q 'prealpha_core8c_world_lease_review' server/src/main.rs
+          ! grep -q 'prealpha_lmb_ingress_review' server/src/main.rs
+          ! grep -q 'prealpha-lmb-gesture-outbox-proposal' web/online-game.mjs
+      - name: Original Combat4 and Core8A shared v2 source tests
+        run: node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs
+      - name: Unchanged complete Rust source formatting gate
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Core8A original replay ingress + Core8C actual World lifecycle
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_core8c_world_lease_review
+      - name: Strict all-target Rust lint
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
