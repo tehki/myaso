@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "src/browser/pagehide-transport-fence.mjs"
+      - "tests/core8c-pagehide-transport-fence.test.mjs"
       - "scripts/core8c_ui10_native_pagehide_departure.mjs"
       - ".github/workflows/core8c-ui10-native-pagehide.yml"
   workflow_dispatch:
@@ -24,6 +26,11 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
+      - name: Exact source test for departure before and after async admission
+        run: |
+          node --check src/browser/pagehide-transport-fence.mjs
+          node --check web/online-game.mjs
+          node --test tests/core8c-pagehide-transport-fence.test.mjs
       - name: Compile original authoritative Rust server
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Native Firefox voluntarily navigates away; Chrome survivors and fifth seat
