@@ -8,6 +8,9 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "=1.0.104"
+# Already transitively locked through wtransport; used directly for SHA-256
+# offline exact-history witness, NOT a MAC or authenticated remote provider.
+ring = "=0.17.14"
 tokio = { version = "~1.51", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 wtransport = { version = "=0.7.2", default-features = false, features = ["ring", "self-signed"] }
 
