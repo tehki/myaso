@@ -34,3 +34,19 @@ The outbox now rejects an ACK when that exact pending event has `attempts === 0`
 **Local exact branch** authorized Windows Node `node --test`: **28/28 PASS, zero skips**, original 24 plus four negative scheduling regressions. Strict cross-language Rust and protected browser quality require their own exact-head CI.
 
 **Important limit:** Selecting event bytes in `nextSendBatch` means only *offered to a hypothetical transport owner*, not delivered to a genuine admitted QUIC connection. There is still no approved live v2 negotiation or production ingress. No source authority or HP/HIT is created. This small source-only queue fix is necessary but not sufficient for Pre-Alpha instant pointerDOWN light or 320ms READY heavy release.
+
+
+## Cross-language forward-gap window (Core 8A review follow-up)
+
+**Real source mismatch found:** original dormant Rust `server/src/prealpha_lmb_ingress_review.rs` has `MAX_GAP: u32 = 16` and `MAX_BUFFERED: usize = 16`. In the JS outbox, the independent `maxPending` capacity is configurable up to 256. Although the previous fair-first-send fix preserves first attempts, `nextSendBatch(32)` on 22 pending fast PRESS/RELEASE edges offered sequence 1..22 immediately. If sequence 1 is missing from a reordered stream, original Rust denies seq18 as exceeding its 16-edge forward gap and closes. This is a strict **review model mismatch**, not evidence of actual live QUIC packet reordering; the current real server v1 never imports this proposal.
+
+**Fail-first evidence:** three new exact-source Node regressions in `tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs` were RED against unchanged parent source, while eight original cases remained green:
+- A 22-event queue with `maxPending=32` must initially offer only 1..17, leaving 18..22 unscheduled and ineligible for fabricated ACK.
+- An out-of-order ACK for seq17 must NOT advance the earliest-unACKed seq1 fence; ACK for seq1 permits exactly seq18's initial attempt.
+- As the oldest consecutive pending sequence is individually acknowledged, the permitted window slides 1 step without rewriting original v2 16-byte event bytes or setting `combatCommitted:true`.
+
+**Minimal fix:** JS outbox computes `oldestUnacked` from the existing monotonically inserted pending queue, filters all first attempts/retries to `sequence <= oldestUnacked + 16`, prioritizes first attempts within that bound, and returns selected events in original sequence order. The original `maxPending`, `maxAttempts`, terminal-event reservation, same-lease ACK correlation, initial-send ACK fencing, sequence-ID monotonicity, stale/rejected fail-closed and canonical typed codecs are untouched. The constant mirrors the original Rust review gate; no server changes. Under malformed or missing ACKs, the client may conservatively stop/close instead of emitting beyond the receiver's known bounded window.
+
+**Test outcome:** authorized local Windows Node after the fix **31/31 PASS, zero skipped** (original 28 + three new) with unchanged LMB/KeyE and original production no-import assertions. Native Chrome/Firefox/full Rust/strict protected quality require their own exact-head CI.
+
+**Nonclaims and release HOLD:** This improves an **inactive in-memory outbox**; it has not been attached to an authenticated, version-negotiated QUIC ordered stream and does not show actual arrival, server ACK, actor authorization, HP or attack execution. Real authenticated reliable streams should preserve order independently and still require formal review of retries, delivery guarantees and epoch fencing. Main #723 has not formally activated the draft `0x11/0x12` gesture family; v1 gameplay, live World and browser stay untouched.
