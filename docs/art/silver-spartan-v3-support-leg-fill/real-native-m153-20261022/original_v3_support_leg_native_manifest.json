@@ -1,0 +1,58 @@
+{
+  "actualThreeNativeBrowsers": true,
+  "realAuthoritativeM153": true,
+  "supportLegOriginalBlenderVariant": true,
+  "actualWebP": "silver_kick_v3_support.webp",
+  "independentSourceSHA256": "c99c392a067494fff7416c6040422d2ff2bbf196ddfc3086d6fda3acd8790158",
+  "previewOnly": true,
+  "screenshotProvenance": "real original game Canvas observed source-phase frame, unmodified pixels",
+  "actualActiveFrameProvenForKicker": true,
+  "activeFrameRequiredFromSpectators": false,
+  "allClientsCapturedActive": false,
+  "actualGreyhavenGroundValidated": false,
+  "humanArtApproval": false,
+  "originalV3SourceAtlasUnchanged": true,
+  "originalV2VictimSourceUnchanged": true,
+  "preAlphaIncluded": false,
+  "images": [
+    {
+      "browser": "chrome",
+      "authenticatedServerId": 1,
+      "sourceFile": "silver_kick_v3_support.webp",
+      "filename": "original_silver_spartan_v3_support_chrome.png",
+      "capturedSourcePhase": "active",
+      "capturedSourceFrame": 3,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792691628283,
+      "activeFrameActuallyObserved": true,
+      "bytes": 31011,
+      "sha256": "d3bd1f482c06cac1313432545d92c6bb742ffbc7524d3cd1ae2bfd43e9fd380d"
+    },
+    {
+      "browser": "firefox",
+      "authenticatedServerId": 2,
+      "sourceFile": "silver_kick_v3_support.webp",
+      "filename": "original_silver_spartan_v3_support_firefox.png",
+      "capturedSourcePhase": "recovery",
+      "capturedSourceFrame": 5,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792691628414,
+      "activeFrameActuallyObserved": false,
+      "bytes": 25832,
+      "sha256": "6a8d129cfc5896170176cc6cbc57e8e335f955aaf3a75ba9ca7d2d3db63c3813"
+    },
+    {
+      "browser": "chrome2",
+      "authenticatedServerId": 3,
+      "sourceFile": "silver_kick_v3_support.webp",
+      "filename": "original_silver_spartan_v3_support_chrome2.png",
+      "capturedSourcePhase": "active",
+      "capturedSourceFrame": 3,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792691628316,
+      "activeFrameActuallyObserved": true,
+      "bytes": 30632,
+      "sha256": "0268b460e389f8e3f3b8349e0e564672e52199e7395face04239b742687b7b41"
+    }
+  ]
+}
