@@ -8,6 +8,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseAlphaConfig, alphaPlayPath } from "../web/alpha-config.mjs";
 
+test("Bing SEO: both public Myaso page heads have one unique, meaningful meta description", () => {
+  const files = [
+    ["alpha.html", /multiplayer alpha/i],
+    ["index.html", /browser combat prototype/i],
+  ];
+  const descriptions = [];
+  for (const [filename, relevance] of files) {
+    const html = readFileSync(new URL("../web/" + filename, import.meta.url), "utf8");
+    const head = html.match(/<head>([\s\S]*?)<\/head>/i)?.[1];
+    assert.ok(head, filename + " must have an HTML head");
+    const matches = [...head.matchAll(/<meta\s+name="description"\s+content="([^"]+)"\s*\/?\s*>/gi)];
+    assert.equal(matches.length, 1, filename + " must have exactly one description in head");
+    const description = matches[0][1].trim();
+    assert.ok(description.length >= 70 && description.length <= 160,
+      filename + " description should fit search-result snippets");
+    assert.match(description, relevance, filename + " must describe its actual page");
+    assert.ok(!/[<>]/.test(description), filename + " description must contain plain text");
+    descriptions.push(description);
+  }
+  assert.notEqual(descriptions[0], descriptions[1], "Pages need distinct descriptions");
+});
+
 const trusted = {
   serverUrl: "https://game.open-trust-layer.org:4433/game",
   certificateSha256: "a".repeat(64),
