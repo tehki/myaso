@@ -1,0 +1,39 @@
+name: Core8A original M144 native input-ACK provenance (REVIEW ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "src/browser/m144-input-sample-observer.mjs"
+      - "tests/core8a-m144-input-sample-observer.test.mjs"
+      - "tests/core8a-m144-original-input-ack-trace.test.mjs"
+      - ".github/workflows/core8a-m144-native-v1-input-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-m144-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate real Chrome and Firefox native infrastructure
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check src/browser/m144-input-sample-observer.mjs
+      - name: Strict read-only source and bounded M144 sample regressions
+        run: node --test tests/core8a-m144-original-input-ack-trace.test.mjs tests/core8a-m144-input-sample-observer.test.mjs
+      - name: Compile original Rust authoritative server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict original three-peer Chrome Firefox Chrome2 M144 without waivers
+        env:
+          MYASO_PVP_SCENARIO: uimultirecoveryffa
+        run: timeout --signal=TERM --kill-after=5s 160s node scripts/pvp_browser_flight_runner.mjs
