@@ -718,13 +718,23 @@ impl World {
 
         resolve_roll_collisions(self.width, self.height, &mut self.fighters);
         separate_fighters(self.width, self.height, &mut self.fighters);
-        if let Some(winner) = resolve_attacks(
+        // Combat knockback occurs after the movement body pass. Without a
+        // final collision settle, a true hit can publish penetrating fighter
+        // bodies for one entire authoritative tick (P6-C03). Only do this
+        // additional bounded settle on ticks that actually applied knockback.
+        let mut attack_displaced_fighter = false;
+        let winner = resolve_attacks(
             self.width,
             self.height,
             self.now_ms,
             &mut self.fighters,
             events,
-        ) {
+            &mut attack_displaced_fighter,
+        );
+        if attack_displaced_fighter {
+            separate_fighters(self.width, self.height, &mut self.fighters);
+        }
+        if let Some(winner) = winner {
             self.winner = Some(winner);
             self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
         }
@@ -1479,6 +1489,7 @@ fn resolve_attacks(
     now_ms: f32,
     fighters: &mut [Fighter],
     events: &mut Vec<CombatEvent>,
+    attack_displaced_fighter: &mut bool,
 ) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
         let Some(profile) = attack_profile(fighters[attacker_index].action) else {
@@ -1557,12 +1568,14 @@ fn resolve_attacks(
 
             if profile.kick {
                 knock_back(width, height, attacker, target, profile.knockback);
+                *attack_displaced_fighter = true;
                 target.set_action(Action::Knockdown, KICK_KNOCKDOWN_MS);
                 continue;
             }
 
             target.hp = (target.hp - profile.damage).max(0.0);
             knock_back(width, height, attacker, target, profile.knockback);
+            *attack_displaced_fighter = true;
             events.push(CombatEvent::Hit {
                 attacker: attacker.net_id,
                 target: target.net_id,
