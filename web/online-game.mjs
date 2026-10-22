@@ -359,6 +359,20 @@ networkClient = await connectAuthoritativeClient({
     recordKillEvent(event);
   },
   onAck(ack) {
+    // M144 only: server INPUT_ACK may coalesce samples; it does not prove
+    // which physical DOM edges occurred or a Combat HIT. Bounded diagnostics.
+    if (acceptanceScenario === "uimultirecoveryffa") {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.inputAckReceipts ??= [];
+        debug.inputAckReceipts.push({
+          epochMs: Date.now(),
+          processedClientTick: networkClient?.processedClientTick ?? null,
+          serverTick: networkClient?.latestServerTick ?? null,
+        });
+        if (debug.inputAckReceipts.length > 32) debug.inputAckReceipts.shift();
+      }
+    }
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
@@ -755,12 +769,15 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        // M144: preserve even idle 30Hz samples, to distinguish an unsampled
+        // real Space+LMB click from an accepted sample without World action.
+        // M145 retains its previous action-only sample logging.
+        if (acceptanceScenario === "uimultirecoveryffa" || currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
