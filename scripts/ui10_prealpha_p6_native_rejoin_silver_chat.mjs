@@ -405,6 +405,21 @@ try {
    console.log("UI10_BACK_FOUR_SOURCE_SILVER_STRICT_FAILURE_PROVENANCE",JSON.stringify({
     error:String(error).slice(0,240),status:reality?.status,roster:reality?.roster,
     recentFrames:reality?.frames?.slice(-4),silverFourFrames:reality?.silverFourFrames}));
+   // Preserve per-observer attribution: are ALL authenticated survivors
+   // missing actor #8's source art, or just this viewer's camera? This logs
+   // real pre-movement Canvas/scoreboard only. Never weaken the four-art gate.
+   const otherObservers=[];
+   for (const [viewerIndex,viewer] of surviving.entries()) {
+    try {
+     const trace=await visible(viewer);
+     otherObservers.push({viewerIndex,roster:trace?.roster,status:trace?.status,
+      latestFrames:trace?.frames?.slice(-3),silverFourFrames:trace?.silverFourFrames});
+    } catch(viewError) {
+     otherObservers.push({viewerIndex,error:String(viewError)});
+    }
+   }
+   console.log("UI10_BACK_ALL_THREE_ORIGINAL_VIEWERS_PRE_MOVE",JSON.stringify({
+    originalStrictResult:"FAIL",authenticActor:8,observers:otherObservers}));
    // Diagnostic-only movement AFTER the strict failure was already captured:
    // the actual authenticated actor #8 drives LEFT in the real Rust World.
    // Observe if missing Silver #8 appears when closer to arena center; never
