@@ -121,6 +121,72 @@ try {
   assert.equal(after.closed,true,"native click recloses controls");
   assert.equal(after.scrollY,0,"help open/close must not scroll game page");
   assert(after.bottom<=target.height+1,"actual arena remains visible after controls");
+  // Passive real W3C mouse movement on this LIVE authoritative player's
+  // actual scaled Combat canvas. No programmatic pointer events, simulated
+  // fighters, wheel/roll, attacks, client-to-server packets or hit claims.
+  // The browser's trusted event source pixels must match the same CSS
+  // getBoundingClientRect scale used by the existing production aim handler.
+  await evaljs(session,[
+   "if(!window.__UI10_LIVE_AIM_QA__){",
+   "const c=document.querySelector('#arena'),positions=[];",
+   "let down=0,up=0;",
+   "c.addEventListener('pointermove',e=>{",
+   "const r=c.getBoundingClientRect();",
+   "positions.push({trusted:e.isTrusted,type:e.pointerType,buttons:e.buttons,",
+   "target:e.target?.id,sourceX:(e.clientX-r.left)*c.width/r.width,",
+   "sourceY:(e.clientY-r.top)*c.height/r.height,",
+   "cssX:e.clientX,cssY:e.clientY});",
+   "if(positions.length>16)positions.shift();",
+   "},true);",
+   "c.addEventListener('pointerdown',()=>down++,true);",
+   "c.addEventListener('pointerup',()=>up++,true);",
+   "window.__UI10_LIVE_AIM_QA__=()=>({positions:[...positions],down,up,",
+   "width:c.width,height:c.height});",
+   "}"
+  ].join(""));
+  const aimBounds=await evaljs(session,[
+   "const c=document.querySelector('#arena'),r=c.getBoundingClientRect();",
+   "return {left:r.left,top:r.top,width:r.width,height:r.height,",
+   "pixelsW:c.width,pixelsH:c.height};"
+  ].join(""));
+  assert.equal(aimBounds.pixelsW,960,"real backing Canvas width unchanged");
+  assert.equal(aimBounds.pixelsH,540,"real backing Canvas height unchanged");
+  const targets=[
+   {x:.34,y:.33},{x:.51,y:.48},{x:.67,y:.61}
+  ];
+  for(const [index,point] of targets.entries()){
+   const moveX=Math.round(aimBounds.left+point.x*aimBounds.width);
+   const moveY=Math.round(aimBounds.top+point.y*aimBounds.height);
+   assert(moveX>=0&&moveX<target.width&&moveY>=0&&moveY<target.height,
+    "native aim target must remain in actual visible screen");
+   await wd("POST","/session/"+session+"/actions",{
+    actions:[{type:"pointer",id:"ui10-native-aim-"+i,
+     parameters:{pointerType:"mouse"},
+     actions:[{type:"pointerMove",duration:80,
+      x:moveX,y:moveY,origin:"viewport"}]}]
+   });
+   const receipt=await poll("trusted on-canvas scaled aim move "+i+"/"+index,
+    async()=>{
+     const q=await evaljs(session,"return window.__UI10_LIVE_AIM_QA__?.()");
+     const last=q?.positions?.at(-1);
+     return {...q,last,ok:!!last&&last.cssX===moveX&&last.cssY===moveY};
+    },4200);
+   assert.equal(receipt.last.trusted,true,"pointer move must be genuine W3C browser event");
+   assert.equal(receipt.last.type,"mouse");
+   assert.equal(receipt.last.target,"arena","overlay must not hijack arena pointer aim");
+   assert.equal(receipt.last.buttons,0,"aim motion must never synthesize a held attack");
+   assert.equal(receipt.down,0,"native aim must never create pointerdown attack");
+   assert.equal(receipt.up,0,"native aim must never create pointerup attack");
+   assert(Math.abs(receipt.last.sourceX-point.x*960)<3.1,
+    "live scaled CSS X must round-trip to original source canvas pixels");
+   assert(Math.abs(receipt.last.sourceY-point.y*540)<3.1,
+    "live scaled CSS Y must round-trip to original source canvas pixels");
+  }
+  console.log("UI10_NATIVE_LIVE_SHORT_CANVAS_AIM_PASS",JSON.stringify({
+   browser:browserMatrix[i],target,sourcePixels:"960x540",
+   trustedMoves:targets.length,correctCssToSource:true,
+   noSyntheticAttacks:true,liveChatConnected:true
+  }));
   viewportResults.push({browser:browserMatrix[i],target,
    canvas:{top:before.top,bottom:before.bottom,width:before.width,height:before.height},
    chatConnected:before.chatConnected,realStatus:before.serverStatus});
@@ -337,6 +403,7 @@ try {
   browserMatrix,realRustGameAndChat:true,oneExactSetOfFourSessions:true,
   allFourOriginalSilverInRealRAF:true,authenticatedProximityAndAck:true,
   originalShortArenaFullyVisible:true,allFourCanvasAndChatComposerInViewport:true,
+  actualTrustedScaledNativeAim:true,noExtraMouseAttack:true,
   chatFocusReturnedToCombat:true,authoritativeInputAndServerTicks:true,
   fourRealHumanOperators:false,instantLightFixed:false,
   publicChatEnabled:false,noRealSwordsOrItems:true,
