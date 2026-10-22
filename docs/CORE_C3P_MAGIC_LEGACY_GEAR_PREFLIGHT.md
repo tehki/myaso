@@ -236,3 +236,36 @@ global epoch-fenced writer may be considered later for migration.
 No live Magic/Items serializer fix, item writer, protected workflow gate
 change, Combat, browser, server listener, database migration or Pre-Alpha
 release change is included.
+
+## 2026-10-22 — source custody preservation in the proposed import
+
+Actual Magic/Items #424 quiescent MYWLD003 stores physical unique `ItemStack`
+in a *parked character backpack*, *one of five equipment slots*, *ground
+drop*, or *corpse items*. Original Core8B #770 verified each item ID/kind/
+amount/allocator-bound but could still propose the very same unique sword as
+`Equipped` for character A even when the snapshot placed that item in character
+B's backpack, on a corpse or on the ground. This duplicates physical custody
+and would violate the Core/Items single-writer contract if activated.
+
+Review-only `LegacySourceCustodyCatalog` now requires exactly one location
+record for EVERY item in the previous ID/kind/amount source catalog, using
+registered character, corpse and ground-entity identities from the same
+reviewed legacy import; it rejects missing/duplicate/unregistered locations,
+invalid slot codes, invalid item kind/quantity for its recorded equipped
+slot, repeated item claims to one physical equipment slot, recycled raw
+item/container IDs and a ground/corpse container ID collision. Multiple items
+may legitimately inhabit one corpse,
+but not one GroundDrop. The stricter
+`preflight_equipment_manifest_against_custody` returns an equipment proposal
+ONLY if the source row is actually `ParkedEquipped` under the same character
+and exact same disk slot, then retains all original typed ID/kind/amount
+checks. Tests show that #770 permits correctly typed items from other custody
+positions while this new guard refuses them.
+
+**Not live transfer or source provenance.** This does not itself verify
+quiescence or authenticate/anchor source history, recover missing snapshots,
+attest retired IDs, prevent forged self-consistent copies or establish one
+authoritative epoch-fenced writer. Core8C and Magic/Items retain cutover and
+source completeness responsibility. The original Magic #424 decoder still
+rejects four/five occupied equipment slots (`equipped > 3`). No Combat, UI,
+server/main, DB, production migration or Pre-Alpha source has changed.
