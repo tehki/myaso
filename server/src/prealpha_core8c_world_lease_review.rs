@@ -66,6 +66,8 @@ pub enum ReviewEdgeStatus {
 /// membership. It deliberately only emits validated *intent*, never a HIT.
 pub struct ReviewWorldLease {
     actor: ReviewActorLease,
+    // Captured from the original World fighter, not fabricated by the client.
+    world_incarnation: u64,
     ingress: ReviewLmbIngress,
     pending: VecDeque<GestureEvent>,
     observed_world_tick: u32,
@@ -84,6 +86,7 @@ impl ReviewWorldLease {
         }
         Some(Self {
             actor,
+            world_incarnation: fighter.world_incarnation(),
             ingress: ReviewLmbIngress::new_from_trusted_admission(actor.core_lease()),
             pending: VecDeque::new(),
             observed_world_tick: world.tick,
@@ -122,7 +125,11 @@ impl ReviewWorldLease {
         // World::reset_match revives living fighters without a Dead interval.
         // Revoke ALL old-round queued input on the authoritative winning tick.
         if world.match_over()
-            || current.is_none_or(|fighter| fighter.action == Action::Dead || fighter.hp <= 0.0)
+            || current.is_none_or(|fighter| {
+                fighter.action == Action::Dead
+                    || fighter.hp <= 0.0
+                    || fighter.world_incarnation() != self.world_incarnation
+            })
         {
             self.retire();
             return false;

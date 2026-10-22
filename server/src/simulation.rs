@@ -228,6 +228,8 @@ struct ActionEdges {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fighter {
     pub net_id: u32,
+    // Ephemeral World-owned life token, NOT Core8B's durable CharacterId/generation.
+    world_incarnation: u64,
     pub x: f32,
     pub y: f32,
     pub spawn_x: f32,
@@ -278,9 +280,10 @@ pub struct Fighter {
 }
 
 impl Fighter {
-    fn new(net_id: u32, x: f32, y: f32, facing: f32) -> Self {
+    fn new(net_id: u32, x: f32, y: f32, facing: f32, world_incarnation: u64) -> Self {
         Self {
             net_id,
+            world_incarnation,
             x,
             y,
             spawn_x: x,
@@ -333,6 +336,11 @@ impl Fighter {
 
     pub fn input(&self) -> InputIntent {
         self.latest_input
+    }
+
+    /// Current ephemeral World life; never an authenticated network lease.
+    pub fn world_incarnation(&self) -> u64 {
+        self.world_incarnation
     }
 
     fn latch_action_edges(&mut self, input: InputIntent) {
@@ -543,6 +551,7 @@ pub struct World {
     winner: Option<u32>,
     reset_at_ms: f32,
     fighters: Vec<Fighter>,
+    next_world_incarnation: u64,
 }
 
 impl Default for World {
@@ -563,6 +572,7 @@ impl World {
             winner: None,
             reset_at_ms: 0.0,
             fighters: Vec::new(),
+            next_world_incarnation: 1,
         }
     }
 
@@ -613,11 +623,13 @@ impl World {
             Ok(_) => return false,
             Err(index) => index,
         };
+        let world_incarnation = reserve_world_incarnation(&mut self.next_world_incarnation);
         let fighter = Fighter::new(
             net_id,
             clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
             clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
             facing,
+            world_incarnation,
         );
         self.fighters.insert(insertion_index, fighter);
         true
@@ -674,6 +686,8 @@ impl World {
         for fighter in &mut self.fighters {
             if fighter.action == Action::Dead {
                 if self.now_ms >= fighter.respawn_at_ms {
+                    fighter.world_incarnation =
+                        reserve_world_incarnation(&mut self.next_world_incarnation);
                     respawn_fighter(fighter);
                     events.push(CombatEvent::Respawn {
                         fighter: fighter.net_id,
@@ -739,9 +753,20 @@ impl World {
             fighter.clear_pending_actions();
             fighter.guard_regen_blocked_until_ms = 0.0;
             fighter.stamina_regen_blocked_until_ms = 0.0;
+            fighter.world_incarnation = reserve_world_incarnation(&mut self.next_world_incarnation);
             respawn_fighter(fighter);
         }
     }
+}
+
+// A single World issues non-reusable actor-life tokens, including same-tick
+// remove/re-add and respawn. Never wrap: aliasing an earlier life is unsafe.
+fn reserve_world_incarnation(next: &mut u64) -> u64 {
+    let value = *next;
+    *next = next
+        .checked_add(1)
+        .expect("World actor incarnation exhausted");
+    value
 }
 
 fn normalize_input(mut input: InputIntent) -> InputIntent {
