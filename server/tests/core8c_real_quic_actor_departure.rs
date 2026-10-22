@@ -11,6 +11,9 @@ use std::{
     time::Duration,
 };
 use tokio::time::{sleep, timeout};
+use myaso_server::snapshot::{
+    decode_snapshot, DecodedSnapshot, SNAPSHOT_FIELD_REMOVED,
+};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
     SendStream, VarInt,
@@ -165,4 +168,108 @@ async fn four_real_quic_sessions_disconnect_frees_capacity_without_reusing_actor
     assert_original_v1_input_ack(&one, 1, 601).await;
     assert_original_v1_input_ack(&three, 3, 603).await;
     assert_original_v1_input_ack(&four, 4, 604).await;
+}
+
+async fn actual_initial_game_baseline(recv: &mut RecvStream) -> DecodedSnapshot {
+    let mut length = [0_u8; 2];
+    timeout(Duration::from_secs(8), recv.read_exact(&mut length))
+        .await
+        .expect("real game reliable baseline header arrived")
+        .expect("original game reliable header read");
+    let bytes_len = u16::from_le_bytes(length) as usize;
+    assert!(bytes_len >= 14 && bytes_len <= 1100, "real full baseline bounded");
+    let mut bytes = vec![0_u8; bytes_len];
+    timeout(Duration::from_secs(8), recv.read_exact(&mut bytes))
+        .await
+        .expect("real game reliable baseline payload arrived")
+        .expect("original game reliable baseline read");
+    let baseline = decode_snapshot(&bytes).expect("original encoded Rust snapshot");
+    assert!(baseline.full, "first server baseline is authoritative full");
+    baseline
+}
+
+fn send_v1_with_baseline_ack(
+    connection: &Connection,
+    sequence: u16,
+    baseline_sequence: u16,
+    tick: u32,
+) {
+    let mut input = [0_u8; 22];
+    input[0] = 1;
+    input[1] = 1;
+    input[2] = 1;
+    input[4..6].copy_from_slice(&sequence.to_le_bytes());
+    input[6..8].copy_from_slice(&baseline_sequence.to_le_bytes());
+    input[8..12].copy_from_slice(&tick.to_le_bytes());
+    input[17] = 127;
+    connection
+        .send_datagram(input)
+        .expect("genuine old v1 input through authenticated QUIC");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcomer() {
+    let (_server, url, digest) = start_server();
+    let (_ep1, one, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, departed, _send2, _recv2) = connect(&url, &digest).await;
+    let (_ep3, three, _send3, _recv3) = connect(&url, &digest).await;
+    let (_ep4, viewer, _send4, mut viewer_recv) = connect(&url, &digest).await;
+
+    let initial = actual_initial_game_baseline(&mut viewer_recv).await;
+    assert_eq!(initial.sequence, 0, "new viewer starts with baseline sequence zero");
+    for actor_id in 1_u32..=4 {
+        assert!(
+            initial.records.iter().any(|r| {
+                r.net_id == actor_id && r.mask & SNAPSHOT_FIELD_REMOVED == 0
+            }),
+            "four actual previously admitted actors must exist in real viewer baseline: {actor_id}"
+        );
+    }
+
+    send_v1_with_baseline_ack(&viewer, 1, initial.sequence, 708);
+    // After the actual four-player initial baseline has been acknowledged,
+    // original server sends authoritative real-time delta snapshots to viewer.
+    departed.close(VarInt::from_u32(0), b"core8c-tombstone-test");
+    sleep(Duration::from_millis(900)).await;
+    let (_ep5, newcomer, _send5, _recv5) = connect(&url, &digest).await;
+    assert_original_v1_input_ack(&newcomer, 5, 705).await;
+
+    let mut saw_departed_removal = false;
+    let mut saw_fresh_actor = false;
+    let mut last_tick = 0_u32;
+    timeout(Duration::from_secs(7), async {
+        loop {
+            let frame = viewer
+                .receive_datagram()
+                .await
+                .expect("viewer remains genuine QUIC game connection");
+            if frame.len() < 2 || frame[0] != 1 || frame[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(&frame).expect("server-authored delta snapshot");
+            assert!(snapshot.server_tick >= last_tick, "server clock must not regress");
+            last_tick = snapshot.server_tick;
+            assert!(
+                !snapshot.full,
+                "baseline-ACK-confirmed viewer must observe delta, not forged full"
+            );
+            saw_departed_removal |= snapshot.records.iter().any(|r| {
+                r.net_id == 2 && r.mask & SNAPSHOT_FIELD_REMOVED != 0
+            });
+            saw_fresh_actor |= snapshot.records.iter().any(|r| {
+                r.net_id == 5 && r.mask & SNAPSHOT_FIELD_REMOVED == 0
+            });
+            if saw_departed_removal && saw_fresh_actor {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("real server must replicate old actor removal and fresh actor admission");
+    assert!(saw_departed_removal && saw_fresh_actor);
+
+    assert_original_v1_input_ack(&one, 1, 711).await;
+    assert_original_v1_input_ack(&three, 3, 713).await;
+    // The actual viewer remains able to play after observing the tombstone.
+    assert_original_v1_input_ack(&viewer, 4, 714).await;
 }
