@@ -1,0 +1,35 @@
+name: Core 8A dormant v2 Rust gesture ingress replay gate
+
+on:
+  pull_request:
+    paths:
+      - "server/src/prealpha_lmb_ingress_review.rs"
+      - "server/tests/prealpha_lmb_ingress_review.rs"
+      - "server/src/lib.rs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "docs/CORE8A_PREALPHA_RUST_GESTURE_INGRESS_REVIEW.md"
+      - ".github/workflows/core8a-prealpha-v2-rust-ingress-review.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dormant-v2-rust-lease-replay-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert original Rust production QUIC ingress and JS online game unchanged
+        run: |
+          ! grep -q 'prealpha_lmb_ingress_review' server/src/main.rs
+          ! grep -q 'prealpha-lmb-gesture-outbox-proposal' web/online-game.mjs
+          ! grep -q 'prealpha-lmb-gesture-proposal' web/online-game.mjs
+          node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
+      - name: Original reviewed Combat codec and Core8A lease/outbox Node tests
+        run: node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs
+      - name: Rust1.89 complete original source rustfmt
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Rust original Combat4 codec plus Core8A 14 replay tests
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
+      - name: Strict Rust Clippy all targets, no assertion suppressions
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings

@@ -6,6 +6,8 @@ use std::sync::{
 pub mod kill_event;
 // Proposal-only codec: no active ingress, no protocol v1 changes.
 pub mod prealpha_lmb_gesture_proposal;
+// Review-only per-lease v2 replay/ordering gate: NO QUIC server caller.
+pub mod prealpha_lmb_ingress_review;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
