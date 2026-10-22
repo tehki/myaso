@@ -295,3 +295,78 @@ async fn four_connections_with_identical_v1_sequence_and_tick_keep_distinct_acto
     .await
     .expect("same client tick on four leases must never suppress a peer ACK");
 }
+
+async fn send_and_expect_original_v1_tick(
+    connection: &Connection,
+    player_net_id: u32,
+    sequence: u16,
+    client_tick: u32,
+) {
+    let mut input = [0_u8; 22];
+    input[0] = 1; // original v1 version
+    input[1] = 1; // original INPUT
+    input[2] = 1; // one genuine sample
+    input[4..6].copy_from_slice(&sequence.to_le_bytes());
+    input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+    input[8..12].copy_from_slice(&client_tick.to_le_bytes());
+    input[17] = 127;
+    connection
+        .send_datagram(input)
+        .expect("real original QUIC gameplay INPUT");
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let bytes = connection
+                .receive_datagram()
+                .await
+                .expect("live original gameplay session");
+            if bytes.len() != 16 || bytes[0] != 1 || bytes[1] != 3 {
+                continue; // authoritative snapshots may be interleaved
+            }
+            assert_eq!(
+                u32::from_le_bytes(bytes[12..16].try_into().unwrap()),
+                player_net_id,
+                "original INPUT_ACK must never be delivered under another actor"
+            );
+            let acknowledged_tick = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+            assert_eq!(
+                acknowledged_tick, client_tick,
+                "each awaited v1 send must be independently admitted and ACKed"
+            );
+            break;
+        }
+    })
+    .await
+    .expect("original QUIC tick must yield bounded authentic ACK");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn original_quic_v1_sequence_and_tick_wrap_preserve_per_actor_input_receipts() {
+    // Source-real ingress/dedup ACK continuity, rather than testing only
+    // is_sequence_newer16()/is_tick_newer32() as pure Rust unit helpers.
+    // Actor #1 crosses BOTH u16 sequence and u32 tick wraps; actor #2
+    // concurrently uses ordinary and colliding post-wrap tick values.
+    let (_server, url, digest) = start_server();
+    let (_ep1, crossing, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, other, _send2, _recv2) = connect(&url, &digest).await;
+
+    timeout(Duration::from_secs(25), async {
+        tokio::join!(
+            async {
+                for (sequence, tick) in [
+                    (u16::MAX - 1, u32::MAX - 1),
+                    (u16::MAX, u32::MAX),
+                    (0_u16, 0_u32),
+                    (1_u16, 1_u32),
+                ] {
+                    send_and_expect_original_v1_tick(&crossing, 1, sequence, tick).await;
+                }
+            },
+            async {
+                send_and_expect_original_v1_tick(&other, 2, 1, 0).await;
+                send_and_expect_original_v1_tick(&other, 2, 2, 1).await;
+            },
+        );
+    })
+    .await
+    .expect("two independent real QUIC actors must survive input wrap");
+}
