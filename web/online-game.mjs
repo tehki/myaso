@@ -46,7 +46,13 @@ const knightSprites = knightQuery.get("knights") === "1"
       sourceKickPreview: knightQuery.get("knightKickSource") === "1",
       // THIRD explicit QA flag chooses the authentic V3 original Blender atlas.
       // Requires knights=1 and knightKickSource=1; all defaults remain V2/off.
-      sourceKickVariant: knightQuery.get("knightKickV3") === "1" ? "v3" : "v2",
+      sourceKickVariant: knightQuery.get("knightKickV3") === "1"
+        ? knightQuery.get("knightKickV3Light") === "1" ? "v3lit" : "v3"
+        : "v2",
+      // Fifth QA flag cannot activate without knights=1, source kick and V3.
+      sourceKickLightStudy: knightQuery.get("knightKickV3Light") === "1"
+        && knightQuery.get("knightKickV3") === "1"
+        && knightQuery.get("knightKickSource") === "1",
       // FOURTH test-only opt-in; selects victim sprite solely for server
       // confirmed COMBAT_ACTION.knockdown, NEVER for cosmetic kick frames.
       sourceKnockdownPreview: knightQuery.get("knightKnockdownSource") === "1",

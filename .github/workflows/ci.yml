@@ -1377,3 +1377,52 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
+
+  # Independent real Rust M153 server + three native browsers for the
+  # unapproved original Silver V3 LIGHTING study only. Full quality remains
+  # mandatory and separate; no default renderer or Pre-Alpha activation.
+  graphics3a-v3-light-three-native:
+    name: graphics3a-original-v3-light-real-three-browser
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/v3-light-native-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Silver V3 lighting-study native QA commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fail-closed original V3 study, source and authority tests
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/knight-sprites.mjs
+          node --check web/online-game.mjs
+          node --test tests/graphics3a-v3-light-native.test.mjs tests/graphics3a-v3-readability-study.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-grounded-v2-source.test.mjs
+      - name: Verify native Rust Chrome and Firefox tools
+        run: |
+          cargo --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Prebuild true Rust authority for actual M153 knockdown
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real Chrome Firefox Chrome2 original Silver V3 light with grounded V2 victim
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
+          MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG: "1"
+          MYASO_GRAPHICS3A_GROUNDED_V2_FLIGHT: "1"
+          MYASO_GRAPHICS3A_V3_LIGHT_NATIVE_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Publish unmodified genuine V3 lighting native PNGs and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-original-v3-light-native-arena
+          path: |
+            .graphics3a-v3-light-native-png/
+            .graphics3a-original-victim-native-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
