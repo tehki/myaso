@@ -1,0 +1,35 @@
+name: UI10 Pre-Alpha short desktop arena Canvas native viewport (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "web/styles.css"
+      - "scripts/graphics3b_native_viewport_parity.mjs"
+      - "scripts/graphics3b_gameplay_fold_budget.mjs"
+      - "scripts/graphics3b_native_layout_parity.mjs"
+      - "tests/graphics3b-native-layout-parity.test.mjs"
+      - ".github/workflows/ui10-prealpha-native-short-viewport.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-accessible-arena-fold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate unchanged source geometry and all 14 Combat instructions
+        run: |
+          node --check scripts/graphics3b_native_layout_parity.mjs
+          node --test tests/graphics3b-native-layout-parity.test.mjs
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Real Chrome and Firefox, 1280x720 plus 1366x682, no clipping or scroll
+        env:
+          MYASO_P0_GAME_FIRST_LAYOUT: "1"
+        run: timeout --signal=TERM --kill-after=5s 150s node scripts/graphics3b_native_layout_parity.mjs
