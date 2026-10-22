@@ -20,8 +20,7 @@ fn golden() -> Vec<[u8; BYTES]> {
             assert_eq!(columns[2].len(), 2 * BYTES);
             let mut bytes = [0u8; BYTES];
             for (i, byte) in bytes.iter_mut().enumerate() {
-                *byte =
-                    u8::from_str_radix(&columns[2][i * 2..i * 2 + 2], 16).expect("hex event");
+                *byte = u8::from_str_radix(&columns[2][i * 2..i * 2 + 2], 16).expect("hex event");
             }
             let event = decode_event(&bytes).expect("original Combat4 Rust event");
             assert_eq!(event.sequence as usize, seq);
@@ -65,8 +64,7 @@ fn actual_js_22_edge_byte_fixture_fits_original_rust_gap_at_exact_17_event_bound
     assert_eq!(gate.accepted_count(), 0);
     // Missing seq1 arrives: Rust validates all 17 real distinct original
     // PRESS/RELEASE events atomically and ACKs exact original source bytes.
-    let IngressResult::Accepted(unblocked) = gate.review_ingest(l, &fixture[0], 100)
-    else {
+    let IngressResult::Accepted(unblocked) = gate.review_ingest(l, &fixture[0], 100) else {
         panic!("true original JS prefix must atomically unblock all 17 legal edges");
     };
     assert_eq!(unblocked.len(), 17);
@@ -81,8 +79,7 @@ fn actual_js_22_edge_byte_fixture_fits_original_rust_gap_at_exact_17_event_bound
     assert_eq!(gate.buffered_count(), 0);
     assert_eq!(gate.accepted_count(), 17);
     for (i, event) in fixture.iter().enumerate().skip(17) {
-        let IngressResult::Accepted(edges) = gate.review_ingest(l, event, 101)
-        else {
+        let IngressResult::Accepted(edges) = gate.review_ingest(l, event, 101) else {
             panic!("later JS window event must be accepted only after prefix");
         };
         assert_eq!(edges.len(), 1);
@@ -93,8 +90,7 @@ fn actual_js_22_edge_byte_fixture_fits_original_rust_gap_at_exact_17_event_bound
     assert_eq!(gate.accepted_count(), 22);
     assert_eq!(gate.buffered_count(), 0);
     // Retransmitting a genuine original JS event cannot create another action.
-    let IngressResult::Duplicate(ack) = gate.review_ingest(l, &fixture[1], 102)
-    else {
+    let IngressResult::Duplicate(ack) = gate.review_ingest(l, &fixture[1], 102) else {
         panic!("exact original JS replays must be transport-only duplicates");
     };
     assert_eq!(ack.status, AckStatus::Duplicate);
@@ -107,8 +103,7 @@ fn one_event_beyond_the_allowed_js_window_fail_closes_real_rust_ingress() {
     let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
     // The formerly unrestricted JS nextSendBatch(32) could expose #18
     // while #1 was still missing. This must NOT be treated as acceptable.
-    let IngressResult::Rejected(Some(ack)) = gate.review_ingest(l, &fixture[17], 5)
-    else {
+    let IngressResult::Rejected(Some(ack)) = gate.review_ingest(l, &fixture[17], 5) else {
         panic!("original Rust must reject 17-ahead seq18");
     };
     assert_eq!(ack.status, AckStatus::Rejected);
