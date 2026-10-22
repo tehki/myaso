@@ -358,6 +358,16 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
+  onProcessedAck(ack) {
+    // Transport-declared original processed INPUT_ACK; independent of replay/reconciliation.
+    recordM144OriginalInputTrace({
+      kind: "processed-ack",
+      epochMs: Date.now(),
+      processedClientTick: ack.processedClientTick,
+      playerNetId: ack.playerNetId,
+      serverTick: Number.isInteger(ack.serverTick) ? ack.serverTick : null,
+    });
+  },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
@@ -744,6 +754,23 @@ function sampleInput() {
   }
 }
 
+// Combat4 M144/M143: genuine native browser-only INPUT / processed ACK provenance.
+// All records are observations of the existing v1 sender and the real input ACK.
+// No synthetic events, retransmits, admission decisions or game rule changes.
+function recordM144OriginalInputTrace(entry) {
+  if (acceptanceScenario !== "uimultirecoveryffa" && acceptanceScenario !== "uijumprecoveryffa") return;
+  const debug = window.__MYASO_ACCEPTANCE_STATE__;
+  if (!debug) return;
+  const active = entry.kind === "send"
+    && (entry.attack || entry.heavyAttack || entry.jump);
+  if (active) debug.originalInputTraceRemaining = 12;
+  else if (entry.kind === "send") debug.originalInputTraceRemaining = Math.max(0, (debug.originalInputTraceRemaining ?? 0) - 1);
+  if (!active && !(debug.originalInputTraceRemaining > 0)) return;
+  debug.inputSubmissions ??= [];
+  debug.inputSubmissions.push(entry);
+  if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+}
+
 function simulatePrediction(stepMs) {
   sampleInput();
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
@@ -772,6 +799,18 @@ function simulatePrediction(stepMs) {
         }
       }
     }
+    recordM144OriginalInputTrace({
+      kind: "send",
+      clientTick: outgoingTick,
+      epochMs: Date.now(),
+      attack: Boolean(currentInput.attack),
+      heavyAttack: Boolean(currentInput.heavyAttack),
+      jump: Boolean(currentInput.jump),
+      pointerHeld: leftButtonCharge.isPressed(),
+      charging: leftButtonCharge.isCharging(),
+      spaceHeld: keys.has("Space"),
+      leftButtonDown,
+    });
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
