@@ -140,6 +140,26 @@ impl LegacyItemKind {
     pub fn require_checkpoint_kind(code: u8) -> Result<Self, LegacyMigrationError> {
         Self::from_checkpoint_code(code).ok_or(LegacyMigrationError::InvalidKindCode)
     }
+
+    /// Mirrors the actual Magic/Items #424 ItemKind::fits slot rule. This
+    /// alone does not authenticate the source item's metadata or ownership.
+    pub const fn fits_checkpoint_slot(self, slot: LegacyEquipmentSlot) -> bool {
+        matches!(
+            (self, slot),
+            (
+                Self::RustySword | Self::IronSword | Self::WoodenClub,
+                LegacyEquipmentSlot::MainHand
+            ) | (
+                Self::LeatherArmor | Self::ChainmailArmor,
+                LegacyEquipmentSlot::Body
+            ) | (Self::IronHelmet, LegacyEquipmentSlot::Head)
+                | (Self::LeatherBoots, LegacyEquipmentSlot::Feet)
+                | (
+                    Self::WoodenShield | Self::Spellbook,
+                    LegacyEquipmentSlot::OffHand
+                )
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -159,6 +179,7 @@ pub enum LegacyMigrationError {
     TooManyEquippedSlots,
     DuplicateEquippedSlot,
     DuplicateEquippedItem,
+    IncompatibleEquippedKind,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -296,12 +317,15 @@ impl LegacyImportPreflight {
 pub struct LegacyEquippedRow {
     pub checkpoint_slot_code: u8,
     pub legacy_item_id: u64,
+    /// Explicit source disk ItemKind, never inferred from slot or item ID.
+    pub checkpoint_kind_code: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProposedCanonicalEquippedRow {
     pub item_id: ItemId,
     pub location: ItemLocation,
+    pub kind: LegacyItemKind,
 }
 
 /// Preflight at most five DISTINCT legacy slot/item bindings. Historic
@@ -327,6 +351,10 @@ pub fn preflight_equipment_manifest<const N: usize>(
         if !seen_slots.insert(slot.checkpoint_code()) {
             return Err(LegacyMigrationError::DuplicateEquippedSlot);
         }
+        let kind = LegacyItemKind::require_checkpoint_kind(row.checkpoint_kind_code)?;
+        if !kind.fits_checkpoint_slot(slot) {
+            return Err(LegacyMigrationError::IncompatibleEquippedKind);
+        }
         if row.legacy_item_id == 0 {
             return Err(LegacyMigrationError::ZeroLegacyId);
         }
@@ -335,6 +363,7 @@ pub fn preflight_equipment_manifest<const N: usize>(
         }
         canonical.push(ProposedCanonicalEquippedRow {
             item_id: import.core_item(row.legacy_item_id)?,
+            kind,
             location: ItemLocation::Equipped {
                 character_id,
                 slot: slot.proposed_core_slot(),
@@ -463,22 +492,27 @@ mod tests {
             LegacyEquippedRow {
                 checkpoint_slot_code: 0,
                 legacy_item_id: 201,
+                checkpoint_kind_code: 0,
             },
             LegacyEquippedRow {
                 checkpoint_slot_code: 1,
                 legacy_item_id: 202,
+                checkpoint_kind_code: 2,
             },
             LegacyEquippedRow {
                 checkpoint_slot_code: 2,
                 legacy_item_id: 203,
+                checkpoint_kind_code: 1,
             },
             LegacyEquippedRow {
                 checkpoint_slot_code: 3,
                 legacy_item_id: 204,
+                checkpoint_kind_code: 11,
             },
             LegacyEquippedRow {
                 checkpoint_slot_code: 4,
                 legacy_item_id: 205,
+                checkpoint_kind_code: 12,
             },
         ];
         let character_id = import.core_character(101).unwrap();
@@ -522,6 +556,7 @@ mod tests {
         let hand = LegacyEquippedRow {
             checkpoint_slot_code: 0,
             legacy_item_id: 201,
+            checkpoint_kind_code: 0,
         };
         assert_eq!(
             preflight_equipment_manifest(&import, 101, [hand, hand]),
@@ -535,7 +570,8 @@ mod tests {
                     hand,
                     LegacyEquippedRow {
                         checkpoint_slot_code: 1,
-                        legacy_item_id: 201
+                        legacy_item_id: 201,
+                        checkpoint_kind_code: 2
                     }
                 ]
             ),
@@ -546,6 +582,7 @@ mod tests {
                 LegacyEquippedRow {
                     checkpoint_slot_code: 5,
                     legacy_item_id: 202,
+                    checkpoint_kind_code: 2,
                 },
                 LegacyMigrationError::InvalidSlotCode,
             ),
@@ -553,6 +590,7 @@ mod tests {
                 LegacyEquippedRow {
                     checkpoint_slot_code: 1,
                     legacy_item_id: 0,
+                    checkpoint_kind_code: 2,
                 },
                 LegacyMigrationError::ZeroLegacyId,
             ),
@@ -560,6 +598,7 @@ mod tests {
                 LegacyEquippedRow {
                     checkpoint_slot_code: 1,
                     legacy_item_id: 203,
+                    checkpoint_kind_code: 2,
                 },
                 LegacyMigrationError::UnregisteredSourceIdentity,
             ),
@@ -759,6 +798,74 @@ mod tests {
         assert_ne!(be, le);
         assert_eq!(u128::from_be_bytes(be), mapped);
         assert_ne!(u128::from_be_bytes(le), mapped);
+    }
+
+    #[test]
+    fn exact_magic_kind_slot_matrix_rejects_wrong_gear_and_non_equipment() {
+        let allowed = [
+            (0, 0),
+            (8, 0),
+            (9, 0), // original swords and club -> MainHand
+            (1, 2),
+            (10, 2), // leather/chainmail -> Body
+            (2, 1),
+            (13, 1), // book/shield -> OffHand
+            (11, 3),
+            (12, 4), // helmet and boots -> Head and Feet
+        ];
+        for kind_code in 0..=13 {
+            let kind = LegacyItemKind::require_checkpoint_kind(kind_code).unwrap();
+            for slot_code in 0..=4 {
+                let slot = LegacyEquipmentSlot::from_checkpoint_code(slot_code).unwrap();
+                assert_eq!(
+                    kind.fits_checkpoint_slot(slot),
+                    allowed.contains(&(kind_code, slot_code)),
+                    "source kind code {kind_code} on slot {slot_code}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn kind_bound_equipment_manifest_denies_swap_unknown_kind_and_incompatible_item() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 10).unwrap();
+        import.stage_owner(LegacyDomain::Item, 20).unwrap();
+        let valid = LegacyEquippedRow {
+            checkpoint_slot_code: 0,
+            legacy_item_id: 20,
+            checkpoint_kind_code: 8,
+        };
+        let approved = preflight_equipment_manifest(&import, 10, [valid]).unwrap();
+        assert_eq!(approved[0].item_id, import.core_item(20).unwrap());
+        assert_eq!(approved[0].kind, LegacyItemKind::IronSword);
+        for (bad_kind, expected) in [
+            (1, LegacyMigrationError::IncompatibleEquippedKind),
+            (4, LegacyMigrationError::IncompatibleEquippedKind),
+            (6, LegacyMigrationError::IncompatibleEquippedKind),
+            (14, LegacyMigrationError::InvalidKindCode),
+            (255, LegacyMigrationError::InvalidKindCode),
+        ] {
+            let wrong = LegacyEquippedRow {
+                checkpoint_kind_code: bad_kind,
+                ..valid
+            };
+            assert_eq!(
+                preflight_equipment_manifest(&import, 10, [wrong]),
+                Err(expected)
+            );
+        }
+        assert_eq!(
+            preflight_equipment_manifest(
+                &import,
+                10,
+                [LegacyEquippedRow {
+                    checkpoint_slot_code: 3,
+                    ..valid
+                }]
+            ),
+            Err(LegacyMigrationError::IncompatibleEquippedKind)
+        );
     }
 
     #[test]
