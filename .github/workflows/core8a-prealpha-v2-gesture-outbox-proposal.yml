@@ -24,6 +24,6 @@ jobs:
           node --check src/network/prealpha-lmb-gesture-proposal.mjs
           node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
           node --check tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs
-          git diff --check HEAD^ HEAD
+          git show --format= --check HEAD
       - name: Unchanged v1 and 15 focused strict edge replay lease tests
         run: node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs
