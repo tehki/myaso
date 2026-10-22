@@ -32,7 +32,7 @@ jobs:
         run: |
           cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
           cargo test --locked --manifest-path server/Cargo.toml --test prealpha_core8c_world_lease_review
-      - name: Four ACTUAL certificate-pinned QUIC game sessions and disconnect/rejoin capacity
+      - name: Four ACTUAL QUIC sessions, departure, authoritative tombstone, fresh actor
         run: cargo test --locked --manifest-path server/Cargo.toml --test core8c_real_quic_actor_departure
       - name: Strict all-target Rust lint
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
