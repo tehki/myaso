@@ -1,0 +1,467 @@
+{
+  "sourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "originalRigBones": 22,
+  "blenderKnockdownClipMs": 360,
+  "authoritativeKickKnockdownMs": 360,
+  "sourceEditableBlend": true,
+  "actorRootTranslationChanged": false,
+  "ownerApprovedGameplay": false,
+  "authoritativeStateChanged": false,
+  "originalMeshRedistributed": false,
+  "worldFloorBootSoleValidated": false,
+  "impactMeshCollisionValidated": false,
+  "normalGameRendererUnchanged": true,
+  "rendered": [
+    {
+      "direction": 0,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 22399
+    },
+    {
+      "direction": 0,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 23724
+    },
+    {
+      "direction": 0,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 24005
+    },
+    {
+      "direction": 0,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 23334
+    },
+    {
+      "direction": 0,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 22765
+    },
+    {
+      "direction": 0,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 22765
+    },
+    {
+      "direction": 0,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 24265
+    },
+    {
+      "direction": 0,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 22399
+    },
+    {
+      "direction": 1,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20704
+    },
+    {
+      "direction": 1,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 22025
+    },
+    {
+      "direction": 1,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 22867
+    },
+    {
+      "direction": 1,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 22200
+    },
+    {
+      "direction": 1,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21581
+    },
+    {
+      "direction": 1,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21581
+    },
+    {
+      "direction": 1,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 22846
+    },
+    {
+      "direction": 1,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20704
+    },
+    {
+      "direction": 2,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20711
+    },
+    {
+      "direction": 2,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20746
+    },
+    {
+      "direction": 2,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 21229
+    },
+    {
+      "direction": 2,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21592
+    },
+    {
+      "direction": 2,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21765
+    },
+    {
+      "direction": 2,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21765
+    },
+    {
+      "direction": 2,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20906
+    },
+    {
+      "direction": 2,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20711
+    },
+    {
+      "direction": 3,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 21351
+    },
+    {
+      "direction": 3,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 21013
+    },
+    {
+      "direction": 3,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20179
+    },
+    {
+      "direction": 3,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 20962
+    },
+    {
+      "direction": 3,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21693
+    },
+    {
+      "direction": 3,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21693
+    },
+    {
+      "direction": 3,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20271
+    },
+    {
+      "direction": 3,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 21351
+    },
+    {
+      "direction": 4,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 21079
+    },
+    {
+      "direction": 4,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20564
+    },
+    {
+      "direction": 4,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20139
+    },
+    {
+      "direction": 4,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21509
+    },
+    {
+      "direction": 4,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21731
+    },
+    {
+      "direction": 4,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21731
+    },
+    {
+      "direction": 4,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20280
+    },
+    {
+      "direction": 4,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 21079
+    },
+    {
+      "direction": 5,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20723
+    },
+    {
+      "direction": 5,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20178
+    },
+    {
+      "direction": 5,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20565
+    },
+    {
+      "direction": 5,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21806
+    },
+    {
+      "direction": 5,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 22356
+    },
+    {
+      "direction": 5,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 22356
+    },
+    {
+      "direction": 5,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20580
+    },
+    {
+      "direction": 5,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20723
+    },
+    {
+      "direction": 6,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20967
+    },
+    {
+      "direction": 6,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 22250
+    },
+    {
+      "direction": 6,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 23339
+    },
+    {
+      "direction": 6,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 23703
+    },
+    {
+      "direction": 6,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 23737
+    },
+    {
+      "direction": 6,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 23737
+    },
+    {
+      "direction": 6,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 23229
+    },
+    {
+      "direction": 6,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20967
+    },
+    {
+      "direction": 7,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 22202
+    },
+    {
+      "direction": 7,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 23869
+    },
+    {
+      "direction": 7,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 24501
+    },
+    {
+      "direction": 7,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 23911
+    },
+    {
+      "direction": 7,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 23545
+    },
+    {
+      "direction": 7,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 23545
+    },
+    {
+      "direction": 7,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 24563
+    },
+    {
+      "direction": 7,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 22202
+    }
+  ],
+  "sourceKeyframes": [
+    {
+      "frame": 1.0,
+      "ms": 0.0
+    },
+    {
+      "frame": 3.0,
+      "ms": 33.333
+    },
+    {
+      "frame": 5.4,
+      "ms": 73.333
+    },
+    {
+      "frame": 8.0,
+      "ms": 116.667
+    },
+    {
+      "frame": 10.6,
+      "ms": 160.0
+    },
+    {
+      "frame": 14.2,
+      "ms": 220.0
+    },
+    {
+      "frame": 18.2,
+      "ms": 286.667
+    },
+    {
+      "frame": 22.6,
+      "ms": 360.0
+    }
+  ],
+  "sourceRigMeasurements": {
+    "headStartZ": 0.2119968831539154,
+    "headDownZ": -0.16621945798397064,
+    "spineStartZ": -0.08906330913305283,
+    "spineDownZ": -0.11627253144979477
+  },
+  "realSourceAtlasSha256": "3df3f16e3007cd030027fca95d008331e1d6ba06bef8e9925a821558ba1cf872",
+  "realEditableSourceBlendSha256": "8db1e600970c519a593302b15f8426daba02e1c2505850cfaa77605a1fb8f2d1",
+  "eightFacingAnimatedReviewGifSha256": "d63cac52e4b2803505e2d1e8bcf33d80d53d3448dea2b5c47fa856c0c2c92ba7",
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "sourceCellPx": [
+    160,
+    160
+  ],
+  "sourceClipFrames": 8,
+  "directionCount": 8,
+  "reviewGifDurationsMs": [
+    35,
+    40,
+    45,
+    45,
+    60,
+    70,
+    45,
+    20
+  ],
+  "all64AtlasCellsFromRealBlenderSource": true,
+  "humanArtApproval": false,
+  "sourceOnly": true,
+  "worldContactValidated": false
+}
