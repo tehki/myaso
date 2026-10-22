@@ -346,6 +346,80 @@ mod tests {
         assert!(registry.is_current(third));
     }
 
+    /// Negative witness, NOT a safety claim: an empty registry does not know
+    /// what generation the last server committed before it crashed. A caller
+    /// that reactivates that SAME record without a new durable generation can
+    /// recreate the exact old lease if its connection number also repeats.
+    #[test]
+    fn restart_without_committed_generation_advance_exposes_lease_aba() {
+        let stored = CharacterRecord::new(character(71))
+            .next_generation()
+            .expect("first committed generation");
+        let committed_bytes = stored.encode();
+        let mut first_process = SessionLeaseRegistry::default();
+        let before_crash = first_process
+            .activate_committed(stored, connection(19))
+            .expect("first session");
+        assert!(first_process.is_current(before_crash));
+        drop(first_process);
+
+        // Deliberately INCORRECT integration: restart with old durable record
+        // and reuse the process-local connection number without incrementing
+        // and durably publishing the character generation first.
+        let recovered_old_record = CharacterRecord::decode(&committed_bytes)
+            .expect("source record integrity; not authenticity");
+        let mut unsafe_recovery = SessionLeaseRegistry::default();
+        let repeated = unsafe_recovery
+            .activate_committed(recovered_old_record, connection(19))
+            .expect("the registry cannot authenticate a fresh durable commit");
+        assert_eq!(repeated, before_crash);
+        assert!(unsafe_recovery.is_current(before_crash));
+
+        // REQUIRED integration contract: authenticated storage must commit
+        // next generation BEFORE live admission, then lease the new one.
+        let next_committed = recovered_old_record
+            .next_generation()
+            .expect("fresh generation must be durable before activation");
+        let persisted_replacement =
+            CharacterRecord::decode(&next_committed.encode()).expect("recovered newer record");
+        let mut fenced_recovery = SessionLeaseRegistry::default();
+        let after_restart = fenced_recovery
+            .activate_committed(persisted_replacement, connection(19))
+            .expect("new committed generation");
+        assert_ne!(after_restart, before_crash);
+        assert!(!fenced_recovery.is_current(before_crash));
+        assert!(!fenced_recovery.release(before_crash));
+        assert!(fenced_recovery.is_current(after_restart));
+    }
+
+    /// Source integrity != verified auth: this non-cryptographic checksum is
+    /// trivial to recompute and cannot attest account/character ownership.
+    #[test]
+    fn well_formed_checksum_does_not_authorize_claimed_character_or_generation() {
+        let original = CharacterRecord::new(character(71))
+            .next_generation()
+            .expect("first");
+        let mut forged = original.encode();
+        forged[8..24].copy_from_slice(&character(999).get().to_le_bytes());
+        forged[24..32].copy_from_slice(&u64::MAX.to_le_bytes());
+        let replacement_checksum = fnv1a32(&forged[..32]);
+        forged[32..36].copy_from_slice(&replacement_checksum.to_le_bytes());
+        let decoded = CharacterRecord::decode(&forged).expect("checksum only validates bytes");
+        assert_eq!(decoded.character_id, character(999));
+        assert_eq!(decoded.session_generation, u64::MAX);
+
+        // Public review-only in-memory API assumes trusted durable input;
+        // do not use this result as an authenticated principal in live QUIC.
+        let mut without_auth = SessionLeaseRegistry::default();
+        assert!(without_auth
+            .activate_committed(decoded, connection(7))
+            .is_ok());
+        assert_eq!(
+            decoded.next_generation(),
+            Err(CharacterRecordError::GenerationExhausted)
+        );
+    }
+
     #[test]
     fn one_connection_cannot_claim_two_characters() {
         let mut registry = SessionLeaseRegistry::default();
