@@ -47,6 +47,9 @@ const knightSprites = knightQuery.get("knights") === "1"
       // THIRD explicit QA flag chooses the authentic V3 original Blender atlas.
       // Requires knights=1 and knightKickSource=1; all defaults remain V2/off.
       sourceKickVariant: knightQuery.get("knightKickV3") === "1" ? "v3" : "v2",
+      // FOURTH test-only opt-in; selects victim sprite solely for server
+      // confirmed COMBAT_ACTION.knockdown, NEVER for cosmetic kick frames.
+      sourceKnockdownPreview: knightQuery.get("knightKnockdownSource") === "1",
     }) : null;
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");

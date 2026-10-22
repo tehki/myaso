@@ -69,7 +69,7 @@ export function knightDirectionIndex(facing) {
 
 // Actor kind must come from a validated Core/AI roster. A network-locality
 // flag is NEVER permission to draw a Sentinel for another human player.
-export function knightClip(action, actorKind, speed = 0, moving = false, sourceKickPreview = false) {
+export function knightClip(action, actorKind, speed = 0, moving = false, sourceKickPreview = false, sourceKnockdownPreview = false) {
   if (actorKind !== "player" && actorKind !== "npc") return null;
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
     return actorKind === "npc" ? "t1_roll" : "silver_roll";
@@ -90,6 +90,10 @@ export function knightClip(action, actorKind, speed = 0, moving = false, sourceK
   if (sourceKickPreview && Object.hasOwn(KNIGHT_KICK_SOURCE_PHASE_MS, action)) {
     return "silver_kick";
   }
+  // A victim reaction is legal ONLY after the authoritative knockdown
+  // snapshot. Never infer a knockdown from an opponent's cosmetic kick.
+  if (sourceKnockdownPreview && action === COMBAT_ACTION.knockdown)
+    return "silver_knockdown";
   if (action === COMBAT_ACTION.jump) return "silver_jump";
   if (action !== COMBAT_ACTION.idle) return null;
   if (moving && speed >= 280) return "silver_sprint";
@@ -107,7 +111,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
   assetBase = new URL("./assets/knights/", import.meta.url),
   presentationScale = KNIGHT_PRESENTATION_SCALE,
   sourceKickPreview = false,
-  sourceKickVariant = "v2" } = {}) {
+  sourceKickVariant = "v2",
+  sourceKnockdownPreview = false } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
@@ -117,10 +122,14 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     || (sourceKickVariant === "v3" && sourceKickPreview !== true)) {
     throw new RangeError("Spartan V3 requires opt-in source kick rendering");
   }
+  if (sourceKnockdownPreview
+    && (!sourceKickPreview || sourceKickVariant !== "v3"))
+    throw new RangeError("Silver victim knockdown requires original V3 kick QA preview gates");
   const atlases = new Map();
   const states = new Map();
   const clipList = sourceKickPreview
-    ? {...KNIGHT_CLIPS, silver_kick: KNIGHT_KICK_SOURCE_FRAMES}
+    ? {...KNIGHT_CLIPS, silver_kick: KNIGHT_KICK_SOURCE_FRAMES,
+      ...(sourceKnockdownPreview ? {silver_knockdown:8} : {})}
     : KNIGHT_CLIPS;
   for (const [name] of Object.entries(clipList)) {
     const image = new ImageCtor();
@@ -161,7 +170,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
       const action = fighter.action ?? COMBAT_ACTION.idle;
-      const clip = knightClip(action, actorKind, state.speed, moving, sourceKickPreview);
+      const clip = knightClip(action, actorKind, state.speed, moving,
+        sourceKickPreview, sourceKnockdownPreview);
       if (!clip) {
         // End the previous clip on unsupported states. A future roll must
         // start at frame zero rather than resume its previous final frame.
@@ -193,7 +203,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       } else if (clip === "silver_idle") {
         frame = Math.floor(nowMs / 300) % frames;
       } else {
-        const duration = clip.endsWith("_roll") ? KNIGHT_ROLL_PRESENTATION_MS
+        const duration = clip === "silver_knockdown" ? 360
+          : clip.endsWith("_roll") ? KNIGHT_ROLL_PRESENTATION_MS
           : clip === "silver_jump" ? 430 : clip === "t1_block" ? 240 : 470;
         frame = Math.min(frames - 1, Math.floor((nowMs - state.clipStartedMs) / duration * frames));
       }
