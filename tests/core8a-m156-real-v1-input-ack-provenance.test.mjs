@@ -13,6 +13,8 @@ test("M156 observes real pointer release and onLight latch, no fabricated input 
   assert.match(browser,/if \(acceptanceScenario !== "uirollknockdownffahit"\) return;/);
   assert.match(browser,/onLight\(\) \{\s*attackRequested = true;\s*observeM156OriginalInput\("onLight"/);
   assert.match(browser,/const committed = leftButtonCharge\.release\(event\.pointerId\);/);
+  assert.match(browser,/leftButtonCharge\.release\(event\.pointerId\);\s*leftButtonPressMovement = null;/,
+    "M156 observer must not split protected R1 real release/capture cleanup");
   assert.match(browser,/observeM156OriginalInput\("pointerup", \{/);
   assert.match(browser,/pointerId:event\.pointerId, button:event\.button/);
   assert.match(browser,/committed:committed \?\? null, attackRequested/);
