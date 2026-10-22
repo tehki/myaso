@@ -1063,7 +1063,12 @@ fn begin_requested_action(
     // R2: an immediate authentic LMB light may upgrade to charged heavy
     // only during its unlanded windup. Running light may upgrade as well.
     // Once active, already-hit or recovering, the second action is rejected.
+    // Proposed v2 LMB owns its own authenticated UPGRADE command.
+    // The legacy KeyE heavy edge must never change that unrelated
+    // still-unlanded light into a heavy without matching gesture identity.
+    // Legacy v1 remains unchanged when this review-only flag is false.
     if edges.heavy_attack
+        && !fighter.gesture_review_owns_light
         && matches!(
             fighter.action,
             Action::AttackWindup
