@@ -100,3 +100,12 @@ fn unnegotiated_protocol_source_reserved_and_length_corruptions_fail_closed() {
     assert!(decode_review(&GOLDEN[..47], expected).is_err());
     assert!(decode_review(&GOLDEN[..15], expected).is_err());
 }
+
+#[test]
+fn original_live_rust_ingress_rejects_unnegotiated_v2_review_envelope() {
+    use myaso_server::{decode_input_packet, DecodeError};
+    assert_eq!(
+        decode_input_packet(&GOLDEN),
+        Err(DecodeError::UnsupportedProtocol(2))
+    );
+}

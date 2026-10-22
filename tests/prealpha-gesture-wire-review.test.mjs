@@ -1,3 +1,4 @@
+import {decodeInputPacket as decodeLegacyInput} from "../src/network/input-codec.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {encodeReview,decodeReview,PreviewGate,KIND} from "./fixtures/core8c-lmb-gesture-wire-review.mjs";
@@ -49,6 +50,9 @@ test("repeated upgrade and unmatched KeyE release do not create multiple actions
   assert.deepEqual(gate.accept(wire([e(7,32,KIND.KEYE_PRESS)])),[]);
   assert.deepEqual(gate.accept(wire([e(8,32,KIND.KEYE_RELEASE)])),[]);
   assert.deepEqual(gate.accept(wire([e(9,31,KIND.KEYE_RELEASE)])),["keye-release"]);
+});
+test("unchanged live v1 browser decoder rejects review-only v2 gesture packets",()=>{
+  assert.throws(()=>decodeLegacyInput(pair),/unsupported protocol version/);
 });
 test("version, length, source, reserved fields and zero IDs fail closed",()=>{
   assert.throws(()=>wire([]),/count/);
