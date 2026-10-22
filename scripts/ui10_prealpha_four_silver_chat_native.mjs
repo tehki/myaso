@@ -121,6 +121,101 @@ try {
   assert.equal(after.closed,true,"native click recloses controls");
   assert.equal(after.scrollY,0,"help open/close must not scroll game page");
   assert(after.bottom<=target.height+1,"actual arena remains visible after controls");
+  // Native keyboard accessibility on the SAME server-authenticated short
+  // browser viewport: Space/Enter belong to focused <summary>, never Combat
+  // canvas jump/attack or the optional Chat C1 Enter composer.
+  await evaljs(session,[
+   "if(!window.__UI10_CONTROLS_KEYS__){",
+   "const log={keys:[],canvasKeys:0};",
+   "document.addEventListener('keydown',e=>{",
+   "if(e.key==='Enter'||e.code==='Space')log.keys.push({",
+   "key:e.key,code:e.code,trusted:e.isTrusted,",
+   "summary:e.target===document.querySelector('.controls-disclosure summary')});",
+   "},true);",
+   "document.querySelector('#arena').addEventListener('keydown',",
+   "()=>log.canvasKeys++,true);",
+   "window.__UI10_CONTROLS_KEYS__=()=>({...log,",
+   "focusSummary:document.activeElement===document.querySelector('.controls-disclosure summary'),",
+   "open:document.querySelector('.controls-disclosure')?.open,",
+   "chatOpen:document.querySelector('[data-local-chat]')?.dataset.open==='true',",
+   "pageScrollY:window.scrollY});",
+   "}"
+  ].join(""));
+  const focused=await evaljs(session,"return window.__UI10_CONTROLS_KEYS__()");
+  assert.equal(focused.focusSummary,true,
+   "native pointer click on disclosure must leave actual keyboard focus on summary");
+  await key(session,"\uE00D"); // genuine W3C keyboard SPACE
+  const space=await evaljs(session,"return window.__UI10_CONTROLS_KEYS__()");
+  assert.equal(space.open,true,"Space on focused native summary opens original Controls");
+  assert.equal(space.chatOpen,false,"Space in Controls cannot open Chat C1");
+  assert.equal(space.pageScrollY,0,"Space on Controls cannot scroll the arena");
+  await key(session,"\uE007"); // genuine W3C keyboard ENTER
+  const enter=await evaljs(session,"return window.__UI10_CONTROLS_KEYS__()");
+  assert.equal(enter.open,false,"Enter on native summary recloses controls");
+  assert.equal(enter.chatOpen,false,"Enter on Controls must not hijack Chat C1");
+  assert.equal(enter.canvasKeys,0,"controls keyboard must never trigger arena Combat");
+  assert(enter.keys.some(x=>x.code==="Space"&&x.summary&&x.trusted),
+   "real trusted Space event must target Controls summary");
+  assert(enter.keys.some(x=>x.key==="Enter"&&x.summary&&x.trusted),
+   "real trusted Enter event must target Controls summary");
+  // Original game focus stays available; pressing Enter AFTER focus returns
+  // to the ACTUAL Canvas must still open the real Chat C1 composer, then
+  // Escape must return focus to the fighting arena without sending text.
+  await evaljs(session,"document.querySelector('#arena').focus()");
+  await key(session,"\uE007");
+  const chatFocus=await evaljs(session,[
+   "const x=document.querySelector('[data-local-chat]');",
+   "return {open:x?.dataset.open==='true',focused:document.activeElement===x?.querySelector('input')};"
+  ].join(""));
+  assert(chatFocus.open&&chatFocus.focused,
+   "after Controls keyboard use genuine arena Enter must open real Chat C1");
+
+  // The same genuine authenticated player must be able to type controls
+  // keys as plain chat text, never emitting gameplay Canvas keydown.
+  await evaljs(session,[
+   "if(!window.__UI10_C1_TYPING__){",
+   "const chat=document.querySelector('[data-local-chat]');",
+   "const input=chat.querySelector('input'),log={keys:[],canvasKeys:0};",
+   "input.addEventListener('keydown',e=>log.keys.push({",
+   "key:e.key,code:e.code,trusted:e.isTrusted,",
+   "inputTarget:e.target===input}),true);",
+   "document.querySelector('#arena').addEventListener('keydown',e=>{",
+   "if(['KeyW','KeyE','Space'].includes(e.code))log.canvasKeys++;",
+   "},true);",
+   "window.__UI10_C1_TYPING__=()=>({value:input.value,",
+   "focused:document.activeElement===input,open:chat.dataset.open==='true',",
+   "keys:[...log.keys],canvasKeys:log.canvasKeys});",
+   "}"
+  ].join(""));
+  await key(session,"w");
+  await key(session,"e");
+  await key(session,"\uE00D");
+  const typed=await evaljs(session,"return window.__UI10_C1_TYPING__()");
+  assert.equal(typed.value,"we ","W/E/Space should be typed into C1 text, not Combat");
+  assert(typed.focused&&typed.open,"real C1 input retains focus while typing game keys");
+  assert.equal(typed.canvasKeys,0,"typing W/E/Space must never reach Combat canvas");
+  assert.equal(typed.keys.length,3,"one trusted native keydown per typed key");
+  for(const code of ["KeyW","KeyE","Space"]){
+   assert(typed.keys.some(x=>x.code===code&&x.trusted&&x.inputTarget),
+    "authentic keyboard event must target C1 input: "+code);
+  }
+  console.log("UI10_P6_NATIVE_CHAT_COMBAT_KEY_ISOLATION_PASS",
+   JSON.stringify({browser:browserMatrix[i],viewport:target,
+    trustedInputKeys:["KeyW","KeyE","Space"],typed:"we ",
+    canvasAttackAndMoveKeys:0,realChatFocus:true}));
+  await key(session,"\uE00C");
+  const restored=await evaljs(session,[
+   "const x=document.querySelector('[data-local-chat]');",
+   "return {closed:x?.dataset.open==='false',arenaFocused:document.activeElement?.id==='arena'};"
+  ].join(""));
+  assert(restored.closed&&restored.arenaFocused,
+   "Escape after Controls keyboard use must restore original Combat focus");
+  console.log("UI10_PREALPHA_NATIVE_CONTROLS_KEYBOARD_PASS",
+   JSON.stringify({browser:browserMatrix[i],viewport:target,
+    realSpace:true,realEnter:true,keysTrusted:true,canvasCombatKeys:0,
+    chatNotHijacked:true,gameplayEnterEscapeRecovered:true}));
+
+
   viewportResults.push({browser:browserMatrix[i],target,
    canvas:{top:before.top,bottom:before.bottom,width:before.width,height:before.height},
    chatConnected:before.chatConnected,realStatus:before.serverStatus});
