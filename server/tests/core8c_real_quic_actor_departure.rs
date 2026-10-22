@@ -4,6 +4,7 @@
 //! fifth ID while remaining real original sessions continue playing.
 //! Pre-Alpha authority regression ONLY: original v1, NO live v2 gesture,
 //! no Combat hit, no browser/independent host or production release claim.
+use myaso_server::snapshot::{decode_snapshot, DecodedSnapshot, SNAPSHOT_FIELD_REMOVED};
 use std::{
     io::{BufRead, BufReader},
     process::{Child, Command, Stdio},
@@ -11,9 +12,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::{sleep, timeout};
-use myaso_server::snapshot::{
-    decode_snapshot, DecodedSnapshot, SNAPSHOT_FIELD_REMOVED,
-};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
     SendStream, VarInt,
@@ -177,7 +175,10 @@ async fn actual_initial_game_baseline(recv: &mut RecvStream) -> DecodedSnapshot 
         .expect("real game reliable baseline header arrived")
         .expect("original game reliable header read");
     let bytes_len = u16::from_le_bytes(length) as usize;
-    assert!(bytes_len >= 14 && bytes_len <= 1100, "real full baseline bounded");
+    assert!(
+        bytes_len >= 14 && bytes_len <= 1100,
+        "real full baseline bounded"
+    );
     let mut bytes = vec![0_u8; bytes_len];
     timeout(Duration::from_secs(8), recv.read_exact(&mut bytes))
         .await
@@ -216,12 +217,16 @@ async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcome
     let (_ep4, viewer, _send4, mut viewer_recv) = connect(&url, &digest).await;
 
     let initial = actual_initial_game_baseline(&mut viewer_recv).await;
-    assert_eq!(initial.sequence, 0, "new viewer starts with baseline sequence zero");
+    assert_eq!(
+        initial.sequence, 0,
+        "new viewer starts with baseline sequence zero"
+    );
     for actor_id in 1_u32..=4 {
         assert!(
-            initial.records.iter().any(|r| {
-                r.net_id == actor_id && r.mask & SNAPSHOT_FIELD_REMOVED == 0
-            }),
+            initial
+                .records
+                .iter()
+                .any(|r| { r.net_id == actor_id && r.mask & SNAPSHOT_FIELD_REMOVED == 0 }),
             "four actual previously admitted actors must exist in real viewer baseline: {actor_id}"
         );
     }
@@ -247,18 +252,23 @@ async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcome
                 continue;
             }
             let snapshot = decode_snapshot(&frame).expect("server-authored delta snapshot");
-            assert!(snapshot.server_tick >= last_tick, "server clock must not regress");
+            assert!(
+                snapshot.server_tick >= last_tick,
+                "server clock must not regress"
+            );
             last_tick = snapshot.server_tick;
             assert!(
                 !snapshot.full,
                 "baseline-ACK-confirmed viewer must observe delta, not forged full"
             );
-            saw_departed_removal |= snapshot.records.iter().any(|r| {
-                r.net_id == 2 && r.mask & SNAPSHOT_FIELD_REMOVED != 0
-            });
-            saw_fresh_actor |= snapshot.records.iter().any(|r| {
-                r.net_id == 5 && r.mask & SNAPSHOT_FIELD_REMOVED == 0
-            });
+            saw_departed_removal |= snapshot
+                .records
+                .iter()
+                .any(|r| r.net_id == 2 && r.mask & SNAPSHOT_FIELD_REMOVED != 0);
+            saw_fresh_actor |= snapshot
+                .records
+                .iter()
+                .any(|r| r.net_id == 5 && r.mask & SNAPSHOT_FIELD_REMOVED == 0);
             if saw_departed_removal && saw_fresh_actor {
                 break;
             }
