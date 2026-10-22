@@ -320,6 +320,11 @@ pub struct RevisionedRoute {
     goal: (i32, i32),
     current: (i32, i32),
     path: Vec<(i32, i32)>,
+    // Freeze the exact authoritative window used to approve this route.
+    // Reused revision numbers with different geometry must fail closed.
+    manifest_bounds: NavBounds,
+    manifest_clearance: i32,
+    manifest_blockers: Vec<Collider>,
     next_index: usize,
     last_tick: Option<u32>,
     halted: bool,
@@ -338,6 +343,9 @@ impl RevisionedRoute {
             goal,
             current: start,
             path,
+            manifest_bounds: window.bounds,
+            manifest_clearance: window.clearance,
+            manifest_blockers: window.blockers.clone(),
             next_index: 1,
             last_tick: None,
             halted: false,
@@ -368,6 +376,12 @@ impl RevisionedRoute {
             return Err(NavigationError::StaleRevision);
         }
         self.revision = window.revision();
+        // A successful replan is always bound to the exact new geometry.
+        // If planning fails, retain the new revision but halt permanently
+        // until a still-newer authoritative manifest is adopted.
+        self.manifest_bounds = window.bounds;
+        self.manifest_clearance = window.clearance;
+        self.manifest_blockers.clone_from(&window.blockers);
         match window.plan(self.current, self.goal) {
             Ok(path) => {
                 self.next_index = 1;
@@ -389,6 +403,17 @@ impl RevisionedRoute {
     /// and blocked waypoints cannot advance.
     pub fn advance(&mut self, window: &CollisionWindow, tick: u32) -> bool {
         if self.halted || self.space != window.space() || self.revision != window.revision() {
+            return false;
+        }
+        // Matching zone+revision does not imply matching geometry. Reject
+        // accidental same-revision collider edits, reordering or window
+        // replacement rather than taking even one unauthorized waypoint.
+        if self.manifest_bounds != window.bounds
+            || self.manifest_clearance != window.clearance
+            || self.manifest_blockers != window.blockers
+        {
+            self.path.clear();
+            self.halted = true;
             return false;
         }
         if self.last_tick.is_some_and(|prior| {
@@ -764,6 +789,68 @@ mod tests {
         assert!(actor.advance(&original, 6));
         assert!(!actor.advance(&original, u32::MAX));
         assert!(!actor.halted());
+    }
+
+    #[test]
+    fn same_revision_different_collider_manifest_halts_before_any_movement() {
+        let bounds = BOUNDS;
+        let original =
+            CollisionWindow::from_server_collision_manifest(ZoneId::Moonvale, 1, 7, bounds, &[])
+                .unwrap();
+        let changed = CollisionWindow::from_server_collision_manifest(
+            ZoneId::Moonvale,
+            1,
+            7,
+            bounds,
+            &[Collider {
+                x: 4400,
+                y: 4000,
+                width: 10,
+                height: 10,
+            }],
+        )
+        .unwrap();
+        let start = (4150, 4050);
+        let goal = (4250, 4050);
+        let mut actor = RevisionedRoute::new(&original, start, goal).unwrap();
+        // The new obstacle is off-route, so destination-only checks would
+        // allow movement despite the wrong geometry carrying revision 7.
+        assert!(!actor.advance(&changed, 6));
+        assert_eq!(actor.current(), start);
+        assert!(actor.halted());
+        assert!(!actor.advance(&original, 12));
+        let newer =
+            CollisionWindow::from_server_collision_manifest(ZoneId::Moonvale, 1, 8, bounds, &[])
+                .unwrap();
+        assert!(actor.adopt_revision(&newer).is_ok());
+        assert!(!actor.halted());
+        assert!(actor.advance(&newer, 18));
+    }
+
+    #[test]
+    fn same_revision_replaced_bounds_halts_even_if_waypoint_is_still_in_grid() {
+        let original =
+            CollisionWindow::from_server_collision_manifest(ZoneId::Moonvale, 1, 7, BOUNDS, &[])
+                .unwrap();
+        let changed_bounds = NavBounds {
+            min_x: BOUNDS.min_x + GRID_STEP,
+            max_x: BOUNDS.max_x + GRID_STEP,
+            ..BOUNDS
+        };
+        let changed = CollisionWindow::from_server_collision_manifest(
+            ZoneId::Moonvale,
+            1,
+            7,
+            changed_bounds,
+            &[],
+        )
+        .unwrap();
+        let start = (4150, 4050);
+        let mut actor = RevisionedRoute::new(&original, start, (4250, 4050)).unwrap();
+        assert!(!actor.advance(&changed, 6));
+        assert!(actor.halted());
+        assert_eq!(actor.current(), start);
+        assert!(!actor.advance(&original, 12));
     }
 
     #[test]
