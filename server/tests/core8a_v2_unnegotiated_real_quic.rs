@@ -42,7 +42,12 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
                 url = Some(value.trim().to_owned());
             }
             if let Some(value) = line.split("development certificate SHA-256: ").nth(1) {
-                digest = Some(value.trim().parse::<Sha256Digest>().expect("actual TLS pin"));
+                digest = Some(
+                    value
+                        .trim()
+                        .parse::<Sha256Digest>()
+                        .expect("actual TLS pin"),
+                );
             }
             if url.is_some() && digest.is_some() {
                 let _ = tx.send((url.take().unwrap(), digest.take().unwrap()));
@@ -106,7 +111,9 @@ async fn assert_original_v1_input_ack(connection: &Connection, net_id: u32, tick
                 .receive_datagram()
                 .await
                 .expect("original game connection remains alive");
-            if packet.len() == 16 && packet[0] == 1 && packet[1] == 3
+            if packet.len() == 16
+                && packet[0] == 1
+                && packet[1] == 3
                 && u32::from_le_bytes(packet[4..8].try_into().unwrap()) == tick
             {
                 break packet;
@@ -135,8 +142,8 @@ async fn current_v1_server_rejects_both_unnegotiated_v2_proposals_but_keeps_two_
     let one_key_e: [u8; 16] = [2, 0x11, 1, 1, 3, 0, 0, 0, 2, 0, 0, 0, 43, 0, 0, 0];
     // Other department's incompatible v2 0x52 alternative is also forbidden.
     let alternative: [u8; 48] = [
-        2, 0x52, 2, 0, 8, 7, 6, 5, 4, 3, 2, 1, 9, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0,
-        0, 100, 0, 0, 0, 1, 1, 0, 0, 2, 0, 0, 0, 7, 0, 0, 0, 100, 0, 0, 0, 3, 1, 0, 0,
+        2, 0x52, 2, 0, 8, 7, 6, 5, 4, 3, 2, 1, 9, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0, 0, 100, 0, 0, 0, 1,
+        1, 0, 0, 2, 0, 0, 0, 7, 0, 0, 0, 100, 0, 0, 0, 3, 1, 0, 0,
     ];
     for packet in [
         one_lmb.as_slice(),
@@ -165,7 +172,10 @@ async fn current_v1_server_rejects_both_unnegotiated_v2_proposals_but_keeps_two_
             }
         })
         .await;
-        assert!(unwanted.is_err(), "non-negotiated v2 transport ACK MUST NOT exist");
+        assert!(
+            unwanted.is_err(),
+            "non-negotiated v2 transport ACK MUST NOT exist"
+        );
     }
     assert_original_v1_input_ack(&one, 1, 501).await;
     assert_original_v1_input_ack(&two, 2, 502).await;
