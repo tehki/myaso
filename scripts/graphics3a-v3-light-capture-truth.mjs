@@ -1,8 +1,9 @@
 // Original Canvas pixel provenance selection, separate from mandatory
 // authenticated M153 and source-asset hash receipts. NEVER synthesize frames.
-const sourceFile="silver_kick_v3_lit.webp";
+const sourceFiles=Object.freeze(["silver_kick_v3_lit.webp","silver_kick_v3_support.webp"]);
 const phases=Object.freeze(["windup","active","recovery"]);
-export function selectAuthenticV3LightCapture({browser,draws,captures}={}){
+export function selectAuthenticV3LightCapture({browser,draws,captures,sourceFile="silver_kick_v3_lit.webp"}={}){
+ if(!sourceFiles.includes(sourceFile))throw Error("Unapproved authentic V3 capture source");
  if(!["chrome","firefox","chrome2"].includes(browser))
   throw Error("Unknown genuine native browser for V3 study capture");
  if(!Array.isArray(draws)||!captures||typeof captures!=="object")
