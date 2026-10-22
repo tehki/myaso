@@ -9,6 +9,7 @@ on:
       - "web/graphics3b-red-lion-live-art-smoke.mjs"
       - "tools/art/verify_a232_live_optin_native_browsers.mjs"
       - "tests/graphics3b-red-lion-live-art-optin.test.mjs"
+      - "tests/graphics3b-red-lion-camera-parity.test.mjs"
       - "assets/environment/greyhaven/a232-review/**"
       - ".github/workflows/graphics3b-a232-live-optin-native.yml"
 
@@ -27,7 +28,7 @@ jobs:
           node --check web/online-game.mjs
           node --check web/graphics3b-red-lion-live-art-smoke.mjs
           node --check tools/art/verify_a232_live_optin_native_browsers.mjs
-          node --test tests/graphics3b-red-lion-live-art-optin.test.mjs tests/world-building-presentation.test.mjs
+          node --test tests/graphics3b-red-lion-live-art-optin.test.mjs tests/graphics3b-red-lion-camera-parity.test.mjs tests/world-building-presentation.test.mjs
       - name: Require native Chrome Firefox and local W3C drivers
         run: |
           google-chrome --version

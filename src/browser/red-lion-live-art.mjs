@@ -4,7 +4,7 @@
 import {createAuthoredWorldRenderer} from "./authored-world-renderer.mjs";
 import {normalizeWorldBuildingReplacementIds,worldBuildingPresentation} from "../world/building-presentation.mjs";
 import {MAP_IDS} from "../world/authored-maps.mjs";
-import {projectArenaPoint} from "./arena-viewport.mjs";
+// World and the live fighter painter each apply the one shared ARENA_VIEW_ZOOM transform.
 
 export const ORIGINAL_RED_LION_ART=Object.freeze({
   day:Object.freeze({name:"red_lion_a232_day_ironwork.webp",sha256:"bdd2dcb2cb480f3631cbfe8cd4fa63ffee63699d8f17f33a520f8a3dcfd085fa",width:228,height:297}),
@@ -97,8 +97,13 @@ export function createOriginalRedLionLiveArt({
    artCtx.save();
    try{
     applyGameZoom(artCtx,w,h,z);
-    const loc=projectArenaPoint(ORIGINAL_RED_LION_WORLD_ANCHOR.x,ORIGINAL_RED_LION_WORLD_ANCHOR.y,
-      camera.x,camera.y,w,h,z);
+    // IMPORTANT: the artCtx already has the same WORLD-TO-CANVAS
+    // ARENA_VIEW_ZOOM transform as the real live client. This anchor must
+    // remain in UNZOOMED screen/world units here. Using projectArenaPoint()
+    // (already zoomed) here would zoom camera displacement a SECOND time,
+    // detaching the facade from World9 tiles whenever the camera moves.
+    const loc={x:w/2+ORIGINAL_RED_LION_WORLD_ANCHOR.x-camera.x,
+      y:h/2+ORIGINAL_RED_LION_WORLD_ANCHOR.y-camera.y};
     artCtx.drawImage(images[mood],loc.x+ORIGINAL_RED_LION_WORLD_ANCHOR.facadeDx,
       loc.y+ORIGINAL_RED_LION_WORLD_ANCHOR.facadeDy);
     artCtx.drawImage(images.roof,loc.x+ORIGINAL_RED_LION_WORLD_ANCHOR.roofDx,

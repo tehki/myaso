@@ -8,7 +8,7 @@ The original Red Lion Blender scene was edited by Graphics 3B in #810 (exact hea
 
 This draft copies ONLY its actual verified day/dusk/roof WebPs into assets/environment/greyhaven/a232-review. The new src/browser/red-lion-live-art.mjs validates the exact SHA256 bytes of ALL THREE first-party source images and their dimensions, then uses the World9 canonical replacement validator to build a separate version of Graphics 3C's approved authored tile renderer which suppresses ONLY the existing Red Lion placeholder. Failure of an image HTTP fetch, hash, decode, renderer creation or offscreen paint leaves the original default unmodified world renderer selected. No fake actor, item ID or world-geometry change.
 
-The opt-in display is available only when an authenticated game's original opt-in world is already enabled: `?world=1&redlion=1`. Without both flags, the original renderer and exact existing combat/arena UI remain unchanged. `?world=1` without redlion still paints every original World placeholder.
+The original facades now share the exact same SINGLE camera scale as World9 tiles and fighter sprites, including when the actual view moves in X/Y: the offscreen source positions remain unzoomed until the game-world Canvas transform projects them once. Explicit camera-pan regression checks and genuine native Chrome/Firefox 100×40 world-unit camera-pan screenshots prevent drift.\n\nThe opt-in display is available only when an authenticated game's original opt-in world is already enabled: `?world=1&redlion=1`. Without both flags, the original renderer and exact existing combat/arena UI remain unchanged. `?world=1` without redlion still paints every original World placeholder.
 
 ## Real render order, source World depth
 
@@ -23,7 +23,7 @@ The real game still has original authoritative physics, packet validation, colli
 - World9 canonical identity/actor behind-vs-front placement; safe actor fallback away from Red Lion
 - Source default opt-out, no Pre-Alpha change, no Item/Combat/Physics/packet changes
 - Local Node source tests must be green
-- Native Chrome/Firefox with real first-party WebPs, actual World #571/3C #648 cache, page screenshots plus genuine multi-Rust-client actor depth and source alpha gesture parity STILL PENDING (separate acceptance; do not claim it without the real run)
+- Native Chrome/Firefox with real first-party WebPs, actual World #571/3C #648 cache, and camera-panned page screenshots are mandatory in the dedicated CI; genuine multi-Rust-client actor depth and source alpha gesture parity STILL PENDING (separate acceptance; do not claim it without the real run).
 - Protected full quality exact combined head must be green
 - Main orchestrator #360 alone owns merge/release. No deployment or production flag.
 

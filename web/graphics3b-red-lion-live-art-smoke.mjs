@@ -1,7 +1,9 @@
 import {createOriginalRedLionLiveArt} from "../src/browser/red-lion-live-art.mjs";
 import {createAuthoredWorldRenderer} from "../src/browser/authored-world-renderer.mjs";
 import {MAP_IDS} from "../src/world/authored-maps.mjs";
-const w=640,h=640,z=.84,camera={x:4365,y:4075};
+const w=640,h=640,z=.84;
+const pan=new URLSearchParams(location.search).get("mode")==="pan";
+const camera=pan?{x:4465,y:4115}:{x:4365,y:4075};
 const result=document.querySelector("#status");
 window.__graphics3bLiveArtSmoke=null;
 try{
@@ -34,7 +36,7 @@ try{
   ready:true,sourceArtState:art.state().phase,originalSourceHashValidated:!!frame,
   canonicalReplacement:!!frame,changedRgb:changed,changedAlpha,
   unchangedWorldFallback:!frame && changed===0,worldReplaceOnlyRedLion:true,
-  realGameAuthority:false,realMultiplayerActors:false,originalSourceBlender:true
+  realGameAuthority:false,realMultiplayerActors:false,originalSourceBlender:true,cameraX:camera.x,cameraY:camera.y,actualCameraPan:pan
  });
  window.__graphics3bLiveArtSmoke=outcome;
  result.textContent=JSON.stringify(outcome);

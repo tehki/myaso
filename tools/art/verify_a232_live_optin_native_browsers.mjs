@@ -10,7 +10,7 @@ import {createHash} from "node:crypto";
 import {setTimeout as sleep} from "node:timers/promises";
 const base=process.cwd();
 const dest=resolve(process.argv[2]||"graphics3b-a232-live-optin-native-evidence");
-const cases=["normal","fail-day","tamper-day"];
+const cases=["normal","pan","fail-day","tamper-day"];
 let mode="normal",server=null;
 const drivers=[];
 function mime(file){return extname(file)===".mjs"?"text/javascript; charset=utf-8":
@@ -60,7 +60,10 @@ async function sourceCases(browser,page){
    await sleep(90);
   }
   assert.ok(report?.ready, browser.name+" "+choice+" first-party browser smoke failed "+JSON.stringify(report));
-  const accepted=choice==="normal";
+  const accepted=choice==="normal"||choice==="pan";
+  assert.equal(report.actualCameraPan,choice==="pan");
+  assert.equal(report.cameraX,choice==="pan"?4465:4365);
+  assert.equal(report.cameraY,choice==="pan"?4115:4075);
   assert.equal(report.originalSourceBlender,true);
   assert.equal(report.realMultiplayerActors,false);
   assert.equal(report.realGameAuthority,false);
@@ -115,15 +118,15 @@ try{
   try{trials.push(...await sourceCases(b,page))}
   finally{if(b.id)await wd(b,"DELETE","/session/"+b.id).catch(()=>{})}
  }
- assert.equal(trials.length,6);
+ assert.equal(trials.length,8);
  await writeFile(join(dest,"graphics3b-a232-native-live-art-source-report.json"),
-  JSON.stringify({actualOriginalSource:true,sixGenuineBrowserScenarios:true,
+  JSON.stringify({actualOriginalSource:true,eightGenuineBrowserScenarios:true,
    productionIntegrationOnlyWhenOptedIn:true,actualMultiplayerProof:false,actorDepthCertified:false,
    trials},null,2)+"\n");
  console.log("GRAPHICS3B_A232_NATIVE_LIVE_ART_OPTIN_PASS "+JSON.stringify({
   cases:trials.length,chromium:trials.filter(t=>t.browser==="chrome").length,
   firefox:trials.filter(t=>t.browser==="firefox").length,
-  realWebPArtAccepted:trials.filter(t=>t.mode==="normal").length,
+  realWebPArtAccepted:trials.filter(t=>t.mode==="normal"||t.mode==="pan").length,
   exactOriginalFallback:trials.filter(t=>t.mode!=="normal").length}));
 }catch(e){failure=e;console.error("GRAPHICS3B_A232_NATIVE_LIVE_ART_OPTIN_FAIL "+String(e.stack||e))}
 finally{
