@@ -20,8 +20,33 @@ const server = createServer(async (req, res) => {
       : absolute.endsWith(".mjs") || absolute.endsWith(".js") ? "text/javascript; charset=utf-8"
       : absolute.endsWith(".html") ? "text/html; charset=utf-8"
       : absolute.endsWith(".css") ? "text/css; charset=utf-8" : "application/octet-stream";
-    res.writeHead(200, { "content-type": type, "cache-control": "no-store" });
-    res.end(await readFile(absolute));
+    const bytes = await readFile(absolute);
+    // Real HTMLMediaElement near-tail acceptance must seek the original MP3
+    // bytes using ordinary HTTP range reads, not synthetic "ended" callbacks.
+    if (absolute.endsWith(".mp3") && req.headers.range) {
+      const match = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range);
+      if (!match) { res.writeHead(416).end(); return; }
+      const start = Number(match[1]);
+      const end = match[2] ? Math.min(Number(match[2]), bytes.length - 1) : bytes.length - 1;
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)
+        || start < 0 || start > end || start >= bytes.length) {
+        res.writeHead(416, { "content-range": "bytes */" + bytes.length }).end();
+        return;
+      }
+      res.writeHead(206, {
+        "content-type": type, "cache-control": "no-store",
+        "accept-ranges": "bytes", "content-range": "bytes " + start + "-" + end + "/" + bytes.length,
+        "content-length": end - start + 1,
+      });
+      res.end(bytes.subarray(start, end + 1));
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": type, "cache-control": "no-store",
+      ...(absolute.endsWith(".mp3") ? { "accept-ranges": "bytes" } : {}),
+      "content-length": bytes.length,
+    });
+    res.end(bytes);
   } catch { res.writeHead(404).end(); }
 });
 await new Promise((resolve, reject) => {
@@ -96,7 +121,15 @@ async function run(browser, port) {
           }
         }
         class TrackedMusic extends Audio {
-          constructor(url) { super(url); window.__r4Music = this; }
+          constructor(url) {
+            super(url);
+            window.__r4Music = this;
+            window.__r4NativeEnds = [];
+            this.addEventListener("ended", () => window.__r4NativeEnds.push({
+              src: this.currentSrc, position: this.currentTime,
+              duration: this.duration, ended: this.ended,
+            }));
+          }
         }
         window.__r4Audio = createGameAudio({
           AudioContextImpl: TrackedContext, AudioElementImpl: TrackedMusic,
@@ -247,25 +280,67 @@ async function run(browser, port) {
       await delay(100);
     }
     assert.ok(playbackTime > 0.08, browser + " music did not advance through decoded media");
-    // Simulate the HTMLMediaElement 'ended' notification to verify the
-    // playlist moves to a new real MP3 URL without creating a second player.
-    const advanced = await script(`
-      const a = window.__r4Audio;
-      const sameElement = window.__r4Music;
-      const initial = sameElement.src;
-      sameElement.onended();
-      return { sameElement: window.__r4Music === sameElement, initial,
-        next: sameElement.src, index: a.getMusicTrackIndex(),
-        count: a.getMusicTrackCount(), loop: sameElement.loop };
-    `);
-    assert.equal(advanced.sameElement, true, browser + " created overlapping music elements");
-    assert.equal(advanced.count, 4);
-    assert.equal(advanced.index, 1);
-    assert.ok(advanced.initial.endsWith("moonlight-sonata-adagio.mp3"));
-    assert.ok(advanced.next.endsWith("vivaldi-autumn-adagio.mp3"));
-    assert.equal(advanced.loop, false);
+    // FOUR real native HTMLMediaElement ending events — never call onended().
+    // Seek near each genuine full-length MP3 tail to avoid a 21m49s test.
+    // This proves metadata and actual near-end progression, NOT continuous
+    // uninterrupted 21-minute listening; keep that distinction in reports.
+    const expectedMusic = [
+      ["moonlight-sonata-adagio.mp3", 335.543531],
+      ["vivaldi-autumn-adagio.mp3", 152.693333],
+      ["vivaldi-winter.mp3", 197.668625],
+      ["track-04-untitled.mp3", 622.923938],
+    ];
+    const nativeEndEvidence = [];
+    for (let i = 0; i < expectedMusic.length; i++) {
+      const [filename, expectedSeconds] = expectedMusic[i];
+      let metadata = null;
+      for (let n = 0; n < 140; n++) {
+        metadata = await script('const m=window.__r4Music; return {src:m.src,duration:m.duration,seekable:m.seekable.length,paused:m.paused,error:m.error?.code ?? null};');
+        if (metadata.error) throw new Error(browser + " media error " + metadata.error + " on " + filename);
+        if (metadata.src.endsWith(filename) && Number.isFinite(metadata.duration)
+          && metadata.duration > 0 && metadata.seekable > 0) break;
+        await delay(100);
+      }
+      assert.ok(metadata.src.endsWith(filename) && metadata.seekable > 0
+        && Number.isFinite(metadata.duration),
+      browser + " did not load seekable original MP3 " + filename + ": " + JSON.stringify(metadata));
+      assert.ok(Math.abs(metadata.duration - expectedSeconds) < 1.5,
+        browser + " MP3 duration was truncated: " + filename + " " + metadata.duration);
+      assert.equal(metadata.paused, false, browser + " expected playing media " + filename);
+      await script('window.__r4Music.currentTime = window.__r4Music.duration - 1.25; return true;');
+      let ended = null;
+      for (let n = 0; n < 180; n++) {
+        const records = await script("return window.__r4NativeEnds;");
+        if (records.length > i) { ended = records[i]; break; }
+        await delay(100);
+      }
+      assert.ok(ended, browser + " did not receive genuine native ended for " + filename);
+      assert.ok(ended.src.endsWith(filename), browser + " ended the wrong MP3");
+      assert.equal(ended.ended, true, browser + " expected browser-owned ended=true");
+      assert.ok(ended.position > expectedSeconds - 1.5,
+        browser + " song stopped before its real end: " + filename + " at " + ended.position);
+      let nextIndex = -1;
+      for (let n = 0; n < 40; n++) {
+        nextIndex = await script("return window.__r4Audio.getMusicTrackIndex();");
+        if (nextIndex === (i + 1) % expectedMusic.length) break;
+        await delay(50);
+      }
+      assert.equal(nextIndex, (i + 1) % expectedMusic.length,
+        browser + " ended track did not advance automatically");
+      nativeEndEvidence.push({
+        title: filename, fullDuration: metadata.duration, endedAt: ended.position,
+        nextIndex, browserEndedEvent: true, seekedNearEnd: true,
+      });
+    }
+    assert.equal(await script("return window.__r4NativeEnds.length"), 4);
+    assert.equal(await script("return window.__r4Audio.getMusicTrackIndex()"), 0,
+      browser + " all four full MP3s must wrap back to Moonlight Sonata");
+    console.log("R4_NATIVE_FULL_MP3_ENDINGS " + JSON.stringify({
+      browser, nativeEndEvidence, fullRealTimeEnduranceTest: false,
+      playlistTracks: 4, originalTracksShortened: false, naturalNativeEnds: 4,
+    }));
     console.log("R4_NATIVE_AUDIO " + JSON.stringify({ browser, decoded: loaded, ...result,
-      playbackTime, playlistNext: advanced.next }));
+      playbackTime, playlistNext: await script("return window.__r4Music.src;") }));
     // Release native media/context resources before closing browser.
     await script("window.__r4Audio.dispose(); return true;");
 
