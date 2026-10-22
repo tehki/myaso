@@ -1,0 +1,35 @@
+name: Core 8A Pre-Alpha four actual browser players Chat C1 default OFF
+
+on:
+  pull_request:
+    paths:
+      - "scripts/prealpha_c1_disabled_four_native_browsers.mjs"
+      - ".github/workflows/core8a-prealpha-four-native-chat-default-off.yml"
+      - "web/bootstrap.mjs"
+      - "src/browser/chat-c1-activation.mjs"
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+
+permissions:
+  contents: read
+
+jobs:
+  four-actual-browsers-no-unapproved-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real browser test must parse and preserve existing flag-gate contract
+        run: |
+          node --check scripts/prealpha_c1_disabled_four_native_browsers.mjs
+          node --test tests/prealpha-chat-release-gating.test.mjs tests/chat-c1-core-preview.test.mjs
+      - name: Report original browser binaries
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Compile actual original Rust QUIC Combat server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four actual native W3C players with forged chat query but no operator chat flag
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/prealpha_c1_disabled_four_native_browsers.mjs
