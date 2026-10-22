@@ -1,0 +1,35 @@
+name: UI10 Pre-Alpha C1 and Silver same four genuine browsers (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui10_prealpha_four_silver_chat_native.mjs"
+      - ".github/workflows/ui10-prealpha-silver-chat-native.yml"
+      - "web/online-game.mjs"
+      - "web/knight-sprites.mjs"
+      - "src/browser/local-chat.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prealpha-joined-original-arena:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict new script syntax and real client source
+        run: |
+          node --check scripts/ui10_prealpha_four_silver_chat_native.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-chat-release-gating.test.mjs
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Build actual source Rust authoritative server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: One real four-client Chrome Firefox Silver Combat and Chat C1 scenario
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 200s node scripts/ui10_prealpha_four_silver_chat_native.mjs
