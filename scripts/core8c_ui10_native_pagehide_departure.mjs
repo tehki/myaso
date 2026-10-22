@@ -218,6 +218,48 @@ try {
   rejoined.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids),
    status:q.status});
  }
+
+ // Repeat a REAL pagehide after the first replacement, without changing
+ // production code or injecting server state. Verify a *second* freed slot
+ // and strictly monotonic fresh identity 6, rather than an accidental ID 2
+ // resurrection, a one-shot cleanup or a leaked reconnect admission permit.
+ const secondDepartureAt=Date.now();
+ await wd("POST","/session/"+newcomer+"/url",{url:"about:blank"});
+ const sixth=(await wd("POST","/session",
+   {capabilities:{alwaysMatch:newcomerCaps}},driverPorts.chrome)).sessionId;
+ sessionDriverPorts.set(sixth,driverPorts.chrome);
+ sessions.push(sixth);
+ await wd("POST","/session/"+sixth+"/url",{url});
+ const sixthJoined=await poll("second real pagehide admits unique actor #6",
+   async()=>evaljs(sixth,
+    "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #6 - server tick \\d+/.test(x),status:x};"),5000);
+ const secondElapsedMs=Date.now()-secondDepartureAt;
+ assert(secondElapsedMs<6000,"repeated graceful pagehide must free same capped seat within 6s");
+ console.log("CORE8C_PAGEHIDE_SECOND_ADMISSION",JSON.stringify({
+   ...sixthJoined,elapsedMs:secondElapsedMs,expectedActor:6,
+ }));
+ const twiceRemoved=[];
+ for(const sid of surviving){
+  const v=await poll("authentic Canvas/HUD retire #2 and #5; new #6 persists",
+   async()=>{
+    const snapshot=await visible(sid),frames=snapshot?.frames?.slice(-12)||[];
+    return {...snapshot,ok:snapshot?.roster?.length===4
+     &&[1,3,4,6].every(id=>rosterHas(snapshot.roster,id))
+     &&!rosterHas(snapshot.roster,2)&&!rosterHas(snapshot.roster,5)
+     &&frames.length>=8
+     &&frames.filter(x=>x.ids.includes("#6")
+       &&!x.ids.includes("#5")&&!x.ids.includes("#2")&&x.ids.length>=3).length>=8};
+   },12000);
+  twiceRemoved.push({roster:v.roster,frames:v.frames.slice(-8).map(x=>x.ids)});
+  const ownAck=await realWasdAndAck(sid,"post-second-pagehide","s");
+  console.log("CORE8C_PAGEHIDE_SECOND_SURVIVOR_ACK",JSON.stringify(ownAck));
+ }
+ console.log("CORE8C_UI10_SECOND_PAGEHIDE_PASS",JSON.stringify({
+  genuineSecondSeatRetirement:true,firstRemovedActor:2,secondRemovedActor:5,
+  secondNewServerActor:6,elapsedMs:secondElapsedMs,
+  originalSurvivingNativeBrowsers:browserMatrix,
+  realCanvasAndHudAfterSecond:twiceRemoved,
+ }));
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
   initialActorIds:[1,2,3,4],disconnectedActorId:2,replacementActorId:5,
