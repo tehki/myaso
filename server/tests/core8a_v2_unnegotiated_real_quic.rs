@@ -229,3 +229,41 @@ async fn current_v1_server_ignores_unnegotiated_reliable_gesture_streams_without
     assert_original_v1_input_ack(&one, 1, 701).await;
     assert_original_v1_input_ack(&two, 2, 702).await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn one_unnegotiated_v2_sender_cannot_starve_another_legacy_v1_player() {
+    // Source-real, loopback-only peer isolation: the attacker does not hold a
+    // privileged v2 lease and must never block a separate admitted actor.
+    // This is a bounded burst, NOT a benchmark or hostile-WAN load test.
+    let (_server, url, digest) = start_server();
+    let (_ep1, noisy, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, quiet, _send2, _recv2) = connect(&url, &digest).await;
+
+    let flood = async {
+        for sequence in 1..=32_u32 {
+            let mut packet = [2_u8, 0x11, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0];
+            packet[4..8].copy_from_slice(&sequence.to_le_bytes());
+            if sequence % 4 == 0 {
+                // Also inject the incompatible proposed wire family.
+                packet[1] = 0x52;
+            }
+            if sequence % 4 == 1 {
+                // Future KeyE must be rejected before capability negotiation.
+                packet[3] = 1;
+            }
+            noisy
+                .send_datagram(packet)
+                .expect("bounded unnegotiated gesture datagram");
+            tokio::task::yield_now().await;
+        }
+    };
+    let independent_v1 = assert_original_v1_input_ack(&quiet, 2, 901);
+    timeout(Duration::from_secs(8), async {
+        tokio::join!(flood, independent_v1);
+    })
+    .await
+    .expect("one invalid v2 sender must not block independent v1 ACK");
+
+    // The noisy peer's authentic gameplay connection must also remain usable.
+    assert_original_v1_input_ack(&noisy, 1, 902).await;
+}
