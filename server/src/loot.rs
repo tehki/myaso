@@ -1794,6 +1794,117 @@ mod tests {
     }
 
     #[test]
+    fn exact_rack_click_rejects_ground_entity_aba_after_original_sword_returns() {
+        // A sword keeps its physical ItemId through transfer, but its
+        // GroundEntityId MUST change on a new drop. The stale click must not
+        // become valid just because the sword returned to the same socket.
+        // This is an Items-only source/preview test, NOT a writer fence.
+        let sockets = [3740.0_f32, 3780.0, 3820.0, 3860.0].map(|x| ProposedRackSocket {
+            at: Point { x, y: 4038.0 },
+        });
+        let zone = ZoneId::Moonvale;
+        let mut loot = LootAuthority::new();
+        let mut world = World::new(8192.0, 8192.0);
+        let mut physical = Vec::new();
+        for (index, socket) in sockets.iter().enumerate() {
+            let donor = index as u32 + 1;
+            assert!(world.add_player_at(donor, socket.at.x, socket.at.y, 0.0));
+            loot.register(donor).unwrap();
+            let item_id = loot.grant(donor, ItemKind::IronSword, 1).unwrap();
+            let ground_entity_id = loot
+                .drop_backpack(donor, world.fighter(donor).unwrap(), zone, item_id, 1)
+                .unwrap();
+            physical.push((ground_entity_id, item_id));
+        }
+        let actor = 9;
+        assert!(world.add_player_at(actor, sockets[0].at.x, sockets[0].at.y, 0.0));
+        loot.register(actor).unwrap();
+        let fighter = world.fighter(actor).unwrap();
+        let (original_ground, physical_item) = physical[0];
+        let old_click = ProposedRackMainHandSelection {
+            socket_id: 1,
+            ground_entity_id: original_ground,
+            item_id: physical_item,
+        };
+
+        let old_source = loot.export_state().unwrap();
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, old_click, 2)
+                .unwrap()
+                .item_id,
+            physical_item
+        );
+        assert_eq!(loot.export_state().unwrap(), old_source);
+
+        // Legitimate Items-domain competing claim, not an actual live
+        // Ground->MainHand commit; the old target ceases to exist.
+        let taken = loot
+            .take_ground(actor, fighter, zone, original_ground, 2)
+            .unwrap();
+        assert_eq!(taken.id, physical_item);
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, old_click, 2),
+            Err(LootError::NotFound)
+        );
+        let new_ground = loot
+            .drop_backpack(actor, fighter, zone, physical_item, 3)
+            .unwrap();
+        assert_ne!(new_ground, original_ground);
+        assert_eq!(loot.ground()[&new_ground].at, sockets[0].at);
+        assert_eq!(loot.ground()[&new_ground].item.id, physical_item);
+        assert!(loot.inventory(actor).unwrap().backpack().is_empty());
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, old_click, 4),
+            Err(LootError::NotFound),
+            "old ground entity cannot authorize a new instance of the same sword"
+        );
+        let fresh_click = ProposedRackMainHandSelection {
+            socket_id: 1,
+            ground_entity_id: new_ground,
+            item_id: physical_item,
+        };
+        assert_eq!(
+            loot.preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, fresh_click, 4)
+                .unwrap()
+                .item_id,
+            physical_item
+        );
+
+        let current = loot.proposed_current_rack_swords(zone, sockets, 4).unwrap();
+        assert_eq!(current[0].unwrap().ground_entity_id, new_ground);
+        for index in 1..4 {
+            assert_eq!(current[index].unwrap().ground_entity_id, physical[index].0);
+            assert_eq!(current[index].unwrap().item_id, physical[index].1);
+        }
+        let new_state = loot.export_state().unwrap();
+        let recovered = LootAuthority::restore_state(new_state.clone()).unwrap();
+        assert_eq!(recovered.export_state().unwrap(), new_state);
+        assert_eq!(
+            recovered
+                .preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, old_click, 4),
+            Err(LootError::NotFound)
+        );
+        assert_eq!(
+            recovered
+                .preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, fresh_click, 4)
+                .unwrap()
+                .item_id,
+            physical_item
+        );
+        // A valid historical in-memory snapshot is still replayable. Only
+        // an approved globally fenced durable authority revision can reject
+        // an OLD snapshot, so this preview must never be used as a live ACK.
+        let historical = LootAuthority::restore_state(old_source).unwrap();
+        assert_eq!(
+            historical
+                .preview_rack_sword_direct_mainhand(actor, fighter, zone, sockets, old_click, 4)
+                .unwrap()
+                .item_id,
+            physical_item
+        );
+    }
+
+    #[test]
     fn exact_adjacent_rack_click_preview_never_substitutes_closer_sword() {
         // Four REAL physical original ground items, each with independent
         // item ID and ground entity ID. The reviewed y4068 waypoints
