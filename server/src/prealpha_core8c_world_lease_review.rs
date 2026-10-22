@@ -192,3 +192,133 @@ impl ReviewWorldLease {
         self.pending.drain(..).collect()
     }
 }
+
+// Dormant server-side ownership wrapper. The single process-wide allocator is
+// authoritative ONLY for review fixtures in this Rust process. A real cluster
+// needs the Core8B/zone owner authority and nonreusable session epoch.
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_REVIEW_WORLD_OWNER_EPOCH: AtomicU64 = AtomicU64::new(1);
+
+fn reserve_review_world_owner_epoch() -> Option<u64> {
+    NEXT_REVIEW_WORLD_OWNER_EPOCH
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            next.checked_add(1)
+        })
+        .ok()
+}
+
+/// A review owner that couples the genuine World and a nonzero epoch.
+/// Its World is never exposed mutably: replacing the whole World MUST retire
+/// its old epoch, including if actor IDs, life counters and ticks repeat.
+pub struct ReviewOwnedWorld {
+    world: World,
+    owner_epoch: u64,
+}
+
+impl ReviewOwnedWorld {
+    pub fn review_new(world: World) -> Option<Self> {
+        Some(Self {
+            world,
+            owner_epoch: reserve_review_world_owner_epoch()?,
+        })
+    }
+
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    pub fn owner_epoch(&self) -> u64 {
+        self.owner_epoch
+    }
+
+    /// Fail closed before replacement if the process-local token space ends.
+    pub fn review_replace_world(&mut self, replacement: World) -> bool {
+        let Some(next) = reserve_review_world_owner_epoch() else {
+            return false;
+        };
+        self.world = replacement;
+        self.owner_epoch = next;
+        true
+    }
+
+    pub fn review_step(&mut self) {
+        let _ = self.world.step();
+    }
+
+    pub fn review_remove_player(&mut self, actor: u32) -> bool {
+        self.world.remove_player(actor)
+    }
+
+    pub fn review_add_player(&mut self, actor: u32) -> bool {
+        self.world.add_player(actor)
+    }
+}
+
+/// Extra ownership layer over the existing Core8C incarnation/actor fence.
+/// Does not send an ACK, mutate Combat or create an authenticated connection.
+pub struct ReviewWorldOwnerLease {
+    bound_owner_epoch: u64,
+    actor: ReviewActorLease,
+    inner: ReviewWorldLease,
+}
+
+impl ReviewWorldOwnerLease {
+    pub fn review_from_current_owner(
+        owner: &ReviewOwnedWorld,
+        actor: ReviewActorLease,
+    ) -> Option<Self> {
+        let inner = ReviewWorldLease::review_from_admitted_world(owner.world(), actor)?;
+        Some(Self {
+            bound_owner_epoch: owner.owner_epoch(),
+            actor,
+            inner,
+        })
+    }
+
+    fn verify_owner(&mut self, owner: &ReviewOwnedWorld) -> bool {
+        if self.inner.is_retired() {
+            return false;
+        }
+        if self.bound_owner_epoch != owner.owner_epoch() {
+            self.inner.retire();
+            return false;
+        }
+        self.inner.observe_world_tick(owner.world())
+    }
+
+    pub fn is_retired(&self) -> bool {
+        self.inner.is_retired()
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.inner.pending_count()
+    }
+
+    pub fn review_ingest(
+        &mut self,
+        owner: &ReviewOwnedWorld,
+        presented_actor: ReviewActorLease,
+        packet: &[u8],
+    ) -> ReviewEdgeStatus {
+        if !self.verify_owner(owner) {
+            return ReviewEdgeStatus::Retired;
+        }
+        self.inner
+            .review_ingest(owner.world(), presented_actor, packet)
+    }
+
+    /// Ordered review intent only. Live code MUST recheck under its actual
+    /// World mutation lock while converting intent to authoritative Combat.
+    pub fn review_drain_for_owner(
+        &mut self,
+        owner: &ReviewOwnedWorld,
+        presented_actor: ReviewActorLease,
+    ) -> Vec<GestureEvent> {
+        if !self.verify_owner(owner) || presented_actor != self.actor {
+            return Vec::new();
+        }
+        self.inner
+            .review_drain_for_world(owner.world(), presented_actor)
+    }
+}
