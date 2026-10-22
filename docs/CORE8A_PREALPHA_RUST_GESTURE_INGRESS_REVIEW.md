@@ -19,10 +19,10 @@ Core 8C [#715](https://github.com/tehki/myaso/pull/715) independently proposed v
 
 ## Strict original-content validation
 
-`server/tests/prealpha_lmb_ingress_review.rs` executes the actual Combat-owned Rust `encode_event/decode_event/encode_ack` and new Core review gate; 13 independent negative/positive tests include:
+`server/tests/prealpha_lmb_ingress_review.rs` executes the actual Combat-owned Rust `encode_event/decode_event/encode_ack` and new Core review gate; 14 independent negative/positive tests include:
 1. Same-clientTick immediate PRESS/RELEASE preserved in order.
 2. RELEASE before PRESS held unacknowledged, then flushed only after PRESS.
-3. Duplicate accepted event yields only duplicate ACK, not second HIT.
+3. Exact duplicate accepted event yields only duplicate ACK, not second HIT; altered action or client tick under the same accepted event sequence+gesture ID is denied.
 4. Old actor generation/connection nonce cannot enter the new gate.
 5. Buffered identical retry vs same-sequence conflicting bytes.
 6. Missing prefix excessive forward jump rejected.
