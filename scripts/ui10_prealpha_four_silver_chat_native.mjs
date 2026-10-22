@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { join } from "node:path";
+import { nativeContentViewportMatches, nextNativeW3cWindowRect } from "./graphics3b_native_viewport_parity.mjs";
 const root=process.cwd(), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const randomPort=()=>new Promise((resolve,reject)=>{const s=createServer();s.on("error",reject);s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const processes=[],sessions=[];
@@ -66,6 +67,66 @@ try {
   const connected=await poll("player "+(i+1),()=>evaljs(session,"const x=document.querySelector('[data-local-chat]');return {ok:x?.dataset.connected==='true',status:x?.querySelector('.local-chat-status')?.textContent,event:document.querySelector('#event-text')?.textContent,connected:x?.dataset.connected};"),15000);
   console.log("PLAYER_READY",i+1,JSON.stringify(connected));
  }
+ // Same four authenticated Rust/Chat/Silver player sessions must also fit
+ // the actual short desktop browser viewport: no offline-only layout claim.
+ const viewportTargets=[
+  {width:1280,height:720},{width:1366,height:682},
+  {width:1366,height:682},{width:1280,height:720}
+ ];
+ const viewportResults=[];
+ for(let i=0;i<sessions.length;i++){
+  const session=sessions[i],target=viewportTargets[i];
+  const size=()=>evaljs(session,
+   "return {innerWidth,innerHeight,outerWidth,outerHeight};");
+  for(let attempt=0;attempt<5;attempt++){
+   const measured=await size();
+   if(nativeContentViewportMatches(measured,target))break;
+   await wd("POST","/session/"+session+"/window/rect",
+    nextNativeW3cWindowRect(measured,target));
+   await delay(180);
+  }
+  assert(nativeContentViewportMatches(await size(),target),
+   "real browser CSS viewport must match requested short dimensions");
+  const measure=()=>evaljs(session,[
+   "const canvas=document.querySelector('#arena'),r=canvas.getBoundingClientRect();",
+   "const details=document.querySelector('.controls-disclosure');",
+   "return {innerWidth,innerHeight,top:r.top,bottom:r.bottom,left:r.left,right:r.right,",
+   "width:r.width,height:r.height,scrollY,",
+   "ratio:r.width/r.height,controls:details?.querySelector('.controls')?.children.length,",
+   "closed:details?.open===false,",
+   "serverStatus:document.querySelector('#event-text')?.textContent||'',",
+   "chatConnected:document.querySelector('[data-local-chat]')?.dataset.connected==='true'};"
+  ].join(""));
+  const before=await measure();
+  assert(before.top>=0&&before.left>=0&&before.bottom<=target.height+1
+   &&before.right<=target.width+1,
+   "FULL ACTUAL game canvas must fit inside real live multiplayer CSS viewport");
+  assert(Math.abs(before.ratio-16/9)<.02,"original Canvas must remain undistorted 16:9");
+  assert.equal(before.scrollY,0,"no artificial page scroll");
+  assert.equal(before.controls,14,"all fourteen source Combat controls preserved");
+  assert.equal(before.closed,true,"native Combat help initially collapsed");
+  assert.equal(before.chatConnected,true,"same session must have real Chat C1");
+  assert.match(before.serverStatus,/Online - player #\d+ - server tick \d+/);
+  const node=await wd("POST","/session/"+session+"/element",
+   {using:"css selector",value:".controls-disclosure summary"});
+  const elementId=node["element-6066-11e4-a52e-4f735466cecf"];
+  assert(elementId,"native accessible summary must exist");
+  await wd("POST","/session/"+session+"/element/"+elementId+"/click",{});
+  const open=await evaljs(session,
+   "const d=document.querySelector('.controls-disclosure');return {open:d?.open,items:d?.querySelector('.controls')?.children.length};");
+  assert.equal(open.open,true,"native click opens controls");
+  assert.equal(open.items,14);
+  await wd("POST","/session/"+session+"/element/"+elementId+"/click",{});
+  const after=await measure();
+  assert.equal(after.closed,true,"native click recloses controls");
+  assert.equal(after.scrollY,0,"help open/close must not scroll game page");
+  assert(after.bottom<=target.height+1,"actual arena remains visible after controls");
+  viewportResults.push({browser:browserMatrix[i],target,
+   canvas:{top:before.top,bottom:before.bottom,width:before.width,height:before.height},
+   chatConnected:before.chatConnected,realStatus:before.serverStatus});
+ }
+ console.log("UI10_PREALPHA_FOUR_LIVE_SHORT_VIEWPORT_PASS",
+  JSON.stringify(viewportResults));
  // Passive measurement only: unchanged Canvas/RAF and original 5 Silver WebPs.
  // Installed before Chat C1 actions, then measured AFTER real ACK/focus/input.
  const silverSourceProof = [
@@ -104,8 +165,15 @@ try {
  async function send(session,message){
   await evaljs(session,"document.querySelector('#arena').focus();");
   await key(session,"\uE007");
-  const f=await evaljs(session,"const x=document.querySelector('[data-local-chat]');return {focused:document.activeElement===x.querySelector('input'),open:x.dataset.open};");
+  const f=await evaljs(session,[
+   "const x=document.querySelector('[data-local-chat]'),input=x.querySelector('input');",
+   "const r=input.getBoundingClientRect();return {focused:document.activeElement===input,",
+   "open:x.dataset.open,inputVisible:r.width>0&&r.height>0&&r.left>=0",
+   "&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,scrollY};"
+  ].join(""));
   assert(f.focused&&f.open==="true","native composer focus");
+  assert(f.inputVisible&&f.scrollY===0,
+   "Chat composer must be visible and usable within short desktop viewport");
   await evaljs(session,"document.querySelector('.local-chat-input').value=arguments[0]",[message]);
   await key(session,"\uE007");
  }
@@ -268,6 +336,7 @@ try {
  console.log("UI10_PREALPHA_C1_FOUR_SILVER_NATIVE_PASS",JSON.stringify({
   browserMatrix,realRustGameAndChat:true,oneExactSetOfFourSessions:true,
   allFourOriginalSilverInRealRAF:true,authenticatedProximityAndAck:true,
+  originalShortArenaFullyVisible:true,allFourCanvasAndChatComposerInViewport:true,
   chatFocusReturnedToCombat:true,authoritativeInputAndServerTicks:true,
   fourRealHumanOperators:false,instantLightFixed:false,
   publicChatEnabled:false,noRealSwordsOrItems:true,
