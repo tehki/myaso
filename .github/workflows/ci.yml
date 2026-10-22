@@ -1291,3 +1291,44 @@ jobs:
           MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
           MYASO_PVP_FLIGHT_DURATION_MS: "11000"
         run: node scripts/pvp_browser_flight_runner.mjs
+
+  # Native screenshot evidence from the actual Rust M153 three-player victim
+  # fall; never substitutes for the original source or protected quality gates.
+  graphics3a-native-original-victim-png:
+    name: graphics3a-native-original-victim-knockdown-png
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/original-silver-victim-native-png-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact original Silver victim screenshot QA head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse unauthenticated victim PNG and source substitution
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/graphics3a-original-silver-native-archive.test.mjs tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+      - name: Verify native Chrome Firefox and Rust runtime
+        run: |
+          cargo --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Prebuild exact authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Capture three real browser knockdown low poses only after server confirmation
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
+          MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Publish real native original Silver victim screenshots strictly
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-original-victim-real-arena
+          path: .graphics3a-original-victim-native-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
