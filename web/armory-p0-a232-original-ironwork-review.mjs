@@ -94,9 +94,45 @@ try {
   priorSourceDifferencePixels=Object.freeze({changedRgb,changedAlpha});
  }
 
+ let priorHingeArtReady=false,priorHingeDifferencePixels=null;
+ if(ready && !injectedCanvasFailure && composed.detailedDrawn){
+  // Compare real 3B owner-approved physical door support revision against the
+  // PREVIOUS genuine editable Blender A2.32 hinged-door source in this SAME
+  // source World9+3C rendered browser frame; no synthetic image/actor movement.
+  const priorHingePaths=Object.freeze({
+   day:"/__3ba232_before__/assets/environment/greyhaven/a232-review/red_lion_a232_day_ironwork.webp",
+   dusk:"/__3ba232_before__/assets/environment/greyhaven/a232-review/red_lion_a232_dusk_ironwork.webp",
+   roof:"/__3ba232_before__/assets/environment/greyhaven/a232-review/red_lion_a232_roof_unchanged.webp"
+  });
+  const priorHingeArt=await prepareRedLionSourceArt({
+   paths:priorHingePaths,loadImage,origin:location.origin
+  });
+  if(priorHingeArt.status!=="ready")
+   throw Error("Actual A2.32 lower hinge source comparison unavailable");
+  const priorHingeDecision=createRedLionArtGatedWorldPainter({
+   art:priorHingeArt,createRenderer:createAuthoredWorldRenderer,
+   worldReplacementValidator:normalizeWorldBuildingReplacementIds,
+   options:{cacheCap:24,buildLimit:8}
+  });
+  if(!priorHingeDecision.paintFacadeAllowed)
+   throw Error("Prior physically mounted A2.32 Blender World facade approval denied");
+  const priorCanvas=document.createElement("canvas");
+  priorCanvas.width=w;priorCanvas.height=w;
+  const pixels=frame(priorCanvas,priorHingeDecision.painter,priorHingeArt);
+  let changedRgb=0,changedAlpha=0;
+  for(let i=0;i<pixels.length;i+=4){
+   if(pixels[i]!==observed[i]||pixels[i+1]!==observed[i+1]||pixels[i+2]!==observed[i+2])
+    changedRgb++;
+   if(pixels[i+3]!==observed[i+3])changedAlpha++;
+  }
+  priorHingeArtReady=true;
+  priorHingeDifferencePixels=Object.freeze({changedRgb,changedAlpha});
+ }
  window.__redLionFallbackReview=Object.freeze({
   ready:true,artReady:ready,originalArtRevision:"A2.32",
   sourceBeforeRevision:"A2.31",priorSourceArtReady,priorSourceDifferencePixels,
+  priorHingeArtReady,priorHingeDifferencePixels,
+  raisedLowerHingeSourceZ:.96,unchangedUpperHingeSourceZ:1.88,
   actualBrowserImageDecode:ready,
   fallbackDefaultPlaceholder:composed.placeholderDrawn,
   replacementApplied:composed.detailedDrawn,
