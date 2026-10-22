@@ -1,5 +1,18 @@
 # Department 10 — real browser History Back after a fourth voluntary multiplayer seat exit
 
+## Critical corrected interpretation — original offscreen HUD marker, not missing player
+
+The original `web/online-game.mjs` draws offscreen player identity labels in `drawOffscreenEnemyPointers()`, using **9px** font and a viewport-edge position derived from `nearbyOffscreenPointers()`. The on-canvas `drawRemoteIdentity()` instead uses **10px** and sits above the actual Silver. On the genuine actor #8 History Back run, spectator #1 observed a `#8` label at **(919.59,143.09)**, within the right viewport-edge pointer region of the original **960x540** arena. This is NOT proof that #8 had an on-canvas label with no body. Other spectators #3 and #4 had #8 within their camera and correctly rendered its original Silver source WebP immediately.
+
+The **old QA requirement of 4 source Silver drawImage calls in EVERY spectator's frame was inappropriate when the fourth fighter was genuinely offscreen**. The revised strict source acceptance requires:
+1. Exactly 4 authenticated server roster identities, and no departed #2/#5/#6/#7 ghosts.
+2. In a spectator where remote #8's original **9px offscreen arrow label** is drawn, THREE on-canvas original Silver WebPs (local + two nearer fighters), no prototype fallback, **and no duplicate 10px on-canvas #8 label**.
+3. In a spectator where actor #8's original **10px on-canvas badge** is drawn, FOUR original Silver WebP source draws in the SAME real RAF, no offscreen #8 arrow, no prototype fallback.
+4. Genuine server-ACKed W3C movement from authenticated #8 brings that actor into each original survivor's view and requires **FOUR source WebPs in ≥8 recent same-real-RAF frames per spectator**, with the offscreen #8 marker replaced by the true on-canvas badge. No fake camera, direct World relocation, NPC, actor packet or sprite shim.
+
+Thus the new acceptance is **more accurate**, not permission for a missing in-view character. The earlier statement that #8's sprite was incorrectly missing from viewer #1 is **superseded** by this original-source interpretation. The genuine actor never disappeared from the server; it was offscreen for viewer #1 and available as a pointer.
+
+
 **DRAFT / TEST ONLY / NO PRODUCTION CODE CHANGE.** This is a direct test-only child of assembled four-player Physics6 / Silver Knight / local Chat C1 / short viewport seat-rotation [PR #777](https://github.com/tehki/myaso/pull/777), exact parent `bf8b06c0f053712b693dba77210f8e6fc246cdd2`. The parent already has a genuinely native two-matrix three-seat lifecycle success [CI #39788812164](https://github.com/tehki/myaso/actions/runs/39788812164), but its exact full protected quality [#39788812072](https://github.com/tehki/myaso/actions/runs/39788812072) **FAILED strict Combat M143**, and none of these browser QA steps waives that.
 
 ## New stricter same-browser lifecycle acceptance
