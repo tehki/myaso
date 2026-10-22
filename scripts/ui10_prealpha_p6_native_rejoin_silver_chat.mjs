@@ -405,6 +405,21 @@ try {
    console.log("UI10_BACK_FOUR_SOURCE_SILVER_STRICT_FAILURE_PROVENANCE",JSON.stringify({
     error:String(error).slice(0,240),status:reality?.status,roster:reality?.roster,
     recentFrames:reality?.frames?.slice(-4),silverFourFrames:reality?.silverFourFrames}));
+   // Diagnostic-only movement AFTER the strict failure was already captured:
+   // the actual authenticated actor #8 drives LEFT in the real Rust World.
+   // Observe if missing Silver #8 appears when closer to arena center; never
+   // turn the original failed assertion into success or replay that gate.
+   try {
+    const first=await realWasdAndAck(b,"actor8-visual-diagnostic-left-1","a");
+    const second=await realWasdAndAck(b,"actor8-visual-diagnostic-left-2","a");
+    await delay(450);
+    const post=await visible(sid);
+    console.log("UI10_BACK_FOUR_SOURCE_SILVER_AFTER_REAL_LEFT",JSON.stringify({
+     originalStrictResult:"FAIL",nativeMovesWithServerAck:[first,second],
+     actualSurvivorRoster:post?.roster,frames:post?.frames?.slice(-4)}));
+   } catch(diagnosticError) {
+    console.log("UI10_BACK_REAL_LEFT_DIAGNOSTIC_ERROR",String(diagnosticError));
+   }
    throw error;
   }
   console.log("UI10_BACK_FOUR_SOURCE_SILVER_PASS",JSON.stringify({
