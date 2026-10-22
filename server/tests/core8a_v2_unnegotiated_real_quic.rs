@@ -359,10 +359,7 @@ async fn short_v1_press_release_packets_get_a_server_receipt_but_not_a_hit_recei
             );
             let tick = u32::from_le_bytes(message[4..8].try_into().unwrap());
             if tick == 1202 {
-                break (
-                    tick,
-                    u32::from_le_bytes(message[8..12].try_into().unwrap()),
-                );
+                break (tick, u32::from_le_bytes(message[8..12].try_into().unwrap()));
             }
             assert_eq!(tick, 1201, "unknown or cross-actor input receipt");
         }
