@@ -93,7 +93,7 @@ export class ProposedSharedSourceGestureAllocator {
     // This is COUNTER headroom, not pending/outbox packet capacity.
     this.#requireAvailable(
       this.#remainingActiveEdges() + 1 + (source === SOURCE.LMB ? 2 : 1),
-      true, // reject a new PRESS without retiring valid existing gestures
+      this.#active.size > 0, // only retire if no valid older source exists
     );
     const gestureId = this.#gestureId;
     const event = this.#event(source, ACTION.PRESS, gestureId, clientTick);
