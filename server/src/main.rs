@@ -23,6 +23,7 @@ use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarIn
 
 const GAME_PATH: &str = "/game";
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
+const CLOSE_PLAYER_ID_EXHAUSTED: u32 = 0x12;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
 const INPUT_ACK_PACKET_TYPE: u8 = 3;
@@ -220,13 +221,15 @@ impl SharedGame {
         })
     }
 
-    fn allocate_player_id(&self) -> u32 {
-        loop {
-            let candidate = self.next_player_id.fetch_add(1, Ordering::Relaxed);
-            if candidate != 0 {
-                return candidate;
-            }
-        }
+    fn allocate_player_id(&self) -> Option<u32> {
+        // A network fighter ID is session-scoped, never durable identity.
+        // Exhaust instead of wrapping: a former connection must never
+        // receive its old fighter ID when the counter overflows.
+        self.next_player_id
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |id| {
+                (id != 0).then(|| id.wrapping_add(1))
+            })
+            .ok()
     }
 }
 
@@ -335,7 +338,13 @@ async fn main() -> Result<()> {
                 return;
             }
 
-            let player_id = game.allocate_player_id();
+            let Some(player_id) = game.allocate_player_id() else {
+                connection.close(
+                    VarInt::from_u32(CLOSE_PLAYER_ID_EXHAUSTED),
+                    b"session ID space exhausted",
+                );
+                return;
+            };
             {
                 let mut state = game.state.lock().await;
                 if !state.world.add_player(player_id) {
@@ -1379,5 +1388,132 @@ mod r0_player_cap_tests {
                 "unexpected admission cap accepted: {invalid}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod core8b_prealpha_session_fencing_tests {
+    use super::*;
+
+    fn empty_flight() -> LoopbackFlightConfig {
+        LoopbackFlightConfig {
+            background_players: 0,
+            near_pressure_players: 0,
+            reliable_write_delay: Duration::ZERO,
+            drop_new_action_datagrams: false,
+        }
+    }
+
+    #[test]
+    fn network_ids_are_unique_and_never_wrap_into_an_older_session() {
+        let game = SharedGame::new(empty_flight());
+        assert_eq!(game.allocate_player_id(), Some(1));
+        assert_eq!(game.allocate_player_id(), Some(2));
+        game.next_player_id.store(u32::MAX - 1, Ordering::Release);
+        assert_eq!(game.allocate_player_id(), Some(u32::MAX - 1));
+        assert_eq!(game.allocate_player_id(), Some(u32::MAX));
+        assert_eq!(game.allocate_player_id(), None);
+        assert_eq!(game.allocate_player_id(), None);
+        assert_eq!(game.next_player_id.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn concurrent_admission_near_exhaustion_never_duplicates_network_ids() {
+        let game = SharedGame::new(empty_flight());
+        game.next_player_id.store(u32::MAX - 7, Ordering::Release);
+
+        let handles = (0..16)
+            .map(|_| {
+                let game = Arc::clone(&game);
+                std::thread::spawn(move || game.allocate_player_id())
+            })
+            .collect::<Vec<_>>();
+        let results = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("allocator thread"))
+            .collect::<Vec<_>>();
+
+        let mut granted = results.iter().copied().flatten().collect::<Vec<_>>();
+        granted.sort_unstable();
+        assert_eq!(granted, ((u32::MAX - 7)..=u32::MAX).collect::<Vec<_>>());
+        assert_eq!(results.iter().filter(|result| result.is_none()).count(), 8);
+        assert_eq!(game.allocate_player_id(), None);
+    }
+
+    #[test]
+    fn late_input_after_disconnect_cannot_control_replacement_world_fighter() {
+        let game = SharedGame::new(empty_flight());
+        let old = game.allocate_player_id().expect("original session");
+        let replacement = game.allocate_player_id().expect("replacement session");
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player(old));
+        assert!(state.world.remove_player(old));
+        assert!(state.world.add_player(replacement));
+        let spawn = state
+            .world
+            .fighter(replacement)
+            .expect("replacement fighter")
+            .clone();
+        let mut original_session_acks = VecDeque::new();
+        let old_command = InputIntent {
+            attack: true,
+            move_y: 1.0,
+            ..InputIntent::default()
+        };
+        let observed_tick = apply_coalesced_input_and_read_tick(
+            &mut state,
+            old,
+            Some((99, old_command)),
+            &mut original_session_acks,
+        );
+        assert_eq!(observed_tick, state.world.tick);
+        state.world.step();
+        let current = state
+            .world
+            .fighter(replacement)
+            .expect("replacement still present");
+        assert_eq!(current.action, myaso_server::simulation::Action::Idle);
+        assert_eq!(
+            (current.x, current.y, current.hp),
+            (spawn.x, spawn.y, spawn.hp)
+        );
+
+        // The original function may record a *transport* input ACK even for
+        // this removed fighter. Such ACKs are not World action authorization.
+        assert_eq!(original_session_acks.len(), 1);
+        let mut replacement_acks = VecDeque::new();
+        let replacement_input = InputIntent {
+            move_y: 1.0,
+            ..InputIntent::default()
+        };
+        apply_coalesced_input_and_read_tick(
+            &mut state,
+            replacement,
+            Some((100, replacement_input)),
+            &mut replacement_acks,
+        );
+        state.world.step();
+        assert!(state.world.fighter(replacement).expect("replacement").y > spawn.y);
+        assert_eq!(replacement_acks.len(), 1);
+    }
+
+    #[test]
+    fn disconnected_fighter_cannot_act_as_a_new_connection() {
+        let game = SharedGame::new(empty_flight());
+        let old = game.allocate_player_id().expect("old connection");
+        let replacement = game.allocate_player_id().expect("new connection");
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player(old));
+        assert!(state.world.remove_player(old));
+        assert!(state.world.add_player(replacement));
+        let old_attack = InputIntent {
+            attack: true,
+            move_x: 1.0,
+            ..InputIntent::default()
+        };
+        assert!(!state.world.set_input(old, old_attack));
+        assert!(state.world.fighter(old).is_none());
+        assert!(state.world.fighter(replacement).is_some());
+        assert!(state.world.set_input(replacement, InputIntent::default()));
     }
 }
