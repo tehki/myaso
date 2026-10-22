@@ -128,6 +128,13 @@ export class ProposedLmbGestureOutbox {
     if (!existing) throw new Error("unexpected, old or replayed gesture ACK");
     if (existing.gestureId !== ack.gestureId)
       throw new Error("ACK gesture identity does not match pending event");
+    // An event enqueued but NOT YET returned in any send batch has never
+    // been offered to the trusted transport owner. Even an ACK on the same
+    // opaque connection cannot settle that unscheduled event. This is not
+    // proof bytes were sent: only a future authenticated QUIC stream can
+    // establish that. Keep the event queued on refusal.
+    if (existing.attempts === 0)
+      throw new Error("ACK for an unscheduled gesture event rejected");
     this.#pending.delete(ack.sequence);
     const acceptedEdge = ack.status === GESTURE_ACK_STATUS.ACCEPTED;
     const duplicateEdge = ack.status === GESTURE_ACK_STATUS.DUPLICATE;
