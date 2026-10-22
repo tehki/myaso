@@ -92,16 +92,16 @@ try {
  ].join("");
  const [a,b,c,d]=sessions;
  const surviving=[a,c,d];
- async function realWasdAndAck(sid,label) {
+ async function realWasdAndAck(sid,label,moveKey="w") {
   const old=await evaljs(sid,
    "const x=document.querySelector('#event-text')?.textContent||'';return Number(x.match(/server tick (\\d+)/)?.[1]||0)");
   await evaljs(sid,"document.querySelector('#arena').focus()");
   await wd("POST","/session/"+sid+"/actions",{actions:[{
-   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyDown",value:"w"}]
+   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyDown",value:moveKey}]
   }]});
   await delay(330);
   await wd("POST","/session/"+sid+"/actions",{actions:[{
-   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyUp",value:"w"}]
+   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyUp",value:moveKey}]
   }]});
   return poll("real W3C native input produced fresh authoritative server tick "+label,
    ()=>evaljs(sid,
@@ -220,7 +220,10 @@ try {
  // continue processing genuine v1 input ACKs after peer #2 departed.
  try {
   for(const sid of surviving){
-   const ack=await realWasdAndAck(sid,"post-departure");
+   // After initial W, a fighter may be against the NORTH arena wall.
+   // Press S to genuinely move away from the wall and require a fresh
+   // authoritative own-player snapshot; do NOT waive its ACK alignment.
+   const ack=await realWasdAndAck(sid,"post-departure","s");
    console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
   }
  }catch(error){
