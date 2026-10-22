@@ -16,6 +16,7 @@ p.add_argument("--no-render",action="store_true",help="Validate independently sa
 p.add_argument("--plant-kick",action="store_true",help="Correct original Blender pose-action hip center to hold the original support toe; source-only, not actual Greyhaven floor proof")
 p.add_argument("--spartan-kick",action="store_true",help="Opt-in cinematic high-knee front push-kick, grounded source-only; unchanged Combat authority")
 p.add_argument("--spartan-high-forward",action="store_true",help="Owner-approved silhouette: higher knee-to-chest chamber and farther boot thrust using natural 22-bone hip drive; preview only")
+p.add_argument("--spartan-contact-recoil-v3",action="store_true",help="Further refine authentic Silver armored high-knee contact and knee-return between exact Combat action phase boundaries; source art only")
 p.add_argument("--samples",type=int,default=1)
 p.add_argument("--engine",choices=["CYCLES","BLENDER_EEVEE_NEXT"],default="CYCLES")
 args=p.parse_args(argv)
@@ -125,6 +126,35 @@ spartaRecoilingV2={**spartaGuard,
  "RightUpLeg":(1.11,-.02,-.06),"RightLeg":(-1.28,0,0),
  "RightFoot":(.08,0,.02),"LeftUpLeg":(-.10,0,-.02),"LeftLeg":(.18,0,0),
  "Hips":(.09,0,.01),"Spine":(-.04,0,0),"Spine1":(-.05,0,-.02)}
+# V3 of the same owner-approved original Silver Spartan kick: braced,
+# knee-forward silhouette followed by a CLEAN final extension and recoil.
+# Keep source foot under pelvis, no actor-root movement; no new physics.
+# The additional in-between poses prevent a stiff snap between knee chamber
+# and contact, then visibly re-fold before recovery.
+spartaHighChamberV3={**spartaGuard,
+ "RightUpLeg":(2.16,-.02,-.08),"RightLeg":(-1.71,0,0),
+ "RightFoot":(.24,0,.04),"LeftUpLeg":(-.15,0,-.03),"LeftLeg":(.24,0,0),
+ "Hips":(.035,0,.01),"Spine":(-.13,0,.05),"Spine1":(-.12,0,-.03)}
+spartaDriveV3={**spartaGuard,
+ "RightUpLeg":(2.04,-.02,-.06),"RightLeg":(-.60,0,0),
+ "RightFoot":(-.16,0,.05),"LeftUpLeg":(-.17,0,-.04),"LeftLeg":(.27,0,0),
+ "Hips":(.18,0,.025),"Spine":(-.22,0,.03),"Spine1":(-.13,0,-.02)}
+spartaThrustV3={**spartaGuard,
+ "RightUpLeg":(1.96,-.02,-.05),"RightLeg":(-.16,0,0),
+ "RightFoot":(-.37,0,.05),"LeftUpLeg":(-.18,0,-.04),"LeftLeg":(.28,0,0),
+ "Hips":(.32,0,.04),"Spine":(-.29,0,.04),"Spine1":(-.15,0,-.03)}
+spartaContactV3={**spartaGuard,
+ "RightUpLeg":(2.075,-.02,-.05),"RightLeg":(-.07,0,0),
+ "RightFoot":(-.42,0,.06),"LeftUpLeg":(-.18,0,-.04),"LeftLeg":(.29,0,0),
+ "Hips":(.39,0,.04),"Spine":(-.33,0,.035),"Spine1":(-.16,0,-.03)}
+spartaSnapBackV3={**spartaGuard,
+ "RightUpLeg":(1.77,-.02,-.06),"RightLeg":(-.64,0,0),
+ "RightFoot":(-.06,0,.04),"LeftUpLeg":(-.15,0,-.03),"LeftLeg":(.25,0,0),
+ "Hips":(.19,0,.02),"Spine":(-.19,0,.035),"Spine1":(-.12,0,-.02)}
+spartaRecoilingV3={**spartaGuard,
+ "RightUpLeg":(1.08,-.02,-.06),"RightLeg":(-1.36,0,0),
+ "RightFoot":(.10,0,.02),"LeftUpLeg":(-.10,0,-.02),"LeftLeg":(.19,0,0),
+ "Hips":(.085,0,.01),"Spine":(-.05,0,0),"Spine1":(-.055,0,-.02)}
 # Dash: separate 140ms short forward lean. No rig root translation;
 # true movement is always server authoritative (750 world unit/s).
 dashReady={"Spine":(.12,0,0),"Spine1":(.11,0,-.02),
@@ -168,6 +198,21 @@ if args.spartan_high_forward:
   (13.5,spartaRecoilingV2,(0,0,-.023)),
   (18.0,spartaGuard,(0,0,-.007)),
   (23.8,{},(0,0,0))]
+if args.spartan_contact_recoil_v3:
+ assert args.spartan_high_forward and args.spartan_kick and args.plant_kick, "V3 depends on the owner high-forward source and planted original support"
+ # Exact published visual action phase boundaries retained: windup 90ms,
+ # active 70ms, recovery 220ms. Additional intermediate authored curves
+ # refine silhouette WITHOUT lengthening server windup or hitbox interval.
+ kickKeys=[(1,{},(0,0,0)),
+  (3.7,spartaLift,(0,0,-.018)),
+  (6.4,spartaHighChamberV3,(0,0,-.034)),
+  (8.1,spartaDriveV3,(0,0,-.024)),
+  (9.35,spartaThrustV3,(0,0,-.021)),
+  (10.6,spartaContactV3,(0,0,-.017)),
+  (11.3,spartaSnapBackV3,(0,0,-.019)),
+  (13.5,spartaRecoilingV3,(0,0,-.023)),
+  (18.0,spartaGuard,(0,0,-.007)),
+  (23.8,{},(0,0,0))]
 dashKeys=[(1,{},(0,0,0)),
  (2.1,dashReady,(0,0,-.025)),
  (3.7,dashPeak,(0,0,-.05)),
@@ -196,8 +241,8 @@ if args.plant_kick:
  # BOTH the integer 60fps tick and ORIGINAL fractional authored
  # anticipation/strike/recovery pose keys must be stabilized. Previously
  # fractional keys reset the toe when the action was reopened.
- sourceKeyFrames=[1.0,3.7,6.4,8.5,10.6,13.5,18.0,23.8]
- contactFrames=sorted(set(sourceKeyFrames+[float(f) for f in range(1,24)]))
+ sourceKeyFrames=[float(fr) for fr,_,_ in kickKeys]
+ contactFrames=sorted(set(sourceKeyFrames+[8.5]+[float(f) for f in range(1,24)]))
  for frame in contactFrames:
   sc.frame_set(int(frame),subframe=frame-int(frame));bpy.context.view_layer.update()
   before=toe_world().copy()
@@ -305,7 +350,7 @@ if not (args.smoke or args.smoke_fast):
  arm.animation_data.action=kick
  arm.animation_data.action_slot=kick.slots[0]
  for act in actions.values():act.use_fake_user=True
- blend=out/("Graphics3A_Silver_Spartan_Higher_Forward_Kick_source.blend" if args.spartan_high_forward else "Graphics3A_Silver_Spartan_Power_Kick_action_source.blend" if args.spartan_kick else "Graphics3A_Silver_Kick_Dash_grounded_action_source.blend" if args.plant_kick else "Graphics3A_Silver_Kick_Dash_action_source.blend")
+ blend=out/("Graphics3A_Silver_Spartan_Contact_Recoil_V3_source.blend" if args.spartan_contact_recoil_v3 else "Graphics3A_Silver_Spartan_Higher_Forward_Kick_source.blend" if args.spartan_high_forward else "Graphics3A_Silver_Spartan_Power_Kick_action_source.blend" if args.spartan_kick else "Graphics3A_Silver_Kick_Dash_grounded_action_source.blend" if args.plant_kick else "Graphics3A_Silver_Kick_Dash_action_source.blend")
  bpy.ops.wm.save_as_mainfile(filepath=str(blend))
  assert blend.stat().st_size>30000
  print("ACTION_BLEND_SOURCE",blend.stat().st_size,flush=True)
@@ -318,6 +363,8 @@ if not (args.smoke or args.smoke_fast):
  "framesPerDirection":8,"directions":8,"sourceFramePx":160,
  "sourceRigBones":22,"spartanHighKneeKickOptIn":args.spartan_kick,
  "spartanHighForwardRevisionOptIn":args.spartan_high_forward,
+ "spartanContactRecoilV3OptIn":args.spartan_contact_recoil_v3,
+ "sourceActionKeys":[{"blenderFrame":fr,"sourceMs":round((fr-1.0)/60*1000,3)} for fr,_,_ in kickKeys],
  "worldGroundValidated":False,
  "originalArtReplaced":False,"realGreyhaven":False,"humanVisualApproved":False,
  "trueServerEvent":False,"sourceEditableBlend":not args.smoke,

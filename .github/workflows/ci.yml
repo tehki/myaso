@@ -1101,3 +1101,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
+
+
+  # Source-only authentic Blender Silver review. Independent of full mandatory
+  # Combat quality; this job NEVER authorizes gameplay use, merge or deploy.
+  graphics3a-original-spartan-v3-source:
+    name: graphics3a-authentic-silver-spartan-v3-source
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-contact-recoil-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact original Blender-authored Silver artifact
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify first-party Blender V2 and V3 pose, asset SHA and immutable combat budgets
+        run: |
+          node --check web/silver-spartan-contact-recoil-v3-review.mjs
+          node --check tools/art/verify_silver_spartan_contact_recoil_v3_browser.mjs
+          node --test tests/silver-spartan-contact-recoil-v3-source.test.mjs tests/silver-spartan-contact-recoil-v3-browser-evidence.test.mjs tests/silver-spartan-high-forward-source-art.test.mjs

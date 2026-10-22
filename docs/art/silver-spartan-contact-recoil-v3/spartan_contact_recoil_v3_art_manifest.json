@@ -1,0 +1,45 @@
+{
+  "sourceBaseline": "Spartan V2 high-forward exact source SHA from previous draft",
+  "previousSpartanV2KickAtlasSha256": "2e879da928211445cbfc48b7897eafd44611b0d2b49ecfb581401615df00dab1",
+  "newOriginalSpartanV3KickAtlasSha256": "a6001a61c9cd48aa5b34ff7a7ecccb071bd6a3c6465ec5fd0cabffb4d3d1d747",
+  "contactRecoilComparisonGifSha256": "4548668bc9d4dbbace7df79ddca0624306b7b75727c8e4201e255a87115b43da",
+  "sourceDrawCount": 64,
+  "sourceFramesPerFacing": 8,
+  "directionCount": 8,
+  "sourceFramePx": [
+    160,
+    160
+  ],
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "kickVisualBudgetMs": 380,
+  "timingsMs": [
+    20,
+    40,
+    50,
+    40,
+    50,
+    65,
+    70,
+    45
+  ],
+  "pixelChangesPerFacing": [
+    155117,
+    154087,
+    154525,
+    154717,
+    159037,
+    155428,
+    156517,
+    155379
+  ],
+  "approvedHumanVisual": false,
+  "notGameplayIntegrated": true,
+  "originalSourceArtOnly": true,
+  "verifiedRealGround": false,
+  "gameplayEnabled": false,
+  "serverOrHitboxChanged": false,
+  "dashOriginalUnchanged": true
+}
