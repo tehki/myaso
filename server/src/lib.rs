@@ -7,6 +7,8 @@ pub mod kill_event;
 // P0 review-only authority reducer and codec; no runtime ingress or v1 changes.
 pub mod prealpha_lmb_gesture_authority;
 pub mod prealpha_lmb_gesture_proposal;
+// Review-only per-lease v2 replay/ordering gate: NO QUIC server caller.
+pub mod prealpha_lmb_ingress_review;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
