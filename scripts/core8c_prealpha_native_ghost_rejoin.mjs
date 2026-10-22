@@ -191,22 +191,6 @@ try {
  }
  assert(newConnected?.ok,"fifth real native browser must admit under original four-seat limit");
  console.log("CORE8C_BROWSER_NEW_ACTOR_CONNECTED",JSON.stringify(newConnected));
- // The original three authenticated sessions must also remain alive and
- // continue processing genuine v1 input ACKs after peer #2 departed.
- try {
-  for(const sid of surviving){
-   const ack=await realWasdAndAck(sid,"post-departure");
-   console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
-  }
- }catch(error){
-  const clients=await Promise.all(surviving.map(sid=>evaljs(sid,
-   "return {status:document.querySelector('#event-text')?.textContent||'',roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.querySelector('span')?.textContent||''),diag:document.querySelector('#network-diagnostics')?.textContent||''}").catch(e=>({error:String(e)}))));
-  console.error("CORE8C_NATIVE_AFTER_PEER_CLOSE_DIAGNOSTIC",JSON.stringify({
-   error:String(error),serverExitCode:server.exitCode,serverSignalCode:server.signalCode,
-   serverStdoutTail:stdout.slice(-2000),serverStderrTail:stderr.slice(-2600),clients
-  }));
-  throw error;
- }
  const removed=[];
  for(const sid of surviving){
   const q=await poll("native Canvas AND HUD remove #2 and show authentic new #5",async()=>{
@@ -231,6 +215,22 @@ try {
   },22000);
   rejoined.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids),
    status:q.status});
+ }
+ // The original three authenticated sessions must also remain alive and
+ // continue processing genuine v1 input ACKs after peer #2 departed.
+ try {
+  for(const sid of surviving){
+   const ack=await realWasdAndAck(sid,"post-departure");
+   console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
+  }
+ }catch(error){
+  const clients=await Promise.all(surviving.map(sid=>evaljs(sid,
+   "return {status:document.querySelector('#event-text')?.textContent||'',roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.querySelector('span')?.textContent||''),diag:document.querySelector('#network-diagnostics')?.textContent||''}").catch(e=>({error:String(e)}))));
+  console.error("CORE8C_NATIVE_AFTER_PEER_CLOSE_DIAGNOSTIC",JSON.stringify({
+   error:String(error),serverExitCode:server.exitCode,serverSignalCode:server.signalCode,
+   serverStdoutTail:stdout.slice(-2000),serverStderrTail:stderr.slice(-2600),clients
+  }));
+  throw error;
  }
  console.log("CORE8C_PREALPHA_NATIVE_GHOST_REJOIN_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
