@@ -8,6 +8,8 @@ pub mod kill_event;
 pub mod prealpha_lmb_gesture_proposal;
 // Review-only per-lease v2 replay/ordering gate: NO QUIC server caller.
 pub mod prealpha_lmb_ingress_review;
+// Core 8C dormant World actor/lease retirement review: NO server runtime caller.
+pub mod prealpha_core8c_world_lease_review;
 pub mod reliable;
 pub mod simulation;
 pub mod snapshot;
