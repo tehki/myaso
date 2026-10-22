@@ -69,3 +69,41 @@ export function decodeProposedGestureAck(bytes) {
   assertU32Nonzero(gestureId, "gestureId");
   return { status, sequence, gestureId, serverTick: v.getUint32(12, true) };
 }
+
+// REVIEW-ONLY explicit source-tagged variant selected for DRAFT refinement in
+// Main #723. Existing encode/decodeProposedGestureEvent deliberately remain
+// unchanged and reject byte3=1; the live game does not import this function.
+// Reuse their exact proven byte grammar, not a competing second packet format.
+export const PROPOSED_GESTURE_SOURCE = Object.freeze({LMB:0, KEY_E:1});
+function assertTypedSourceAction(source, action) {
+  if (source !== PROPOSED_GESTURE_SOURCE.LMB
+      && source !== PROPOSED_GESTURE_SOURCE.KEY_E)
+    throw new RangeError("unknown reviewed gesture source");
+  if (!isMember(action, GESTURE_ACTION)
+      || (source === PROPOSED_GESTURE_SOURCE.KEY_E
+          && action === GESTURE_ACTION.UPGRADE))
+    throw new RangeError("invalid reviewed source/action pair");
+}
+export function encodeProposedTypedGestureEvent({source, action, sequence, gestureId, clientTick = 0}) {
+  assertTypedSourceAction(source, action);
+  const encoded = new Uint8Array(encodeProposedGestureEvent({
+    action, sequence, gestureId, clientTick,
+  }));
+  encoded[3] = source; // source0 original LMB bytes remain bit-for-bit identical
+  return encoded.buffer;
+}
+export function decodeProposedTypedGestureEvent(bytes) {
+  const v = asView(bytes);
+  if (v.byteLength !== PROPOSED_GESTURE_BYTES)
+    throw new RangeError("invalid reviewed gesture event length");
+  const source = v.getUint8(3);
+  const action = v.getUint8(2);
+  assertTypedSourceAction(source, action);
+  // Decode the rest through the original independent Combat4/Core8A codec.
+  // The temporary normalized COPY cannot affect the authenticated source bytes.
+  const normalized = new Uint8Array(PROPOSED_GESTURE_BYTES);
+  normalized.set(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+  normalized[3] = 0;
+  const event = decodeProposedGestureEvent(normalized);
+  return {source, ...event};
+}
