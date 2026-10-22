@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Graphics 3B A2.32: original Blender Red Lion non-roof forged hardware.
 
 Source: frozen original A2.30 *editable* geometry, no procedural substitute.
@@ -98,4 +98,3 @@ report={"name":"Original 3B A2.32 ironwork","sourceBlend":source.name,"sourceSha
  "gameplayGeometryOrPortalChanged":False,"liveGameIntegrated":False,"artApproved":False}
 (out/"red_lion_a232_blender_source.json").write_text(json.dumps(report,indent=2)+"\n","utf8")
 print("ORIGINAL_3B_A232_IRONWORK="+json.dumps({"addedMeshes":len(details),"render":render_proof,"sourceUnchanged":True}))
-
