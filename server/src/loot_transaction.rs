@@ -1699,7 +1699,7 @@ mod tests {
             }
         }
         assert!(path.exists(), "only winning transfer should checkpoint");
-        let (recovered, _) = load_joint(&path).unwrap();
+        let (mut recovered, recovered_magic) = load_joint(&path).unwrap();
         assert!(recovered.ground().is_empty());
         let mut physical_count = 0;
         for id in 1..=4 {
@@ -1723,6 +1723,78 @@ mod tests {
             recovered.committed_operation_sequence(CharacterId::new(u64::from(winner)).unwrap()),
             Some(1)
         );
+        // Simulate the server crash AFTER the durable commit but BEFORE any
+        // pickup ACK reached the four contenders. All four reconnect with
+        // verified, fresh lease generations and replay their original exact
+        // (ground entity, physical ItemId, sequence=1) intent. No retry can
+        // mint a new sword, claim a previous winner's sword, consume a losing
+        // player's operation watermark, or rewrite the committed checkpoint.
+        let durable_before_retries = fs::read(&path).unwrap();
+        let mut reconnect_identity = SessionIdentityRegistry::new();
+        for id in 1..=4 {
+            let reconnect_lease = SessionLease::new(id, 2).unwrap();
+            reconnect_identity
+                .bind_verified(reconnect_lease, CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            recovered
+                .resume_inventory(&reconnect_identity, reconnect_lease)
+                .unwrap();
+        }
+        let before_retries = recovered.export_state().unwrap();
+        for id in [winner, 1, 2, 3, 4] {
+            // The winner is retried twice; every losing actor still points to
+            // the same physically removed original ground entity.
+            let reconnect_lease = SessionLease::new(id, 2).unwrap();
+            let result = commit_verified_ground_sword_equip_checked(
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: &mut recovered,
+                    magic: &recovered_magic,
+                    identity: &reconnect_identity,
+                    tick: PickupWorldTick {
+                        world: &guard.world,
+                        completed_tick: guard.world.tick,
+                        zones: &guard.zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: reconnect_lease,
+                        sequence: 1,
+                    },
+                },
+                GroundSwordSelection {
+                    ground_entity_id: entity_id,
+                    expected_item_id: item_id,
+                },
+                |_, _, _| -> Result<(), PickupCommitError> {
+                    panic!("stale post-crash pickup must not reach geometry or commit");
+                },
+            );
+            if id == winner {
+                assert!(matches!(
+                    result,
+                    Err(PickupCommitError::Loot(LootError::ReplayOperation))
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(PickupCommitError::Loot(LootError::NotFound))
+                ));
+            }
+            assert_eq!(recovered.export_state().unwrap(), before_retries);
+            assert_eq!(fs::read(&path).unwrap(), durable_before_retries);
+        }
+        for id in 1..=4 {
+            let character = CharacterId::new(u64::from(id)).unwrap();
+            assert_eq!(
+                recovered.committed_operation_sequence(character),
+                (id == winner).then_some(1)
+            );
+            let owned = recovered.inventory(id).unwrap();
+            assert_eq!(
+                owned.equipped(EquipmentSlot::MainHand).map(|x| x.id),
+                (id == winner).then_some(item_id)
+            );
+        }
         let _ = fs::remove_file(path);
     }
 
