@@ -25,6 +25,9 @@ pub(crate) const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHARACTERS: usize = 4096;
 const MAX_WORLD_OBJECTS: usize = 100_000;
 const MAX_ITEM_STACKS: usize = 67;
+// MYASOL03 encodes all five typed equipment slots (0..=4). The original
+// three-slot decoder cap rejected valid snapshots written by this encoder.
+const MAX_EQUIPMENT_SLOTS: usize = 5;
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
@@ -373,7 +376,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError>
             backpack.push(reader.item()?);
         }
         let equipped = usize::from(reader.u8()?);
-        if equipped > 3 {
+        if equipped > MAX_EQUIPMENT_SLOTS {
             return Err(CheckpointError::Corrupt);
         }
         let mut equipment = BTreeMap::new();
@@ -830,6 +833,126 @@ mod tests {
             restored.export_state().unwrap(),
             loot.export_state().unwrap()
         );
+    }
+
+    #[test]
+    fn quiescent_checkpoint_roundtrips_legacy_and_all_five_equipment_slots() {
+        use crate::character_identity::{SessionIdentityRegistry, SessionLease};
+
+        let equipment = [
+            (EquipmentSlot::MainHand, ItemKind::IronSword),
+            (EquipmentSlot::OffHand, ItemKind::WoodenShield),
+            (EquipmentSlot::Body, ItemKind::ChainmailArmor),
+            (EquipmentSlot::Head, ItemKind::IronHelmet),
+            (EquipmentSlot::Feet, ItemKind::LeatherBoots),
+        ];
+        // MYASOL03 has always written a count+0..4 slot tags. Verify old
+        // zero-to-three records and the formerly unreadable 4/5-slot cases
+        // with real grant/equip/park/checkpoint/recover identity conservation.
+        for equipped_count in 0..=MAX_EQUIPMENT_SLOTS {
+            let mut loot = LootAuthority::new();
+            let mut identities = SessionIdentityRegistry::new();
+            let owner = CharacterId::new(701).unwrap();
+            let lease = SessionLease::new(7, 1).unwrap();
+            identities.bind_verified(lease, owner).unwrap();
+            loot.register(7).unwrap();
+            let gold = loot.grant(7, ItemKind::Gold, 17).unwrap();
+            let mut expected = BTreeMap::new();
+            for (slot, kind) in equipment.iter().take(equipped_count).copied() {
+                let id = loot.grant(7, kind, 1).unwrap();
+                loot.equip(7, id, slot).unwrap();
+                expected.insert(slot, (id, kind));
+            }
+            loot.park_inventory(&identities, lease).unwrap();
+            let original = loot.export_state().unwrap();
+            let bytes = encode(&original).unwrap();
+            assert_eq!(decode(&bytes).unwrap(), original);
+            let path = checkpoint_path();
+            save_quiescent(&path, &loot).unwrap();
+            let recovered = load_quiescent(&path).unwrap();
+            fs::remove_file(&path).unwrap();
+            assert_eq!(recovered.export_state().unwrap(), original);
+            let inventory = recovered.parked_inventory(owner).unwrap();
+            assert_eq!(inventory.backpack().len(), 1);
+            assert_eq!(inventory.backpack()[0].id, gold);
+            assert_eq!(inventory.backpack()[0].amount, 17);
+            for (slot, (id, kind)) in &expected {
+                let stack = inventory.equipped(*slot).expect("equipped slot recovered");
+                assert_eq!(stack.id, *id);
+                assert_eq!(stack.kind, *kind);
+                assert_eq!(stack.amount, 1);
+            }
+            assert_eq!(inventory.stack_count(), equipped_count + 1);
+        }
+    }
+
+    #[test]
+    fn five_slot_checkpoint_rejects_extra_duplicate_and_invalid_equipment_tags() {
+        use crate::character_identity::{SessionIdentityRegistry, SessionLease};
+
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let owner = CharacterId::new(702).unwrap();
+        let lease = SessionLease::new(8, 1).unwrap();
+        identities.bind_verified(lease, owner).unwrap();
+        loot.register(8).unwrap();
+        loot.grant(8, ItemKind::Gold, 3).unwrap();
+        for (slot, kind) in [
+            (EquipmentSlot::MainHand, ItemKind::RustySword),
+            (EquipmentSlot::OffHand, ItemKind::Spellbook),
+            (EquipmentSlot::Body, ItemKind::LeatherArmor),
+            (EquipmentSlot::Head, ItemKind::IronHelmet),
+            (EquipmentSlot::Feet, ItemKind::LeatherBoots),
+        ] {
+            let id = loot.grant(8, kind, 1).unwrap();
+            loot.equip(8, id, slot).unwrap();
+        }
+        loot.park_inventory(&identities, lease).unwrap();
+        let bytes = encode(&loot.export_state().unwrap()).unwrap();
+        assert!(decode(&bytes).is_ok());
+
+        // Locate the encoded equipment count by parsing the versioned source,
+        // not assuming a magic byte offset that breaks for old backpack data.
+        let mut reader = Reader::new(&bytes[..bytes.len() - 8]);
+        assert_eq!(reader.take(MAGIC.len()).unwrap(), MAGIC);
+        assert_eq!(reader.u16().unwrap(), LOOT_STATE_SCHEMA_VERSION);
+        reader.u64().unwrap();
+        assert_eq!(reader.count(MAX_OPERATION_WATERMARKS).unwrap(), 0);
+        assert_eq!(reader.count(MAX_CHARACTERS).unwrap(), 1);
+        assert_eq!(reader.u64().unwrap(), owner.get());
+        assert_eq!(reader.u8().unwrap(), 0);
+        let backpack_count = usize::from(reader.u16().unwrap());
+        for _ in 0..backpack_count {
+            reader.item().unwrap();
+        }
+        let count_at = reader.pos;
+        assert_eq!(bytes[count_at], 5);
+        let first_slot_at = count_at + 1;
+        let second_slot_at = first_slot_at + 12; // slot u8 + item u64,u8,u16
+        assert_eq!(bytes[first_slot_at], slot_code(EquipmentSlot::MainHand));
+        assert_eq!(bytes[second_slot_at], slot_code(EquipmentSlot::OffHand));
+
+        for (offset, replacement) in [
+            (count_at, 6_u8),                       // refuse unbounded sixth equipment record
+            (first_slot_at, 255),                   // unknown slot
+            (second_slot_at, bytes[first_slot_at]), // duplicate MainHand
+        ] {
+            let mut malformed = bytes.clone();
+            malformed[offset] = replacement;
+            // Recompute the unkeyed checksum so the decoder must reject
+            // malformed semantic data instead of merely a checksum mismatch.
+            let payload_end = malformed.len() - 8;
+            let digest = checksum(&malformed[..payload_end]);
+            malformed[payload_end..].copy_from_slice(&digest.to_le_bytes());
+            assert!(matches!(decode(&malformed), Err(CheckpointError::Corrupt)));
+            let path = checkpoint_path();
+            fs::write(&path, malformed).unwrap();
+            assert!(matches!(
+                load_quiescent(&path),
+                Err(CheckpointError::Corrupt)
+            ));
+            fs::remove_file(&path).unwrap();
+        }
     }
 
     #[test]
