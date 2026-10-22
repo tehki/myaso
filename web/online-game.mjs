@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createPagehideTransportFence } from "../src/browser/pagehide-transport-fence.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -167,6 +168,7 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+const pagehideTransportFence = createPagehideTransportFence();
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -330,7 +332,7 @@ window.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 // A voluntary tab/navigation exit should promptly retire its server-owned
 // gameplay admission lease. Losing OS/browser process still uses QUIC timeout.
-window.addEventListener("pagehide", () => networkClient?.close("pagehide"));
+window.addEventListener("pagehide", () => pagehideTransportFence.depart());
 // The closed transport cannot be reused if the browser restores a BFCache page.
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();
@@ -387,6 +389,9 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+// The user may have navigated away while authenticated admission awaited.
+// Retire that freshly resolved client before its first gameplay input.
+pagehideTransportFence.bind(networkClient);
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
