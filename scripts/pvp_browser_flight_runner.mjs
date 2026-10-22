@@ -6,6 +6,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { qualifyPrealphaSilverConnectedClients } from "./graphics3a-prealpha-silver-connected-receipt.mjs";
+import { qualifyPrealphaSilverConnectedMotions } from "./graphics3a-prealpha-connected-motion-receipt.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
@@ -42,6 +43,9 @@ const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 const prealphaSilverFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT === "1";
+const prealphaSilverMotionFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_MOTION_FLIGHT === "1";
+if (prealphaSilverMotionFlight && !prealphaSilverFlight)
+  throw new Error("Graphics 3A roll/jump test requires real connected Silver gate");
 if (prealphaSilverFlight && scenario !== "uiidentity")
   throw new Error("Graphics 3A connected Silver flight requires M47 uiidentity");
 // Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
@@ -193,6 +197,10 @@ try {
     if (prealphaSilverFlight) {
       const receipt = await verifyConnectedPrealphaSilverDraws(sessions,results);
       console.log("GRAPHICS3A_PREALPHA_CONNECTED_TWO_SILVER "+JSON.stringify(receipt));
+      if(prealphaSilverMotionFlight) {
+        const motions = await verifyConnectedPrealphaSilverMotions(sessions,receipt);
+        console.log("GRAPHICS3A_PREALPHA_CONNECTED_ROLL_JUMP "+JSON.stringify(motions));
+      }
     }
     console.log(`M47_FFA_PLAYER_IDENTITY ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiscore") {
@@ -809,6 +817,71 @@ async function verifyConnectedPrealphaSilverDraws(sessions,m47results) {
       serverTick:tick,...visual});
   }
   return qualifyPrealphaSilverConnectedClients(clients);
+}
+
+// Additional P0 authentic Chrome + Firefox *roll / jump* drawing audit.
+// It is separate from and strictly AFTER the already proven genuine two-Silver
+// M47 browser connection. No fake actor state, server packet or shortcuts.
+async function verifyConnectedPrealphaSilverMotions(sessions,connected){
+  const chrome=sessions.find(x=>x.name==="chrome");
+  const firefox=sessions.find(x=>x.name==="firefox");
+  if(!chrome||!firefox||!connected.authoritativeConnectedTwoPlayerSilver)
+    throw Error("Graphics 3A movement must follow real two-client server acceptance");
+  const offsets=async()=>await Promise.all(sessions.map(async s=>{
+    const len=await execute(s.base,s.sessionId,
+      "return window.__graphics3aPrealphaSilverDraws?.draws?.length??0;");
+    return {engine:s.name,start:len};
+  }));
+  const captured=async(start,clip)=>await Promise.all(sessions.map(async s=>{
+    const from=start.find(o=>o.engine===s.name)?.start;
+    const data=await execute(s.base,s.sessionId,`
+      return (window.__graphics3aPrealphaSilverDraws?.draws??[]).slice(${Number(from)})
+        .filter(x=>x.clip===${JSON.stringify(clip)});
+    `);
+    return {engine:s.name,draws:data};
+  }));
+  async function awaitBoth(start,clip) {
+    let views=[];
+    const deadline=Date.now()+1750;
+    while(Date.now()<deadline) {
+      views=await captured(start,clip);
+      if(views.length===2 && views.every(x=>x.draws.length>=1))return views;
+      await sleep(40);
+    }
+    throw Error("Graphics3A real "+clip+" never rendered in BOTH clients: "+
+      JSON.stringify(views.map(x=>({engine:x.engine,count:x.draws.length}))));
+  }
+  // Let real movement finish before testing a distinct independently
+  // authoritative jump. No visual or packet injection.
+  await sleep(800);
+  const preJump=await offsets();
+  await execute(chrome.base,chrome.sessionId,
+    "document.querySelector('#arena')?.focus(); return document.activeElement?.id;");
+  await performArenaJumpPress(chrome,90);
+  const jumping=await awaitBoth(preJump,"silver_jump");
+  await sleep(820);
+  const preRoll=await offsets();
+  const element=await resolveArenaElement(firefox,"Graphics3A independent W3C roll");
+  await aimArena(firefox,element,130,0);
+  await scrollArenaWheel(firefox,element,-120,0);
+  const rolling=await awaitBoth(preRoll,"silver_roll");
+  const input=await Promise.all(sessions.map(readUiEvidence));
+  const c=input.find(x=>x.browser==="chrome");
+  const f=input.find(x=>x.browser==="firefox");
+  const realJump=Boolean(c?.keys?.includes("keydown:Space") &&
+    c?.keys?.includes("keyup:Space"));
+  const realRoll=Boolean(f?.wheels?.some(x=>x.deltaY<0));
+  return qualifyPrealphaSilverConnectedMotions({
+    players:connected.players.map(x=>({
+      engine:x.browser,serverPlayerId:x.serverPlayerId
+    })),
+    phases:[
+      {label:"jump",clip:"silver_jump",initiator:"chrome",
+        nativeGestureObserved:realJump,clients:jumping},
+      {label:"roll",clip:"silver_roll",initiator:"firefox",
+        nativeGestureObserved:realRoll,clients:rolling}
+    ]
+  });
 }
 
 async function runOnlineUiIdentityFlight(entries) {
