@@ -185,7 +185,6 @@ async fn current_v1_server_rejects_both_unnegotiated_v2_proposals_but_keeps_two_
     assert_original_v1_input_ack(&two, 2, 502).await;
 }
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn current_v1_server_ignores_unnegotiated_reliable_gesture_streams_without_closing_game() {
     // The proposed future v2 delivery path is a separate, reliable stream
