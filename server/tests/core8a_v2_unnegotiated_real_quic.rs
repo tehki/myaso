@@ -44,8 +44,8 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
             if let Some(value) = line.split("development certificate SHA-256: ").nth(1) {
                 digest = Some(value.trim().parse::<Sha256Digest>().expect("actual TLS pin"));
             }
-            if let (Some(url), Some(digest)) = (url.take(), digest.take()) {
-                let _ = tx.send((url, digest));
+            if url.is_some() && digest.is_some() {
+                let _ = tx.send((url.take().unwrap(), digest.take().unwrap()));
                 break;
             }
         }
