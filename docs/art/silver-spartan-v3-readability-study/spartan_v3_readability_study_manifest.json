@@ -1,0 +1,621 @@
+{
+  "classification": "SOURCE TESTED / VISUAL REVIEW HOLD / NOT GAMEPLAY INTEGRATED",
+  "originalRigBones": 22,
+  "originalSourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "originalV3AtlasSha256": "a6001a61c9cd48aa5b34ff7a7ecccb071bd6a3c6465ec5fd0cabffb4d3d1d747",
+  "newStudyAtlasSha256": "3522f093a095a616dedf6f859c954553dd4832f8c1cbf655b644207faf239a79",
+  "studyBlendSha256": "52f616e570b63639d9c4b79b5121a579317f05402f473232e93b9577e9d7d086",
+  "comparisonGifSha256": "d691ebfa9b9707302268e62ade69d4d9016794c94085d8eb4ba2b4b3cd9892f2",
+  "originalV3AtlasUnmodified": true,
+  "sourceOriginalMeshNotBundled": true,
+  "onlyCyclesLightingChanged": true,
+  "noCameraOrActorRootChanges": true,
+  "noCombatOrPhysicsChanges": true,
+  "actionDurationMs": 380,
+  "renderedCells": 64,
+  "directionCount": 8,
+  "sourceFramesPerDirection": 8,
+  "sourceCellPx": [
+    160,
+    160
+  ],
+  "studyAtlasPx": [
+    1280,
+    1280
+  ],
+  "allCellsIdenticalSilhouette": true,
+  "minimumSourceLumaGainPct": 21.52,
+  "averageSourceLumaGainPct": 24.6,
+  "sourceLighting": {
+    "enabled": true,
+    "worldStrength": 0.88,
+    "keyEnergy": 295,
+    "fillEnergy": 280,
+    "noGameplayOrPhysicsModification": true,
+    "humanArtApproval": false
+  },
+  "sampledFrames": [
+    {
+      "direction": 0,
+      "phase": 0,
+      "visiblePixels": 2235,
+      "sourceMeanLuma": 49.431,
+      "studyMeanLuma": 60.223,
+      "lumaGainPct": 21.83,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 1,
+      "visiblePixels": 2453,
+      "sourceMeanLuma": 50.277,
+      "studyMeanLuma": 61.329,
+      "lumaGainPct": 21.98,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 2,
+      "visiblePixels": 2466,
+      "sourceMeanLuma": 48.565,
+      "studyMeanLuma": 59.128,
+      "lumaGainPct": 21.75,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 3,
+      "visiblePixels": 2539,
+      "sourceMeanLuma": 46.192,
+      "studyMeanLuma": 56.483,
+      "lumaGainPct": 22.28,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 4,
+      "visiblePixels": 2389,
+      "sourceMeanLuma": 45.087,
+      "studyMeanLuma": 55.136,
+      "lumaGainPct": 22.29,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 5,
+      "visiblePixels": 2367,
+      "sourceMeanLuma": 49.913,
+      "studyMeanLuma": 60.988,
+      "lumaGainPct": 22.19,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 6,
+      "visiblePixels": 2369,
+      "sourceMeanLuma": 48.259,
+      "studyMeanLuma": 58.865,
+      "lumaGainPct": 21.98,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "phase": 7,
+      "visiblePixels": 2235,
+      "sourceMeanLuma": 49.431,
+      "studyMeanLuma": 60.223,
+      "lumaGainPct": 21.83,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 0,
+      "visiblePixels": 1649,
+      "sourceMeanLuma": 51.236,
+      "studyMeanLuma": 62.474,
+      "lumaGainPct": 21.93,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 1,
+      "visiblePixels": 1784,
+      "sourceMeanLuma": 54.031,
+      "studyMeanLuma": 65.87,
+      "lumaGainPct": 21.91,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 2,
+      "visiblePixels": 2025,
+      "sourceMeanLuma": 52.027,
+      "studyMeanLuma": 63.768,
+      "lumaGainPct": 22.57,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 3,
+      "visiblePixels": 2127,
+      "sourceMeanLuma": 51.168,
+      "studyMeanLuma": 62.18,
+      "lumaGainPct": 21.52,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 4,
+      "visiblePixels": 2037,
+      "sourceMeanLuma": 48.083,
+      "studyMeanLuma": 58.748,
+      "lumaGainPct": 22.18,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 5,
+      "visiblePixels": 1801,
+      "sourceMeanLuma": 53.044,
+      "studyMeanLuma": 64.458,
+      "lumaGainPct": 21.52,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 6,
+      "visiblePixels": 1687,
+      "sourceMeanLuma": 52.793,
+      "studyMeanLuma": 64.371,
+      "lumaGainPct": 21.93,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "phase": 7,
+      "visiblePixels": 1649,
+      "sourceMeanLuma": 51.236,
+      "studyMeanLuma": 62.474,
+      "lumaGainPct": 21.93,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 0,
+      "visiblePixels": 1929,
+      "sourceMeanLuma": 27.59,
+      "studyMeanLuma": 34.288,
+      "lumaGainPct": 24.28,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 1,
+      "visiblePixels": 1741,
+      "sourceMeanLuma": 31.622,
+      "studyMeanLuma": 39.158,
+      "lumaGainPct": 23.83,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 2,
+      "visiblePixels": 1825,
+      "sourceMeanLuma": 37.588,
+      "studyMeanLuma": 46.274,
+      "lumaGainPct": 23.11,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 3,
+      "visiblePixels": 1992,
+      "sourceMeanLuma": 38.205,
+      "studyMeanLuma": 46.985,
+      "lumaGainPct": 22.98,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 4,
+      "visiblePixels": 2020,
+      "sourceMeanLuma": 36.843,
+      "studyMeanLuma": 45.432,
+      "lumaGainPct": 23.31,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 5,
+      "visiblePixels": 1810,
+      "sourceMeanLuma": 32.08,
+      "studyMeanLuma": 39.746,
+      "lumaGainPct": 23.9,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 6,
+      "visiblePixels": 2021,
+      "sourceMeanLuma": 28.813,
+      "studyMeanLuma": 35.727,
+      "lumaGainPct": 24.0,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "phase": 7,
+      "visiblePixels": 1929,
+      "sourceMeanLuma": 27.59,
+      "studyMeanLuma": 34.288,
+      "lumaGainPct": 24.28,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 0,
+      "visiblePixels": 2750,
+      "sourceMeanLuma": 18.282,
+      "studyMeanLuma": 23.073,
+      "lumaGainPct": 26.21,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 1,
+      "visiblePixels": 2442,
+      "sourceMeanLuma": 20.455,
+      "studyMeanLuma": 25.67,
+      "lumaGainPct": 25.49,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 2,
+      "visiblePixels": 2113,
+      "sourceMeanLuma": 23.563,
+      "studyMeanLuma": 29.574,
+      "lumaGainPct": 25.51,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 3,
+      "visiblePixels": 2188,
+      "sourceMeanLuma": 24.13,
+      "studyMeanLuma": 30.339,
+      "lumaGainPct": 25.73,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 4,
+      "visiblePixels": 2242,
+      "sourceMeanLuma": 24.008,
+      "studyMeanLuma": 30.03,
+      "lumaGainPct": 25.08,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 5,
+      "visiblePixels": 2441,
+      "sourceMeanLuma": 21.751,
+      "studyMeanLuma": 27.305,
+      "lumaGainPct": 25.53,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 6,
+      "visiblePixels": 2813,
+      "sourceMeanLuma": 19.245,
+      "studyMeanLuma": 24.201,
+      "lumaGainPct": 25.75,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "phase": 7,
+      "visiblePixels": 2750,
+      "sourceMeanLuma": 18.282,
+      "studyMeanLuma": 23.073,
+      "lumaGainPct": 26.21,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 0,
+      "visiblePixels": 2729,
+      "sourceMeanLuma": 17.036,
+      "studyMeanLuma": 21.793,
+      "lumaGainPct": 27.92,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 1,
+      "visiblePixels": 2643,
+      "sourceMeanLuma": 19.904,
+      "studyMeanLuma": 25.521,
+      "lumaGainPct": 28.22,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 2,
+      "visiblePixels": 2234,
+      "sourceMeanLuma": 22.151,
+      "studyMeanLuma": 28.192,
+      "lumaGainPct": 27.27,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 3,
+      "visiblePixels": 2343,
+      "sourceMeanLuma": 21.218,
+      "studyMeanLuma": 27.079,
+      "lumaGainPct": 27.62,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 4,
+      "visiblePixels": 2398,
+      "sourceMeanLuma": 21.671,
+      "studyMeanLuma": 27.524,
+      "lumaGainPct": 27.01,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 5,
+      "visiblePixels": 2575,
+      "sourceMeanLuma": 19.903,
+      "studyMeanLuma": 25.272,
+      "lumaGainPct": 26.98,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 6,
+      "visiblePixels": 2766,
+      "sourceMeanLuma": 17.924,
+      "studyMeanLuma": 22.987,
+      "lumaGainPct": 28.24,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "phase": 7,
+      "visiblePixels": 2729,
+      "sourceMeanLuma": 17.036,
+      "studyMeanLuma": 21.793,
+      "lumaGainPct": 27.92,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 0,
+      "visiblePixels": 2024,
+      "sourceMeanLuma": 26.361,
+      "studyMeanLuma": 33.699,
+      "lumaGainPct": 27.84,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 1,
+      "visiblePixels": 2092,
+      "sourceMeanLuma": 27.668,
+      "studyMeanLuma": 35.149,
+      "lumaGainPct": 27.04,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 2,
+      "visiblePixels": 1832,
+      "sourceMeanLuma": 30.11,
+      "studyMeanLuma": 38.513,
+      "lumaGainPct": 27.91,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 3,
+      "visiblePixels": 2036,
+      "sourceMeanLuma": 29.641,
+      "studyMeanLuma": 37.653,
+      "lumaGainPct": 27.03,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 4,
+      "visiblePixels": 2134,
+      "sourceMeanLuma": 28.426,
+      "studyMeanLuma": 36.189,
+      "lumaGainPct": 27.31,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 5,
+      "visiblePixels": 2086,
+      "sourceMeanLuma": 26.02,
+      "studyMeanLuma": 33.459,
+      "lumaGainPct": 28.59,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 6,
+      "visiblePixels": 2095,
+      "sourceMeanLuma": 26.356,
+      "studyMeanLuma": 33.733,
+      "lumaGainPct": 27.99,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "phase": 7,
+      "visiblePixels": 2024,
+      "sourceMeanLuma": 26.361,
+      "studyMeanLuma": 33.699,
+      "lumaGainPct": 27.84,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 0,
+      "visiblePixels": 1638,
+      "sourceMeanLuma": 44.548,
+      "studyMeanLuma": 55.954,
+      "lumaGainPct": 25.6,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 1,
+      "visiblePixels": 1670,
+      "sourceMeanLuma": 49.776,
+      "studyMeanLuma": 62.11,
+      "lumaGainPct": 24.78,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 2,
+      "visiblePixels": 1546,
+      "sourceMeanLuma": 47.196,
+      "studyMeanLuma": 58.967,
+      "lumaGainPct": 24.94,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 3,
+      "visiblePixels": 1573,
+      "sourceMeanLuma": 44.853,
+      "studyMeanLuma": 56.325,
+      "lumaGainPct": 25.58,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 4,
+      "visiblePixels": 1562,
+      "sourceMeanLuma": 43.675,
+      "studyMeanLuma": 54.628,
+      "lumaGainPct": 25.08,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 5,
+      "visiblePixels": 1593,
+      "sourceMeanLuma": 48.038,
+      "studyMeanLuma": 59.925,
+      "lumaGainPct": 24.75,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 6,
+      "visiblePixels": 1735,
+      "sourceMeanLuma": 45.206,
+      "studyMeanLuma": 56.736,
+      "lumaGainPct": 25.51,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "phase": 7,
+      "visiblePixels": 1638,
+      "sourceMeanLuma": 44.548,
+      "studyMeanLuma": 55.954,
+      "lumaGainPct": 25.6,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 0,
+      "visiblePixels": 2222,
+      "sourceMeanLuma": 48.184,
+      "studyMeanLuma": 59.201,
+      "lumaGainPct": 22.86,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 1,
+      "visiblePixels": 2343,
+      "sourceMeanLuma": 49.876,
+      "studyMeanLuma": 61.397,
+      "lumaGainPct": 23.1,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 2,
+      "visiblePixels": 2188,
+      "sourceMeanLuma": 48.376,
+      "studyMeanLuma": 59.502,
+      "lumaGainPct": 23.0,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 3,
+      "visiblePixels": 2208,
+      "sourceMeanLuma": 46.924,
+      "studyMeanLuma": 57.576,
+      "lumaGainPct": 22.7,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 4,
+      "visiblePixels": 2085,
+      "sourceMeanLuma": 44.072,
+      "studyMeanLuma": 54.23,
+      "lumaGainPct": 23.05,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 5,
+      "visiblePixels": 2216,
+      "sourceMeanLuma": 49.605,
+      "studyMeanLuma": 60.821,
+      "lumaGainPct": 22.61,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 6,
+      "visiblePixels": 2323,
+      "sourceMeanLuma": 48.486,
+      "studyMeanLuma": 59.635,
+      "lumaGainPct": 22.99,
+      "sourceAlphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "phase": 7,
+      "visiblePixels": 2222,
+      "sourceMeanLuma": 48.184,
+      "studyMeanLuma": 59.201,
+      "lumaGainPct": 22.86,
+      "sourceAlphaIdentical": true
+    }
+  ],
+  "gameplayScaleValidated": false,
+  "nativeMultiplayerValidated": false,
+  "greyhavenBootSoleValidated": false,
+  "humanVisualApproved": false,
+  "defaultRendererActivated": false,
+  "preAlphaIncluded": false
+}
