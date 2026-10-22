@@ -113,19 +113,21 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
   sourceKickPreview = false,
   sourceKickVariant = "v2",
   sourceKickLightStudy = false,
+  sourceKickSupportLegStudy = false,
   sourceKnockdownPreview = false } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
   // This changes ONLY the explicit source-art preview texture. Never grant
   // a kick action, override a server phase, or activate V3 in Pre-Alpha.
-  if (!["v2","v3","v3lit"].includes(sourceKickVariant)
+  if (!["v2","v3","v3lit","v3leg"].includes(sourceKickVariant)
     || (sourceKickVariant !== "v2" && sourceKickPreview !== true)
-    || (sourceKickVariant === "v3lit" && sourceKickLightStudy !== true)) {
+    || (sourceKickVariant === "v3lit" && sourceKickLightStudy !== true)
+    || (sourceKickVariant === "v3leg" && (sourceKickLightStudy !== true || sourceKickSupportLegStudy !== true))) {
     throw new RangeError("Spartan V3 requires opt-in source kick rendering");
   }
   if (sourceKnockdownPreview
-    && (!sourceKickPreview || !["v3","v3lit"].includes(sourceKickVariant)))
+    && (!sourceKickPreview || !["v3","v3lit","v3leg"].includes(sourceKickVariant)))
     throw new RangeError("Silver victim knockdown requires original V3 kick QA preview gates");
   const atlases = new Map();
   const states = new Map();
@@ -143,7 +145,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     image.onerror = () => { atlas.ready = false; };
     image.decoding = "async";
     // Fifth QA gate selects a study atlas; original/default source retained.
-    const kickSource = sourceKickVariant === "v3lit" ? "silver_kick_v3_lit.webp"
+    const kickSource = sourceKickVariant === "v3leg" ? "silver_kick_v3_support.webp"
+      : sourceKickVariant === "v3lit" ? "silver_kick_v3_lit.webp"
       : sourceKickVariant === "v3" ? "silver_kick_v3.webp" : "silver_kick.webp";
     image.src = new URL(name === "silver_kick" ? kickSource : name + ".webp", assetBase).href;
     atlases.set(name, atlas);

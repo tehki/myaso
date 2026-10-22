@@ -1426,3 +1426,68 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
+
+  # Original 22-bone Blender Cycles source-only leg lighting. Dedicated art gate
+  # plus the existing independent mandatory "quality" job; no gameplay GO.
+  graphics3a-original-silver-v3-support-leg:
+    name: graphics3a-authentic-silver-v3-support-leg-blender-source
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-support-leg-fill-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact original 22-bone Blender source candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify original rig source artifacts, authentic frame SHA and phase timing
+        run: |
+          node --test tests/graphics3a-v3-support-leg-source.test.mjs tests/graphics3a-v3-readability-study.test.mjs tests/silver-spartan-contact-recoil-v3-source.test.mjs tests/silver-spartan-contact-recoil-v3-browser-evidence.test.mjs
+
+  # Real original Blender support-leg correction + real Rust M153 game browsers.
+  # Independent mandatory protected quality still applies, no release authority.
+  graphics3a-spartan-v3-support-leg-three-native:
+    name: graphics3a-original-blender-v3-support-leg-real-three-browser
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-support-leg-native-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact original 22-bone support-leg Blender source candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify exact source shader hashes, gameplay flags and strict M153 receipts
+        run: |
+          node --check web/knight-sprites.mjs
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/graphics3a-v3-support-leg-source.test.mjs tests/graphics3a-v3-support-leg-native.test.mjs tests/graphics3a-v3-light-capture-truth.test.mjs tests/graphics3a-v3-light-native.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-original-silver-grounded-v2-source.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs
+      - name: Verify genuine Rust Chrome Firefox and Node tools
+        run: |
+          cargo --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Compile genuine Rust-authoritative M153 server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real Chrome Firefox Chrome2 with original Blender support leg
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
+          MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG: "1"
+          MYASO_GRAPHICS3A_GROUNDED_V2_FLIGHT: "1"
+          MYASO_GRAPHICS3A_V3_LIGHT_NATIVE_FLIGHT: "1"
+          MYASO_GRAPHICS3A_V3_SUPPORT_LEG_NATIVE_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Upload original unmodified support-leg and approved V2 native images
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-original-blender-support-leg-real-arena
+          path: |
+            .graphics3a-v3-support-leg-native-png/
+            .graphics3a-original-victim-native-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1

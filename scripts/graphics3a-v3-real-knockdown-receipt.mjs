@@ -12,7 +12,7 @@ const ordered=(events,actions)=>{
 };
 export function summarizeSpartanV3RealKnockdown({results,clients,
   expectedSourceFile="silver_kick_v3.webp"}) {
- requireProof(["silver_kick_v3.webp","silver_kick_v3_lit.webp"].includes(expectedSourceFile),
+ requireProof(["silver_kick_v3.webp","silver_kick_v3_lit.webp","silver_kick_v3_support.webp"].includes(expectedSourceFile),
    "unapproved source evidence target");
  requireProof(Array.isArray(results)&&results.length===3,"three true M153 browser states needed");
  requireProof(Array.isArray(clients)&&clients.length===3,"three native browser source receipts needed");

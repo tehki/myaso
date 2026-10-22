@@ -52,6 +52,11 @@ const originalSilverVictimKnockdownFlight = process.env.MYASO_GRAPHICS3A_ORIGINA
 const silverVictimNativePng = process.env.MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG === "1";
 const groundedOriginalSilverV2Flight = process.env.MYASO_GRAPHICS3A_GROUNDED_V2_FLIGHT === "1";
 const spartanV3LightNativeFlight = process.env.MYASO_GRAPHICS3A_V3_LIGHT_NATIVE_FLIGHT === "1";
+const spartanV3SupportLegNativeFlight = process.env.MYASO_GRAPHICS3A_V3_SUPPORT_LEG_NATIVE_FLIGHT === "1";
+if(spartanV3SupportLegNativeFlight && !spartanV3LightNativeFlight)
+  throw Error("Real original Blender V3 leg study requires all V3 light native QA gates");
+const v3NativeKickSourceFile = spartanV3SupportLegNativeFlight
+  ? "silver_kick_v3_support.webp" : "silver_kick_v3_lit.webp";
 if (spartanV3LightNativeFlight && (scenario !== "uikickknockdownffa"
   || !spartanV3KnockdownFlight || !originalSilverVictimKnockdownFlight
   || !silverVictimNativePng || !groundedOriginalSilverV2Flight))
@@ -437,9 +442,11 @@ try {
     console.log(`M153_KICK_KNOCKDOWN_FFA_FOCUS ${JSON.stringify({ ok: true, results })}`);
     if (spartanV3KnockdownFlight) {
       const clients=await Promise.all(sessions.map(readSpartanKickDrawProbe));
-      const receipt=spartanV3LightNativeFlight
-        ? summarizeSpartanV3RealKnockdown({results,clients,expectedSourceFile:"silver_kick_v3_lit.webp"})
-        : summarizeSpartanV3RealKnockdown({results,clients});
+      const receipt=spartanV3SupportLegNativeFlight
+        ? summarizeSpartanV3RealKnockdown({results,clients,expectedSourceFile:"silver_kick_v3_support.webp"})
+        : spartanV3LightNativeFlight
+          ? summarizeSpartanV3RealKnockdown({results,clients,expectedSourceFile:"silver_kick_v3_lit.webp"})
+          : summarizeSpartanV3RealKnockdown({results,clients});
       console.log("GRAPHICS3A_SPARTAN_V3_REAL_KNOCKDOWN " + JSON.stringify(receipt));
       if(originalSilverVictimKnockdownFlight){
         const observations=await Promise.all(sessions.map(readOriginalSilverKnockdownProbe));
@@ -465,15 +472,20 @@ try {
       }
       if(spartanV3LightNativeFlight){
         const study=JSON.parse(await readFile(path.join(root,
-          "docs/art/silver-spartan-v3-readability-study/spartan_v3_readability_study_manifest.json"),"utf8"));
-        const atlas=await readFile(path.join(root,"web/assets/knights/silver_kick_v3_lit.webp"));
+          spartanV3SupportLegNativeFlight
+          ? "docs/art/silver-spartan-v3-support-leg-fill/support_leg_fill_manifest.json"
+          : "docs/art/silver-spartan-v3-readability-study/spartan_v3_readability_study_manifest.json"),"utf8"));
+        const atlas=await readFile(path.join(root,"web/assets/knights/"+v3NativeKickSourceFile));
         const sha=createHash("sha256").update(atlas).digest("hex");
-        if(sha!==study.newStudyAtlasSha256
-          || receipt.exactObservedSourceFile!=="silver_kick_v3_lit.webp"
+        const expectedSha=spartanV3SupportLegNativeFlight?study.newAtlasSha256:study.newStudyAtlasSha256;
+        if(sha!==expectedSha
+          || receipt.exactObservedSourceFile!==v3NativeKickSourceFile
           || !receipt.realAuthoritativeThreePlayerKickKnockdown)
           throw Error("original V3 lighting source SHA/server receipt mismatch");
         const native=await captureSpartanV3LightNativePngs(sessions,receipt,sha);
-        console.log("GRAPHICS3A_SPARTAN_V3_LIGHT_REAL_THREE_BROWSER_PNG "
+        console.log((spartanV3SupportLegNativeFlight
+          ? "GRAPHICS3A_SPARTAN_V3_SUPPORT_LEG_REAL_THREE_BROWSER_PNG "
+          : "GRAPHICS3A_SPARTAN_V3_LIGHT_REAL_THREE_BROWSER_PNG ")
           +JSON.stringify({realAuthoritativeThreePlayerKnockdown:true,
             studyAtlasSha256:sha,originalKickerSourceLight:true,
             originalVictimV2StillVerified:true,nativeImages:native,
@@ -684,6 +696,8 @@ async function navigate(session, gameUrl, certificateHash) {
       url.searchParams.set("knightKickV3", "1");
     if (spartanV3LightNativeFlight)
       url.searchParams.set("knightKickV3Light", "1");
+    if (spartanV3SupportLegNativeFlight)
+      url.searchParams.set("knightKickV3SupportLeg", "1");
     if (originalSilverVictimKnockdownFlight)
       url.searchParams.set("knightKnockdownSource", "1");
   }
@@ -6915,11 +6929,12 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
 // the ACTUAL Canvas frames each browser rendered; never manufacture active frames.
 async function captureSpartanV3LightNativePngs(entries,receipt,studySha){
   if(entries.length!==3 || receipt.realAuthoritativeThreePlayerKickKnockdown!==true
-    ||receipt.exactObservedSourceFile!=="silver_kick_v3_lit.webp"
+    ||receipt.exactObservedSourceFile!==v3NativeKickSourceFile
     ||!receipt.browsers?.every(x=>x.counts.windup>0&&x.counts.recovery>0)
     ||receipt.browsers.find(x=>x.browser==="chrome")?.counts.active<=0)
     throw Error("V3 lighting trial missing genuine three-person M153 receipt");
-  const dir=path.join(root,".graphics3a-v3-light-native-png");
+  const dir=path.join(root,spartanV3SupportLegNativeFlight
+    ? ".graphics3a-v3-support-leg-native-png" : ".graphics3a-v3-light-native-png");
   await mkdir(dir,{recursive:true});
   const images=[];
   for(const entry of entries){
@@ -6929,23 +6944,28 @@ async function captureSpartanV3LightNativePngs(entries,receipt,studySha){
         draws:probe?.draws??[]};
     `);
     const selected=selectAuthenticV3LightCapture({
-      browser:entry.name,draws:observed.draws,captures:observed.captures});
+      browser:entry.name,draws:observed.draws,captures:observed.captures,
+      sourceFile:v3NativeKickSourceFile});
     const png=Buffer.from(selected.png.slice("data:image/png;base64,".length),"base64");
     if(png.length<15000 || png.subarray(0,8).toString("hex")!=="89504e470d0a1a0a"
        || png.readUInt32BE(16)!==960 || png.readUInt32BE(20)!==540)
       throw Error("invalid native original 960x540 light-study image "+entry.name);
-    const filename="original_silver_spartan_v3_lit_"+entry.name+".png";
+    const filename=(spartanV3SupportLegNativeFlight
+      ? "original_silver_spartan_v3_support_" : "original_silver_spartan_v3_lit_")+entry.name+".png";
     await writeFile(path.join(dir,filename),png);
     const browser=receipt.browsers.find(x=>x.browser===entry.name);
     images.push({browser:entry.name,authenticatedServerId:browser?.serverId,
-      sourceFile:"silver_kick_v3_lit.webp",filename,
+      sourceFile:v3NativeKickSourceFile,filename,
       capturedSourcePhase:selected.phase,capturedSourceFrame:selected.frame,
       capturedSourceDirection:selected.direction,
       capturedDrawEpochMs:selected.epochMs,activeFrameActuallyObserved:selected.phase==="active",
       bytes:png.length,sha256:createHash("sha256").update(png).digest("hex")});
   }
-  await writeFile(path.join(dir,"original_v3_light_native_manifest.json"),
+  await writeFile(path.join(dir,spartanV3SupportLegNativeFlight
+    ? "original_v3_support_leg_native_manifest.json" : "original_v3_light_native_manifest.json"),
     JSON.stringify({actualThreeNativeBrowsers:true,realAuthoritativeM153:true,
+      supportLegOriginalBlenderVariant:spartanV3SupportLegNativeFlight,
+      actualWebP:v3NativeKickSourceFile,
       independentSourceSHA256:studySha,previewOnly:true,
       screenshotProvenance:"real original game Canvas observed source-phase frame, unmodified pixels",
       actualActiveFrameProvenForKicker:true,
@@ -6969,7 +6989,7 @@ async function installSpartanKickDrawProbe(session) {
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string" ? image.src : "";
         if((src.endsWith("/silver_kick_v3.webp") || src.endsWith("/silver_kick.webp")
-          || (${spartanV3LightNativeFlight} && src.endsWith("/silver_kick_v3_lit.webp")))
+          || (${spartanV3LightNativeFlight} && src.endsWith("/${v3NativeKickSourceFile}")))
           && args.length===8) {
           const frame=args[0]/160, direction=args[1]/160;
           if (data.draws.length<2048) data.draws.push({
@@ -6980,7 +7000,7 @@ async function installSpartanKickDrawProbe(session) {
         // Only QA native V3 contact visual frame. Actual game Canvas pixels,
         // no regenerated art, no hit or remote action forged.
         if(((${spartanV3ContactPng} && src.endsWith("/silver_kick_v3.webp"))
-          || (${spartanV3LightNativeFlight} && src.endsWith("/silver_kick_v3_lit.webp")))
+          || (${spartanV3LightNativeFlight} && src.endsWith("/${v3NativeKickSourceFile}")))
           && args.length===8 && (args[0]===480 || args[0]===640)
           && !data.contactPng && !data.contactPending) {
           data.contactPending=true;
@@ -7000,7 +7020,7 @@ async function installSpartanKickDrawProbe(session) {
         // Independent genuine source-phase capture. The kicker MUST have an
         // active screenshot; remote clients may legitimately observe only
         // windup/recovery during the short server-authoritative active phase.
-        if(${spartanV3LightNativeFlight} && src.endsWith("/silver_kick_v3_lit.webp")
+        if(${spartanV3LightNativeFlight} && src.endsWith("/${v3NativeKickSourceFile}")
           && args.length===8) {
           const frame=args[0]/160, direction=args[1]/160;
           if(Number.isInteger(frame)&&frame>=0&&frame<=7
