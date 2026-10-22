@@ -36,7 +36,7 @@ async function poll(label,fn,timeout=12000){
 }
 try {
  const binary=join(root,"server","target","debug","myaso-server");
- const server=launch(binary,[],{env:{MYASO_BIND:"127.0.0.1:0",MYASO_CHAT_RADIUS:"160",MYASO_CHAT_C1_ENABLED:"1"},stdio:["ignore","pipe","pipe"]});
+ const server=launch(binary,[],{env:{MYASO_BIND:"127.0.0.1:0",MYASO_CHAT_RADIUS:"160",MYASO_CHAT_C1_ENABLED:"1",MYASO_P6_NATIVE_AUDIT:"1"},stdio:["ignore","pipe","pipe"]});
  let stdout="",stderr="";
  server.stdout.on("data",d=>{stdout+=d.toString()});
  server.stderr.on("data",d=>{stderr+=d.toString()});
@@ -359,6 +359,30 @@ try {
    presentationZoom:.84,browserObservedMinCss:26,
    crowdObservedMaxCss:135,realWASDMovement:true,
    worldAuthorityNotInferredFromPixels:true,noFakeFighters:true}));
+ // P6-C02 source of truth: ONLY test-feature, loopback-bound, read-only
+ // Rust World coordinates AFTER World.step(). Never infer raw collision from
+ // rounded/compact QUIC snapshots or the projected Silver sprites.
+ // Do not weaken radius18 / diameter36 or inject synthetic actors.
+ const rawWorld=await poll("P6 actual Rust completed-tick four-player clearance",()=>{
+  const rows=stdout.split(/\r?\n/).filter(line=>line.startsWith("P6_AUTH_WORLD "));
+  const records=rows.map(line=>{
+   const match=line.match(/^P6_AUTH_WORLD tick=(\d+) fighters=4 min=([0-9.]+) max=([0-9.]+)$/);
+   return match?{tick:Number(match[1]),min:Number(match[2]),max:Number(match[3])}:null;
+  }).filter(Boolean);
+  const crowded=records.filter(r=>r.max<=160).slice(-12);
+  const proven=crowded.length>=8 && crowded.every(r=>r.min>=35.99)
+    && new Set(crowded.map(r=>r.tick)).size===crowded.length;
+  return {ok:proven,records:records.length,clockSampleCount:crowded.length,
+   firstTick:crowded[0]?.tick,lastTick:crowded.at(-1)?.tick,
+   minRaw:crowded.length?Math.min(...crowded.map(r=>r.min)):null,
+   maxRaw:crowded.length?Math.max(...crowded.map(r=>r.max)):null,
+   firstFailure:crowded.find(r=>r.min<35.99)||null};
+ },15000);
+ assert.equal(rawWorld.firstFailure,null,"no raw Rust World four-player overlaps");
+ console.log("P6_C02_FOUR_ACTUAL_WORLD_TICK_CLEARANCE_PASS",JSON.stringify({
+  ...rawWorld,worldDiameter:36,source:"real Rust World.step() on four live WebTransport player inputs",
+  snapshotQuantizationIgnored:true,productionFeatureDisabled:true
+ }));
  console.log("PASS real Rust server and "+sessions.length+" "+browserMatrix.join("/")+" WebTransport browser connections with pinned TLS: A↔B; C excluded from A; genuine ChatResult and continuing gameplay input ACKs");
 }finally{
  for(const session of sessions){try{await wd("DELETE","/session/"+session)}catch{}}
