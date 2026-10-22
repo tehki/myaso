@@ -132,6 +132,7 @@ try {
  console.log("CORE8C_BROWSER_REAL_FOUR_ROSTER_BEFORE",JSON.stringify(before));
 
  // Real WebDriver session teardown closes authentic QUIC and original actor #2.
+ const departedAt=Date.now();
  await wd("POST","/session/"+b+"/url",{url:"about:blank"});
  console.log("CORE8C_BROWSER_REAL_PEER2_NAVIGATED_AWAY");
  await delay(900);
@@ -149,7 +150,6 @@ try {
  // Intentional user navigation MUST send graceful WebTransport.close via
  // the pagehide handler before unloading. This is NOT an abrupt process
  // crash or time-based QUIC expiry; require a new server-owned actor promptly.
- const departedAt=Date.now();
  let newConnected=null;
  for(let attempt=0;attempt<5;attempt++){
   let observed={ok:false,failed:false,status:"uninitialized"};
@@ -192,6 +192,31 @@ try {
    serverStdoutTail:stdout.slice(-2000),serverStderrTail:stderr.slice(-2600),clients
   }));
   throw error;
+ }
+ const removed=[];
+ for(const sid of surviving){
+  const q=await poll("native Canvas AND HUD remove #2 and show authentic new #5",async()=>{
+   const v=await visible(sid);
+   const recent=v?.frames?.slice(-12)||[];
+   return {...v,ok:v?.roster?.length===4&&[1,3,4,5].every(id=>rosterHas(v.roster,id))
+      &&!rosterHas(v.roster,2)&&recent.length>=8
+      &&recent.filter(frame=>!frame.ids.includes("#2")&&frame.ids.includes("#5")
+        &&frame.ids.length>=3).length>=8};
+  },18000);
+  removed.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids)});
+ }
+ console.log("CORE8C_BROWSER_REAL_GHOST_REMOVED",JSON.stringify(removed));
+ const rejoined=[];
+ for(const sid of surviving){
+  const q=await poll("original Canvas HUD removes #2 and renders fresh #5",async()=>{
+   const v=await visible(sid);
+   const recent=v?.frames?.slice(-12)||[];
+   return {...v,ok:v?.roster?.length===4&&[1,3,4,5].every(id=>rosterHas(v.roster,id))
+      &&!rosterHas(v.roster,2)&&recent.length>=8
+      &&recent.filter(x=>x.ids.includes("#5")&&!x.ids.includes("#2")&&x.ids.length>=3).length>=8};
+  },22000);
+  rejoined.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids),
+   status:q.status});
  }
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
