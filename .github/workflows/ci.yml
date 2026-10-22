@@ -941,6 +941,15 @@ jobs:
           MYASO_PVP_SCENARIO: "uiidentity"
         run: node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate Graphics 3A original Silver in two native authoritative clients
+        env:
+          MYASO_PVP_SCENARIO: "uiidentity"
+          MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT: "1"
+        run: |
+          node --check scripts/graphics3a-prealpha-silver-connected-receipt.mjs
+          node --test tests/prealpha-silver-connected-browser-receipt.test.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M48 authoritative FFA kill score
         env:
           MYASO_PVP_SCENARIO: "uiscore"

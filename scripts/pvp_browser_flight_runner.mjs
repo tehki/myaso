@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
+import { qualifyPrealphaSilverConnectedClients } from "./graphics3a-prealpha-silver-connected-receipt.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
@@ -40,6 +41,9 @@ import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
+const prealphaSilverFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT === "1";
+if (prealphaSilverFlight && scenario !== "uiidentity")
+  throw new Error("Graphics 3A connected Silver flight requires M47 uiidentity");
 // Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
 // Keep the real E key depressed across multiple browser/input frames so the
 // authoritative client has a fair opportunity to sample the genuine gesture.
@@ -184,7 +188,12 @@ try {
     const results = await runOnlineUiVitalsFlight(sessions);
     console.log(`M46_FFA_SPATIAL_VITALS ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiidentity") {
+    if (prealphaSilverFlight) await Promise.all(sessions.map(installPrealphaSilverDrawProbe));
     const results = await runOnlineUiIdentityFlight(sessions);
+    if (prealphaSilverFlight) {
+      const receipt = await verifyConnectedPrealphaSilverDraws(sessions,results);
+      console.log("GRAPHICS3A_PREALPHA_CONNECTED_TWO_SILVER "+JSON.stringify(receipt));
+    }
     console.log(`M47_FFA_PLAYER_IDENTITY ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiscore") {
     const results = await runOnlineUiScoreFlight(sessions);
@@ -600,6 +609,7 @@ async function navigate(session, gameUrl, certificateHash) {
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
+  if (prealphaSilverFlight) url.searchParams.set("knights", "1");
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
     url.searchParams.set("scenario", scenario);
@@ -748,6 +758,57 @@ async function runOnlineUiVitalsFlight(entries) {
     ...entry,
     spatialVitals: entry.browser === attacker.browser ? attackerVitals : defenderVitals,
   }));
+}
+
+// This WebDriver hook watches *real* authenticated browser Canvas frames,
+// and does not modify any gameplay input, server state, or player role.
+async function installPrealphaSilverDrawProbe(session) {
+  const installed = await execute(session.base,session.sessionId,`
+    if (!window.__graphics3aPrealphaSilverDraws) {
+      const original=CanvasRenderingContext2D.prototype.drawImage;
+      const probe={draws:[],installed:true};
+      const allowed=["silver_idle","silver_walk","silver_sprint","silver_roll","silver_jump"];
+      CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
+        const source=typeof image?.src==="string" ? image.src : "";
+        const leaf=source.split("/").at(-1);
+        const name=leaf?.endsWith(".webp") ? leaf.slice(0,-5) : "";
+        if(allowed.includes(name) && args.length===8 && this.canvas?.id==="arena"
+          && probe.draws.length<3000) {
+          const t=this.getTransform();
+          probe.draws.push({clip:name,sourceFrame:args[0]/160,facing:args[1]/160,
+            x:t.e,y:t.f,epochMs:Date.now()});
+        }
+        return original.call(this,image,...args);
+      };
+      window.__graphics3aPrealphaSilverDraws=probe;
+    }
+    return window.__graphics3aPrealphaSilverDraws.installed;
+  `);
+  if (!installed)throw new Error("Graphics 3A original Silver probe not installed: "+session.name);
+}
+async function verifyConnectedPrealphaSilverDraws(sessions,m47results) {
+  await Promise.all(sessions.map(session=>execute(session.base,session.sessionId,
+    "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
+  // W3C REAL browser keyDown/keyUp, not a fake actor state.
+  await pulseMovementKey(sessions[0],"d",480);
+  await sleep(350);
+  const clients=[];
+  for(const session of sessions) {
+    const evidence=m47results.find(r=>r.browser===session.name);
+    if(!evidence)throw new Error("M47 missing actual server-issued player ID");
+    const tick=Number((evidence.eventText??"").split("server tick ").at(-1));
+    const visual=await execute(session.base,session.sessionId,`
+      return {
+        mockedState:false,
+        realConnected:document.querySelector("#event-text")?.textContent?.includes("Online - player #")===true,
+        knightsFlag:new URL(location.href).searchParams.get("knights")==="1",
+        draws:window.__graphics3aPrealphaSilverDraws?.draws??[]
+      };
+    `);
+    clients.push({engine:session.name,serverPlayerId:evidence.playerNetId,
+      serverTick:tick,...visual});
+  }
+  return qualifyPrealphaSilverConnectedClients(clients);
 }
 
 async function runOnlineUiIdentityFlight(entries) {
