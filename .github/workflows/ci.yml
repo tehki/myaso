@@ -1240,3 +1240,21 @@ jobs:
           MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
           MYASO_PVP_FLIGHT_DURATION_MS: "11000"
         run: node scripts/pvp_browser_flight_runner.mjs
+
+  # Original 22-bone Silver victim reaction source art, pure QA-only.
+  # This does NOT enable an unapproved knockdown sprite in Pre-Alpha.
+  graphics3a-original-silver-victim-knockdown-art:
+    name: graphics3a-authentic-silver-victim-knockdown-360ms
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/original-silver-knockdown-art-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout immutable original 22-bone Silver knockdown source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate real Blender source/manifest and exact 360ms refusal contract
+        run: |
+          node --check scripts/graphics3a-v3-real-knockdown-receipt.mjs
+          python3 -m py_compile tools/art/author_original_silver_knockdown_p0.py tools/art/pack_original_silver_knockdown.py tools/art/audit_original_silver_knockdown.py
+          node --test tests/graphics3a-original-silver-knockdown-source.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
