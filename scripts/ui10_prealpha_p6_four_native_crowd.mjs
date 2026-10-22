@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { join } from "node:path";
+import { nativeContentViewportMatches, nextNativeW3cWindowRect } from "./graphics3b_native_viewport_parity.mjs";
 const root=process.cwd(), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const randomPort=()=>new Promise((resolve,reject)=>{const s=createServer();s.on("error",reject);s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const processes=[],sessions=[];
@@ -273,6 +274,76 @@ try {
   publicChatEnabled:false,noRealSwordsOrItems:true,
   releaseApproved:false
  }));
+ // Reuse the ORIGINAL live four server+Silver+Chat sessions AFTER genuine
+ // C1 radius/exclusion proof but BEFORE the P6 converging WASD choreography.
+ // This proves the same actual crowd experience on the compact UI layout.
+ const viewportTargets=[
+  {width:1280,height:720},{width:1366,height:682},
+  {width:1366,height:682},{width:1280,height:720}
+ ];
+ const shortViewports=[];
+ for(let i=0;i<sessions.length;i++){
+  const session=sessions[i],target=viewportTargets[i];
+  const size=()=>evaljs(session,"return {innerWidth,innerHeight,outerWidth,outerHeight}");
+  for(let tries=0;tries<5;tries++){
+   const before=await size();
+   if(nativeContentViewportMatches(before,target))break;
+   await wd("POST","/session/"+session+"/window/rect",
+    nextNativeW3cWindowRect(before,target));
+   await delay(175);
+  }
+  assert(nativeContentViewportMatches(await size(),target),
+   "P6 crowd requires exact real measured browser CSS short-viewport");
+  const measure=()=>evaljs(session,[
+   "const c=document.querySelector('#arena'),r=c.getBoundingClientRect();",
+   "const details=document.querySelector('.controls-disclosure');",
+   "const chat=document.querySelector('[data-local-chat]');",
+   "return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,",
+   "width:r.width,height:r.height,scrollY,",
+   "originalPixels:[c.width,c.height],",
+   "closed:details?.open===false,controls:details?.querySelector('.controls')?.children.length,",
+   "chatConnected:chat?.dataset.connected==='true',",
+   "status:document.querySelector('#event-text')?.textContent||''};"
+  ].join(""));
+  const q=await measure();
+  assert.deepEqual(q.originalPixels,[960,540],"source pixel-buffer unchanged");
+  assert(q.left>=0&&q.top>=0&&q.right<=target.width+1
+   &&q.bottom<=target.height+1,"full Combat arena on screen");
+  assert(Math.abs(q.width/q.height-16/9)<.02,"16:9 native presentation");
+  assert.equal(q.scrollY,0,"no game-page scroll");
+  assert.equal(q.controls,14,"all original Combat controls retained");
+  assert.equal(q.closed,true,"Controls help starts collapsed");
+  assert.equal(q.chatConnected,true,"same native client still genuinely Chat C1 connected");
+  const elem=await wd("POST","/session/"+session+"/element",
+   {using:"css selector",value:".controls-disclosure summary"});
+  const id=elem["element-6066-11e4-a52e-4f735466cecf"];
+  assert(id,"native keyboard-accessible controls summary exists");
+  await wd("POST","/session/"+session+"/element/"+id+"/click",{});
+  assert.equal(await evaljs(session,
+   "return document.querySelector('.controls-disclosure')?.open"),true);
+  await wd("POST","/session/"+session+"/element/"+id+"/click",{});
+  assert.equal((await measure()).closed,true,"controls reclose");
+  await evaljs(session,"document.querySelector('#arena').focus()");
+  await key(session,"\uE007");
+  const chat=await evaljs(session,[
+   "const x=document.querySelector('[data-local-chat]'),input=x?.querySelector('input');",
+   "const r=input.getBoundingClientRect();",
+   "return {open:x?.dataset.open==='true',focused:document.activeElement===input,",
+   "visible:r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth+1",
+   "&&r.top>=0&&r.bottom<=innerHeight+1,scrollY};"
+  ].join(""));
+  assert(chat.open&&chat.focused&&chat.visible&&chat.scrollY===0,
+   "same real player can see and focus Chat in compact window");
+  await key(session,"\uE00C");
+  const restored=await evaljs(session,[
+   "const x=document.querySelector('[data-local-chat]');",
+   "return {closed:x?.dataset.open==='false',focus:document.activeElement?.id==='arena'};"
+  ].join(""));
+  assert(restored.closed&&restored.focus,"Chat Escape returns authentic arena focus");
+  shortViewports.push({browser:browserMatrix[i],target,canvasBottom:q.bottom,
+   nativeChatVisible:true,controls:14,server:q.status});
+ }
+ console.log("UI10_P6_LIVE_SHORT_VIEWPORT_PASS",JSON.stringify(shortViewports));
  // P6-C02 actual-player crowd: observe real source-aligned 2D Silver sprite
  // origin positions from Canvas' own current transform, inside its original
  // animation-frame callback. Do not touch state, server, camera or actors.
