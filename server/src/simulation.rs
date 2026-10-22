@@ -251,6 +251,9 @@ pub struct Fighter {
     attack_input_was_down: bool,
     heavy_attack_input_was_down: bool,
     charging_heavy: bool,
+    // The direction of an unlanded legacy co-held LMB press belongs to
+    // PRESS, never to a later release sample after a strafe key lifted.
+    legacy_charge_press_lateral: f32,
     // Only genuine review-v2 owned action may accept preview commands;
     // normal v1 KeyE and LMB attacks must never be hijacked by this bridge.
     gesture_review_owns_light: bool,
@@ -310,6 +313,7 @@ impl Fighter {
             attack_input_was_down: false,
             heavy_attack_input_was_down: false,
             charging_heavy: false,
+            legacy_charge_press_lateral: 0.0,
             gesture_review_owns_light: false,
             gesture_review_owns_held_charge: false,
             block_input_was_down: false,
@@ -499,6 +503,7 @@ impl Fighter {
             self.gesture_review_owns_light = false;
         }
         if action != Action::HeavyAttackWindup {
+            self.legacy_charge_press_lateral = 0.0;
             self.charging_heavy = false;
             self.gesture_review_owns_held_charge = false;
         }
@@ -1043,9 +1048,10 @@ fn begin_requested_action(
                     fighter.set_action(Action::Idle, 0.0);
                 }
             } else {
-                let lateral =
-                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
-                fighter.begin_light_attack(lateral);
+                // A quick LMB charge resolves the directional light selected
+                // at the original trusted press, even if the strafe key was
+                // already released in the current sampled input packet.
+                fighter.begin_light_attack(fighter.legacy_charge_press_lateral);
             }
             return;
         }
@@ -1088,9 +1094,17 @@ fn begin_requested_action(
         // retains its existing non-held action semantics.
         let light_elapsed_ms = fighter.action_elapsed_ms;
         let held_lmb = input.attack && input.heavy_attack;
+        // Preserve the pre-upgrade original light strike direction, rather
+        // than rereading release-time movement (which may already be neutral).
+        let press_lateral = match fighter.action {
+            Action::AttackLeftWindup => 1.0,
+            Action::AttackRightWindup => -1.0,
+            _ => 0.0,
+        };
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
         if held_lmb {
+            fighter.legacy_charge_press_lateral = press_lateral;
             fighter.action_elapsed_ms = light_elapsed_ms;
             fighter.charging_heavy = true;
         }
@@ -1174,8 +1188,11 @@ fn begin_requested_action(
 
     let moving = input.move_x.hypot(input.move_y) >= 0.5;
     if fighter.action == Action::Idle && input.attack && input.heavy_attack && edges.attack {
+        let press_lateral =
+            fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        fighter.legacy_charge_press_lateral = press_lateral;
         fighter.charging_heavy = true;
         return;
     }
