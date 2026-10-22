@@ -126,6 +126,46 @@ fn server_disconnect_retirement_clears_pending_and_reused_actor_id_stays_fenced(
 }
 
 #[test]
+fn same_tick_actor_slot_replacement_cannot_inherit_retired_gestures() {
+    let mut world = world_with_players(2);
+    let prior = lease(1, 3, 321);
+    let mut old = ReviewWorldLease::review_from_admitted_world(&world, prior).unwrap();
+    let former_life = world.fighter(1).unwrap().world_incarnation();
+    let unaffected_life = world.fighter(2).unwrap().world_incarnation();
+
+    assert_eq!(
+        old.review_ingest(&world, prior, &wire(GestureAction::Press, 1, 9)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+
+    // The original World permits remove/re-admit of the SAME numeric slot
+    // between World::step() calls, so tick and net_id alone are insufficient.
+    assert!(world.remove_player(1));
+    assert!(world.add_player(1));
+    assert_eq!(world.tick, 0);
+    assert_ne!(world.fighter(1).unwrap().world_incarnation(), former_life);
+    assert_eq!(world.fighter(2).unwrap().world_incarnation(), unaffected_life);
+
+    assert!(old.review_drain_for_world(&world, prior).is_empty());
+    assert!(old.is_retired());
+    assert_eq!(old.pending_count(), 0);
+    assert_eq!(
+        old.review_ingest(&world, prior, &wire(GestureAction::Release, 2, 9)),
+        ReviewEdgeStatus::Retired
+    );
+
+    // Even identical first-sequence bytes belong only to a NEW admitted lease.
+    let replacement = lease(1, 4, 322);
+    let mut current = ReviewWorldLease::review_from_admitted_world(&world, replacement).unwrap();
+    assert_eq!(
+        current.review_ingest(&world, replacement, &wire(GestureAction::Press, 1, 9)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(current.review_drain_for_world(&world, replacement).len(), 1);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+}
+
+#[test]
 fn missed_disconnect_cleanup_is_observed_from_real_world_membership() {
     let mut world = world_with_players(2);
     let owner = lease(2, 3, 98);
