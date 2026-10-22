@@ -11,6 +11,7 @@ on:
       - "tests/core8a-prealpha-v2-22edge-window.test.mjs"
       - "tests/core8a-prealpha-v2-four-lease-isolation.test.mjs"
       - "server/tests/prealpha_lmb_22edge_wire_window_review.rs"
+      - "server/tests/prealpha_lmb_four_actor_isolation_review.rs"
       - "server/tests/prealpha_lmb_js_wire_bridge_review.rs"
 
 permissions:
@@ -38,6 +39,8 @@ jobs:
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_js_wire_bridge_review
       - name: Original 22 JS edge bytes obey Rust bounded gap, negative 18-ahead and duplicate ACK
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_22edge_wire_window_review
+      - name: Four original JS gesture byte vectors on four Rust actor lease fixtures
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_four_actor_isolation_review
       - name: Original Rust replay regressions cannot regress
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
       - name: Strict Rust Clippy
