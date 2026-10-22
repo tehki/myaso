@@ -57,3 +57,52 @@ test("review-only schema cannot accidentally enable live server or web gesture i
   assert.doesNotMatch(server,/core8a_one_v2_gesture_wire_review|prealpha_lmb_gesture_authority/);
   assert.doesNotMatch(browser,/core8a-one-v2-gesture-wire-review|prealpha-lmb-gesture-outbox-proposal/);
 });
+
+test("selected-family immutable fixture matches actual JS EVENT/ACK encoding and strict negatives",()=>{
+  const lines=readFileSync(
+    new URL("./fixtures/core8a-p723-selected-family-v2.golden",import.meta.url),"utf8")
+    .split(/\r?\n/).filter(line=>line&&!line.startsWith("#"));
+  const fixture=new Map(lines.map(line=>{
+    const parts=line.split("=");
+    assert.equal(parts.length,2,"one immutable key/value per row");
+    assert.match(parts[1],/^[0-9a-f]{32}$/,"exact 16-byte lowercase fixture");
+    return parts;
+  }));
+  assert.equal(fixture.size,15,"all selected-family and negative vectors present");
+  const bytes=name=>{
+    const hex=fixture.get(name);
+    assert.ok(hex, `missing shared vector ${name}`);
+    return Uint8Array.from(hex.match(/../g),h=>Number.parseInt(h,16));
+  };
+  const events=[
+    ["LMB_PRESS",S.LMB,A.PRESS,1,1,42],
+    ["LMB_RELEASE",S.LMB,A.RELEASE,2,1,42],
+    ["KEY_E_PRESS",S.KEY_E,A.PRESS,3,2,43],
+    ["KEY_E_RELEASE",S.KEY_E,A.RELEASE,4,2,44],
+    ["KEY_E_CANCEL",S.KEY_E,A.CANCEL,5,2,45],
+    ["LMB_UPGRADE",S.LMB,A.UPGRADE,6,3,42],
+    ["LMB_CANCEL",S.LMB,A.CANCEL,7,3,42],
+  ];
+  for(const [name,source,action,sequence,gestureId,clientTick] of events){
+    const encoded=encodeReviewEvent({source,action,sequence,gestureId,clientTick});
+    assert.deepEqual(encoded,bytes(name),name);
+    assert.deepEqual(decodeReviewEvent(bytes(name)),
+      {source,action,sequence,gestureId,clientTick},name);
+    if(source===S.KEY_E)
+      assert.throws(()=>decodeProposedGestureEvent(bytes(name)),/reserved/i);
+    else assert.equal(decodeProposedGestureEvent(bytes(name)).action,action);
+  }
+  for(const [name,status] of [
+    ["ACK_ACCEPTED",K.ACCEPTED],["ACK_DUPLICATE",K.DUPLICATE],
+    ["ACK_STALE",K.STALE],["ACK_REJECTED",K.REJECTED]
+  ]){
+    assert.deepEqual(encodeReviewAck({status,sequence:3,gestureId:2,serverTick:50}),bytes(name));
+    assert.deepEqual(decodeProposedGestureAck(bytes(name)),
+      {status,sequence:3,gestureId:2,serverTick:50});
+  }
+  for(const name of ["BAD_KEY_E_UPGRADE","BAD_UNKNOWN_SOURCE","BAD_UNSELECTED_52"])
+    assert.throws(()=>decodeReviewEvent(bytes(name)),undefined,name);
+  assert.throws(()=>decodeProposedGestureAck(bytes("BAD_ACK_SOURCE")) ,/reserved/i);
+  // These are ABI fixtures only; no KeyE enable, actor trust or Combat hit grant.
+  assert.equal(fixture.get("KEY_E_PRESS").slice(0,8),"02110101");
+});
