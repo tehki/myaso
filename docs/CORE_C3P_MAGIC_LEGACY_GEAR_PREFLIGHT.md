@@ -145,3 +145,36 @@ PR head remains a **separate gate**.
 **Readiness: EXPERIMENTAL / TESTED offline only; BLOCKED for integration
 and PLAYABLE.** Corpse loot/trade/MOCMP remain excluded from the first
 alpha critical path.
+
+## 2026-10-22 — C3p child: canonical inventory/expanded slot negative gate
+
+An independent read of the original Magic & Items [#424] `loot_persistence.rs`
+confirmed a specific version gap: it **writes** the actual equipment-map
+length, supports slot tags **0..4**, but the **decoder rejects `equipped > 3`**.
+Therefore a valid owner with four or five pieces can produce a checkpoint
+that the same owner implementation cannot recover. **This Core 8B child does
+not change or certify that decoder.** Magic & Items 2B must fix its own
+versioned 3-slot/5-slot compatibility and test full save/reload on its
+branch before approving migration or activating full loot.
+
+The Core-only, offline `preflight_equipment_manifest` accepts explicit source
+rows with 0–5 occupied slots and returns typed canonical item IDs with
+proposed equipped character/slot locations. It validates original slot
+codes exactly, registered source item/character IDs, distinct occupied slot
+codes and distinct item IDs; rejects >5, zero, unknown, duplicate and dangling
+IDs. It does **not** establish actual item ownership or source-provenance
+completeness: caller must independently verify a quiescent authentic source
+snapshot and exclusive writer/epoch before any real migration.
+
+`LegacyImportPreflight::new` also rejects duplicated canonical inventory IDs,
+instead of silently discarding duplicates when building its set of active +
+retired IDs. Canonical IDs remain intentionally unapproved test namespace
+values, and a distinct inventory scan can still be incomplete; validation is
+necessary but not sufficient for production cutover.
+
+New focused regressions test 3/4/5 gear slots, all slot meanings, old/new
+character and item ID bindings, duplicate canonical owner inventory input,
+duplicated equipment positions/items, unsupported slot, zero ID, dangling
+source reference and >5 occupied entries. Original legacy format, writer,
+network, runtime World/Combat, actual item registry, production database and
+first combat-only Pre-Alpha remain untouched.
