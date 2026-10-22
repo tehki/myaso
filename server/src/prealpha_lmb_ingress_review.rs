@@ -7,10 +7,10 @@
 //! death/respawn/disconnect. Client bytes NEVER contain this LeaseKey.
 //! This model consumes Combat4's 16-byte v2 EVENT 0x11 and would produce its
 //! 16-byte ACK 0x12. It does NOT support alternative 8C proposal type 0x52.
-use std::collections::{BTreeMap, VecDeque};
 use crate::prealpha_lmb_gesture_proposal::{
     decode_event, AckStatus, GestureAck, GestureAction, GestureEvent,
 };
+use std::collections::{BTreeMap, VecDeque};
 
 const MAX_GAP: u32 = 16;
 const MAX_BUFFERED: usize = 16;
@@ -33,7 +33,11 @@ impl TrustedLeaseKey {
         if actor_net_id == 0 || generation == 0 || connection_nonce == 0 {
             return None;
         }
-        Some(Self { actor_net_id, generation, connection_nonce })
+        Some(Self {
+            actor_net_id,
+            generation,
+            connection_nonce,
+        })
     }
 }
 
@@ -71,13 +75,24 @@ pub struct ReviewLmbIngress {
 impl ReviewLmbIngress {
     pub fn new_from_trusted_admission(lease: TrustedLeaseKey) -> Self {
         Self {
-            lease, expected_seq: 1, latest_gesture_id: 0, active: None,
-            buffered: BTreeMap::new(), seen: VecDeque::new(), closed: false,
+            lease,
+            expected_seq: 1,
+            latest_gesture_id: 0,
+            active: None,
+            buffered: BTreeMap::new(),
+            seen: VecDeque::new(),
+            closed: false,
         }
     }
-    pub fn is_closed(&self) -> bool { self.closed }
-    pub fn buffered_count(&self) -> usize { self.buffered.len() }
-    pub fn accepted_count(&self) -> usize { self.seen.len() }
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+    pub fn buffered_count(&self) -> usize {
+        self.buffered.len()
+    }
+    pub fn accepted_count(&self) -> usize {
+        self.seen.len()
+    }
     pub fn close(&mut self) {
         self.closed = true;
         self.buffered.clear();
@@ -85,8 +100,10 @@ impl ReviewLmbIngress {
     }
     fn ack(event: GestureEvent, status: AckStatus, server_tick: u32) -> GestureAck {
         GestureAck {
-            status, sequence: event.sequence,
-            gesture_id: event.gesture_id, server_tick,
+            status,
+            sequence: event.sequence,
+            gesture_id: event.gesture_id,
+            server_tick,
         }
     }
 
@@ -94,13 +111,20 @@ impl ReviewLmbIngress {
     /// check. `server_tick` must come from the true World authority; this model
     /// does not verify a tick or dispatch actions. No live ingress is attached.
     pub fn review_ingest(
-        &mut self, current_trusted_lease: TrustedLeaseKey, packet: &[u8],
+        &mut self,
+        current_trusted_lease: TrustedLeaseKey,
+        packet: &[u8],
         server_tick: u32,
     ) -> IngressResult {
-        if self.closed { return IngressResult::Rejected(None); }
+        if self.closed {
+            return IngressResult::Rejected(None);
+        }
         let event = match decode_event(packet) {
             Ok(event) => event,
-            Err(_) => { self.close(); return IngressResult::Rejected(None); }
+            Err(_) => {
+                self.close();
+                return IngressResult::Rejected(None);
+            }
         };
         if current_trusted_lease != self.lease {
             return IngressResult::Stale(Self::ack(event, AckStatus::Stale, server_tick));
@@ -108,10 +132,9 @@ impl ReviewLmbIngress {
 
         let seq = u64::from(event.sequence);
         if seq < self.expected_seq {
-            let previously_accepted = self.seen.iter()
-                .any(|&(accepted_seq, accepted_id)| {
-                    accepted_seq == event.sequence && accepted_id == event.gesture_id
-                });
+            let previously_accepted = self.seen.iter().any(|&(accepted_seq, accepted_id)| {
+                accepted_seq == event.sequence && accepted_id == event.gesture_id
+            });
             let status = if previously_accepted {
                 AckStatus::Duplicate
             } else {
@@ -126,20 +149,25 @@ impl ReviewLmbIngress {
         }
         if seq > self.expected_seq {
             // Missing seq must be replayed: no speculative ACCEPTED ACK.
-            if seq - self.expected_seq > u64::from(MAX_GAP) ||
-                (self.buffered.len() >= MAX_BUFFERED &&
-                 !self.buffered.contains_key(&event.sequence)) {
+            if seq - self.expected_seq > u64::from(MAX_GAP)
+                || (self.buffered.len() >= MAX_BUFFERED
+                    && !self.buffered.contains_key(&event.sequence))
+            {
                 self.close();
-                return IngressResult::Rejected(Some(
-                    Self::ack(event, AckStatus::Rejected, server_tick)
-                ));
+                return IngressResult::Rejected(Some(Self::ack(
+                    event,
+                    AckStatus::Rejected,
+                    server_tick,
+                )));
             }
             if let Some(previous) = self.buffered.get(&event.sequence) {
                 if *previous != event {
                     self.close();
-                    return IngressResult::Rejected(Some(
-                        Self::ack(event, AckStatus::Rejected, server_tick)
-                    ));
+                    return IngressResult::Rejected(Some(Self::ack(
+                        event,
+                        AckStatus::Rejected,
+                        server_tick,
+                    )));
                 }
                 return IngressResult::Deferred;
             }
@@ -167,9 +195,14 @@ impl ReviewLmbIngress {
                 GestureAction::Press => {
                     if active.is_none() && edge.gesture_id > last_id {
                         last_id = edge.gesture_id;
-                        active = Some(ActiveGesture { id: edge.gesture_id, upgraded: false });
+                        active = Some(ActiveGesture {
+                            id: edge.gesture_id,
+                            upgraded: false,
+                        });
                         true
-                    } else { false }
+                    } else {
+                        false
+                    }
                 }
                 GestureAction::Upgrade => match &mut active {
                     Some(gesture) if gesture.id == edge.gesture_id && !gesture.upgraded => {
@@ -182,7 +215,9 @@ impl ReviewLmbIngress {
                     if active.is_some_and(|gesture| gesture.id == edge.gesture_id) {
                         active = None;
                         true
-                    } else { false }
+                    } else {
+                        false
+                    }
                 }
             };
             if !legal {
