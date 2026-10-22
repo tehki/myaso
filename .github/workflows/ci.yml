@@ -1223,3 +1223,45 @@ jobs:
           MYASO_GRAPHICS3A_PREALPHA_FOUR_FLIGHT: "1"
           MYASO_PVP_FLIGHT_DURATION_MS: "11000"
         run: node scripts/pvp_browser_flight_runner.mjs
+
+
+  # Separate authentic visual evidence; NEVER replaces four-player source
+  # receipt or mandatory Combat quality. Captures are actual W3C PNGs.
+  graphics3a-silver-four-native-png:
+    name: graphics3a-native-four-silver-screenshots
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/p0-original-silver-4p-native-png-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact first-party Silver screenshot QA head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify source capture syntax and four-player refusal contract
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/prealpha-silver-four-connected-receipt.test.mjs
+      - name: Verify genuine native browsers and Rust available
+        run: |
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+          cargo --version
+      - name: Prebuild exact authoritative four-player Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Capture four genuine native WebDriver arena PNGs only after proof succeeds
+        env:
+          MYASO_PVP_SCENARIO: "uiidentity"
+          MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT: "1"
+          MYASO_GRAPHICS3A_PREALPHA_FOUR_FLIGHT: "1"
+          MYASO_GRAPHICS3A_FOUR_NATIVE_PNG: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Publish exact native 4-player screenshots for human Art review
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-actual-four-silver-native
+          path: .graphics3a-real-four-silver-native-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1

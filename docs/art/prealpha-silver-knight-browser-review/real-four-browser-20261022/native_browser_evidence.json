@@ -1,0 +1,72 @@
+{
+  "realServerFourPlayerAccepted": true,
+  "notHumanOperated": true,
+  "screenshots": [
+    {
+      "browser": "chrome",
+      "kind": "viewport",
+      "originalServerId": 3,
+      "filename": "prealpha_real_four_silver_chrome.png",
+      "bytes": 64985,
+      "sha256": "a978355b29089106bd533437d9f4e9c4c0910b746190356b50fb03fc5c5ef265"
+    },
+    {
+      "browser": "chrome",
+      "kind": "arena",
+      "originalServerId": 3,
+      "filename": "prealpha_real_four_silver_chrome_arena.png",
+      "bytes": 27807,
+      "sha256": "1ca09d6b6f1360562bb338a2158ae3e59f773c312faa963c410972c1839d8ae2"
+    },
+    {
+      "browser": "firefox",
+      "kind": "viewport",
+      "originalServerId": 4,
+      "filename": "prealpha_real_four_silver_firefox.png",
+      "bytes": 181993,
+      "sha256": "1b62df5d0a37cfb18ecdf2b35b2d55b8f0da8ee66cae424af8ff2fc9d84cde23"
+    },
+    {
+      "browser": "firefox",
+      "kind": "arena",
+      "originalServerId": 4,
+      "filename": "prealpha_real_four_silver_firefox_arena.png",
+      "bytes": 48919,
+      "sha256": "a61bdfd5ae1a62b4a1551bf8e917de0f7e446ec46e13c5335f472161094cd6f5"
+    },
+    {
+      "browser": "chrome2",
+      "kind": "viewport",
+      "originalServerId": 1,
+      "filename": "prealpha_real_four_silver_chrome2.png",
+      "bytes": 64872,
+      "sha256": "18324170cfe583f7571d2ea34cd82b3316e7366ca713651c987f8e9c374e168d"
+    },
+    {
+      "browser": "chrome2",
+      "kind": "arena",
+      "originalServerId": 1,
+      "filename": "prealpha_real_four_silver_chrome2_arena.png",
+      "bytes": 27598,
+      "sha256": "a7b88e630639d3e653e3a66fc77315f257f12d8c60a304576518d124c29cac49"
+    },
+    {
+      "browser": "chrome3",
+      "kind": "viewport",
+      "originalServerId": 2,
+      "filename": "prealpha_real_four_silver_chrome3.png",
+      "bytes": 65000,
+      "sha256": "bdd63a73b4fb5045b00e1d1e18fef4f66f3c5210ae544f8be95946d60de5d845"
+    },
+    {
+      "browser": "chrome3",
+      "kind": "arena",
+      "originalServerId": 2,
+      "filename": "prealpha_real_four_silver_chrome3_arena.png",
+      "bytes": 27861,
+      "sha256": "48e9a4aa97b8b9c5f5d978854b7b503ecacc38e8c61c03108af4bd8ba0ccf7ca"
+    }
+  ],
+  "artSourceUnchanged": true,
+  "serverHitNotProven": true
+}
