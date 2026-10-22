@@ -276,6 +276,7 @@ pub enum ClaimJournalError {
     Invalid(&'static str),
     SequenceGap,
     RollbackSuspected,
+    ExternalWitnessMismatch,
     Capacity,
     ConflictingReplay,
     StaleGeneration,
@@ -313,6 +314,16 @@ struct Record {
 pub struct ClaimReceipt {
     pub sequence: u64,
     pub event_id: u128,
+}
+
+/// A NON-AUTHENTICATING description of precisely one locally committed MYID
+/// V1 history. It must be captured/attested by a separately trusted authority
+/// and protected OUTSIDE this directory to detect valid older snapshots.
+/// SHA-256 authenticates nothing by itself; this is not a signature or MAC.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OfflineExactHistoryWitness {
+    pub head: u64,
+    pub sha256: [u8; 32],
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservedClaim {
@@ -726,6 +737,67 @@ impl OfflineClaimJournal {
         Ok(store)
     }
 
+    /// Compute a cryptographic digest of the EXACT locally committed and
+    /// recovered canonical MYID event history. It is not itself signed,
+    /// remote-attested or monotonic. An adversary who can rewrite both this
+    /// store and an unprotected witness can forge matching digests.
+    ///
+    /// The domain prefix and sequence order prevent a caller from treating
+    /// this as a digest of unrelated data, reordered records or prefixes.
+    pub fn offline_exact_history_witness(
+        &self,
+    ) -> Result<OfflineExactHistoryWitness, ClaimJournalError> {
+        use ring::digest::{Context, SHA256};
+        if self.poisoned {
+            return Err(ClaimJournalError::Poisoned);
+        }
+        self.ensure_writer_anchor()?;
+        if self.records.len() as u64 != self.head {
+            return Err(ClaimJournalError::Invalid("MYID history length mismatch"));
+        }
+        let mut entries: Vec<&Record> = self.records.values().collect();
+        entries.sort_by_key(|entry| entry.sequence);
+        let mut hasher = Context::new(&SHA256);
+        hasher.update(b"MYID-V1-EXACT-HISTORY\0");
+        hasher.update(&self.head.to_le_bytes());
+        for (index, record) in entries.into_iter().enumerate() {
+            if record.sequence != (index as u64 + 1) {
+                return Err(ClaimJournalError::SequenceGap);
+            }
+            hasher.update(&encode(record));
+        }
+        let hash = hasher.finish();
+        let mut sha256 = [0u8; 32];
+        sha256.copy_from_slice(hash.as_ref());
+        // A changed root or writer lock during hashing must not be
+        // accepted as an attested local snapshot.
+        self.ensure_writer_anchor()?;
+        Ok(OfflineExactHistoryWitness {
+            head: self.head,
+            sha256,
+        })
+    }
+
+    /// OFFLINE: check one **externally captured AND PROTECTED** SHA-256
+    /// witness. The witness is untrusted when simply supplied by an arbitrary
+    /// caller or stored alongside these MYID files. Both a valid older head
+    /// and a different same-length event history fail closed. A newer local
+    /// head also requires a fresh external witness; this is deliberately an
+    /// EXACT snapshot check, not a production lease/evidence authority.
+    pub fn open_with_external_exact_history_witness(
+        root: impl AsRef<Path>,
+        protected: OfflineExactHistoryWitness,
+    ) -> Result<Self, ClaimJournalError> {
+        let store = Self::open(root)?;
+        if store.head < protected.head {
+            return Err(ClaimJournalError::RollbackSuspected);
+        }
+        if store.offline_exact_history_witness()? != protected {
+            return Err(ClaimJournalError::ExternalWitnessMismatch);
+        }
+        Ok(store)
+    }
+
     fn persist(&self, rec: &Record) -> Result<(), ClaimJournalError> {
         self.persist_after_preflight(rec, || {})
     }
@@ -1010,6 +1082,15 @@ mod tests {
         fn open_with_minimum(&self, floor: u64) -> Result<OfflineClaimJournal, ClaimJournalError> {
             Self::with_bounded_writer_handoff(|| {
                 OfflineClaimJournal::open_with_minimum_head(&self.0, floor)
+            })
+        }
+
+        fn open_with_exact_witness(
+            &self,
+            external: OfflineExactHistoryWitness,
+        ) -> Result<OfflineClaimJournal, ClaimJournalError> {
+            Self::with_bounded_writer_handoff(|| {
+                OfflineClaimJournal::open_with_external_exact_history_witness(&self.0, external)
             })
         }
     }
@@ -1579,6 +1660,108 @@ mod tests {
         assert!(recovered
             .observed_unverified_claim(bob, first_lease.character_id())
             .is_none());
+    }
+
+    #[test]
+    fn trusted_external_exact_witness_detects_valid_same_head_claim_fork() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let viewer = actor(0x1234_0000_0000_0002);
+        let mut original = root.open();
+        append(
+            &mut original,
+            &bridge,
+            &leases,
+            lease,
+            (viewer, 1, "Marta", 101),
+        )
+        .unwrap();
+        let witness = original.offline_exact_history_witness().unwrap();
+        assert_eq!(witness.head, 1);
+        assert_ne!(witness.sha256, [0u8; 32]);
+        assert_eq!(witness, original.offline_exact_history_witness().unwrap());
+        drop(original);
+        let matching = root.open_with_exact_witness(witness).unwrap();
+        assert_eq!(matching.head(), 1);
+        drop(matching);
+
+        // An adversary rewrites the *same sequence* with a different,
+        // equally valid UTF-8 Claimed identity, and recomputes the unkeyed
+        // legacy FNV checksum. Plain bounded decoder MUST accept it: local
+        // file validity is not an authentication or lineage proof.
+        let path = root.0.join(filename(1));
+        let mut forged = fs::read(&path).unwrap();
+        assert_eq!(&forged[82..87], b"Marta");
+        forged[82..87].copy_from_slice(b"Tomas");
+        let checksum = hash(&forged[..252]);
+        forged[252..256].copy_from_slice(&checksum.to_le_bytes());
+        fs::write(&path, &forged).unwrap();
+        let weak = root.open();
+        assert_eq!(
+            weak.observed_unverified_claim(viewer, lease.character_id())
+                .unwrap()
+                .name,
+            "Tomas",
+            "FNV and sequence checks alone cannot detect valid event rewriting"
+        );
+        let forged_witness = weak.offline_exact_history_witness().unwrap();
+        assert_eq!(forged_witness.head, witness.head);
+        assert_ne!(forged_witness.sha256, witness.sha256);
+        drop(weak);
+        assert!(matches!(
+            root.open_with_exact_witness(witness),
+            Err(ClaimJournalError::ExternalWitnessMismatch)
+        ));
+        // A forged witness captured from the rewritten journal naturally
+        // passes: only an INDEPENDENTLY PROTECTED witness has authority.
+        assert!(root.open_with_exact_witness(forged_witness).is_ok());
+    }
+
+    #[test]
+    fn exact_external_witness_rejects_shorter_valid_prefix_and_unapproved_later_append() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let viewer = actor(0x1234_0000_0000_0002);
+        let another = actor(0x1234_0000_0000_0003);
+        let mut journal = root.open();
+        append(
+            &mut journal,
+            &bridge,
+            &leases,
+            lease,
+            (viewer, 1, "Marta", 201),
+        )
+        .unwrap();
+        let one = journal.offline_exact_history_witness().unwrap();
+        append(
+            &mut journal,
+            &bridge,
+            &leases,
+            lease,
+            (another, 1, "Elara", 202),
+        )
+        .unwrap();
+        let two = journal.offline_exact_history_witness().unwrap();
+        assert_eq!(two.head, 2);
+        assert_ne!(one.sha256, two.sha256);
+        drop(journal);
+        assert!(
+            matches!(
+                root.open_with_exact_witness(one),
+                Err(ClaimJournalError::ExternalWitnessMismatch)
+            ),
+            "an external witness of 1 MUST NOT attest unapproved event 2"
+        );
+        assert!(root.open_with_exact_witness(two).is_ok());
+        // Restoring a fully valid earlier prefix passes ordinary decode,
+        // but cannot satisfy a protected witness of the later committed head.
+        fs::remove_file(root.0.join(filename(2))).unwrap();
+        assert_eq!(root.open().head(), 1);
+        assert!(matches!(
+            root.open_with_exact_witness(two),
+            Err(ClaimJournalError::RollbackSuspected)
+        ));
+        assert!(root.open_with_exact_witness(one).is_ok());
     }
 
     #[test]
