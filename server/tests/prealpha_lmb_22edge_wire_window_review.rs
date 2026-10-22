@@ -24,7 +24,7 @@ fn golden() -> Vec<[u8; BYTES]> {
             }
             let event = decode_event(&bytes).expect("original Combat4 Rust event");
             assert_eq!(event.sequence as usize, seq);
-            assert_eq!(event.gesture_id as usize, (seq + 1) / 2);
+            assert_eq!(event.gesture_id as usize, seq.div_ceil(2));
             assert_eq!(event.client_tick, 0x1100 + (index / 2) as u32);
             assert_eq!(
                 event.action,
