@@ -1,0 +1,95 @@
+{
+  "source": {
+    "name": "Original 3B A2.32 ironwork",
+    "sourceBlend": "blood_iron_red_lion_a230_joinery.blend",
+    "sourceSha256": "61620d76fafa75bbe26c8fd92fde4da5e79e8cc88132100ebb651fc52e5eef61",
+    "sourceUntouched": true,
+    "derivedBlend": "red_lion_a232_wrought_ironwork.blend",
+    "derivedSha256": "db773404e917213ecd2eddfb0314a3ab19a09d97cf70cf42780211d864c0eaf4",
+    "addedMeshes": 20,
+    "objectNames": [
+      "A2.32 wrought fittings / door hinge strap lower",
+      "A2.32 wrought fittings / hinge barrel lower",
+      "A2.32 wrought fittings / hinge peen lower 0",
+      "A2.32 wrought fittings / hinge peen lower 1",
+      "A2.32 wrought fittings / hinge peen lower 2",
+      "A2.32 wrought fittings / door hinge strap upper",
+      "A2.32 wrought fittings / hinge barrel upper",
+      "A2.32 wrought fittings / hinge peen upper 0",
+      "A2.32 wrought fittings / hinge peen upper 1",
+      "A2.32 wrought fittings / hinge peen upper 2",
+      "A2.32 wrought fittings / door knocker ring",
+      "A2.32 wrought fittings / knocker upper plate",
+      "A2.32 wrought fittings / shutter corner west left lower",
+      "A2.32 wrought fittings / shutter corner west left upper",
+      "A2.32 wrought fittings / shutter corner west right lower",
+      "A2.32 wrought fittings / shutter corner west right upper",
+      "A2.32 wrought fittings / shutter corner east left lower",
+      "A2.32 wrought fittings / shutter corner east left upper",
+      "A2.32 wrought fittings / shutter corner east right lower",
+      "A2.32 wrought fittings / shutter corner east right upper"
+    ],
+    "originalNonroofMeshes": 52,
+    "roofSourceEdited": false,
+    "render640": {
+      "baseline": {
+        "file": "red_lion_a232_baseline_640.png",
+        "bytes": 186015,
+        "sha256": "d031b0a0f8cabe79d3b73e62adc55ecb9f788ac9d75690b5aaf17700e413d307"
+      },
+      "ironwork": {
+        "file": "red_lion_a232_ironwork_640.png",
+        "bytes": 186910,
+        "sha256": "8795ed8037fa489c068ad37d64721dc2369b49abb40884c640fbd4d1fbb4e90c"
+      }
+    },
+    "dayNightOrWorldChanged": false,
+    "gameplayGeometryOrPortalChanged": false,
+    "liveGameIntegrated": false,
+    "artApproved": false
+  },
+  "sourceHead": "0cbf33adf70beda55b8fcb8bef4ba2efb36084e5",
+  "rendered640BeforeAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "rendered640AfterAlphaBounds": [
+    209,
+    54,
+    431,
+    345
+  ],
+  "changedRgbPixels": 6697,
+  "changedAlphaPixels": 0,
+  "changedBoundaryAlphaPixels": 0,
+  "croppedPixels": [
+    228,
+    297
+  ],
+  "drawOffsetFromVisualDoorPx": [
+    -114,
+    -269
+  ],
+  "dayWebP": {
+    "file": "red_lion_a232_day_ironwork.webp",
+    "sha256": "5f37136750909c499e5bfc93597af92b44723f2d4b3b117d83ea7c7eb0ab2610",
+    "bytes": 44814
+  },
+  "duskWebP": {
+    "file": "red_lion_a232_dusk_ironwork.webp",
+    "sha256": "3011a1db7fe92014639bec749357e21c7196d33c03d650460779a52b07bba3ea",
+    "bytes": 43748
+  },
+  "roofSha256": "f65554286ea1bb8b80562c72539d82172fd3ea8cc97e6b9d0d3203057a1aedc1",
+  "roofByteIdentical": true,
+  "dayDuskAlphaIdentical": true,
+  "originalSourceBlenderUnmodified": true,
+  "newOriginalIronMeshes": 20,
+  "sourceWorldChanged": false,
+  "serverCollisionChanged": false,
+  "gameRenderIntegrated": false,
+  "realFourPlayerAcceptance": false,
+  "releaseApproved": false
+}
