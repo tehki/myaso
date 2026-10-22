@@ -1350,7 +1350,7 @@ jobs:
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
           python3 -m py_compile tools/art/author_original_silver_knockdown_grounded_v2.py tools/art/pack_original_silver_knockdown_grounded_v2.py tools/art/audit_original_silver_knockdown_grounded_v2.py
-          node --test tests/graphics3a-original-silver-grounded-v2-source.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-native-archive.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+          node --test tests/graphics3a-grounded-v2-native-images.test.mjs tests/graphics3a-original-silver-grounded-v2-source.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-native-archive.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
       - name: Verify native Chrome Firefox and Rust QA tools
         run: |
           cargo --version
