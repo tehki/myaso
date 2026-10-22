@@ -391,7 +391,6 @@ fn real_match_win_retires_unspent_spectator_press_before_next_round() {
     );
 }
 
-
 #[test]
 fn two_distinct_worlds_with_identical_actor_incarnation_and_tick_cannot_replay() {
     use myaso_server::prealpha_core8c_world_lease_review::{
@@ -471,7 +470,10 @@ fn entire_world_replacement_same_tick_retires_stale_pending_edges() {
     assert!(owner.review_replace_world(world_with_players(2)));
     assert_ne!(owner.owner_epoch(), former_epoch);
     assert_eq!(owner.world().tick, 0);
-    assert_eq!(owner.world().fighter(1).unwrap().world_incarnation(), former_life);
+    assert_eq!(
+        owner.world().fighter(1).unwrap().world_incarnation(),
+        former_life
+    );
 
     assert!(old.review_drain_for_owner(&owner, lease_key).is_empty());
     assert!(old.is_retired());
