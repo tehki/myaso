@@ -251,6 +251,12 @@ pub struct Fighter {
     attack_input_was_down: bool,
     heavy_attack_input_was_down: bool,
     charging_heavy: bool,
+    // Only genuine review-v2 owned action may accept preview commands;
+    // normal v1 KeyE and LMB attacks must never be hijacked by this bridge.
+    gesture_review_owns_light: bool,
+    // Dormant reviewed v2 gesture ownership; no network/runtime callers.
+    // Original v1 input release handling is unchanged when this is false.
+    gesture_review_owns_held_charge: bool,
     block_input_was_down: bool,
     dodge_input_was_down: bool,
     kick_input_was_down: bool,
@@ -304,6 +310,8 @@ impl Fighter {
             attack_input_was_down: false,
             heavy_attack_input_was_down: false,
             charging_heavy: false,
+            gesture_review_owns_light: false,
+            gesture_review_owns_held_charge: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
             kick_input_was_down: false,
@@ -481,8 +489,18 @@ impl Fighter {
     }
 
     fn set_action(&mut self, action: Action, duration_ms: f32) {
+        if !matches!(
+            action,
+            Action::AttackWindup
+                | Action::AttackLeftWindup
+                | Action::AttackRightWindup
+                | Action::HeavyAttackWindup
+        ) {
+            self.gesture_review_owns_light = false;
+        }
         if action != Action::HeavyAttackWindup {
             self.charging_heavy = false;
+            self.gesture_review_owns_held_charge = false;
         }
         if !matches!(
             action,
@@ -642,6 +660,121 @@ impl World {
         self.fighters[index].latch_action_edges(input);
         self.fighters[index].latest_input = input;
         true
+    }
+
+    /// REVIEW-ONLY bridge for the separately authenticated LMBGesture v2
+    /// reducer. There are NO runtime callers and v1 input wire is unchanged.
+    /// Core8A/8C must later bind commands to the real player lease and world
+    /// tick, atomically arbitrate KeyE/Space/RMB/roll/parry, and never let a
+    /// remote caller directly select a command or an actor.
+    pub fn apply_review_only_lmb_gesture_command(
+        &mut self,
+        net_id: u32,
+        command: crate::prealpha_lmb_gesture_authority::Command,
+    ) -> bool {
+        use crate::prealpha_lmb_gesture_authority::Command;
+        if self.winner.is_some() {
+            return false;
+        }
+        let Ok(index) = self.fighter_index(net_id) else {
+            return false;
+        };
+        let fighter = &mut self.fighters[index];
+        if fighter.action == Action::Dead {
+            return false;
+        }
+        match command {
+            Command::BeginLightWindup
+                if fighter.action == Action::Idle
+                    && !fighter.latest_input.block
+                    && !fighter.latest_input.dodge
+                    && !fighter.latest_input.kick
+                    && !fighter.latest_input.jump
+                    && !fighter.latest_input.dash =>
+            {
+                let lateral = fighter.facing.sin() * fighter.latest_input.move_x
+                    - fighter.facing.cos() * fighter.latest_input.move_y;
+                fighter.begin_light_attack(lateral);
+                fighter.gesture_review_owns_light = true;
+                true
+            }
+            Command::UpgradeHeldHeavy { server_elapsed_ms }
+                if matches!(
+                    fighter.action,
+                    Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                ) && fighter.gesture_review_owns_light
+                    && fighter.action_elapsed_ms + EPSILON < ATTACK_WINDUP_MS
+                    && (fighter.action_elapsed_ms - server_elapsed_ms as f32).abs()
+                        <= SERVER_DT_MS + 2.0 =>
+            {
+                // Already-active or already-landed light NEVER upgrades.
+                // Keep the actual original World windup time, not a client
+                // timestamp, and hold until server-approved heavy RELEASE.
+                let elapsed = fighter.action_elapsed_ms;
+                fighter.attack_hit_targets.clear();
+                fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+                fighter.action_elapsed_ms = elapsed;
+                fighter.charging_heavy = true;
+                fighter.gesture_review_owns_held_charge = true;
+                true
+            }
+            Command::ResumeLight { server_elapsed_ms }
+                if fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_light
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON < HEAVY_ATTACK_WINDUP_MS
+                    && (fighter.action_elapsed_ms - server_elapsed_ms as f32).abs()
+                        <= SERVER_DT_MS + 2.0 =>
+            {
+                let elapsed = fighter.action_elapsed_ms;
+                let lateral = fighter.facing.sin() * fighter.latest_input.move_x
+                    - fighter.facing.cos() * fighter.latest_input.move_y;
+                fighter.begin_light_attack(lateral);
+                // An undercharged RELEASE can never reset original light
+                // time, add a second damage window, or secretly become heavy.
+                fighter.action_elapsed_ms = elapsed;
+                true
+            }
+            Command::ReleaseHeavy
+                if fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_light
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS =>
+            {
+                fighter.attack_hit_targets.clear();
+                fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS);
+                true
+            }
+            Command::CancelUnlandedLight
+                if fighter.gesture_review_owns_light
+                    && (matches!(
+                        fighter.action,
+                        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                    ) || (fighter.action == Action::HeavyAttackWindup
+                        && fighter.charging_heavy))
+                    && fighter.attack_hit_targets.is_empty() =>
+            {
+                fighter.set_action(Action::Idle, 0.0);
+                fighter.clear_pending_actions();
+                true
+            }
+            Command::ActivateLight => matches!(
+                fighter.action,
+                Action::AttackActive
+                    | Action::AttackLeftActive
+                    | Action::AttackRightActive
+                    | Action::AttackRecovery
+                    | Action::AttackLeftRecovery
+                    | Action::AttackRightRecovery
+            ),
+            Command::HeavyReady => {
+                fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_light
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS
+            }
+            _ => false,
+        }
     }
 
     pub fn step(&mut self) -> Vec<CombatEvent> {
@@ -869,6 +1002,13 @@ fn begin_requested_action(
         return;
     }
 
+    // The proposed lease-authorized v2 gesture reducer owns held READY
+    // independently of old v1 button snapshots. Without this explicit fence,
+    // a missing v1 attack+heavy pair would cancel the authenticated charge.
+    // The normal legacy path below remains unchanged for all active clients.
+    if fighter.charging_heavy && fighter.gesture_review_owns_held_charge {
+        return;
+    }
     // Combo attack+heavy flags are a sustained LMB charge. The server owns
     // the 320ms windup; reaching READY never emits an attack while held.
     if fighter.charging_heavy {
