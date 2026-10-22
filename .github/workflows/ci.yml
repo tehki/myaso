@@ -1396,7 +1396,7 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check web/knight-sprites.mjs
           node --check web/online-game.mjs
-          node --test tests/graphics3a-v3-light-native.test.mjs tests/graphics3a-v3-readability-study.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-grounded-v2-source.test.mjs
+          node --test tests/graphics3a-v3-light-capture-truth.test.mjs tests/graphics3a-v3-light-native.test.mjs tests/graphics3a-v3-readability-study.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-grounded-v2-source.test.mjs
       - name: Verify native Rust Chrome and Firefox tools
         run: |
           cargo --version

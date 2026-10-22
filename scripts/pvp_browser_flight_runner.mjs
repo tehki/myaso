@@ -16,6 +16,7 @@ import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-laten
 import { summarizeSpartanConnectedKickFlight } from "./graphics3a-spartan-connected-receipt.mjs";
 import { summarizeSpartanV3ConnectedKickFlight } from "./graphics3a-spartan-v3-source-receipt.mjs";
 import { summarizeSpartanV3RealKnockdown } from "./graphics3a-v3-real-knockdown-receipt.mjs";
+import { selectAuthenticV3LightCapture } from "./graphics3a-v3-light-capture-truth.mjs";
 import { qualifyOriginalSilverVictimKnockdown } from "./graphics3a-original-silver-knockdown-receipt.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
@@ -6910,39 +6911,46 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
   }));
 }
 
-// Optional authentic V3 study source screenshots with unchanged M153 authority.
+// Original server-verified M153 kick only. Source-phase screenshot must reflect
+// the ACTUAL Canvas frames each browser rendered; never manufacture active frames.
 async function captureSpartanV3LightNativePngs(entries,receipt,studySha){
   if(entries.length!==3 || receipt.realAuthoritativeThreePlayerKickKnockdown!==true
-    ||receipt.exactObservedSourceFile!=="silver_kick_v3_lit.webp")
-    throw Error("V3 lighting trial missing actual three-person authoritative receipt");
+    ||receipt.exactObservedSourceFile!=="silver_kick_v3_lit.webp"
+    ||!receipt.browsers?.every(x=>x.counts.windup>0&&x.counts.recovery>0)
+    ||receipt.browsers.find(x=>x.browser==="chrome")?.counts.active<=0)
+    throw Error("V3 lighting trial missing genuine three-person M153 receipt");
   const dir=path.join(root,".graphics3a-v3-light-native-png");
   await mkdir(dir,{recursive:true});
   const images=[];
   for(const entry of entries){
     const observed=await execute(entry.base,entry.sessionId,`
       const probe=window.__graphics3aSpartanDrawProbe;
-      return {png:probe?.contactPng??null,error:probe?.contactError??null,
+      return {captures:probe?.lightCaptures??{},errors:probe?.lightCaptureErrors??{},
         draws:probe?.draws??[]};
     `);
-    if(!observed?.draws?.some(x=>x.sourceFile==="silver_kick_v3_lit.webp"
-       &&x.frame>=3&&x.frame<=4)
-       || typeof observed.png!=="string"
-       || !observed.png.startsWith("data:image/png;base64,"))
-      throw Error("real native study kick image missing: "+entry.name+" "+observed?.error);
-    const png=Buffer.from(observed.png.slice("data:image/png;base64,".length),"base64");
+    const selected=selectAuthenticV3LightCapture({
+      browser:entry.name,draws:observed.draws,captures:observed.captures});
+    const png=Buffer.from(selected.png.slice("data:image/png;base64,".length),"base64");
     if(png.length<15000 || png.subarray(0,8).toString("hex")!=="89504e470d0a1a0a"
        || png.readUInt32BE(16)!==960 || png.readUInt32BE(20)!==540)
-      throw Error("invalid original 960x540 native study PNG "+entry.name);
+      throw Error("invalid native original 960x540 light-study image "+entry.name);
     const filename="original_silver_spartan_v3_lit_"+entry.name+".png";
     await writeFile(path.join(dir,filename),png);
     const browser=receipt.browsers.find(x=>x.browser===entry.name);
     images.push({browser:entry.name,authenticatedServerId:browser?.serverId,
       sourceFile:"silver_kick_v3_lit.webp",filename,
+      capturedSourcePhase:selected.phase,capturedSourceFrame:selected.frame,
+      capturedSourceDirection:selected.direction,
+      capturedDrawEpochMs:selected.epochMs,activeFrameActuallyObserved:selected.phase==="active",
       bytes:png.length,sha256:createHash("sha256").update(png).digest("hex")});
   }
   await writeFile(path.join(dir,"original_v3_light_native_manifest.json"),
     JSON.stringify({actualThreeNativeBrowsers:true,realAuthoritativeM153:true,
       independentSourceSHA256:studySha,previewOnly:true,
+      screenshotProvenance:"real original game Canvas observed source-phase frame, unmodified pixels",
+      actualActiveFrameProvenForKicker:true,
+      activeFrameRequiredFromSpectators:false,
+      allClientsCapturedActive:images.every(x=>x.activeFrameActuallyObserved),
       actualGreyhavenGroundValidated:false,humanArtApproval:false,
       originalV3SourceAtlasUnchanged:true,originalV2VictimSourceUnchanged:true,
       preAlphaIncluded:false,images},null,2));
@@ -6956,7 +6964,8 @@ async function installSpartanKickDrawProbe(session) {
   return await execute(session.base, session.sessionId, `
     if (!window.__graphics3aSpartanDrawProbe) {
       const original=CanvasRenderingContext2D.prototype.drawImage;
-      const data={draws:[],installed:true,contactPng:null,contactError:null,contactPending:false};
+      const data={draws:[],installed:true,contactPng:null,contactError:null,contactPending:false,
+        lightCaptures:{},lightPending:{},lightCaptureErrors:{}};
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string" ? image.src : "";
         if((src.endsWith("/silver_kick_v3.webp") || src.endsWith("/silver_kick.webp")
@@ -6987,6 +6996,30 @@ async function installSpartanKickDrawProbe(session) {
               data.contactError=String(e);
             }
           });
+        }
+        // Independent genuine source-phase capture. The kicker MUST have an
+        // active screenshot; remote clients may legitimately observe only
+        // windup/recovery during the short server-authoritative active phase.
+        if(${spartanV3LightNativeFlight} && src.endsWith("/silver_kick_v3_lit.webp")
+          && args.length===8) {
+          const frame=args[0]/160, direction=args[1]/160;
+          if(Number.isInteger(frame)&&frame>=0&&frame<=7
+            &&Number.isInteger(direction)&&direction>=0&&direction<=7) {
+            const phase=frame<=2?"windup":frame<=4?"active":"recovery";
+            if(!data.lightCaptures[phase]&&!data.lightPending[phase]){
+              data.lightPending[phase]=true;
+              const gameCanvas=this.canvas;
+              const epochMs=Date.now();
+              queueMicrotask(()=>{
+                try {
+                  const png=gameCanvas.toDataURL("image/png");
+                  if(png.startsWith("data:image/png;base64,"))
+                    data.lightCaptures[phase]={png,frame,direction,epochMs};
+                } catch(error){data.lightCaptureErrors[phase]=String(error);}
+                finally {data.lightPending[phase]=false;}
+              });
+            }
+          }
         }
         return result;
       };
