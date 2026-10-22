@@ -432,7 +432,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uiguardbreak", "uiguardbreaktell", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -754,15 +754,18 @@ function sampleInput() {
   }
 }
 
-// Combat4 M144/M143: genuine native browser-only INPUT / processed ACK provenance.
+// Combat4 M144/M143/M193: native-only original INPUT / processed ACK provenance.
 // All records are observations of the existing v1 sender and the real input ACK.
 // No synthetic events, retransmits, admission decisions or game rule changes.
 function recordM144OriginalInputTrace(entry) {
-  if (acceptanceScenario !== "uimultirecoveryffa" && acceptanceScenario !== "uijumprecoveryffa") return;
+  if (acceptanceScenario !== "uimultirecoveryffa"
+    && acceptanceScenario !== "uijumprecoveryffa"
+    && acceptanceScenario !== "uiguardbreak"
+    && acceptanceScenario !== "uiguardbreaktell") return;
   const debug = window.__MYASO_ACCEPTANCE_STATE__;
   if (!debug) return;
   const active = entry.kind === "send"
-    && (entry.attack || entry.heavyAttack || entry.jump);
+    && (entry.attack || entry.heavyAttack || entry.jump || entry.block);
   if (active) debug.originalInputTraceRemaining = 12;
   else if (entry.kind === "send") debug.originalInputTraceRemaining = Math.max(0, (debug.originalInputTraceRemaining ?? 0) - 1);
   if (!active && !(debug.originalInputTraceRemaining > 0)) return;
@@ -806,6 +809,9 @@ function simulatePrediction(stepMs) {
       attack: Boolean(currentInput.attack),
       heavyAttack: Boolean(currentInput.heavyAttack),
       jump: Boolean(currentInput.jump),
+      block: Boolean(currentInput.block),
+      // Read-only local wheel-back protection interval; World still arbitrates Block.
+      shortBlockWindowRemainingMs: Math.max(0, Math.round(shortBlockUntil - performance.now())),
       pointerHeld: leftButtonCharge.isPressed(),
       charging: leftButtonCharge.isCharging(),
       spaceHeld: keys.has("Space"),
