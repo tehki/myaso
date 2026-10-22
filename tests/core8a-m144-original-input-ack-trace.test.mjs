@@ -35,5 +35,5 @@ test("original native M144 scenario and its strict focus verdict remain intact",
   assert.match(runner,/const expectedScenario = spatial \? "uimultirecoveryspatial" : "uimultirecoveryffa";/);
   assert.match(runner,/inputSubmissions: \(window\.__MYASO_ACCEPTANCE_STATE__\.inputSubmissions \?\? \[\]\)\.slice\(-32\)/);
   assert.match(runner,/inputAckReceipts: \(window\.__MYASO_ACCEPTANCE_STATE__\.inputAckReceipts \?\? \[\]\)\.slice\(-32\)/);
-  assert.match(runner,/M144 simultaneous recovery FFA focus did not arbitrate/);
+  assert.match(runner,/did not arbitrate nearest punishable -> remaining punishable -> nearest rival/);
 });
