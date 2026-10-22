@@ -33,12 +33,19 @@ jobs:
           ref: efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac
           path: pin/threec
           persist-credentials: false
-      - name: Graphics3B original Blender A2.32 editable ironwork and source WebPs (PINNED)
+      - name: Graphics3B corrected REAL Blender A2.32 lower door hinge +24cm (PINNED)
         uses: actions/checkout@v4
         with:
           repository: tehki/myaso
-          ref: 814924be535fcda9503bf013b600a60f249692e3
+          ref: 39e9ab8d23109727906cb18b4cc7cac86e425aa7
           path: pin/threeb
+          persist-credentials: false
+      - name: Prior actual physically attached A2.32 lower-hinge artwork before 24cm rise (PINNED)
+        uses: actions/checkout@v4
+        with:
+          repository: tehki/myaso
+          ref: 75bb57abf210cb3c1c7c925067edd8a0fcda4c79
+          path: pin/threeb-before
           persist-credentials: false
       - name: Validate exact source IDs, manifest bounds and isolated QA-only source
         run: |
@@ -48,13 +55,14 @@ jobs:
           git -C pin/world rev-parse HEAD
           git -C pin/threec rev-parse HEAD
           git -C pin/threeb rev-parse HEAD
+          git -C pin/threeb-before rev-parse HEAD
       - name: Require BOTH genuine independent first-party native browser engines
         run: |
           google-chrome --version
           firefox --version
           chromedriver --version
           geckodriver --version
-      - name: Chrome Firefox render original A2.32 ironwork in World+3C and fail closed on real HTTP / draw faults
+      - name: Chrome Firefox verify raised lower hinge against previous Blender source and exact placeholder fallback
         run: timeout --signal=TERM --kill-after=5s 450s node tools/art/verify_p0_a232_native_world3c_ironwork.mjs
       - name: Preserve genuine source-authentic browser Canvas PNGs and source report
         if: always()
