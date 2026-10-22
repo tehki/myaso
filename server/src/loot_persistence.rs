@@ -16,7 +16,7 @@ use crate::character_identity::CharacterId;
 use crate::loot::{
     Corpse, CurrentRackSword, EquipmentSlot, GroundDrop, Inventory, ItemKind, ItemStack,
     LootAuthority, LootError, LootStateSnapshot, ParkedInventory, Point, ProposedRackSocket,
-    LOOT_STATE_SCHEMA_VERSION, MAX_OPERATION_WATERMARKS,
+    BACKPACK_CAPACITY, EQUIPMENT_SLOT_COUNT, LOOT_STATE_SCHEMA_VERSION, MAX_OPERATION_WATERMARKS,
 };
 use crate::zone::ZoneId;
 
@@ -24,7 +24,7 @@ const MAGIC: &[u8; 8] = b"MYASOL03";
 pub(crate) const MAX_FILE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_CHARACTERS: usize = 4096;
 const MAX_WORLD_OBJECTS: usize = 100_000;
-const MAX_ITEM_STACKS: usize = 67;
+const MAX_ITEM_STACKS: usize = BACKPACK_CAPACITY + EQUIPMENT_SLOT_COUNT;
 static WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug)]
@@ -373,7 +373,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<LootStateSnapshot, CheckpointError>
             backpack.push(reader.item()?);
         }
         let equipped = usize::from(reader.u8()?);
-        if equipped > 3 {
+        if equipped > EQUIPMENT_SLOT_COUNT {
             return Err(CheckpointError::Corrupt);
         }
         let mut equipment = BTreeMap::new();
@@ -830,6 +830,139 @@ mod tests {
             restored.export_state().unwrap(),
             loot.export_state().unwrap()
         );
+    }
+
+    #[test]
+    fn five_equipment_slots_roundtrip_through_real_quiescent_checkpoint() {
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let character = CharacterId::new(910).unwrap();
+        let lease = SessionLease::new(1, 1).unwrap();
+        identities.bind_verified(lease, character).unwrap();
+        loot.register(1).unwrap();
+        let gear = [
+            (EquipmentSlot::MainHand, ItemKind::IronSword),
+            (EquipmentSlot::OffHand, ItemKind::WoodenShield),
+            (EquipmentSlot::Body, ItemKind::ChainmailArmor),
+            (EquipmentSlot::Head, ItemKind::IronHelmet),
+            (EquipmentSlot::Feet, ItemKind::LeatherBoots),
+        ];
+        let mut expected = Vec::new();
+        for (slot, kind) in gear {
+            let item = loot.grant(1, kind, 1).unwrap();
+            loot.equip(1, item, slot).unwrap();
+            expected.push((slot, item));
+        }
+        loot.park_inventory(&identities, lease).unwrap();
+        let source = loot.export_state().unwrap();
+        let path = checkpoint_path();
+        save_quiescent(&path, &loot).unwrap();
+        let saved = fs::read(&path).unwrap();
+        let restored = load_quiescent(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+        assert_eq!(restored.export_state().unwrap(), source);
+        for (slot, item) in expected {
+            assert_eq!(
+                restored
+                    .parked_inventory(character)
+                    .unwrap()
+                    .equipped(slot)
+                    .unwrap()
+                    .id,
+                item
+            );
+        }
+
+        // A well-checksummed six-slot count must be rejected before parsing
+        // arbitrary following bytes or accepting a phantom sixth slot.
+        let mut invalid = saved;
+        let equip_count_offset = MAGIC.len() + 2 + 8 + 4 + 4 + 8 + 1 + 2;
+        assert_eq!(invalid[equip_count_offset], EQUIPMENT_SLOT_COUNT as u8);
+        invalid[equip_count_offset] = (EQUIPMENT_SLOT_COUNT + 1) as u8;
+        let payload_len = invalid.len() - 8;
+        let digest = checksum(&invalid[..payload_len]);
+        invalid[payload_len..].copy_from_slice(&digest.to_le_bytes());
+        assert!(matches!(decode(&invalid), Err(CheckpointError::Corrupt)));
+    }
+
+    #[test]
+    fn five_equipped_items_and_full_backpack_fit_corpse_checkpoint_capacity() {
+        use crate::simulation::Action;
+
+        let mut loot = LootAuthority::new();
+        let mut identities = SessionIdentityRegistry::new();
+        let lease = SessionLease::new(1, 1).unwrap();
+        identities
+            .bind_verified(lease, CharacterId::new(911).unwrap())
+            .unwrap();
+        loot.register(1).unwrap();
+        for (slot, kind) in [
+            (EquipmentSlot::MainHand, ItemKind::IronSword),
+            (EquipmentSlot::OffHand, ItemKind::WoodenShield),
+            (EquipmentSlot::Body, ItemKind::ChainmailArmor),
+            (EquipmentSlot::Head, ItemKind::IronHelmet),
+            (EquipmentSlot::Feet, ItemKind::LeatherBoots),
+        ] {
+            let id = loot.grant(1, kind, 1).unwrap();
+            loot.equip(1, id, slot).unwrap();
+        }
+        for _ in 0..BACKPACK_CAPACITY {
+            loot.grant(1, ItemKind::WoodenClub, 1).unwrap();
+        }
+        let original_item_ids: std::collections::BTreeSet<_> = loot
+            .inventory(1)
+            .unwrap()
+            .backpack()
+            .iter()
+            .map(|item| item.id)
+            .chain(
+                [
+                    EquipmentSlot::MainHand,
+                    EquipmentSlot::OffHand,
+                    EquipmentSlot::Body,
+                    EquipmentSlot::Head,
+                    EquipmentSlot::Feet,
+                ]
+                .into_iter()
+                .map(|slot| loot.inventory(1).unwrap().equipped(slot).unwrap().id),
+            )
+            .collect();
+        assert_eq!(
+            original_item_ids.len(),
+            BACKPACK_CAPACITY + EQUIPMENT_SLOT_COUNT
+        );
+        let mut dead = fighter(1);
+        dead.action = Action::Dead;
+        dead.hp = 0.0;
+        let corpse_id = loot.death(1, &dead, ZoneId::Moonvale, 10).unwrap();
+        loot.park_inventory(&identities, lease).unwrap();
+        let snapshot = loot.export_state().unwrap();
+        let corpse = &snapshot.corpses[&corpse_id];
+        let mut remaining_ids: std::collections::BTreeSet<_> =
+            corpse.items.iter().map(|item| item.id).collect();
+        for drop in snapshot.ground.values() {
+            assert!(remaining_ids.insert(drop.item.id));
+        }
+        assert_eq!(remaining_ids, original_item_ids);
+        assert_eq!(decode(&encode(&snapshot).unwrap()).unwrap(), snapshot);
+
+        // Exhaustive valid 69-stack corpse bound (3 existing scattered stacks
+        // returned to the same corpse, retaining every exact physical ItemId).
+        let mut packed = snapshot;
+        let scattered: Vec<_> = packed
+            .ground
+            .values()
+            .map(|drop| drop.item.clone())
+            .collect();
+        packed.ground.clear();
+        packed
+            .corpses
+            .get_mut(&corpse_id)
+            .unwrap()
+            .items
+            .extend(scattered);
+        assert_eq!(packed.corpses[&corpse_id].items.len(), MAX_ITEM_STACKS);
+        assert_eq!(decode(&encode(&packed).unwrap()).unwrap(), packed);
     }
 
     #[test]
