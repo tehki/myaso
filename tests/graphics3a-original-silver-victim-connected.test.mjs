@@ -60,10 +60,10 @@ test("reject original Silver source spoof, missing remote render, invalid crop/d
 test("new original victim source atlas is byte-exact Blender render; default client never opts in",()=>{
  const root=new URL("../",import.meta.url);
  const bytes=p=>readFileSync(new URL(p,root));
- const source=bytes("docs/art/silver-victim-knockdown-360ms/original_silver_knockdown_360ms_8way.webp");
+ const source=bytes("docs/art/silver-victim-grounded-v2-360ms/original_silver_knockdown_grounded_v2_360ms_8way.webp");
  const installed=bytes("web/assets/knights/silver_knockdown.webp");
  const sha=x=>createHash("sha256").update(x).digest("hex");
- const meta=JSON.parse(bytes("docs/art/silver-victim-knockdown-360ms/original_silver_knockdown_source_manifest.json"));
+ const meta=JSON.parse(bytes("docs/art/silver-victim-grounded-v2-360ms/original_silver_knockdown_source_manifest.json"));
  assert.equal(sha(installed),sha(source));
  assert.equal(sha(installed),meta.realSourceAtlasSha256);
  assert.notEqual(sha(installed),sha(bytes("web/assets/knights/silver_kick_v3.webp")));
