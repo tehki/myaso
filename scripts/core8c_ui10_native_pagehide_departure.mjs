@@ -313,7 +313,7 @@ try {
  // was actually observed unless a browser truly uses it.
  const historyBackStart=Date.now();
  await wd("POST","/session/"+b+"/url",{url:"about:blank"});
- await wd("POST","/session/"+b+"/back");
+ await wd("POST","/session/"+b+"/back",{});
  const historyActor=await poll("authentic browser Back must admit fresh actor #8",
    async()=>evaljs(b,
     "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #8 - server tick \\d+/.test(x),status:x,navType:performance.getEntriesByType('navigation')?.[0]?.type||'unknown'};"),14000);
@@ -346,7 +346,7 @@ try {
   noRetiredActorGhosts:[2,5,6,7],
   authoritativeCanvasesAndScoreboards:backReconciled,
   bothReturningAndSurvivingClientInputAck:true,
-  bfcachePersistedWasObserved:false,
+  bfcachePersistenceNotAsserted:true,
   returningClientAck:backClientAck,
  }));
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
