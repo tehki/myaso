@@ -1,6 +1,37 @@
 # 🌕⚡️🚀 Core 8A — ONE v2 gesture wire candidate for Main #723
 
 
+## Isolated typed source API, NOT active v2 — Core8A review
+
+The existing **same** dormant proposal codec modules now expose
+`encodeProposedTypedGestureEvent/decodeProposedTypedGestureEvent` in JS
+and `encode_typed_event/decode_typed_event` in Rust. These reuse the
+original source0 Combat4 16B encoder/decoder and modify **only byte3
+in an independent copy** for the explicitly opt-in source1 candidate.
+There is **no parallel envelope and no change** to the old decoder:
+`decodeProposedGestureEvent`/`decode_event` continue to reject
+source1 until the Main-approved future live adapter explicitly opts in.
+The original v1 gameplay remains unchanged.
+
+The new JS/Rust tests read the SAME canonical 15-row golden fixture;
+they assert source0 bit compatibility, source1 PRESS/RELEASE/CANCEL,
+KeyE UPGRADE rejection, unknown source denial and 0x52 denial.
+A transport ACK is never a hit. This **does not** supply the mandated
+single global per-lease LMB+KeyE sequence/gesture ID allocator,
+authenticated QUIC capability handshake, bounded stream or ACK router,
+World-incarnation/owner epoch check, terminal/replay arbitration,
+browser provenance, or Combat heavy-on-KeyE-PRESS handling.
+Those are still mandatory, not inferred from a byte decoder.
+
+Core8C [#798](https://github.com/tehki/myaso/pull/798) currently
+provides only a dormant World-local incarnation concept; same-World
+lock with authenticated session/World-zone epoch is still required.
+Combat4 [#803](https://github.com/tehki/myaso/pull/803) has separate
+server-World KeyE semantic tests, not proof of typed network admission.
+Main's [draft ABI decision](https://github.com/tehki/myaso/issues/723#issuecomment-6344860886)
+is a review design, not final merged/authenticated wire enable.
+**DRAFT / HOLD.**
+
 ## Reserve Main design decision — 22 October 2026
 
 [Main's protocol-family selection in #723](https://github.com/tehki/myaso/issues/723#issuecomment-6344679826)
