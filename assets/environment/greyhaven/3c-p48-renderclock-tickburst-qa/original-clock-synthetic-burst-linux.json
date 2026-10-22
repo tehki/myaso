@@ -1,0 +1,4957 @@
+{
+  "type": "P48 original production source render-clock catch-up after synthetic packet stalls",
+  "exactParent": "46b63e172c24fd3be4333a4ac52a5ccac95059b6",
+  "pureOriginalClock": true,
+  "syntheticNotRealTraffic": true,
+  "notGPUPresentedFrameTimes": true,
+  "assumptions": {
+    "serverSimulationHz": 60,
+    "remoteInterpolationMs": 90,
+    "remoteExtrapolationCapMs": 100,
+    "frames": 600,
+    "frameMs": 16.666666666666668,
+    "initialAuthoritativeTick": 6000,
+    "freezeStartFrame": 180,
+    "packetCadenceFrames": 3,
+    "noSimulationOfBrowserWork": true,
+    "measurementsSampledEveryMs": 100
+  },
+  "sourceHashes": {
+    "src/browser/smooth-motion.mjs": "a5f111586a767bbfe79f7388f7d11919e130cc55a660166b5242dd7042c2c491",
+    "src/browser/render-gap-telemetry.mjs": "505a889e540fcc4a288e275e7f43f23b5c0ca441926194c6906ebc077791c295",
+    "src/network/constants.mjs": "5d2545fcdb17554f8324b5a63fe83724d0b129fdeece596bcf9ccc05c48da5ef",
+    "web/online-game.mjs": "aa7622e8878eac479a4de5475bf70f138edfd3e1cef93d76e4291b29b8478bc2",
+    "src/browser/authored-world-renderer.mjs": "9528b5485a2feb86af72b650271c5b8e7886f391372228e41fc7c6d721222961",
+    "src/world/authored-maps.mjs": "d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987"
+  },
+  "runs": [
+    {
+      "name": "regular-20hz-packet-arrival",
+      "freezeFrames": 0,
+      "frozenDurationMs": 0,
+      "frameIntervalsMs": 16.666666666666668,
+      "frameCount": 600,
+      "injectedTickIntervalCadence": "once every 3 frames (20Hz)",
+      "finalHUDSnapshot": {
+        "samples": 96,
+        "p50Ms": 0,
+        "p95Ms": 0,
+        "maxMs": 0,
+        "overThresholdPct": 0
+      },
+      "maxPresentationDebtMs": 0,
+      "framesWithDebtOver200Ms": 0,
+      "finalBoundedCatchups": 0,
+      "observedSamples": [
+        {
+          "frame": 0,
+          "atMs": 0,
+          "debtMs": 0
+        },
+        {
+          "frame": 6,
+          "atMs": 100,
+          "debtMs": 0
+        },
+        {
+          "frame": 12,
+          "atMs": 200,
+          "debtMs": 0
+        },
+        {
+          "frame": 18,
+          "atMs": 300,
+          "debtMs": 0
+        },
+        {
+          "frame": 24,
+          "atMs": 400,
+          "debtMs": 0
+        },
+        {
+          "frame": 30,
+          "atMs": 500,
+          "debtMs": 0
+        },
+        {
+          "frame": 37,
+          "atMs": 616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 43,
+          "atMs": 716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 49,
+          "atMs": 816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 55,
+          "atMs": 916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 61,
+          "atMs": 1016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 67,
+          "atMs": 1116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 73,
+          "atMs": 1216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 79,
+          "atMs": 1316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 85,
+          "atMs": 1416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 91,
+          "atMs": 1516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 97,
+          "atMs": 1616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 103,
+          "atMs": 1716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 109,
+          "atMs": 1816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 115,
+          "atMs": 1916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 121,
+          "atMs": 2016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 127,
+          "atMs": 2116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 133,
+          "atMs": 2216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 139,
+          "atMs": 2316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 145,
+          "atMs": 2416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 151,
+          "atMs": 2516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 157,
+          "atMs": 2616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 163,
+          "atMs": 2716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 169,
+          "atMs": 2816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 175,
+          "atMs": 2916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 181,
+          "atMs": 3016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 187,
+          "atMs": 3116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 193,
+          "atMs": 3216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 199,
+          "atMs": 3316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 205,
+          "atMs": 3416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 211,
+          "atMs": 3516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 217,
+          "atMs": 3616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 223,
+          "atMs": 3716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 229,
+          "atMs": 3816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 235,
+          "atMs": 3916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 241,
+          "atMs": 4016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 247,
+          "atMs": 4116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 253,
+          "atMs": 4216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 259,
+          "atMs": 4316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 265,
+          "atMs": 4416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 271,
+          "atMs": 4516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 277,
+          "atMs": 4616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 283,
+          "atMs": 4716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 289,
+          "atMs": 4816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 295,
+          "atMs": 4916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 301,
+          "atMs": 5016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 307,
+          "atMs": 5116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 313,
+          "atMs": 5216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 319,
+          "atMs": 5316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 325,
+          "atMs": 5416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 331,
+          "atMs": 5516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 337,
+          "atMs": 5616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 343,
+          "atMs": 5716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 349,
+          "atMs": 5816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 355,
+          "atMs": 5916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 361,
+          "atMs": 6016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 367,
+          "atMs": 6116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 373,
+          "atMs": 6216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 379,
+          "atMs": 6316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 385,
+          "atMs": 6416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 391,
+          "atMs": 6516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 397,
+          "atMs": 6616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 403,
+          "atMs": 6716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 409,
+          "atMs": 6816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 415,
+          "atMs": 6916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 421,
+          "atMs": 7016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 427,
+          "atMs": 7116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 433,
+          "atMs": 7216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 439,
+          "atMs": 7316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 445,
+          "atMs": 7416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 451,
+          "atMs": 7516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 457,
+          "atMs": 7616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 463,
+          "atMs": 7716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 469,
+          "atMs": 7816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 475,
+          "atMs": 7916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 481,
+          "atMs": 8016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 487,
+          "atMs": 8116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 493,
+          "atMs": 8216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 499,
+          "atMs": 8316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 505,
+          "atMs": 8416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 511,
+          "atMs": 8516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 517,
+          "atMs": 8616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 523,
+          "atMs": 8716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 529,
+          "atMs": 8816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 535,
+          "atMs": 8916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 541,
+          "atMs": 9016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 547,
+          "atMs": 9116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 553,
+          "atMs": 9216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 559,
+          "atMs": 9316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 565,
+          "atMs": 9416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 571,
+          "atMs": 9516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 577,
+          "atMs": 9616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 583,
+          "atMs": 9716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 589,
+          "atMs": 9816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 595,
+          "atMs": 9916.67,
+          "debtMs": 0
+        }
+      ],
+      "ingressTrace": [
+        {
+          "i": 175,
+          "atMs": 2916.667,
+          "authoritativeTick": 6174,
+          "renderedTick": 6169.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 176,
+          "atMs": 2933.333,
+          "authoritativeTick": 6174,
+          "renderedTick": 6170.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 177,
+          "atMs": 2950,
+          "authoritativeTick": 6177,
+          "renderedTick": 6171.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 178,
+          "atMs": 2966.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6172.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 179,
+          "atMs": 2983.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6173.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 180,
+          "atMs": 3000,
+          "authoritativeTick": 6180,
+          "renderedTick": 6174.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 181,
+          "atMs": 3016.667,
+          "authoritativeTick": 6180,
+          "renderedTick": 6175.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 182,
+          "atMs": 3033.333,
+          "authoritativeTick": 6180,
+          "renderedTick": 6176.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 183,
+          "atMs": 3050,
+          "authoritativeTick": 6183,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 184,
+          "atMs": 3066.667,
+          "authoritativeTick": 6183,
+          "renderedTick": 6178.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 185,
+          "atMs": 3083.333,
+          "authoritativeTick": 6183,
+          "renderedTick": 6179.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 186,
+          "atMs": 3100,
+          "authoritativeTick": 6186,
+          "renderedTick": 6180.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 187,
+          "atMs": 3116.667,
+          "authoritativeTick": 6186,
+          "renderedTick": 6181.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 188,
+          "atMs": 3133.333,
+          "authoritativeTick": 6186,
+          "renderedTick": 6182.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 189,
+          "atMs": 3150,
+          "authoritativeTick": 6189,
+          "renderedTick": 6183.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 190,
+          "atMs": 3166.667,
+          "authoritativeTick": 6189,
+          "renderedTick": 6184.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 191,
+          "atMs": 3183.333,
+          "authoritativeTick": 6189,
+          "renderedTick": 6185.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 192,
+          "atMs": 3200,
+          "authoritativeTick": 6192,
+          "renderedTick": 6186.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 193,
+          "atMs": 3216.667,
+          "authoritativeTick": 6192,
+          "renderedTick": 6187.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 194,
+          "atMs": 3233.333,
+          "authoritativeTick": 6192,
+          "renderedTick": 6188.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 195,
+          "atMs": 3250,
+          "authoritativeTick": 6195,
+          "renderedTick": 6189.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 196,
+          "atMs": 3266.667,
+          "authoritativeTick": 6195,
+          "renderedTick": 6190.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 197,
+          "atMs": 3283.333,
+          "authoritativeTick": 6195,
+          "renderedTick": 6191.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 198,
+          "atMs": 3300,
+          "authoritativeTick": 6198,
+          "renderedTick": 6192.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 199,
+          "atMs": 3316.667,
+          "authoritativeTick": 6198,
+          "renderedTick": 6193.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 200,
+          "atMs": 3333.333,
+          "authoritativeTick": 6198,
+          "renderedTick": 6194.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 201,
+          "atMs": 3350,
+          "authoritativeTick": 6201,
+          "renderedTick": 6195.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 202,
+          "atMs": 3366.667,
+          "authoritativeTick": 6201,
+          "renderedTick": 6196.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 203,
+          "atMs": 3383.333,
+          "authoritativeTick": 6201,
+          "renderedTick": 6197.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 204,
+          "atMs": 3400,
+          "authoritativeTick": 6204,
+          "renderedTick": 6198.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 205,
+          "atMs": 3416.667,
+          "authoritativeTick": 6204,
+          "renderedTick": 6199.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 206,
+          "atMs": 3433.333,
+          "authoritativeTick": 6204,
+          "renderedTick": 6200.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 207,
+          "atMs": 3450,
+          "authoritativeTick": 6207,
+          "renderedTick": 6201.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 208,
+          "atMs": 3466.667,
+          "authoritativeTick": 6207,
+          "renderedTick": 6202.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 209,
+          "atMs": 3483.333,
+          "authoritativeTick": 6207,
+          "renderedTick": 6203.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 210,
+          "atMs": 3500,
+          "authoritativeTick": 6210,
+          "renderedTick": 6204.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 211,
+          "atMs": 3516.667,
+          "authoritativeTick": 6210,
+          "renderedTick": 6205.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 212,
+          "atMs": 3533.333,
+          "authoritativeTick": 6210,
+          "renderedTick": 6206.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 213,
+          "atMs": 3550,
+          "authoritativeTick": 6213,
+          "renderedTick": 6207.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 214,
+          "atMs": 3566.667,
+          "authoritativeTick": 6213,
+          "renderedTick": 6208.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 215,
+          "atMs": 3583.333,
+          "authoritativeTick": 6213,
+          "renderedTick": 6209.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 216,
+          "atMs": 3600,
+          "authoritativeTick": 6216,
+          "renderedTick": 6210.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 217,
+          "atMs": 3616.667,
+          "authoritativeTick": 6216,
+          "renderedTick": 6211.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 218,
+          "atMs": 3633.333,
+          "authoritativeTick": 6216,
+          "renderedTick": 6212.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 219,
+          "atMs": 3650,
+          "authoritativeTick": 6219,
+          "renderedTick": 6213.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 220,
+          "atMs": 3666.667,
+          "authoritativeTick": 6219,
+          "renderedTick": 6214.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 221,
+          "atMs": 3683.333,
+          "authoritativeTick": 6219,
+          "renderedTick": 6215.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 222,
+          "atMs": 3700,
+          "authoritativeTick": 6222,
+          "renderedTick": 6216.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 223,
+          "atMs": 3716.667,
+          "authoritativeTick": 6222,
+          "renderedTick": 6217.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 224,
+          "atMs": 3733.333,
+          "authoritativeTick": 6222,
+          "renderedTick": 6218.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 225,
+          "atMs": 3750,
+          "authoritativeTick": 6225,
+          "renderedTick": 6219.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 226,
+          "atMs": 3766.667,
+          "authoritativeTick": 6225,
+          "renderedTick": 6220.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 227,
+          "atMs": 3783.333,
+          "authoritativeTick": 6225,
+          "renderedTick": 6221.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 228,
+          "atMs": 3800,
+          "authoritativeTick": 6228,
+          "renderedTick": 6222.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 229,
+          "atMs": 3816.667,
+          "authoritativeTick": 6228,
+          "renderedTick": 6223.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        }
+      ],
+      "lastFrame": {
+        "i": 599,
+        "atMs": 9983.333,
+        "authoritativeTick": 6597,
+        "renderedTick": 6593.6,
+        "targetGapTicks": 0,
+        "targetDebtMs": 0,
+        "sampled": false,
+        "boundedCatchups": 0
+      }
+    },
+    {
+      "name": "short-100ms-gap-then-catchup",
+      "freezeFrames": 6,
+      "frozenDurationMs": 100,
+      "frameIntervalsMs": 16.666666666666668,
+      "frameCount": 600,
+      "injectedTickIntervalCadence": "once every 3 frames (20Hz)",
+      "finalHUDSnapshot": {
+        "samples": 96,
+        "p50Ms": 0,
+        "p95Ms": 0,
+        "maxMs": 18.3,
+        "overThresholdPct": 0
+      },
+      "maxPresentationDebtMs": 25.833,
+      "framesWithDebtOver200Ms": 0,
+      "finalBoundedCatchups": 4,
+      "observedSamples": [
+        {
+          "frame": 0,
+          "atMs": 0,
+          "debtMs": 0
+        },
+        {
+          "frame": 6,
+          "atMs": 100,
+          "debtMs": 0
+        },
+        {
+          "frame": 12,
+          "atMs": 200,
+          "debtMs": 0
+        },
+        {
+          "frame": 18,
+          "atMs": 300,
+          "debtMs": 0
+        },
+        {
+          "frame": 24,
+          "atMs": 400,
+          "debtMs": 0
+        },
+        {
+          "frame": 30,
+          "atMs": 500,
+          "debtMs": 0
+        },
+        {
+          "frame": 37,
+          "atMs": 616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 43,
+          "atMs": 716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 49,
+          "atMs": 816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 55,
+          "atMs": 916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 61,
+          "atMs": 1016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 67,
+          "atMs": 1116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 73,
+          "atMs": 1216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 79,
+          "atMs": 1316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 85,
+          "atMs": 1416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 91,
+          "atMs": 1516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 97,
+          "atMs": 1616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 103,
+          "atMs": 1716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 109,
+          "atMs": 1816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 115,
+          "atMs": 1916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 121,
+          "atMs": 2016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 127,
+          "atMs": 2116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 133,
+          "atMs": 2216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 139,
+          "atMs": 2316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 145,
+          "atMs": 2416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 151,
+          "atMs": 2516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 157,
+          "atMs": 2616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 163,
+          "atMs": 2716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 169,
+          "atMs": 2816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 175,
+          "atMs": 2916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 181,
+          "atMs": 3016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 187,
+          "atMs": 3116.67,
+          "debtMs": 18.333
+        },
+        {
+          "frame": 193,
+          "atMs": 3216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 199,
+          "atMs": 3316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 205,
+          "atMs": 3416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 211,
+          "atMs": 3516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 217,
+          "atMs": 3616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 223,
+          "atMs": 3716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 229,
+          "atMs": 3816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 235,
+          "atMs": 3916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 241,
+          "atMs": 4016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 247,
+          "atMs": 4116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 253,
+          "atMs": 4216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 259,
+          "atMs": 4316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 265,
+          "atMs": 4416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 271,
+          "atMs": 4516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 277,
+          "atMs": 4616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 283,
+          "atMs": 4716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 289,
+          "atMs": 4816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 295,
+          "atMs": 4916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 301,
+          "atMs": 5016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 307,
+          "atMs": 5116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 313,
+          "atMs": 5216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 319,
+          "atMs": 5316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 325,
+          "atMs": 5416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 331,
+          "atMs": 5516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 337,
+          "atMs": 5616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 343,
+          "atMs": 5716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 349,
+          "atMs": 5816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 355,
+          "atMs": 5916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 361,
+          "atMs": 6016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 367,
+          "atMs": 6116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 373,
+          "atMs": 6216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 379,
+          "atMs": 6316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 385,
+          "atMs": 6416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 391,
+          "atMs": 6516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 397,
+          "atMs": 6616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 403,
+          "atMs": 6716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 409,
+          "atMs": 6816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 415,
+          "atMs": 6916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 421,
+          "atMs": 7016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 427,
+          "atMs": 7116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 433,
+          "atMs": 7216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 439,
+          "atMs": 7316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 445,
+          "atMs": 7416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 451,
+          "atMs": 7516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 457,
+          "atMs": 7616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 463,
+          "atMs": 7716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 469,
+          "atMs": 7816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 475,
+          "atMs": 7916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 481,
+          "atMs": 8016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 487,
+          "atMs": 8116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 493,
+          "atMs": 8216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 499,
+          "atMs": 8316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 505,
+          "atMs": 8416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 511,
+          "atMs": 8516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 517,
+          "atMs": 8616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 523,
+          "atMs": 8716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 529,
+          "atMs": 8816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 535,
+          "atMs": 8916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 541,
+          "atMs": 9016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 547,
+          "atMs": 9116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 553,
+          "atMs": 9216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 559,
+          "atMs": 9316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 565,
+          "atMs": 9416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 571,
+          "atMs": 9516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 577,
+          "atMs": 9616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 583,
+          "atMs": 9716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 589,
+          "atMs": 9816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 595,
+          "atMs": 9916.67,
+          "debtMs": 0
+        }
+      ],
+      "ingressTrace": [
+        {
+          "i": 175,
+          "atMs": 2916.667,
+          "authoritativeTick": 6174,
+          "renderedTick": 6169.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 176,
+          "atMs": 2933.333,
+          "authoritativeTick": 6174,
+          "renderedTick": 6170.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 177,
+          "atMs": 2950,
+          "authoritativeTick": 6177,
+          "renderedTick": 6171.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 178,
+          "atMs": 2966.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6172.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 179,
+          "atMs": 2983.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6173.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 180,
+          "atMs": 3000,
+          "authoritativeTick": 6177,
+          "renderedTick": 6174.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 181,
+          "atMs": 3016.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6175.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 182,
+          "atMs": 3033.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6176.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 183,
+          "atMs": 3050,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 184,
+          "atMs": 3066.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 185,
+          "atMs": 3083.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 186,
+          "atMs": 3100,
+          "authoritativeTick": 6186,
+          "renderedTick": 6179.05,
+          "targetGapTicks": 1.55,
+          "targetDebtMs": 25.833,
+          "sampled": false,
+          "boundedCatchups": 1
+        },
+        {
+          "i": 187,
+          "atMs": 3116.667,
+          "authoritativeTick": 6186,
+          "renderedTick": 6180.5,
+          "targetGapTicks": 1.1,
+          "targetDebtMs": 18.333,
+          "sampled": true,
+          "boundedCatchups": 2
+        },
+        {
+          "i": 188,
+          "atMs": 3133.333,
+          "authoritativeTick": 6186,
+          "renderedTick": 6181.95,
+          "targetGapTicks": 0.65,
+          "targetDebtMs": 10.833,
+          "sampled": false,
+          "boundedCatchups": 3
+        },
+        {
+          "i": 189,
+          "atMs": 3150,
+          "authoritativeTick": 6189,
+          "renderedTick": 6183.4,
+          "targetGapTicks": 0.2,
+          "targetDebtMs": 3.333,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 190,
+          "atMs": 3166.667,
+          "authoritativeTick": 6189,
+          "renderedTick": 6184.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 191,
+          "atMs": 3183.333,
+          "authoritativeTick": 6189,
+          "renderedTick": 6185.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 192,
+          "atMs": 3200,
+          "authoritativeTick": 6192,
+          "renderedTick": 6186.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 193,
+          "atMs": 3216.667,
+          "authoritativeTick": 6192,
+          "renderedTick": 6187.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 194,
+          "atMs": 3233.333,
+          "authoritativeTick": 6192,
+          "renderedTick": 6188.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 195,
+          "atMs": 3250,
+          "authoritativeTick": 6195,
+          "renderedTick": 6189.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 196,
+          "atMs": 3266.667,
+          "authoritativeTick": 6195,
+          "renderedTick": 6190.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 197,
+          "atMs": 3283.333,
+          "authoritativeTick": 6195,
+          "renderedTick": 6191.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 198,
+          "atMs": 3300,
+          "authoritativeTick": 6198,
+          "renderedTick": 6192.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 199,
+          "atMs": 3316.667,
+          "authoritativeTick": 6198,
+          "renderedTick": 6193.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 200,
+          "atMs": 3333.333,
+          "authoritativeTick": 6198,
+          "renderedTick": 6194.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 201,
+          "atMs": 3350,
+          "authoritativeTick": 6201,
+          "renderedTick": 6195.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 202,
+          "atMs": 3366.667,
+          "authoritativeTick": 6201,
+          "renderedTick": 6196.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 203,
+          "atMs": 3383.333,
+          "authoritativeTick": 6201,
+          "renderedTick": 6197.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 204,
+          "atMs": 3400,
+          "authoritativeTick": 6204,
+          "renderedTick": 6198.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 205,
+          "atMs": 3416.667,
+          "authoritativeTick": 6204,
+          "renderedTick": 6199.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 206,
+          "atMs": 3433.333,
+          "authoritativeTick": 6204,
+          "renderedTick": 6200.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 207,
+          "atMs": 3450,
+          "authoritativeTick": 6207,
+          "renderedTick": 6201.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 208,
+          "atMs": 3466.667,
+          "authoritativeTick": 6207,
+          "renderedTick": 6202.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 209,
+          "atMs": 3483.333,
+          "authoritativeTick": 6207,
+          "renderedTick": 6203.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 210,
+          "atMs": 3500,
+          "authoritativeTick": 6210,
+          "renderedTick": 6204.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 211,
+          "atMs": 3516.667,
+          "authoritativeTick": 6210,
+          "renderedTick": 6205.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 212,
+          "atMs": 3533.333,
+          "authoritativeTick": 6210,
+          "renderedTick": 6206.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 213,
+          "atMs": 3550,
+          "authoritativeTick": 6213,
+          "renderedTick": 6207.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 214,
+          "atMs": 3566.667,
+          "authoritativeTick": 6213,
+          "renderedTick": 6208.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 215,
+          "atMs": 3583.333,
+          "authoritativeTick": 6213,
+          "renderedTick": 6209.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 216,
+          "atMs": 3600,
+          "authoritativeTick": 6216,
+          "renderedTick": 6210.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 217,
+          "atMs": 3616.667,
+          "authoritativeTick": 6216,
+          "renderedTick": 6211.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 218,
+          "atMs": 3633.333,
+          "authoritativeTick": 6216,
+          "renderedTick": 6212.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 219,
+          "atMs": 3650,
+          "authoritativeTick": 6219,
+          "renderedTick": 6213.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 220,
+          "atMs": 3666.667,
+          "authoritativeTick": 6219,
+          "renderedTick": 6214.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 221,
+          "atMs": 3683.333,
+          "authoritativeTick": 6219,
+          "renderedTick": 6215.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 222,
+          "atMs": 3700,
+          "authoritativeTick": 6222,
+          "renderedTick": 6216.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 223,
+          "atMs": 3716.667,
+          "authoritativeTick": 6222,
+          "renderedTick": 6217.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 224,
+          "atMs": 3733.333,
+          "authoritativeTick": 6222,
+          "renderedTick": 6218.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 225,
+          "atMs": 3750,
+          "authoritativeTick": 6225,
+          "renderedTick": 6219.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 226,
+          "atMs": 3766.667,
+          "authoritativeTick": 6225,
+          "renderedTick": 6220.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 227,
+          "atMs": 3783.333,
+          "authoritativeTick": 6225,
+          "renderedTick": 6221.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 228,
+          "atMs": 3800,
+          "authoritativeTick": 6228,
+          "renderedTick": 6222.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 229,
+          "atMs": 3816.667,
+          "authoritativeTick": 6228,
+          "renderedTick": 6223.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 230,
+          "atMs": 3833.333,
+          "authoritativeTick": 6228,
+          "renderedTick": 6224.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 231,
+          "atMs": 3850,
+          "authoritativeTick": 6231,
+          "renderedTick": 6225.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 232,
+          "atMs": 3866.667,
+          "authoritativeTick": 6231,
+          "renderedTick": 6226.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 233,
+          "atMs": 3883.333,
+          "authoritativeTick": 6231,
+          "renderedTick": 6227.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 234,
+          "atMs": 3900,
+          "authoritativeTick": 6234,
+          "renderedTick": 6228.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 235,
+          "atMs": 3916.667,
+          "authoritativeTick": 6234,
+          "renderedTick": 6229.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 4
+        }
+      ],
+      "lastFrame": {
+        "i": 599,
+        "atMs": 9983.333,
+        "authoritativeTick": 6597,
+        "renderedTick": 6593.6,
+        "targetGapTicks": 0,
+        "targetDebtMs": 0,
+        "sampled": false,
+        "boundedCatchups": 4
+      }
+    },
+    {
+      "name": "burst-400ms-gap-then-catchup",
+      "freezeFrames": 24,
+      "frozenDurationMs": 400,
+      "frameIntervalsMs": 16.666666666666668,
+      "frameCount": 600,
+      "injectedTickIntervalCadence": "once every 3 frames (20Hz)",
+      "finalHUDSnapshot": {
+        "samples": 96,
+        "p50Ms": 0,
+        "p95Ms": 138.3,
+        "maxMs": 318.3,
+        "overThresholdPct": 7.3
+      },
+      "maxPresentationDebtMs": 325.833,
+      "framesWithDebtOver200Ms": 17,
+      "finalBoundedCatchups": 44,
+      "observedSamples": [
+        {
+          "frame": 0,
+          "atMs": 0,
+          "debtMs": 0
+        },
+        {
+          "frame": 6,
+          "atMs": 100,
+          "debtMs": 0
+        },
+        {
+          "frame": 12,
+          "atMs": 200,
+          "debtMs": 0
+        },
+        {
+          "frame": 18,
+          "atMs": 300,
+          "debtMs": 0
+        },
+        {
+          "frame": 24,
+          "atMs": 400,
+          "debtMs": 0
+        },
+        {
+          "frame": 30,
+          "atMs": 500,
+          "debtMs": 0
+        },
+        {
+          "frame": 37,
+          "atMs": 616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 43,
+          "atMs": 716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 49,
+          "atMs": 816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 55,
+          "atMs": 916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 61,
+          "atMs": 1016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 67,
+          "atMs": 1116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 73,
+          "atMs": 1216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 79,
+          "atMs": 1316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 85,
+          "atMs": 1416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 91,
+          "atMs": 1516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 97,
+          "atMs": 1616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 103,
+          "atMs": 1716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 109,
+          "atMs": 1816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 115,
+          "atMs": 1916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 121,
+          "atMs": 2016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 127,
+          "atMs": 2116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 133,
+          "atMs": 2216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 139,
+          "atMs": 2316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 145,
+          "atMs": 2416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 151,
+          "atMs": 2516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 157,
+          "atMs": 2616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 163,
+          "atMs": 2716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 169,
+          "atMs": 2816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 175,
+          "atMs": 2916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 181,
+          "atMs": 3016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 187,
+          "atMs": 3116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 193,
+          "atMs": 3216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 199,
+          "atMs": 3316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 205,
+          "atMs": 3416.67,
+          "debtMs": 318.333
+        },
+        {
+          "frame": 211,
+          "atMs": 3516.67,
+          "debtMs": 273.333
+        },
+        {
+          "frame": 217,
+          "atMs": 3616.67,
+          "debtMs": 228.333
+        },
+        {
+          "frame": 223,
+          "atMs": 3716.67,
+          "debtMs": 183.333
+        },
+        {
+          "frame": 229,
+          "atMs": 3816.67,
+          "debtMs": 138.333
+        },
+        {
+          "frame": 235,
+          "atMs": 3916.67,
+          "debtMs": 93.333
+        },
+        {
+          "frame": 241,
+          "atMs": 4016.67,
+          "debtMs": 48.333
+        },
+        {
+          "frame": 247,
+          "atMs": 4116.67,
+          "debtMs": 3.333
+        },
+        {
+          "frame": 253,
+          "atMs": 4216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 259,
+          "atMs": 4316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 265,
+          "atMs": 4416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 271,
+          "atMs": 4516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 277,
+          "atMs": 4616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 283,
+          "atMs": 4716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 289,
+          "atMs": 4816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 295,
+          "atMs": 4916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 301,
+          "atMs": 5016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 307,
+          "atMs": 5116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 313,
+          "atMs": 5216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 319,
+          "atMs": 5316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 325,
+          "atMs": 5416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 331,
+          "atMs": 5516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 337,
+          "atMs": 5616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 343,
+          "atMs": 5716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 349,
+          "atMs": 5816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 355,
+          "atMs": 5916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 361,
+          "atMs": 6016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 367,
+          "atMs": 6116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 373,
+          "atMs": 6216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 379,
+          "atMs": 6316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 385,
+          "atMs": 6416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 391,
+          "atMs": 6516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 397,
+          "atMs": 6616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 403,
+          "atMs": 6716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 409,
+          "atMs": 6816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 415,
+          "atMs": 6916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 421,
+          "atMs": 7016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 427,
+          "atMs": 7116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 433,
+          "atMs": 7216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 439,
+          "atMs": 7316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 445,
+          "atMs": 7416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 451,
+          "atMs": 7516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 457,
+          "atMs": 7616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 463,
+          "atMs": 7716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 469,
+          "atMs": 7816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 475,
+          "atMs": 7916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 481,
+          "atMs": 8016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 487,
+          "atMs": 8116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 493,
+          "atMs": 8216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 499,
+          "atMs": 8316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 505,
+          "atMs": 8416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 511,
+          "atMs": 8516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 517,
+          "atMs": 8616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 523,
+          "atMs": 8716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 529,
+          "atMs": 8816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 535,
+          "atMs": 8916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 541,
+          "atMs": 9016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 547,
+          "atMs": 9116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 553,
+          "atMs": 9216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 559,
+          "atMs": 9316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 565,
+          "atMs": 9416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 571,
+          "atMs": 9516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 577,
+          "atMs": 9616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 583,
+          "atMs": 9716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 589,
+          "atMs": 9816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 595,
+          "atMs": 9916.67,
+          "debtMs": 0
+        }
+      ],
+      "ingressTrace": [
+        {
+          "i": 175,
+          "atMs": 2916.667,
+          "authoritativeTick": 6174,
+          "renderedTick": 6169.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 176,
+          "atMs": 2933.333,
+          "authoritativeTick": 6174,
+          "renderedTick": 6170.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 177,
+          "atMs": 2950,
+          "authoritativeTick": 6177,
+          "renderedTick": 6171.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 178,
+          "atMs": 2966.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6172.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 179,
+          "atMs": 2983.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6173.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 180,
+          "atMs": 3000,
+          "authoritativeTick": 6177,
+          "renderedTick": 6174.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 181,
+          "atMs": 3016.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6175.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 182,
+          "atMs": 3033.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6176.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 183,
+          "atMs": 3050,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 184,
+          "atMs": 3066.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 185,
+          "atMs": 3083.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 186,
+          "atMs": 3100,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 187,
+          "atMs": 3116.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 188,
+          "atMs": 3133.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 189,
+          "atMs": 3150,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 190,
+          "atMs": 3166.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 191,
+          "atMs": 3183.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 192,
+          "atMs": 3200,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 193,
+          "atMs": 3216.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 194,
+          "atMs": 3233.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 195,
+          "atMs": 3250,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 196,
+          "atMs": 3266.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 197,
+          "atMs": 3283.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 198,
+          "atMs": 3300,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 199,
+          "atMs": 3316.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 200,
+          "atMs": 3333.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 201,
+          "atMs": 3350,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 202,
+          "atMs": 3366.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 203,
+          "atMs": 3383.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 204,
+          "atMs": 3400,
+          "authoritativeTick": 6204,
+          "renderedTick": 6179.05,
+          "targetGapTicks": 19.55,
+          "targetDebtMs": 325.833,
+          "sampled": false,
+          "boundedCatchups": 1
+        },
+        {
+          "i": 205,
+          "atMs": 3416.667,
+          "authoritativeTick": 6204,
+          "renderedTick": 6180.5,
+          "targetGapTicks": 19.1,
+          "targetDebtMs": 318.333,
+          "sampled": true,
+          "boundedCatchups": 2
+        },
+        {
+          "i": 206,
+          "atMs": 3433.333,
+          "authoritativeTick": 6204,
+          "renderedTick": 6181.95,
+          "targetGapTicks": 18.65,
+          "targetDebtMs": 310.833,
+          "sampled": false,
+          "boundedCatchups": 3
+        },
+        {
+          "i": 207,
+          "atMs": 3450,
+          "authoritativeTick": 6207,
+          "renderedTick": 6183.4,
+          "targetGapTicks": 18.2,
+          "targetDebtMs": 303.333,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 208,
+          "atMs": 3466.667,
+          "authoritativeTick": 6207,
+          "renderedTick": 6184.85,
+          "targetGapTicks": 17.75,
+          "targetDebtMs": 295.833,
+          "sampled": false,
+          "boundedCatchups": 5
+        },
+        {
+          "i": 209,
+          "atMs": 3483.333,
+          "authoritativeTick": 6207,
+          "renderedTick": 6186.3,
+          "targetGapTicks": 17.3,
+          "targetDebtMs": 288.333,
+          "sampled": false,
+          "boundedCatchups": 6
+        },
+        {
+          "i": 210,
+          "atMs": 3500,
+          "authoritativeTick": 6210,
+          "renderedTick": 6187.75,
+          "targetGapTicks": 16.85,
+          "targetDebtMs": 280.833,
+          "sampled": false,
+          "boundedCatchups": 7
+        },
+        {
+          "i": 211,
+          "atMs": 3516.667,
+          "authoritativeTick": 6210,
+          "renderedTick": 6189.2,
+          "targetGapTicks": 16.4,
+          "targetDebtMs": 273.333,
+          "sampled": true,
+          "boundedCatchups": 8
+        },
+        {
+          "i": 212,
+          "atMs": 3533.333,
+          "authoritativeTick": 6210,
+          "renderedTick": 6190.65,
+          "targetGapTicks": 15.95,
+          "targetDebtMs": 265.833,
+          "sampled": false,
+          "boundedCatchups": 9
+        },
+        {
+          "i": 213,
+          "atMs": 3550,
+          "authoritativeTick": 6213,
+          "renderedTick": 6192.1,
+          "targetGapTicks": 15.5,
+          "targetDebtMs": 258.333,
+          "sampled": false,
+          "boundedCatchups": 10
+        },
+        {
+          "i": 214,
+          "atMs": 3566.667,
+          "authoritativeTick": 6213,
+          "renderedTick": 6193.55,
+          "targetGapTicks": 15.05,
+          "targetDebtMs": 250.833,
+          "sampled": false,
+          "boundedCatchups": 11
+        },
+        {
+          "i": 215,
+          "atMs": 3583.333,
+          "authoritativeTick": 6213,
+          "renderedTick": 6195,
+          "targetGapTicks": 14.6,
+          "targetDebtMs": 243.333,
+          "sampled": false,
+          "boundedCatchups": 12
+        },
+        {
+          "i": 216,
+          "atMs": 3600,
+          "authoritativeTick": 6216,
+          "renderedTick": 6196.45,
+          "targetGapTicks": 14.15,
+          "targetDebtMs": 235.833,
+          "sampled": false,
+          "boundedCatchups": 13
+        },
+        {
+          "i": 217,
+          "atMs": 3616.667,
+          "authoritativeTick": 6216,
+          "renderedTick": 6197.9,
+          "targetGapTicks": 13.7,
+          "targetDebtMs": 228.333,
+          "sampled": true,
+          "boundedCatchups": 14
+        },
+        {
+          "i": 218,
+          "atMs": 3633.333,
+          "authoritativeTick": 6216,
+          "renderedTick": 6199.35,
+          "targetGapTicks": 13.25,
+          "targetDebtMs": 220.833,
+          "sampled": false,
+          "boundedCatchups": 15
+        },
+        {
+          "i": 219,
+          "atMs": 3650,
+          "authoritativeTick": 6219,
+          "renderedTick": 6200.8,
+          "targetGapTicks": 12.8,
+          "targetDebtMs": 213.333,
+          "sampled": false,
+          "boundedCatchups": 16
+        },
+        {
+          "i": 220,
+          "atMs": 3666.667,
+          "authoritativeTick": 6219,
+          "renderedTick": 6202.25,
+          "targetGapTicks": 12.35,
+          "targetDebtMs": 205.833,
+          "sampled": false,
+          "boundedCatchups": 17
+        },
+        {
+          "i": 221,
+          "atMs": 3683.333,
+          "authoritativeTick": 6219,
+          "renderedTick": 6203.7,
+          "targetGapTicks": 11.9,
+          "targetDebtMs": 198.333,
+          "sampled": false,
+          "boundedCatchups": 18
+        },
+        {
+          "i": 222,
+          "atMs": 3700,
+          "authoritativeTick": 6222,
+          "renderedTick": 6205.15,
+          "targetGapTicks": 11.45,
+          "targetDebtMs": 190.833,
+          "sampled": false,
+          "boundedCatchups": 19
+        },
+        {
+          "i": 223,
+          "atMs": 3716.667,
+          "authoritativeTick": 6222,
+          "renderedTick": 6206.6,
+          "targetGapTicks": 11,
+          "targetDebtMs": 183.333,
+          "sampled": true,
+          "boundedCatchups": 20
+        },
+        {
+          "i": 224,
+          "atMs": 3733.333,
+          "authoritativeTick": 6222,
+          "renderedTick": 6208.05,
+          "targetGapTicks": 10.55,
+          "targetDebtMs": 175.833,
+          "sampled": false,
+          "boundedCatchups": 21
+        },
+        {
+          "i": 225,
+          "atMs": 3750,
+          "authoritativeTick": 6225,
+          "renderedTick": 6209.5,
+          "targetGapTicks": 10.1,
+          "targetDebtMs": 168.333,
+          "sampled": false,
+          "boundedCatchups": 22
+        },
+        {
+          "i": 226,
+          "atMs": 3766.667,
+          "authoritativeTick": 6225,
+          "renderedTick": 6210.95,
+          "targetGapTicks": 9.65,
+          "targetDebtMs": 160.833,
+          "sampled": false,
+          "boundedCatchups": 23
+        },
+        {
+          "i": 227,
+          "atMs": 3783.333,
+          "authoritativeTick": 6225,
+          "renderedTick": 6212.4,
+          "targetGapTicks": 9.2,
+          "targetDebtMs": 153.333,
+          "sampled": false,
+          "boundedCatchups": 24
+        },
+        {
+          "i": 228,
+          "atMs": 3800,
+          "authoritativeTick": 6228,
+          "renderedTick": 6213.85,
+          "targetGapTicks": 8.75,
+          "targetDebtMs": 145.833,
+          "sampled": false,
+          "boundedCatchups": 25
+        },
+        {
+          "i": 229,
+          "atMs": 3816.667,
+          "authoritativeTick": 6228,
+          "renderedTick": 6215.3,
+          "targetGapTicks": 8.3,
+          "targetDebtMs": 138.333,
+          "sampled": true,
+          "boundedCatchups": 26
+        },
+        {
+          "i": 230,
+          "atMs": 3833.333,
+          "authoritativeTick": 6228,
+          "renderedTick": 6216.75,
+          "targetGapTicks": 7.85,
+          "targetDebtMs": 130.833,
+          "sampled": false,
+          "boundedCatchups": 27
+        },
+        {
+          "i": 231,
+          "atMs": 3850,
+          "authoritativeTick": 6231,
+          "renderedTick": 6218.2,
+          "targetGapTicks": 7.4,
+          "targetDebtMs": 123.333,
+          "sampled": false,
+          "boundedCatchups": 28
+        },
+        {
+          "i": 232,
+          "atMs": 3866.667,
+          "authoritativeTick": 6231,
+          "renderedTick": 6219.65,
+          "targetGapTicks": 6.95,
+          "targetDebtMs": 115.833,
+          "sampled": false,
+          "boundedCatchups": 29
+        },
+        {
+          "i": 233,
+          "atMs": 3883.333,
+          "authoritativeTick": 6231,
+          "renderedTick": 6221.1,
+          "targetGapTicks": 6.5,
+          "targetDebtMs": 108.333,
+          "sampled": false,
+          "boundedCatchups": 30
+        },
+        {
+          "i": 234,
+          "atMs": 3900,
+          "authoritativeTick": 6234,
+          "renderedTick": 6222.55,
+          "targetGapTicks": 6.05,
+          "targetDebtMs": 100.833,
+          "sampled": false,
+          "boundedCatchups": 31
+        },
+        {
+          "i": 235,
+          "atMs": 3916.667,
+          "authoritativeTick": 6234,
+          "renderedTick": 6224,
+          "targetGapTicks": 5.6,
+          "targetDebtMs": 93.333,
+          "sampled": true,
+          "boundedCatchups": 32
+        },
+        {
+          "i": 236,
+          "atMs": 3933.333,
+          "authoritativeTick": 6234,
+          "renderedTick": 6225.45,
+          "targetGapTicks": 5.15,
+          "targetDebtMs": 85.833,
+          "sampled": false,
+          "boundedCatchups": 33
+        },
+        {
+          "i": 237,
+          "atMs": 3950,
+          "authoritativeTick": 6237,
+          "renderedTick": 6226.9,
+          "targetGapTicks": 4.7,
+          "targetDebtMs": 78.333,
+          "sampled": false,
+          "boundedCatchups": 34
+        },
+        {
+          "i": 238,
+          "atMs": 3966.667,
+          "authoritativeTick": 6237,
+          "renderedTick": 6228.35,
+          "targetGapTicks": 4.25,
+          "targetDebtMs": 70.833,
+          "sampled": false,
+          "boundedCatchups": 35
+        },
+        {
+          "i": 239,
+          "atMs": 3983.333,
+          "authoritativeTick": 6237,
+          "renderedTick": 6229.8,
+          "targetGapTicks": 3.8,
+          "targetDebtMs": 63.333,
+          "sampled": false,
+          "boundedCatchups": 36
+        },
+        {
+          "i": 240,
+          "atMs": 4000,
+          "authoritativeTick": 6240,
+          "renderedTick": 6231.25,
+          "targetGapTicks": 3.35,
+          "targetDebtMs": 55.833,
+          "sampled": false,
+          "boundedCatchups": 37
+        },
+        {
+          "i": 241,
+          "atMs": 4016.667,
+          "authoritativeTick": 6240,
+          "renderedTick": 6232.7,
+          "targetGapTicks": 2.9,
+          "targetDebtMs": 48.333,
+          "sampled": true,
+          "boundedCatchups": 38
+        },
+        {
+          "i": 242,
+          "atMs": 4033.333,
+          "authoritativeTick": 6240,
+          "renderedTick": 6234.15,
+          "targetGapTicks": 2.45,
+          "targetDebtMs": 40.833,
+          "sampled": false,
+          "boundedCatchups": 39
+        },
+        {
+          "i": 243,
+          "atMs": 4050,
+          "authoritativeTick": 6243,
+          "renderedTick": 6235.6,
+          "targetGapTicks": 2,
+          "targetDebtMs": 33.333,
+          "sampled": false,
+          "boundedCatchups": 40
+        },
+        {
+          "i": 244,
+          "atMs": 4066.667,
+          "authoritativeTick": 6243,
+          "renderedTick": 6237.05,
+          "targetGapTicks": 1.55,
+          "targetDebtMs": 25.833,
+          "sampled": false,
+          "boundedCatchups": 41
+        },
+        {
+          "i": 245,
+          "atMs": 4083.333,
+          "authoritativeTick": 6243,
+          "renderedTick": 6238.5,
+          "targetGapTicks": 1.1,
+          "targetDebtMs": 18.333,
+          "sampled": false,
+          "boundedCatchups": 42
+        },
+        {
+          "i": 246,
+          "atMs": 4100,
+          "authoritativeTick": 6246,
+          "renderedTick": 6239.95,
+          "targetGapTicks": 0.65,
+          "targetDebtMs": 10.833,
+          "sampled": false,
+          "boundedCatchups": 43
+        },
+        {
+          "i": 247,
+          "atMs": 4116.667,
+          "authoritativeTick": 6246,
+          "renderedTick": 6241.4,
+          "targetGapTicks": 0.2,
+          "targetDebtMs": 3.333,
+          "sampled": true,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 248,
+          "atMs": 4133.333,
+          "authoritativeTick": 6246,
+          "renderedTick": 6242.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 249,
+          "atMs": 4150,
+          "authoritativeTick": 6249,
+          "renderedTick": 6243.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 250,
+          "atMs": 4166.667,
+          "authoritativeTick": 6249,
+          "renderedTick": 6244.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 251,
+          "atMs": 4183.333,
+          "authoritativeTick": 6249,
+          "renderedTick": 6245.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 252,
+          "atMs": 4200,
+          "authoritativeTick": 6252,
+          "renderedTick": 6246.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 253,
+          "atMs": 4216.667,
+          "authoritativeTick": 6252,
+          "renderedTick": 6247.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 44
+        }
+      ],
+      "lastFrame": {
+        "i": 599,
+        "atMs": 9983.333,
+        "authoritativeTick": 6597,
+        "renderedTick": 6593.6,
+        "targetGapTicks": 0,
+        "targetDebtMs": 0,
+        "sampled": false,
+        "boundedCatchups": 44
+      }
+    },
+    {
+      "name": "burst-500ms-gap-then-catchup",
+      "freezeFrames": 30,
+      "frozenDurationMs": 500,
+      "frameIntervalsMs": 16.666666666666668,
+      "frameCount": 600,
+      "injectedTickIntervalCadence": "once every 3 frames (20Hz)",
+      "finalHUDSnapshot": {
+        "samples": 96,
+        "p50Ms": 0,
+        "p95Ms": 238.3,
+        "maxMs": 418.3,
+        "overThresholdPct": 9.4
+      },
+      "maxPresentationDebtMs": 425.833,
+      "framesWithDebtOver200Ms": 31,
+      "finalBoundedCatchups": 57,
+      "observedSamples": [
+        {
+          "frame": 0,
+          "atMs": 0,
+          "debtMs": 0
+        },
+        {
+          "frame": 6,
+          "atMs": 100,
+          "debtMs": 0
+        },
+        {
+          "frame": 12,
+          "atMs": 200,
+          "debtMs": 0
+        },
+        {
+          "frame": 18,
+          "atMs": 300,
+          "debtMs": 0
+        },
+        {
+          "frame": 24,
+          "atMs": 400,
+          "debtMs": 0
+        },
+        {
+          "frame": 30,
+          "atMs": 500,
+          "debtMs": 0
+        },
+        {
+          "frame": 37,
+          "atMs": 616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 43,
+          "atMs": 716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 49,
+          "atMs": 816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 55,
+          "atMs": 916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 61,
+          "atMs": 1016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 67,
+          "atMs": 1116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 73,
+          "atMs": 1216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 79,
+          "atMs": 1316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 85,
+          "atMs": 1416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 91,
+          "atMs": 1516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 97,
+          "atMs": 1616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 103,
+          "atMs": 1716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 109,
+          "atMs": 1816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 115,
+          "atMs": 1916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 121,
+          "atMs": 2016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 127,
+          "atMs": 2116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 133,
+          "atMs": 2216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 139,
+          "atMs": 2316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 145,
+          "atMs": 2416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 151,
+          "atMs": 2516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 157,
+          "atMs": 2616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 163,
+          "atMs": 2716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 169,
+          "atMs": 2816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 175,
+          "atMs": 2916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 181,
+          "atMs": 3016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 187,
+          "atMs": 3116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 193,
+          "atMs": 3216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 199,
+          "atMs": 3316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 205,
+          "atMs": 3416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 211,
+          "atMs": 3516.67,
+          "debtMs": 418.333
+        },
+        {
+          "frame": 217,
+          "atMs": 3616.67,
+          "debtMs": 373.333
+        },
+        {
+          "frame": 223,
+          "atMs": 3716.67,
+          "debtMs": 328.333
+        },
+        {
+          "frame": 229,
+          "atMs": 3816.67,
+          "debtMs": 283.333
+        },
+        {
+          "frame": 235,
+          "atMs": 3916.67,
+          "debtMs": 238.333
+        },
+        {
+          "frame": 241,
+          "atMs": 4016.67,
+          "debtMs": 193.333
+        },
+        {
+          "frame": 247,
+          "atMs": 4116.67,
+          "debtMs": 148.333
+        },
+        {
+          "frame": 253,
+          "atMs": 4216.67,
+          "debtMs": 103.333
+        },
+        {
+          "frame": 259,
+          "atMs": 4316.67,
+          "debtMs": 58.333
+        },
+        {
+          "frame": 265,
+          "atMs": 4416.67,
+          "debtMs": 13.333
+        },
+        {
+          "frame": 271,
+          "atMs": 4516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 277,
+          "atMs": 4616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 283,
+          "atMs": 4716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 289,
+          "atMs": 4816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 295,
+          "atMs": 4916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 301,
+          "atMs": 5016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 307,
+          "atMs": 5116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 313,
+          "atMs": 5216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 319,
+          "atMs": 5316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 325,
+          "atMs": 5416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 331,
+          "atMs": 5516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 337,
+          "atMs": 5616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 343,
+          "atMs": 5716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 349,
+          "atMs": 5816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 355,
+          "atMs": 5916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 361,
+          "atMs": 6016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 367,
+          "atMs": 6116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 373,
+          "atMs": 6216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 379,
+          "atMs": 6316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 385,
+          "atMs": 6416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 391,
+          "atMs": 6516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 397,
+          "atMs": 6616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 403,
+          "atMs": 6716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 409,
+          "atMs": 6816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 415,
+          "atMs": 6916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 421,
+          "atMs": 7016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 427,
+          "atMs": 7116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 433,
+          "atMs": 7216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 439,
+          "atMs": 7316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 445,
+          "atMs": 7416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 451,
+          "atMs": 7516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 457,
+          "atMs": 7616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 463,
+          "atMs": 7716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 469,
+          "atMs": 7816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 475,
+          "atMs": 7916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 481,
+          "atMs": 8016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 487,
+          "atMs": 8116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 493,
+          "atMs": 8216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 499,
+          "atMs": 8316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 505,
+          "atMs": 8416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 511,
+          "atMs": 8516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 517,
+          "atMs": 8616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 523,
+          "atMs": 8716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 529,
+          "atMs": 8816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 535,
+          "atMs": 8916.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 541,
+          "atMs": 9016.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 547,
+          "atMs": 9116.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 553,
+          "atMs": 9216.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 559,
+          "atMs": 9316.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 565,
+          "atMs": 9416.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 571,
+          "atMs": 9516.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 577,
+          "atMs": 9616.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 583,
+          "atMs": 9716.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 589,
+          "atMs": 9816.67,
+          "debtMs": 0
+        },
+        {
+          "frame": 595,
+          "atMs": 9916.67,
+          "debtMs": 0
+        }
+      ],
+      "ingressTrace": [
+        {
+          "i": 175,
+          "atMs": 2916.667,
+          "authoritativeTick": 6174,
+          "renderedTick": 6169.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 176,
+          "atMs": 2933.333,
+          "authoritativeTick": 6174,
+          "renderedTick": 6170.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 177,
+          "atMs": 2950,
+          "authoritativeTick": 6177,
+          "renderedTick": 6171.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 178,
+          "atMs": 2966.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6172.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 179,
+          "atMs": 2983.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6173.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 180,
+          "atMs": 3000,
+          "authoritativeTick": 6177,
+          "renderedTick": 6174.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 181,
+          "atMs": 3016.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6175.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 182,
+          "atMs": 3033.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6176.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 183,
+          "atMs": 3050,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 184,
+          "atMs": 3066.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 185,
+          "atMs": 3083.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 186,
+          "atMs": 3100,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 187,
+          "atMs": 3116.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 188,
+          "atMs": 3133.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 189,
+          "atMs": 3150,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 190,
+          "atMs": 3166.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 191,
+          "atMs": 3183.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 192,
+          "atMs": 3200,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 193,
+          "atMs": 3216.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 194,
+          "atMs": 3233.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 195,
+          "atMs": 3250,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 196,
+          "atMs": 3266.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 197,
+          "atMs": 3283.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 198,
+          "atMs": 3300,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 199,
+          "atMs": 3316.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 200,
+          "atMs": 3333.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 201,
+          "atMs": 3350,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 202,
+          "atMs": 3366.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 203,
+          "atMs": 3383.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 204,
+          "atMs": 3400,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 205,
+          "atMs": 3416.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": true,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 206,
+          "atMs": 3433.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 207,
+          "atMs": 3450,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 208,
+          "atMs": 3466.667,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 209,
+          "atMs": 3483.333,
+          "authoritativeTick": 6177,
+          "renderedTick": 6177.6,
+          "targetGapTicks": 0,
+          "targetDebtMs": 0,
+          "sampled": false,
+          "boundedCatchups": 0
+        },
+        {
+          "i": 210,
+          "atMs": 3500,
+          "authoritativeTick": 6210,
+          "renderedTick": 6179.05,
+          "targetGapTicks": 25.55,
+          "targetDebtMs": 425.833,
+          "sampled": false,
+          "boundedCatchups": 1
+        },
+        {
+          "i": 211,
+          "atMs": 3516.667,
+          "authoritativeTick": 6210,
+          "renderedTick": 6180.5,
+          "targetGapTicks": 25.1,
+          "targetDebtMs": 418.333,
+          "sampled": true,
+          "boundedCatchups": 2
+        },
+        {
+          "i": 212,
+          "atMs": 3533.333,
+          "authoritativeTick": 6210,
+          "renderedTick": 6181.95,
+          "targetGapTicks": 24.65,
+          "targetDebtMs": 410.833,
+          "sampled": false,
+          "boundedCatchups": 3
+        },
+        {
+          "i": 213,
+          "atMs": 3550,
+          "authoritativeTick": 6213,
+          "renderedTick": 6183.4,
+          "targetGapTicks": 24.2,
+          "targetDebtMs": 403.333,
+          "sampled": false,
+          "boundedCatchups": 4
+        },
+        {
+          "i": 214,
+          "atMs": 3566.667,
+          "authoritativeTick": 6213,
+          "renderedTick": 6184.85,
+          "targetGapTicks": 23.75,
+          "targetDebtMs": 395.833,
+          "sampled": false,
+          "boundedCatchups": 5
+        },
+        {
+          "i": 215,
+          "atMs": 3583.333,
+          "authoritativeTick": 6213,
+          "renderedTick": 6186.3,
+          "targetGapTicks": 23.3,
+          "targetDebtMs": 388.333,
+          "sampled": false,
+          "boundedCatchups": 6
+        },
+        {
+          "i": 216,
+          "atMs": 3600,
+          "authoritativeTick": 6216,
+          "renderedTick": 6187.75,
+          "targetGapTicks": 22.85,
+          "targetDebtMs": 380.833,
+          "sampled": false,
+          "boundedCatchups": 7
+        },
+        {
+          "i": 217,
+          "atMs": 3616.667,
+          "authoritativeTick": 6216,
+          "renderedTick": 6189.2,
+          "targetGapTicks": 22.4,
+          "targetDebtMs": 373.333,
+          "sampled": true,
+          "boundedCatchups": 8
+        },
+        {
+          "i": 218,
+          "atMs": 3633.333,
+          "authoritativeTick": 6216,
+          "renderedTick": 6190.65,
+          "targetGapTicks": 21.95,
+          "targetDebtMs": 365.833,
+          "sampled": false,
+          "boundedCatchups": 9
+        },
+        {
+          "i": 219,
+          "atMs": 3650,
+          "authoritativeTick": 6219,
+          "renderedTick": 6192.1,
+          "targetGapTicks": 21.5,
+          "targetDebtMs": 358.333,
+          "sampled": false,
+          "boundedCatchups": 10
+        },
+        {
+          "i": 220,
+          "atMs": 3666.667,
+          "authoritativeTick": 6219,
+          "renderedTick": 6193.55,
+          "targetGapTicks": 21.05,
+          "targetDebtMs": 350.833,
+          "sampled": false,
+          "boundedCatchups": 11
+        },
+        {
+          "i": 221,
+          "atMs": 3683.333,
+          "authoritativeTick": 6219,
+          "renderedTick": 6195,
+          "targetGapTicks": 20.6,
+          "targetDebtMs": 343.333,
+          "sampled": false,
+          "boundedCatchups": 12
+        },
+        {
+          "i": 222,
+          "atMs": 3700,
+          "authoritativeTick": 6222,
+          "renderedTick": 6196.45,
+          "targetGapTicks": 20.15,
+          "targetDebtMs": 335.833,
+          "sampled": false,
+          "boundedCatchups": 13
+        },
+        {
+          "i": 223,
+          "atMs": 3716.667,
+          "authoritativeTick": 6222,
+          "renderedTick": 6197.9,
+          "targetGapTicks": 19.7,
+          "targetDebtMs": 328.333,
+          "sampled": true,
+          "boundedCatchups": 14
+        },
+        {
+          "i": 224,
+          "atMs": 3733.333,
+          "authoritativeTick": 6222,
+          "renderedTick": 6199.35,
+          "targetGapTicks": 19.25,
+          "targetDebtMs": 320.833,
+          "sampled": false,
+          "boundedCatchups": 15
+        },
+        {
+          "i": 225,
+          "atMs": 3750,
+          "authoritativeTick": 6225,
+          "renderedTick": 6200.8,
+          "targetGapTicks": 18.8,
+          "targetDebtMs": 313.333,
+          "sampled": false,
+          "boundedCatchups": 16
+        },
+        {
+          "i": 226,
+          "atMs": 3766.667,
+          "authoritativeTick": 6225,
+          "renderedTick": 6202.25,
+          "targetGapTicks": 18.35,
+          "targetDebtMs": 305.833,
+          "sampled": false,
+          "boundedCatchups": 17
+        },
+        {
+          "i": 227,
+          "atMs": 3783.333,
+          "authoritativeTick": 6225,
+          "renderedTick": 6203.7,
+          "targetGapTicks": 17.9,
+          "targetDebtMs": 298.333,
+          "sampled": false,
+          "boundedCatchups": 18
+        },
+        {
+          "i": 228,
+          "atMs": 3800,
+          "authoritativeTick": 6228,
+          "renderedTick": 6205.15,
+          "targetGapTicks": 17.45,
+          "targetDebtMs": 290.833,
+          "sampled": false,
+          "boundedCatchups": 19
+        },
+        {
+          "i": 229,
+          "atMs": 3816.667,
+          "authoritativeTick": 6228,
+          "renderedTick": 6206.6,
+          "targetGapTicks": 17,
+          "targetDebtMs": 283.333,
+          "sampled": true,
+          "boundedCatchups": 20
+        },
+        {
+          "i": 230,
+          "atMs": 3833.333,
+          "authoritativeTick": 6228,
+          "renderedTick": 6208.05,
+          "targetGapTicks": 16.55,
+          "targetDebtMs": 275.833,
+          "sampled": false,
+          "boundedCatchups": 21
+        },
+        {
+          "i": 231,
+          "atMs": 3850,
+          "authoritativeTick": 6231,
+          "renderedTick": 6209.5,
+          "targetGapTicks": 16.1,
+          "targetDebtMs": 268.333,
+          "sampled": false,
+          "boundedCatchups": 22
+        },
+        {
+          "i": 232,
+          "atMs": 3866.667,
+          "authoritativeTick": 6231,
+          "renderedTick": 6210.95,
+          "targetGapTicks": 15.65,
+          "targetDebtMs": 260.833,
+          "sampled": false,
+          "boundedCatchups": 23
+        },
+        {
+          "i": 233,
+          "atMs": 3883.333,
+          "authoritativeTick": 6231,
+          "renderedTick": 6212.4,
+          "targetGapTicks": 15.2,
+          "targetDebtMs": 253.333,
+          "sampled": false,
+          "boundedCatchups": 24
+        },
+        {
+          "i": 234,
+          "atMs": 3900,
+          "authoritativeTick": 6234,
+          "renderedTick": 6213.85,
+          "targetGapTicks": 14.75,
+          "targetDebtMs": 245.833,
+          "sampled": false,
+          "boundedCatchups": 25
+        },
+        {
+          "i": 235,
+          "atMs": 3916.667,
+          "authoritativeTick": 6234,
+          "renderedTick": 6215.3,
+          "targetGapTicks": 14.3,
+          "targetDebtMs": 238.333,
+          "sampled": true,
+          "boundedCatchups": 26
+        },
+        {
+          "i": 236,
+          "atMs": 3933.333,
+          "authoritativeTick": 6234,
+          "renderedTick": 6216.75,
+          "targetGapTicks": 13.85,
+          "targetDebtMs": 230.833,
+          "sampled": false,
+          "boundedCatchups": 27
+        },
+        {
+          "i": 237,
+          "atMs": 3950,
+          "authoritativeTick": 6237,
+          "renderedTick": 6218.2,
+          "targetGapTicks": 13.4,
+          "targetDebtMs": 223.333,
+          "sampled": false,
+          "boundedCatchups": 28
+        },
+        {
+          "i": 238,
+          "atMs": 3966.667,
+          "authoritativeTick": 6237,
+          "renderedTick": 6219.65,
+          "targetGapTicks": 12.95,
+          "targetDebtMs": 215.833,
+          "sampled": false,
+          "boundedCatchups": 29
+        },
+        {
+          "i": 239,
+          "atMs": 3983.333,
+          "authoritativeTick": 6237,
+          "renderedTick": 6221.1,
+          "targetGapTicks": 12.5,
+          "targetDebtMs": 208.333,
+          "sampled": false,
+          "boundedCatchups": 30
+        },
+        {
+          "i": 240,
+          "atMs": 4000,
+          "authoritativeTick": 6240,
+          "renderedTick": 6222.55,
+          "targetGapTicks": 12.05,
+          "targetDebtMs": 200.833,
+          "sampled": false,
+          "boundedCatchups": 31
+        },
+        {
+          "i": 241,
+          "atMs": 4016.667,
+          "authoritativeTick": 6240,
+          "renderedTick": 6224,
+          "targetGapTicks": 11.6,
+          "targetDebtMs": 193.333,
+          "sampled": true,
+          "boundedCatchups": 32
+        },
+        {
+          "i": 242,
+          "atMs": 4033.333,
+          "authoritativeTick": 6240,
+          "renderedTick": 6225.45,
+          "targetGapTicks": 11.15,
+          "targetDebtMs": 185.833,
+          "sampled": false,
+          "boundedCatchups": 33
+        },
+        {
+          "i": 243,
+          "atMs": 4050,
+          "authoritativeTick": 6243,
+          "renderedTick": 6226.9,
+          "targetGapTicks": 10.7,
+          "targetDebtMs": 178.333,
+          "sampled": false,
+          "boundedCatchups": 34
+        },
+        {
+          "i": 244,
+          "atMs": 4066.667,
+          "authoritativeTick": 6243,
+          "renderedTick": 6228.35,
+          "targetGapTicks": 10.25,
+          "targetDebtMs": 170.833,
+          "sampled": false,
+          "boundedCatchups": 35
+        },
+        {
+          "i": 245,
+          "atMs": 4083.333,
+          "authoritativeTick": 6243,
+          "renderedTick": 6229.8,
+          "targetGapTicks": 9.8,
+          "targetDebtMs": 163.333,
+          "sampled": false,
+          "boundedCatchups": 36
+        },
+        {
+          "i": 246,
+          "atMs": 4100,
+          "authoritativeTick": 6246,
+          "renderedTick": 6231.25,
+          "targetGapTicks": 9.35,
+          "targetDebtMs": 155.833,
+          "sampled": false,
+          "boundedCatchups": 37
+        },
+        {
+          "i": 247,
+          "atMs": 4116.667,
+          "authoritativeTick": 6246,
+          "renderedTick": 6232.7,
+          "targetGapTicks": 8.9,
+          "targetDebtMs": 148.333,
+          "sampled": true,
+          "boundedCatchups": 38
+        },
+        {
+          "i": 248,
+          "atMs": 4133.333,
+          "authoritativeTick": 6246,
+          "renderedTick": 6234.15,
+          "targetGapTicks": 8.45,
+          "targetDebtMs": 140.833,
+          "sampled": false,
+          "boundedCatchups": 39
+        },
+        {
+          "i": 249,
+          "atMs": 4150,
+          "authoritativeTick": 6249,
+          "renderedTick": 6235.6,
+          "targetGapTicks": 8,
+          "targetDebtMs": 133.333,
+          "sampled": false,
+          "boundedCatchups": 40
+        },
+        {
+          "i": 250,
+          "atMs": 4166.667,
+          "authoritativeTick": 6249,
+          "renderedTick": 6237.05,
+          "targetGapTicks": 7.55,
+          "targetDebtMs": 125.833,
+          "sampled": false,
+          "boundedCatchups": 41
+        },
+        {
+          "i": 251,
+          "atMs": 4183.333,
+          "authoritativeTick": 6249,
+          "renderedTick": 6238.5,
+          "targetGapTicks": 7.1,
+          "targetDebtMs": 118.333,
+          "sampled": false,
+          "boundedCatchups": 42
+        },
+        {
+          "i": 252,
+          "atMs": 4200,
+          "authoritativeTick": 6252,
+          "renderedTick": 6239.95,
+          "targetGapTicks": 6.65,
+          "targetDebtMs": 110.833,
+          "sampled": false,
+          "boundedCatchups": 43
+        },
+        {
+          "i": 253,
+          "atMs": 4216.667,
+          "authoritativeTick": 6252,
+          "renderedTick": 6241.4,
+          "targetGapTicks": 6.2,
+          "targetDebtMs": 103.333,
+          "sampled": true,
+          "boundedCatchups": 44
+        },
+        {
+          "i": 254,
+          "atMs": 4233.333,
+          "authoritativeTick": 6252,
+          "renderedTick": 6242.85,
+          "targetGapTicks": 5.75,
+          "targetDebtMs": 95.833,
+          "sampled": false,
+          "boundedCatchups": 45
+        },
+        {
+          "i": 255,
+          "atMs": 4250,
+          "authoritativeTick": 6255,
+          "renderedTick": 6244.3,
+          "targetGapTicks": 5.3,
+          "targetDebtMs": 88.333,
+          "sampled": false,
+          "boundedCatchups": 46
+        },
+        {
+          "i": 256,
+          "atMs": 4266.667,
+          "authoritativeTick": 6255,
+          "renderedTick": 6245.75,
+          "targetGapTicks": 4.85,
+          "targetDebtMs": 80.833,
+          "sampled": false,
+          "boundedCatchups": 47
+        },
+        {
+          "i": 257,
+          "atMs": 4283.333,
+          "authoritativeTick": 6255,
+          "renderedTick": 6247.2,
+          "targetGapTicks": 4.4,
+          "targetDebtMs": 73.333,
+          "sampled": false,
+          "boundedCatchups": 48
+        },
+        {
+          "i": 258,
+          "atMs": 4300,
+          "authoritativeTick": 6258,
+          "renderedTick": 6248.65,
+          "targetGapTicks": 3.95,
+          "targetDebtMs": 65.833,
+          "sampled": false,
+          "boundedCatchups": 49
+        },
+        {
+          "i": 259,
+          "atMs": 4316.667,
+          "authoritativeTick": 6258,
+          "renderedTick": 6250.1,
+          "targetGapTicks": 3.5,
+          "targetDebtMs": 58.333,
+          "sampled": true,
+          "boundedCatchups": 50
+        }
+      ],
+      "lastFrame": {
+        "i": 599,
+        "atMs": 9983.333,
+        "authoritativeTick": 6597,
+        "renderedTick": 6593.6,
+        "targetGapTicks": 0,
+        "targetDebtMs": 0,
+        "sampled": false,
+        "boundedCatchups": 57
+      }
+    }
+  ]
+}
