@@ -137,6 +137,14 @@ impl LegacyItemKind {
         matches!(self, Self::RustySword | Self::IronSword)
     }
 
+    /// Mirrors Magic/Items #424 ItemKind::stackable for its disk codes.
+    pub const fn stackable(self) -> bool {
+        matches!(
+            self,
+            Self::SulfurAsh | Self::BlackPearl | Self::Gold | Self::HealingPotion
+        )
+    }
+
     pub fn require_checkpoint_kind(code: u8) -> Result<Self, LegacyMigrationError> {
         Self::from_checkpoint_code(code).ok_or(LegacyMigrationError::InvalidKindCode)
     }
@@ -180,6 +188,12 @@ pub enum LegacyMigrationError {
     DuplicateEquippedSlot,
     DuplicateEquippedItem,
     IncompatibleEquippedKind,
+    InvalidSourceNextId,
+    SourceIdBeyondNextId,
+    DuplicateSourceItemRecord,
+    InvalidSourceItemStack,
+    MissingSourceItemRecord,
+    SourceItemKindMismatch,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -373,6 +387,89 @@ pub fn preflight_equipment_manifest<const N: usize>(
     canonical
         .try_into()
         .map_err(|_| LegacyMigrationError::TooManyEquippedSlots)
+}
+
+/// Source `ItemStack` (id u64, kind u8, amount u16) extracted from a
+/// separately reviewed, QUIESCENT and internally validated Magic checkpoint.
+/// This struct alone is NOT source authentication or a migration receipt.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LegacySourceItemRecord {
+    pub legacy_item_id: u64,
+    pub checkpoint_kind_code: u8,
+    pub amount: u16,
+}
+
+/// Bounded only by the reviewed source inventory; never construct this from
+/// browser or unauthenticated records. The caller must attest complete source
+/// coverage and `next_id` from the SAME source snapshot, excluding untrusted
+/// active mutations, retired identity collisions and rollback/forked copies.
+pub struct LegacySourceItemCatalog {
+    items: BTreeMap<u64, (LegacyItemKind, u16)>,
+}
+
+impl LegacySourceItemCatalog {
+    pub fn new(
+        import: &LegacyImportPreflight,
+        source_next_id: u64,
+        rows: impl IntoIterator<Item = LegacySourceItemRecord>,
+    ) -> Result<Self, LegacyMigrationError> {
+        if source_next_id == 0 {
+            return Err(LegacyMigrationError::InvalidSourceNextId);
+        }
+        let mut items = BTreeMap::new();
+        for row in rows {
+            if row.legacy_item_id == 0 {
+                return Err(LegacyMigrationError::ZeroLegacyId);
+            }
+            if row.legacy_item_id >= source_next_id {
+                return Err(LegacyMigrationError::SourceIdBeyondNextId);
+            }
+            let kind = LegacyItemKind::require_checkpoint_kind(row.checkpoint_kind_code)?;
+            if row.amount == 0 || (row.amount != 1 && !kind.stackable()) {
+                return Err(LegacyMigrationError::InvalidSourceItemStack);
+            }
+            import.core_item(row.legacy_item_id)?;
+            if items
+                .insert(row.legacy_item_id, (kind, row.amount))
+                .is_some()
+            {
+                return Err(LegacyMigrationError::DuplicateSourceItemRecord);
+            }
+        }
+        Ok(Self { items })
+    }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+/// Stronger *consistency* review using two records from the exact same
+/// externally reviewed quiescent source: equipment positions and the source
+/// item inventory. A forged/incomplete source remains untrusted and must NOT
+/// be converted to live Core ownership merely by passing this check.
+pub fn preflight_equipment_manifest_against_source<const N: usize>(
+    import: &LegacyImportPreflight,
+    catalog: &LegacySourceItemCatalog,
+    legacy_character_id: u64,
+    rows: [LegacyEquippedRow; N],
+) -> Result<[ProposedCanonicalEquippedRow; N], LegacyMigrationError> {
+    if N > 5 {
+        return Err(LegacyMigrationError::TooManyEquippedSlots);
+    }
+    for row in rows {
+        let (kind, amount) = catalog
+            .items
+            .get(&row.legacy_item_id)
+            .ok_or(LegacyMigrationError::MissingSourceItemRecord)?;
+        if *kind != LegacyItemKind::require_checkpoint_kind(row.checkpoint_kind_code)? {
+            return Err(LegacyMigrationError::SourceItemKindMismatch);
+        }
+        if *amount != 1 {
+            return Err(LegacyMigrationError::InvalidSourceItemStack);
+        }
+    }
+    preflight_equipment_manifest(import, legacy_character_id, rows)
 }
 
 /// An offline, owner-reviewed item row extracted from a trusted legacy
@@ -865,6 +962,172 @@ mod tests {
                 }]
             ),
             Err(LegacyMigrationError::IncompatibleEquippedKind)
+        );
+    }
+
+    #[test]
+    fn source_item_catalog_preserves_kind_amount_and_allocator_boundary() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        for item_id in [201, 202, 203] {
+            import.stage_owner(LegacyDomain::Item, item_id).unwrap();
+        }
+        let sword = LegacySourceItemRecord {
+            legacy_item_id: 201,
+            checkpoint_kind_code: 8,
+            amount: 1,
+        };
+        let shield = LegacySourceItemRecord {
+            legacy_item_id: 202,
+            checkpoint_kind_code: 13,
+            amount: 1,
+        };
+        let gold = LegacySourceItemRecord {
+            legacy_item_id: 203,
+            checkpoint_kind_code: 6,
+            amount: 400,
+        };
+        let catalog = LegacySourceItemCatalog::new(&import, 204, [sword, shield, gold]).unwrap();
+        assert_eq!(catalog.count(), 3);
+        let bound = preflight_equipment_manifest_against_source(
+            &import,
+            &catalog,
+            101,
+            [
+                LegacyEquippedRow {
+                    legacy_item_id: 201,
+                    checkpoint_slot_code: 0,
+                    checkpoint_kind_code: 8,
+                },
+                LegacyEquippedRow {
+                    legacy_item_id: 202,
+                    checkpoint_slot_code: 1,
+                    checkpoint_kind_code: 13,
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(bound[0].item_id, import.core_item(201).unwrap());
+        assert_eq!(bound[0].kind, LegacyItemKind::IronSword);
+        assert_eq!(bound[1].kind, LegacyItemKind::WoodenShield);
+        assert_eq!(
+            bound[1].location,
+            ItemLocation::Equipped {
+                character_id: import.core_character(101).unwrap(),
+                slot: 1,
+            }
+        );
+        let incompatible_but_well_formed = LegacyEquippedRow {
+            legacy_item_id: 201,
+            checkpoint_slot_code: 0,
+            checkpoint_kind_code: 9,
+        };
+        // Club also fits MainHand; it must NOT replace a catalogued sword.
+        assert_eq!(
+            preflight_equipment_manifest(&import, 101, [incompatible_but_well_formed]).unwrap()[0]
+                .kind,
+            LegacyItemKind::WoodenClub
+        );
+        assert_eq!(
+            preflight_equipment_manifest_against_source(
+                &import,
+                &catalog,
+                101,
+                [incompatible_but_well_formed]
+            ),
+            Err(LegacyMigrationError::SourceItemKindMismatch)
+        );
+        assert_eq!(
+            preflight_equipment_manifest_against_source(
+                &import,
+                &catalog,
+                101,
+                [LegacyEquippedRow {
+                    legacy_item_id: 203,
+                    checkpoint_slot_code: 0,
+                    checkpoint_kind_code: 6
+                }]
+            ),
+            Err(LegacyMigrationError::InvalidSourceItemStack)
+        );
+    }
+
+    #[test]
+    fn source_item_catalog_rejects_duplicates_corruption_and_unregistered_ids() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        import.stage_owner(LegacyDomain::Item, 201).unwrap();
+        let record = LegacySourceItemRecord {
+            legacy_item_id: 201,
+            checkpoint_kind_code: 8,
+            amount: 1,
+        };
+        assert!(matches!(
+            LegacySourceItemCatalog::new(&import, 0, [record]),
+            Err(LegacyMigrationError::InvalidSourceNextId)
+        ));
+        assert!(matches!(
+            LegacySourceItemCatalog::new(&import, 201, [record]),
+            Err(LegacyMigrationError::SourceIdBeyondNextId)
+        ));
+        assert!(matches!(
+            LegacySourceItemCatalog::new(&import, 202, [record, record]),
+            Err(LegacyMigrationError::DuplicateSourceItemRecord)
+        ));
+        for (bad, expected) in [
+            (
+                LegacySourceItemRecord {
+                    legacy_item_id: 0,
+                    ..record
+                },
+                LegacyMigrationError::ZeroLegacyId,
+            ),
+            (
+                LegacySourceItemRecord {
+                    legacy_item_id: 202,
+                    ..record
+                },
+                LegacyMigrationError::UnregisteredSourceIdentity,
+            ),
+            (
+                LegacySourceItemRecord {
+                    checkpoint_kind_code: 255,
+                    ..record
+                },
+                LegacyMigrationError::InvalidKindCode,
+            ),
+            (
+                LegacySourceItemRecord {
+                    amount: 0,
+                    ..record
+                },
+                LegacyMigrationError::InvalidSourceItemStack,
+            ),
+            (
+                LegacySourceItemRecord {
+                    amount: 2,
+                    ..record
+                },
+                LegacyMigrationError::InvalidSourceItemStack,
+            ),
+        ] {
+            assert!(
+                matches!(LegacySourceItemCatalog::new(&import, 203, [bad]), Err(e) if e == expected)
+            );
+        }
+        let catalog = LegacySourceItemCatalog::new(&import, 202, [record]).unwrap();
+        assert_eq!(
+            preflight_equipment_manifest_against_source(
+                &import,
+                &catalog,
+                101,
+                [LegacyEquippedRow {
+                    legacy_item_id: 999,
+                    checkpoint_slot_code: 0,
+                    checkpoint_kind_code: 8
+                }]
+            ),
+            Err(LegacyMigrationError::MissingSourceItemRecord)
         );
     }
 
