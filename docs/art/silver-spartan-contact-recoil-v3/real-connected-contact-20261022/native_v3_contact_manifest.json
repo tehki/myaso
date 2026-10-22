@@ -1,0 +1,23 @@
+{
+  "realConnectedSourceAccepted": true,
+  "sourceVersion": "contact-recoil-v3",
+  "actualServerHitReceiptValidated": false,
+  "fullFrameAfterRenderLoopValidated": false,
+  "fourHumanOperators": false,
+  "images": [
+    {
+      "browser": "chrome",
+      "serverPlayerId": 1,
+      "filename": "actual_connected_silver_spartan_v3_contact_chrome.png",
+      "bytes": 25708,
+      "sha256": "f9759b217fc99eb67c2c15019c7eddac0afde4e86a2083d26ca8e83a0e6d93c7"
+    },
+    {
+      "browser": "firefox",
+      "serverPlayerId": 2,
+      "filename": "actual_connected_silver_spartan_v3_contact_firefox.png",
+      "bytes": 23997,
+      "sha256": "93ab8a0ad566f8f9d31e6a1b0e10ac0a9fc65a1500b8e281df0158fd9f15498f"
+    }
+  ]
+}

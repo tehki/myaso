@@ -1182,7 +1182,7 @@ jobs:
       - name: Refuse unverified source and fake contact image evidence
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
-          node --test tests/graphics3a-spartan-v3-contact-png.test.mjs tests/graphics3a-spartan-v3-connected.test.mjs tests/graphics3a-connected-spartan-kick-receipt.test.mjs
+          node --test tests/graphics3a-spartan-v3-original-contact-images.test.mjs tests/graphics3a-spartan-v3-contact-png.test.mjs tests/graphics3a-spartan-v3-connected.test.mjs tests/graphics3a-connected-spartan-kick-receipt.test.mjs
       - name: Verify native browsers and Rust toolchain
         run: |
           cargo --version
