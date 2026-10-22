@@ -194,6 +194,10 @@ pub enum LegacyMigrationError {
     InvalidSourceItemStack,
     MissingSourceItemRecord,
     SourceItemKindMismatch,
+    MissingSourceCustody,
+    DuplicateSourceCustody,
+    SourceCustodyMismatch,
+    SourceContainerIdCollision,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -405,6 +409,7 @@ pub struct LegacySourceItemRecord {
 /// active mutations, retired identity collisions and rollback/forked copies.
 pub struct LegacySourceItemCatalog {
     items: BTreeMap<u64, (LegacyItemKind, u16)>,
+    source_next_id: u64,
 }
 
 impl LegacySourceItemCatalog {
@@ -436,7 +441,10 @@ impl LegacySourceItemCatalog {
                 return Err(LegacyMigrationError::DuplicateSourceItemRecord);
             }
         }
-        Ok(Self { items })
+        Ok(Self {
+            items,
+            source_next_id,
+        })
     }
 
     pub fn count(&self) -> usize {
@@ -470,6 +478,165 @@ pub fn preflight_equipment_manifest_against_source<const N: usize>(
         }
     }
     preflight_equipment_manifest(import, legacy_character_id, rows)
+}
+
+/// Snapshot positions that Magic #424 actually encodes in MYWLD003:
+/// parked-character backpack or a named equipped slot, ground entity, corpse.
+/// Active players cannot be checkpointed until source owner quiesces/parks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LegacySourceCustodyLocation {
+    ParkedBackpack {
+        legacy_character_id: u64,
+    },
+    ParkedEquipped {
+        legacy_character_id: u64,
+        checkpoint_slot_code: u8,
+    },
+    Ground {
+        legacy_entity_id: u64,
+    },
+    Corpse {
+        legacy_corpse_id: u64,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LegacySourceCustodyRow {
+    pub legacy_item_id: u64,
+    pub location: LegacySourceCustodyLocation,
+}
+
+/// Verify one source position for EVERY source item record. This cannot
+/// authenticate a forged snapshot or ensure other original files were scanned.
+/// The source owner must attest the rows are from one complete quiescent state.
+pub struct LegacySourceCustodyCatalog {
+    locations: BTreeMap<u64, LegacySourceCustodyLocation>,
+}
+
+impl LegacySourceCustodyCatalog {
+    pub fn new(
+        import: &LegacyImportPreflight,
+        source: &LegacySourceItemCatalog,
+        rows: impl IntoIterator<Item = LegacySourceCustodyRow>,
+    ) -> Result<Self, LegacyMigrationError> {
+        let mut locations = BTreeMap::new();
+        let mut container_kinds = BTreeMap::<u64, LegacyDomain>::new();
+        let mut equipped_positions = BTreeSet::new();
+        for row in rows {
+            if !source.items.contains_key(&row.legacy_item_id) {
+                return Err(LegacyMigrationError::MissingSourceItemRecord);
+            }
+            if locations.contains_key(&row.legacy_item_id) {
+                return Err(LegacyMigrationError::DuplicateSourceCustody);
+            }
+            match row.location {
+                LegacySourceCustodyLocation::ParkedBackpack {
+                    legacy_character_id,
+                }
+                | LegacySourceCustodyLocation::ParkedEquipped {
+                    legacy_character_id,
+                    checkpoint_slot_code: _,
+                } => {
+                    import.core_character(legacy_character_id)?;
+                    if let LegacySourceCustodyLocation::ParkedEquipped {
+                        checkpoint_slot_code,
+                        ..
+                    } = row.location
+                    {
+                        let slot = LegacyEquipmentSlot::from_checkpoint_code(checkpoint_slot_code)
+                            .ok_or(LegacyMigrationError::InvalidSlotCode)?;
+                        let (kind, amount) = source.items[&row.legacy_item_id];
+                        if !kind.fits_checkpoint_slot(slot) {
+                            return Err(LegacyMigrationError::IncompatibleEquippedKind);
+                        }
+                        if amount != 1 {
+                            return Err(LegacyMigrationError::InvalidSourceItemStack);
+                        }
+                        if !equipped_positions.insert((legacy_character_id, checkpoint_slot_code)) {
+                            return Err(LegacyMigrationError::DuplicateEquippedSlot);
+                        }
+                    }
+                }
+                LegacySourceCustodyLocation::Ground { legacy_entity_id } => {
+                    import.resolve_registered(LegacyDomain::GroundEntity, legacy_entity_id)?;
+                    if legacy_entity_id >= source.source_next_id {
+                        return Err(LegacyMigrationError::SourceIdBeyondNextId);
+                    }
+                    // GroundDrop holds exactly one item; raw global entity IDs
+                    // must not collide with item IDs or other source containers.
+                    if container_kinds
+                        .insert(legacy_entity_id, LegacyDomain::GroundEntity)
+                        .is_some()
+                    {
+                        return Err(LegacyMigrationError::SourceContainerIdCollision);
+                    }
+                }
+                LegacySourceCustodyLocation::Corpse { legacy_corpse_id } => {
+                    import.core_corpse(legacy_corpse_id)?;
+                    if legacy_corpse_id >= source.source_next_id {
+                        return Err(LegacyMigrationError::SourceIdBeyondNextId);
+                    }
+                    // Multiple distinct items may belong to the SAME corpse.
+                    // A ground-drop entity cannot reuse the same raw ID.
+                    if let Some(previous) =
+                        container_kinds.insert(legacy_corpse_id, LegacyDomain::Corpse)
+                    {
+                        if previous != LegacyDomain::Corpse {
+                            return Err(LegacyMigrationError::SourceContainerIdCollision);
+                        }
+                    }
+                }
+            }
+            if locations.insert(row.legacy_item_id, row.location).is_some() {
+                return Err(LegacyMigrationError::DuplicateSourceCustody);
+            }
+        }
+        if locations.len() != source.items.len() {
+            return Err(LegacyMigrationError::MissingSourceCustody);
+        }
+        if container_kinds
+            .keys()
+            .any(|id| source.items.contains_key(id))
+        {
+            return Err(LegacyMigrationError::SourceContainerIdCollision);
+        }
+        Ok(Self { locations })
+    }
+
+    pub fn count(&self) -> usize {
+        self.locations.len()
+    }
+}
+
+/// Stronger non-activating location review. Even a registered, correctly
+/// typed IronSword cannot become another character's MainHand when its REAL
+/// source custody was a corpse, a ground item, a backpack, or another slot.
+/// No live owner change occurs and both catalogs must be source-attested.
+pub fn preflight_equipment_manifest_against_custody<const N: usize>(
+    import: &LegacyImportPreflight,
+    source: &LegacySourceItemCatalog,
+    custody: &LegacySourceCustodyCatalog,
+    legacy_character_id: u64,
+    rows: [LegacyEquippedRow; N],
+) -> Result<[ProposedCanonicalEquippedRow; N], LegacyMigrationError> {
+    if N > 5 {
+        return Err(LegacyMigrationError::TooManyEquippedSlots);
+    }
+    for row in rows {
+        let actual = custody
+            .locations
+            .get(&row.legacy_item_id)
+            .ok_or(LegacyMigrationError::MissingSourceCustody)?;
+        if *actual
+            != (LegacySourceCustodyLocation::ParkedEquipped {
+                legacy_character_id,
+                checkpoint_slot_code: row.checkpoint_slot_code,
+            })
+        {
+            return Err(LegacyMigrationError::SourceCustodyMismatch);
+        }
+    }
+    preflight_equipment_manifest_against_source(import, source, legacy_character_id, rows)
 }
 
 /// An offline, owner-reviewed item row extracted from a trusted legacy
@@ -1129,6 +1296,280 @@ mod tests {
             ),
             Err(LegacyMigrationError::MissingSourceItemRecord)
         );
+    }
+
+    #[test]
+    fn source_custody_denies_equipping_another_owner_backpack_ground_or_corpse() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        for owner in [101, 102] {
+            import.stage_owner(LegacyDomain::Character, owner).unwrap();
+        }
+        for item_id in 201..=204 {
+            import.stage_owner(LegacyDomain::Item, item_id).unwrap();
+        }
+        import.stage_owner(LegacyDomain::Corpse, 301).unwrap();
+        import.stage_owner(LegacyDomain::GroundEntity, 302).unwrap();
+        let items = [201, 202, 203, 204].map(|legacy_item_id| LegacySourceItemRecord {
+            legacy_item_id,
+            checkpoint_kind_code: 8,
+            amount: 1,
+        });
+        let catalog = LegacySourceItemCatalog::new(&import, 303, items).unwrap();
+        let custody = LegacySourceCustodyCatalog::new(
+            &import,
+            &catalog,
+            [
+                LegacySourceCustodyRow {
+                    legacy_item_id: 201,
+                    location: LegacySourceCustodyLocation::ParkedEquipped {
+                        legacy_character_id: 101,
+                        checkpoint_slot_code: 0,
+                    },
+                },
+                LegacySourceCustodyRow {
+                    legacy_item_id: 202,
+                    location: LegacySourceCustodyLocation::ParkedBackpack {
+                        legacy_character_id: 101,
+                    },
+                },
+                LegacySourceCustodyRow {
+                    legacy_item_id: 203,
+                    location: LegacySourceCustodyLocation::Ground {
+                        legacy_entity_id: 302,
+                    },
+                },
+                LegacySourceCustodyRow {
+                    legacy_item_id: 204,
+                    location: LegacySourceCustodyLocation::Corpse {
+                        legacy_corpse_id: 301,
+                    },
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(custody.count(), 4);
+        let valid = LegacyEquippedRow {
+            legacy_item_id: 201,
+            checkpoint_kind_code: 8,
+            checkpoint_slot_code: 0,
+        };
+        assert_eq!(
+            preflight_equipment_manifest_against_custody(&import, &catalog, &custody, 101, [valid])
+                .unwrap()[0]
+                .item_id,
+            import.core_item(201).unwrap()
+        );
+        // Legacy #770 accepted the right item ID + kind + amount irrespective
+        // of *where* its one true source copy actually resided.
+        for id in 202..=204 {
+            let other = LegacyEquippedRow {
+                legacy_item_id: id,
+                ..valid
+            };
+            assert!(
+                preflight_equipment_manifest_against_source(&import, &catalog, 101, [other])
+                    .is_ok()
+            );
+            assert_eq!(
+                preflight_equipment_manifest_against_custody(
+                    &import,
+                    &catalog,
+                    &custody,
+                    101,
+                    [other]
+                ),
+                Err(LegacyMigrationError::SourceCustodyMismatch)
+            );
+        }
+        assert_eq!(
+            preflight_equipment_manifest_against_custody(&import, &catalog, &custody, 102, [valid]),
+            Err(LegacyMigrationError::SourceCustodyMismatch)
+        );
+        assert_eq!(
+            preflight_equipment_manifest_against_custody(
+                &import,
+                &catalog,
+                &custody,
+                101,
+                [LegacyEquippedRow {
+                    checkpoint_slot_code: 1,
+                    ..valid
+                }]
+            ),
+            Err(LegacyMigrationError::SourceCustodyMismatch)
+        );
+    }
+
+    #[test]
+    fn source_custody_requires_all_rows_valid_owner_and_noncolliding_world_entities() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        for id in [201, 202] {
+            import.stage_owner(LegacyDomain::Item, id).unwrap();
+        }
+        for id in [201, 301] {
+            import.stage_owner(LegacyDomain::Corpse, id).unwrap();
+        }
+        for id in [201, 301, 302] {
+            import.stage_owner(LegacyDomain::GroundEntity, id).unwrap();
+        }
+        let catalog = LegacySourceItemCatalog::new(
+            &import,
+            303,
+            [
+                LegacySourceItemRecord {
+                    legacy_item_id: 201,
+                    checkpoint_kind_code: 8,
+                    amount: 1,
+                },
+                LegacySourceItemRecord {
+                    legacy_item_id: 202,
+                    checkpoint_kind_code: 8,
+                    amount: 1,
+                },
+            ],
+        )
+        .unwrap();
+        let first = LegacySourceCustodyRow {
+            legacy_item_id: 201,
+            location: LegacySourceCustodyLocation::ParkedEquipped {
+                legacy_character_id: 101,
+                checkpoint_slot_code: 0,
+            },
+        };
+        let second = LegacySourceCustodyRow {
+            legacy_item_id: 202,
+            location: LegacySourceCustodyLocation::ParkedBackpack {
+                legacy_character_id: 101,
+            },
+        };
+        assert!(LegacySourceCustodyCatalog::new(&import, &catalog, [first, second]).is_ok());
+        for (rows, error) in [
+            (vec![first], LegacyMigrationError::MissingSourceCustody),
+            (
+                vec![first, first],
+                LegacyMigrationError::DuplicateSourceCustody,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        legacy_item_id: 999,
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::MissingSourceItemRecord,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        location: LegacySourceCustodyLocation::ParkedBackpack {
+                            legacy_character_id: 0,
+                        },
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::UnregisteredSourceIdentity,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        location: LegacySourceCustodyLocation::ParkedEquipped {
+                            legacy_character_id: 101,
+                            checkpoint_slot_code: 5,
+                        },
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::InvalidSlotCode,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        location: LegacySourceCustodyLocation::Ground {
+                            legacy_entity_id: 201,
+                        },
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::SourceContainerIdCollision,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        location: LegacySourceCustodyLocation::Corpse {
+                            legacy_corpse_id: 201,
+                        },
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::SourceContainerIdCollision,
+            ),
+            (
+                vec![
+                    first,
+                    LegacySourceCustodyRow {
+                        location: LegacySourceCustodyLocation::Ground {
+                            legacy_entity_id: 303,
+                        },
+                        ..second
+                    },
+                ],
+                LegacyMigrationError::UnregisteredSourceIdentity,
+            ),
+        ] {
+            assert!(
+                matches!(LegacySourceCustodyCatalog::new(&import, &catalog, rows), Err(actual) if actual == error),
+                "expected source custody rejection {error:?}"
+            );
+        }
+        // A source scan cannot contain TWO different physical items in the
+        // same one-item equipment slot, even before a requested import list.
+        let same_slot = LegacySourceCustodyRow {
+            legacy_item_id: 202,
+            location: first.location,
+        };
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &catalog, [first, same_slot]),
+            Err(LegacyMigrationError::DuplicateEquippedSlot)
+        ));
+        // Valid registered kind may still be wrong for a specific source slot.
+        let wrong_kind_slot = LegacySourceCustodyRow {
+            legacy_item_id: 202,
+            location: LegacySourceCustodyLocation::ParkedEquipped {
+                legacy_character_id: 101,
+                checkpoint_slot_code: 1,
+            },
+        };
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &catalog, [first, wrong_kind_slot]),
+            Err(LegacyMigrationError::IncompatibleEquippedKind)
+        ));
+        let corpse = LegacySourceCustodyRow {
+            legacy_item_id: 201,
+            location: LegacySourceCustodyLocation::Corpse {
+                legacy_corpse_id: 301,
+            },
+        };
+        let same_corpse = LegacySourceCustodyRow {
+            legacy_item_id: 202,
+            ..corpse
+        };
+        assert!(LegacySourceCustodyCatalog::new(&import, &catalog, [corpse, same_corpse]).is_ok());
+        let ground = LegacySourceCustodyRow {
+            legacy_item_id: 202,
+            location: LegacySourceCustodyLocation::Ground {
+                legacy_entity_id: 301,
+            },
+        };
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &catalog, [corpse, ground]),
+            Err(LegacyMigrationError::SourceContainerIdCollision)
+        ));
     }
 
     #[test]
