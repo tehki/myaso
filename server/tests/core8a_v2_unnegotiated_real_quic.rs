@@ -267,3 +267,46 @@ async fn one_unnegotiated_v2_sender_cannot_starve_another_legacy_v1_player() {
     // The noisy peer's authentic gameplay connection must also remain usable.
     assert_original_v1_input_ack(&noisy, 1, 902).await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_original_players_retain_distinct_acks_during_one_peer_v2_burst() {
+    // P0 Pre-Alpha original-arena four-actor negative. These are genuinely
+    // independent pinned QUIC connections but share one local Rust server.
+    // No live v2 admission, synthetic Combat ACK, or host-to-host WAN claim.
+    let (_server, url, digest) = start_server();
+    let (_ep1, noisy, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, quiet2, _send2, _recv2) = connect(&url, &digest).await;
+    let (_ep3, quiet3, _send3, _recv3) = connect(&url, &digest).await;
+    let (_ep4, quiet4, _send4, _recv4) = connect(&url, &digest).await;
+
+    let noise = async {
+        for sequence in 1..=48_u32 {
+            let mut packet = [2_u8, 0x11, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0];
+            packet[4..8].copy_from_slice(&sequence.to_le_bytes());
+            if sequence % 3 == 0 {
+                packet[1] = 0x52; // incompatible Core8C proposal
+            } else if sequence % 3 == 1 {
+                packet[3] = 1; // dormant future KeyE source
+            }
+            noisy
+                .send_datagram(packet)
+                .expect("real bounded unnegotiated QUIC input");
+            tokio::task::yield_now().await;
+        }
+    };
+    // Run all distinct actor receipts concurrently with invalid peer traffic,
+    // rather than sequentially checking actor #4 only after the noise ends.
+    timeout(Duration::from_secs(9), async {
+        tokio::join!(
+            noise,
+            assert_original_v1_input_ack(&quiet2, 2, 1002),
+            assert_original_v1_input_ack(&quiet3, 3, 1003),
+            assert_original_v1_input_ack(&quiet4, 4, 1004),
+        );
+    })
+    .await
+    .expect("four-player QUIC input isolation exceeded bounded timeout");
+
+    // Noisy actor remains a normal admitted v1 player after all invalid v2.
+    assert_original_v1_input_ack(&noisy, 1, 1001).await;
+}
