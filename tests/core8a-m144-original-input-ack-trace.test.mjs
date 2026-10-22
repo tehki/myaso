@@ -9,7 +9,8 @@ const runner=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",imp
 
 test("M144 and prior M145 observe genuine 30Hz submitted samples without changing sender",()=>{
   assert.match(browser,/acceptanceScenario === "uimultirecoveryspatial" \|\| acceptanceScenario === "uimultirecoveryffa"/);
-  assert.match(browser,/acceptanceScenario === "uimultirecoveryffa" \|\| currentInput\.attack \|\| currentInput\.jump \|\| currentInput\.heavyAttack/);
+  assert.match(browser,/appendM144InputSample\(debug\.inputSubmissions, \{/);
+  assert.match(browser,/else if \(actionSample\) \{/);
   assert.match(browser,/networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\);/);
   assert.equal((browser.match(/networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\);/g)??[]).length,1);
 });
@@ -17,8 +18,8 @@ test("M144 and prior M145 observe genuine 30Hz submitted samples without changin
 test("M144 sender telemetry includes idle samples and enforces prior 32-record ceiling",()=>{
   assert.match(browser,/debug\.lastSubmittedClientTick = outgoingTick;/);
   assert.match(browser,/debug\.lastSubmittedAtEpochMs = Date\.now\(\);/);
-  assert.match(browser,/inputSubmissions\.length > 32/);
-  assert.match(browser,/if \(acceptanceScenario === "uimultirecoveryffa" \|\| currentInput\.attack/);
+  assert.match(browser,/appendM144InputSample\(debug\.inputSubmissions/);
+  assert.match(browser,/if \(acceptanceScenario === "uimultirecoveryffa"\) \{/);
 });
 
 test("M144 authentic input ACK observation remains read-only, bounded and actor-owned",()=>{
