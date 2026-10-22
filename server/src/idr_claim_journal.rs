@@ -46,6 +46,49 @@ fn exclusive_lock(file: &File) -> io::Result<bool> {
     }
 }
 
+/// This dormant local MYID store is Linux-only until another platform has
+/// an independently reviewed NOFOLLOW + exclusive-lock storage path.
+/// Linux O_NOFOLLOW: refuse symlink final components even if an attacker
+/// replaces them after our metadata preflight and before open().
+#[cfg(target_os = "linux")]
+const LINUX_O_NOFOLLOW: i32 = 0o400000;
+
+#[cfg(unix)]
+fn check_regular_owned_storage_file(file: &File) -> Result<(), ClaimJournalError> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = file.metadata()?;
+    if !meta.is_file() || meta.nlink() != 1 || meta.mode() & 0o077 != 0 {
+        return Err(ClaimJournalError::Invalid(
+            "MYID lock/event must be a private regular file with one link",
+        ));
+    }
+    Ok(())
+}
+
+/// Never follow an attacker-provided symlink to an unrelated file while
+/// recovering a claimed identity or inspecting a lock. Metadata alone would
+/// race, so the opened file also uses kernel-enforced O_NOFOLLOW on Linux.
+fn open_existing_record_nofollow(path: &Path) -> Result<File, ClaimJournalError> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(LINUX_O_NOFOLLOW)
+            .open(path)?;
+        check_regular_owned_storage_file(&file)?;
+        Ok(file)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = path;
+        Err(ClaimJournalError::Io(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "review MYID NOFOLLOW on this platform before activation",
+        )))
+    }
+}
+
 const MAGIC: &[u8; 4] = b"MYID";
 const LEN: usize = 256;
 const MAX_NAME_BYTES: usize = 160;
@@ -328,6 +371,14 @@ impl OfflineClaimJournal {
     pub fn open(root: impl AsRef<Path>) -> Result<Self, ClaimJournalError> {
         let root = root.as_ref();
         fs::create_dir_all(root)?;
+        // Reject a linked root BEFORE chmod: set_permissions follows a
+        // symlink and could otherwise change an unrelated private directory.
+        let root_meta = fs::symlink_metadata(root)?;
+        if root_meta.file_type().is_symlink() || !root_meta.is_dir() {
+            return Err(ClaimJournalError::Invalid(
+                "MYID root must be a real directory, not a symlink",
+            ));
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -335,12 +386,21 @@ impl OfflineClaimJournal {
         }
         let mut options = OpenOptions::new();
         options.create(true).read(true).write(true);
-        #[cfg(unix)]
+        #[cfg(target_os = "linux")]
         {
             use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
+            options.mode(0o600).custom_flags(LINUX_O_NOFOLLOW);
+        }
+        #[cfg(all(unix, not(target_os = "linux")))]
+        {
+            return Err(ClaimJournalError::Io(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "MYID linked-storage guard requires Linux",
+            )));
         }
         let lock = options.open(root.join(".identity-writer.lock"))?;
+        #[cfg(unix)]
+        check_regular_owned_storage_file(&lock)?;
         if !exclusive_lock(&lock)? {
             return Err(ClaimJournalError::WriterBusy);
         }
@@ -359,6 +419,11 @@ impl OfflineClaimJournal {
             let name = name
                 .to_str()
                 .ok_or(ClaimJournalError::Invalid("invalid filename"))?;
+            if entry.file_type()?.is_symlink() {
+                return Err(ClaimJournalError::Invalid(
+                    "MYID directory contains linked storage",
+                ));
+            }
             if name == ".identity-writer.lock" || name.starts_with(".staging-") {
                 continue;
             }
@@ -382,7 +447,7 @@ impl OfflineClaimJournal {
                 return Err(ClaimJournalError::SequenceGap);
             }
             let mut bytes = Vec::new();
-            File::open(path)?
+            open_existing_record_nofollow(&path)?
                 .take(LEN as u64 + 1)
                 .read_to_end(&mut bytes)?;
             let rec = decode(&bytes)?;
@@ -1317,6 +1382,99 @@ mod tests {
             Ok(_) => panic!("missing first MYID record unexpectedly recovered"),
             Err(other) => panic!("expected sequence-gap denial, got {other:?}"),
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linked_root_and_writer_lock_never_redirect_identity_store_or_chmod_victim() {
+        use std::os::unix::{fs::symlink, fs::PermissionsExt};
+        let source = Root::new();
+        let external = Root::new();
+        // Repointing a supposed MYID directory to another directory must
+        // deny before chmod, lock creation or any event operation.
+        let linked_root = source.0.join("linked-idr-root");
+        fs::set_permissions(&external.0, fs::Permissions::from_mode(0o755)).unwrap();
+        symlink(&external.0, &linked_root).unwrap();
+        assert!(matches!(
+            OfflineClaimJournal::open(&linked_root),
+            Err(ClaimJournalError::Invalid(
+                "MYID root must be a real directory, not a symlink"
+            ))
+        ));
+        assert_eq!(
+            fs::metadata(&external.0).unwrap().permissions().mode() & 0o777,
+            0o755,
+            "denied root symlink must never chmod external directory",
+        );
+
+        // A malicious alternate lock symlink must fail rather than locking
+        // and possibly writing the unrelated victim; no writer admitted.
+        let victim = external.0.join("other-account-private.txt");
+        fs::write(&victim, b"DO_NOT_TOUCH").unwrap();
+        fs::set_permissions(&victim, fs::Permissions::from_mode(0o600)).unwrap();
+        symlink(&victim, source.0.join(".identity-writer.lock")).unwrap();
+        assert!(OfflineClaimJournal::open(&source.0).is_err());
+        assert_eq!(fs::read(&victim).unwrap(), b"DO_NOT_TOUCH");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linked_or_permission_weak_record_is_not_replayed_as_a_real_identity_event() {
+        use std::os::unix::{fs::symlink, fs::PermissionsExt};
+        let root = Root::new();
+        let external = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let mut journal = root.open();
+        append(
+            &mut journal,
+            &bridge,
+            &leases,
+            lease,
+            (actor(0x1234_0000_0000_0002), 1, "Tomas", 100),
+        )
+        .unwrap();
+        drop(journal);
+        let original = root.0.join(filename(1));
+        let authentic = fs::read(&original).unwrap();
+
+        // A valid original MYID record through a symlink remains forbidden.
+        let victim = external.0.join("actual-record.myid");
+        fs::write(&victim, &authentic).unwrap();
+        fs::set_permissions(&victim, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::remove_file(&original).unwrap();
+        symlink(&victim, &original).unwrap();
+        assert!(matches!(
+            root.try_open(),
+            Err(ClaimJournalError::Invalid(
+                "MYID directory contains linked storage"
+            ))
+        ));
+        assert_eq!(fs::read(&victim).unwrap(), authentic);
+
+        // Even a second hardlink to a regular, byte-valid record is refused;
+        // an alternate path could otherwise mutate the same inode.
+        fs::remove_file(&original).unwrap();
+        fs::hard_link(&victim, &original).unwrap();
+        assert!(matches!(
+            root.try_open(),
+            Err(ClaimJournalError::Invalid(
+                "MYID lock/event must be a private regular file with one link"
+            ))
+        ));
+        fs::remove_file(&original).unwrap();
+        fs::write(&original, &authentic).unwrap();
+        fs::set_permissions(&original, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(matches!(
+            root.try_open(),
+            Err(ClaimJournalError::Invalid(
+                "MYID lock/event must be a private regular file with one link"
+            ))
+        ));
+
+        // Only one owner-private original regular file may recover.
+        fs::set_permissions(&original, fs::Permissions::from_mode(0o600)).unwrap();
+        let recovered = root.open();
+        assert_eq!(recovered.head(), 1);
     }
 
     #[cfg(unix)]
