@@ -147,3 +147,72 @@ fn core8a_wire_never_contains_client_authorized_damage_target_or_actor() {
         "press is windup, not HP"
     );
 }
+
+// Combat4 P0 agreement witness: original World.step(), no client-clock damage.
+#[test]
+fn prealpha_undercharged_upgrade_release_one_real_light_no_retroactive_hit() {
+    let mut lab = LinkLab::new();
+    assert_eq!(
+        lab.accept(&OUTBOX_PRESS_TICK42).1,
+        Command::BeginLightWindup
+    );
+    lab.steps(4); // 66.7ms: original light is still in windup.
+    assert!(matches!(
+        lab.accept(&OUTBOX_UPGRADE_TICK43).1,
+        Command::UpgradeHeldHeavy { .. }
+    ));
+    lab.steps(14); // 300ms from genuine World clock, strictly below READY.
+    assert!(
+        lab.hits.is_empty(),
+        "upgraded hold must not cause a light or auto-heavy"
+    );
+    assert_eq!(
+        lab.accept(&OUTBOX_HEAVY_RELEASE_TICK63),
+        (
+            Disposition::Accepted,
+            Command::ResumeLight {
+                server_elapsed_ms: 300
+            }
+        )
+    );
+    assert!(
+        lab.hits.is_empty(),
+        "release cannot synthesize retroactive HP loss"
+    );
+    lab.steps(48);
+    assert_eq!(
+        lab.hits,
+        vec![(34, 66)],
+        "one original World HIT after short release"
+    );
+    assert_eq!(lab.world.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(
+        lab.accept(&OUTBOX_HEAVY_RELEASE_TICK63).0,
+        Disposition::Duplicate
+    );
+    lab.steps(16);
+    assert_eq!(lab.hits, vec![(34, 66)], "never add 46HP heavy after light");
+}
+
+#[test]
+fn prealpha_late_upgrade_after_real_light_contact_never_reverses_hit_or_adds_heavy() {
+    let mut lab = LinkLab::new();
+    assert_eq!(
+        lab.accept(&OUTBOX_PRESS_TICK42).1,
+        Command::BeginLightWindup
+    );
+    lab.steps(15); // 250ms: original 135ms windup and real light contact passed.
+    assert_eq!(lab.hits, vec![(34, 66)]);
+    assert_eq!(
+        lab.accept(&OUTBOX_UPGRADE_TICK43),
+        (Disposition::Rejected, Command::None),
+        "UPGRADE must be rejected once server-owned light entered Active"
+    );
+    assert_eq!(
+        lab.accept(&OUTBOX_HEAVY_RELEASE_TICK63),
+        (Disposition::Accepted, Command::None)
+    );
+    lab.steps(60);
+    assert_eq!(lab.hits, vec![(34, 66)]);
+    assert_eq!(lab.world.fighter(2).unwrap().hp, 66.0);
+}
