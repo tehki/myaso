@@ -104,7 +104,17 @@ export class ProposedLmbGestureOutbox {
   nextSendBatch(limit=4) {
     this.#requireOpen();
     requireUsable(limit,1,this.#maxPending,"send limit");
-    const selected = [...this.#pending.values()].slice(0,limit);
+    // Fair first-send: no queued RELEASE/CANCEL/UPGRADE may be starved by
+    // retrying an older unACKed PRESS when the owner requests tiny batches.
+    // All first attempts go out in their original order before retry selection.
+    // Sort the final batch by original sequence for its wire presentation;
+    // the future authoritative Rust ingress separately buffers genuine gaps.
+    const pending = [...this.#pending.values()];
+    const firstAttempts = pending.filter(e=>e.attempts===0);
+    const retransmits = pending.filter(e=>e.attempts>0);
+    const selected = [...firstAttempts,...retransmits]
+      .slice(0,limit)
+      .sort((a,b)=>a.sequence-b.sequence);
     if (selected.some(e=>e.attempts>=this.#maxAttempts)) {
       this.#closed = true;
       throw new Error("bounded gesture retransmission exhausted; no silent edge loss");
