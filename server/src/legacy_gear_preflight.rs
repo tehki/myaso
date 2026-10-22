@@ -198,6 +198,10 @@ pub enum LegacyMigrationError {
     DuplicateSourceCustody,
     SourceCustodyMismatch,
     SourceContainerIdCollision,
+    SourceBackpackCapacityExceeded,
+    SourceCorpseCapacityExceeded,
+    SourceCharacterLimitExceeded,
+    SourceWorldEntityLimitExceeded,
 }
 
 /// A five-domain high-64 namespace proposal. Do NOT hard-code its values in
@@ -513,6 +517,15 @@ pub struct LegacySourceCustodyCatalog {
     locations: BTreeMap<u64, LegacySourceCustodyLocation>,
 }
 
+// Mirrors actual Magic/Items #424 snapshot bounds (MYWLD003), not a Core
+// network or future production schema. Count only represented occupied
+// containers; the source owner must still attest empty parked characters and
+// containers, completeness and that no live player was left unparked.
+const LEGACY_BACKPACK_CAPACITY: usize = 64;
+const LEGACY_CORPSE_CAPACITY: usize = LEGACY_BACKPACK_CAPACITY + 3;
+const LEGACY_MAX_CHARACTERS: usize = 4096;
+const LEGACY_MAX_WORLD_OBJECTS: usize = 100_000;
+
 impl LegacySourceCustodyCatalog {
     pub fn new(
         import: &LegacyImportPreflight,
@@ -522,6 +535,10 @@ impl LegacySourceCustodyCatalog {
         let mut locations = BTreeMap::new();
         let mut container_kinds = BTreeMap::<u64, LegacyDomain>::new();
         let mut equipped_positions = BTreeSet::new();
+        let mut parked_characters = BTreeSet::new();
+        let mut backpack_counts = BTreeMap::<u64, usize>::new();
+        let mut corpse_counts = BTreeMap::<u64, usize>::new();
+        let mut ground_count = 0_usize;
         for row in rows {
             if !source.items.contains_key(&row.legacy_item_id) {
                 return Err(LegacyMigrationError::MissingSourceItemRecord);
@@ -538,6 +555,20 @@ impl LegacySourceCustodyCatalog {
                     checkpoint_slot_code: _,
                 } => {
                     import.core_character(legacy_character_id)?;
+                    parked_characters.insert(legacy_character_id);
+                    if parked_characters.len() > LEGACY_MAX_CHARACTERS {
+                        return Err(LegacyMigrationError::SourceCharacterLimitExceeded);
+                    }
+                    if matches!(
+                        row.location,
+                        LegacySourceCustodyLocation::ParkedBackpack { .. }
+                    ) {
+                        let count = backpack_counts.entry(legacy_character_id).or_default();
+                        *count += 1;
+                        if *count > LEGACY_BACKPACK_CAPACITY {
+                            return Err(LegacyMigrationError::SourceBackpackCapacityExceeded);
+                        }
+                    }
                     if let LegacySourceCustodyLocation::ParkedEquipped {
                         checkpoint_slot_code,
                         ..
@@ -570,6 +601,10 @@ impl LegacySourceCustodyCatalog {
                     {
                         return Err(LegacyMigrationError::SourceContainerIdCollision);
                     }
+                    ground_count += 1;
+                    if ground_count > LEGACY_MAX_WORLD_OBJECTS {
+                        return Err(LegacyMigrationError::SourceWorldEntityLimitExceeded);
+                    }
                 }
                 LegacySourceCustodyLocation::Corpse { legacy_corpse_id } => {
                     import.core_corpse(legacy_corpse_id)?;
@@ -584,6 +619,14 @@ impl LegacySourceCustodyCatalog {
                         if previous != LegacyDomain::Corpse {
                             return Err(LegacyMigrationError::SourceContainerIdCollision);
                         }
+                    }
+                    let count = corpse_counts.entry(legacy_corpse_id).or_default();
+                    *count += 1;
+                    if *count > LEGACY_CORPSE_CAPACITY {
+                        return Err(LegacyMigrationError::SourceCorpseCapacityExceeded);
+                    }
+                    if corpse_counts.len() > LEGACY_MAX_WORLD_OBJECTS {
+                        return Err(LegacyMigrationError::SourceWorldEntityLimitExceeded);
                     }
                 }
             }
@@ -1569,6 +1612,96 @@ mod tests {
         assert!(matches!(
             LegacySourceCustodyCatalog::new(&import, &catalog, [corpse, ground]),
             Err(LegacyMigrationError::SourceContainerIdCollision)
+        ));
+    }
+
+    #[test]
+    fn source_backpack_and_corpse_capacity_are_bounded_to_real_magic_snapshot() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        import.stage_owner(LegacyDomain::Corpse, 900).unwrap();
+        for id in 1..=68 {
+            import.stage_owner(LegacyDomain::Item, id).unwrap();
+        }
+        let item_records = (1..=68).map(|id| LegacySourceItemRecord {
+            legacy_item_id: id,
+            checkpoint_kind_code: 8,
+            amount: 1,
+        });
+        let source = LegacySourceItemCatalog::new(&import, 901, item_records).unwrap();
+        let backpack = |id| LegacySourceCustodyRow {
+            legacy_item_id: id,
+            location: LegacySourceCustodyLocation::ParkedBackpack {
+                legacy_character_id: 101,
+            },
+        };
+        let corpse = |id| LegacySourceCustodyRow {
+            legacy_item_id: id,
+            location: LegacySourceCustodyLocation::Corpse {
+                legacy_corpse_id: 900,
+            },
+        };
+        // One source row for EVERY catalog item; overflowing a single
+        // backpack is not made valid by moving the other items into a corpse.
+        let legal_backpack = (1..=64).map(backpack).chain((65..=68).map(corpse));
+        assert!(LegacySourceCustodyCatalog::new(&import, &source, legal_backpack).is_ok());
+        let illegal_backpack = (1..=65).map(backpack).chain((66..=68).map(corpse));
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &source, illegal_backpack),
+            Err(LegacyMigrationError::SourceBackpackCapacityExceeded)
+        ));
+        let legal_corpse = (1..=67).map(corpse).chain((68..=68).map(backpack));
+        assert!(LegacySourceCustodyCatalog::new(&import, &source, legal_corpse).is_ok());
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &source, (1..=68).map(corpse)),
+            Err(LegacyMigrationError::SourceCorpseCapacityExceeded)
+        ));
+    }
+
+    #[test]
+    fn source_parked_character_limit_matches_magic_snapshot_upper_bound() {
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        let count = LEGACY_MAX_CHARACTERS as u64 + 1;
+        for id in 1..=count {
+            import.stage_owner(LegacyDomain::Character, id).unwrap();
+            import.stage_owner(LegacyDomain::Item, id).unwrap();
+        }
+        // Cannot fully scan 4096 entries without also accounting for the
+        // additional item: create a single real valid corpse for that item.
+        import.stage_owner(LegacyDomain::Corpse, count + 2).unwrap();
+        let real_positions = (1..=LEGACY_MAX_CHARACTERS as u64)
+            .map(|id| LegacySourceCustodyRow {
+                legacy_item_id: id,
+                location: LegacySourceCustodyLocation::ParkedBackpack {
+                    legacy_character_id: id,
+                },
+            })
+            .chain(std::iter::once(LegacySourceCustodyRow {
+                legacy_item_id: count,
+                location: LegacySourceCustodyLocation::Corpse {
+                    legacy_corpse_id: count + 2,
+                },
+            }));
+        let source = LegacySourceItemCatalog::new(
+            &import,
+            count + 3,
+            (1..=count).map(|id| LegacySourceItemRecord {
+                legacy_item_id: id,
+                checkpoint_kind_code: 8,
+                amount: 1,
+            }),
+        )
+        .unwrap();
+        assert!(LegacySourceCustodyCatalog::new(&import, &source, real_positions).is_ok());
+        let over = (1..=count).map(|id| LegacySourceCustodyRow {
+            legacy_item_id: id,
+            location: LegacySourceCustodyLocation::ParkedBackpack {
+                legacy_character_id: id,
+            },
+        });
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new(&import, &source, over),
+            Err(LegacyMigrationError::SourceCharacterLimitExceeded)
         ));
     }
 

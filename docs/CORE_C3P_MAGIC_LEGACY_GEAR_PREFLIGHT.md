@@ -269,3 +269,20 @@ authoritative epoch-fenced writer. Core8C and Magic/Items retain cutover and
 source completeness responsibility. The original Magic #424 decoder still
 rejects four/five occupied equipment slots (`equipped > 3`). No Combat, UI,
 server/main, DB, production migration or Pre-Alpha source has changed.
+
+## 2026-10-22 — preserve Magic source container capacity limits
+
+The original Magic #424 `loot.rs` and `loot_persistence.rs` limit a parked
+character backpack to 64 physical stacks, a corpse to 64+3=67 stacks,
+character records to 4096 and each world ground/corpse collection to
+100,000. The existing Core8B physical custody catalog admitted 65 items in
+one backpack, 68 items inside one corpse, or more than 4096 represented parked
+characters despite unique valid IDs/custody; these cannot be faithfully read
+from the original validated source format. The new offline checker denies
+source container and character count overflow before proposing any Core item.
+
+These are upper bounds over *represented occupied* records only; empty source
+character/container records are not attested here. The source owner remains
+responsible for actual quiesced authentic checkpoint bytes, completeness and
+item/ground/corpse entities, plus its original >3-equipped decoder bug. No
+active item writer, network admission or Combat Pre-Alpha logic is altered.
