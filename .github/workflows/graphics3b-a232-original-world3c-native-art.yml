@@ -1,0 +1,67 @@
+name: Graphics3B A2.32 original Blender ironwork + World9 3C real browser QA
+
+on:
+  pull_request:
+    paths:
+      - "web/armory-p0-a232-original-ironwork-review.html"
+      - "web/armory-p0-a232-original-ironwork-review.mjs"
+      - "tools/art/verify_p0_a232_native_world3c_ironwork.mjs"
+      - "tests/graphics3b-a232-world3c-native-source.test.mjs"
+      - ".github/workflows/graphics3b-a232-original-world3c-native-art.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  original-pinned-world-threec-a232-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Original first-party Red Lion QA code, DRAFT
+        uses: actions/checkout@v4
+      - name: World9 canonical original World521 building replacement contract (PINNED)
+        uses: actions/checkout@v4
+        with:
+          repository: tehki/myaso
+          ref: 3178b9aad8757ceb3594ff04b9e3099dced6b729
+          path: pin/world
+          persist-credentials: false
+      - name: Graphics3C original P37 authored-world renderer and lantern (PINNED)
+        uses: actions/checkout@v4
+        with:
+          repository: tehki/myaso
+          ref: efdbf0b0c985fffbc4cf89285f41fcdc8ad983ac
+          path: pin/threec
+          persist-credentials: false
+      - name: Graphics3B original Blender A2.32 editable ironwork and source WebPs (PINNED)
+        uses: actions/checkout@v4
+        with:
+          repository: tehki/myaso
+          ref: 814924be535fcda9503bf013b600a60f249692e3
+          path: pin/threeb
+          persist-credentials: false
+      - name: Validate exact source IDs, manifest bounds and isolated QA-only source
+        run: |
+          node --check tools/art/verify_p0_a232_native_world3c_ironwork.mjs
+          node --check web/armory-p0-a232-original-ironwork-review.mjs
+          node --test tests/graphics3b-a232-world3c-native-source.test.mjs
+          git -C pin/world rev-parse HEAD
+          git -C pin/threec rev-parse HEAD
+          git -C pin/threeb rev-parse HEAD
+      - name: Require BOTH genuine independent first-party native browser engines
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Chrome Firefox render original A2.32 ironwork in World+3C and fail closed on real HTTP / draw faults
+        run: timeout --signal=TERM --kill-after=5s 450s node tools/art/verify_p0_a232_native_world3c_ironwork.mjs
+      - name: Preserve genuine source-authentic browser Canvas PNGs and source report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-graphics3b-a232-ironwork-world3c-real-browsers
+          path: alpha-p0-a232-native-world3c-evidence/*
+          if-no-files-found: ignore
+          retention-days: 7
