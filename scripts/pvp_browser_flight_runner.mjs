@@ -864,7 +864,12 @@ async function verifyConnectedPrealphaSilverMotions(sessions,connected){
   const element=await resolveArenaElement(firefox,"Graphics3A independent W3C roll");
   await aimArena(firefox,element,130,0);
   await scrollArenaWheel(firefox,element,-120,0);
-  const rolling=await awaitBoth(preRoll,"silver_roll");
+  // A single early cell proves visibility, not 350ms source playback.
+  // Keep observing the actual native Canvas animation through recovery;
+  // never synthesize additional states/frames.
+  await awaitBoth(preRoll,"silver_roll");
+  await sleep(490);
+  const rolling=await captured(preRoll,"silver_roll");
   const input=await Promise.all(sessions.map(readUiEvidence));
   const c=input.find(x=>x.browser==="chrome");
   const f=input.find(x=>x.browser==="firefox");

@@ -36,13 +36,25 @@ export function qualifyPrealphaSilverConnectedMotions({players,phases}){
       ||!Number.isFinite(f.epochMs)||!Number.isFinite(f.x)||!Number.isFinite(f.y))
       throw Error(mode.label+" counterfeit or invalid authentic source cell");
    }
+   const frames=[...new Set(c.draws.map(f=>f.sourceFrame))].sort((a,b)=>a-b);
+   const epochs=c.draws.map(f=>f.epochMs);
+   const paintedSpanMs=Math.max(...epochs)-Math.min(...epochs);
+   if(mode.label==="roll"){
+     // Original 8-frame Silver roll authored presentation spans 350ms.
+     // Seeing only source frame zero CANNOT certify the cycle.
+     if(frames.length<5||frames[0]>1||frames.at(-1)<6||paintedSpanMs<200)
+       throw Error("roll incomplete original Silver playback in "+expected
+         +": "+JSON.stringify({frames,paintedSpanMs}));
+   }
    ordered.push({browser:expected,sourceDraws:c.draws.length,
-     frames:[...new Set(c.draws.map(f=>f.sourceFrame))].sort((a,b)=>a-b)});
+     frames,paintedSpanMs});
   }
   summary.push({label:mode.label,initiator:mode.initiator,
     sourceBothBrowsers:true,views:ordered});
  }
  return {genuineConnectedOriginalSilverJumpAndRoll:true,
+   originalSilverRollLateFramesBothBrowsers:true,
+   server350msActionTimingValidated:false,
    serverPlayers:players.map(x=>x.serverPlayerId),motions:summary,
    actualServerActionStartTickValidated:false,
    actualTwoIndependentHumanOperators:false,
