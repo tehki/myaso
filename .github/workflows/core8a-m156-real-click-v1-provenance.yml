@@ -1,0 +1,40 @@
+name: Core8A M156 genuine v1 LMB 6ms click sender ACK trace (REVIEW ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "src/browser/m144-input-sample-observer.mjs"
+      - "tests/core8a-m156-real-v1-input-ack-provenance.test.mjs"
+      - "docs/CORE8A_M156_SHORT_CLICK_REAL_INPUT_ACK_PROVENANCE.md"
+      - ".github/workflows/core8a-m156-real-click-v1-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-m156-three-peer-strict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate unchanged native browser runtime toolchain
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+      - name: Verify genuine v1 M156 only telemetry and original M144 bounded behavior
+        run: |
+          node --test tests/core8a-m156-real-v1-input-ack-provenance.test.mjs
+          node --test tests/core8a-m144-original-input-ack-trace.test.mjs tests/core8a-m144-input-sample-observer.test.mjs
+      - name: Compile unchanged Rust authoritative gameplay server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real Chrome Firefox Chrome2 strict M156 34HP original World knockdown punish
+        env:
+          MYASO_PVP_SCENARIO: uirollknockdownffahit
+        run: timeout --signal=TERM --kill-after=5s 160s node scripts/pvp_browser_flight_runner.mjs
