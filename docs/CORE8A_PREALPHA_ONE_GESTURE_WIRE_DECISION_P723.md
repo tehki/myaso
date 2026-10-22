@@ -1,5 +1,70 @@
 # 🌕⚡️🚀 Core 8A — ONE v2 gesture wire candidate for Main #723
 
+
+## Reserve Main design decision — 22 October 2026
+
+[Main's protocol-family selection in #723](https://github.com/tehki/myaso/issues/723#issuecomment-6344679826)
+**SELECTS only the existing original Combat4/Core8A v2 family**:
+16-byte `0x11` EVENT + 16-byte `0x12` ACK. **Competing `0x52`
+is explicitly rejected for the future live path**, not adopted as
+an alternative parser. This does **not** approve the final source
+discriminator, negotiated handshake bytes or any runtime acceptance.
+
+The **byte3=0 LMB / byte3=1 standalone KeyE is still a proposed
+source grammar** awaiting signed-off Core8A/Core8C/Combat4/UI10
+interoperability review and Main's explicit final ABI lock.
+The *existing* original Rust and JavaScript dormant codecs must
+continue to **reject byte3=1** (historically reserved) until that
+cross-owner decision. Do not switch source1 on merely because the
+review-only decoder accepts it. No actor identity or authentication
+comes from these 16 bytes: each source is associated with the same
+trusted, server-authenticated QUIC actor/lease, not a client epoch.
+
+### Single immutable JS↔Rust golden-vector corpus
+
+The normative **review candidate, not a production codec** is
+[`tests/fixtures/core8a-p723-selected-family-v2.golden`](../tests/fixtures/core8a-p723-selected-family-v2.golden).
+**Both** `tests/core8a-one-v2-gesture-wire-review.test.mjs` and
+`server/tests/core8a_single_v2_wire_choice_review.rs` consume
+the **same exact 15 vectors** rather than maintaining independent
+byte copies that could quietly drift:
+
+- Seven independent EVENT examples: LMB PRESS/RELEASE on the same
+  diagnostic tick42, proposed KeyE PRESS/RELEASE/CANCEL, LMB
+  UPGRADE/CANCEL. Each vector is a standalone ABI example;
+  they are **not** an ordered seven-event game gesture.
+- Four ACK statuses (ACCEPTED, DUPLICATE, STALE, REJECTED), all
+  with reserved byte3 zero and server-owned tick; receipt only,
+  **never Combat success**.
+- Four invalid frames: KeyE UPGRADE, unknown source2,
+  incompatible `0x52`, ACK with byte3 nonzero.
+  The JS original ACK decoder must deny the malformed ACK;
+  Rust currently **encodes** ACKs but does **not** expose a
+  production ACK decoder. A future server ACK parser must
+  fail closed on this value.
+
+This corpus does **not** itself authenticate QUIC streams, settle
+which optional handshake frames are valid, prove true server-side
+125ms parry or 135ms/320ms Combat timing, accept any typed KeyE
+frame in production or grant a release. Original v1 remains intact.
+
+### Open sign-offs before source activation
+
+Core8A must specify a connection-owned version-negotiation
+preface (exact request, reply, stream and capability failure
+bytes) and verify original v1 retains correct behavior on
+negotiation rejection. Core8C must approve trusted same-lock
+actor/World/zone/lifetime binding and retirement, including ABA
+within one server tick. Combat4 must approve KeyE PRESS/RELEASE/
+CANCEL semantics without LMB UPGRADE alias or damage duplication;
+UI10 must verify DOM KeyE, focus and cancel provenance.
+Main chooses the final byte3 grammar after all reviews, and
+only then authorizes a **single** default-disabled live adapter.
+The Reserve Main notice selected a design family but did not
+authorize central merge, live code push, CI bypass, rollout or
+production access. **Release HOLD.**
+
+
 **DRAFT / REVIEW-ONLY / DEFAULT OFF.** Requested by
 [Main decision issue #723](https://github.com/tehki/myaso/issues/723),
 for joint **Core8A + Core8C + Combat4 + UI10** sign-off.
