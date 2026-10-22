@@ -28,7 +28,11 @@ jobs:
           geckodriver --version
       - name: Build the original, unchanged Rust server binary
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
-      - name: Four actual Chrome Firefox sessions must retire old Canvas/HUD identity and show fresh player
+      - name: Firefox peer exits; three real surviving Chrome Canvas/HUD views must retire ghost
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 345s node scripts/core8c_prealpha_native_ghost_rejoin.mjs
+      - name: Chrome peer exits; surviving Firefox plus Chrome Canvas/HUD views must retire ghost
+        env:
+          C1_BROWSER_MATRIX: chrome,chrome,firefox,chrome
         run: timeout --signal=TERM --kill-after=5s 345s node scripts/core8c_prealpha_native_ghost_rejoin.mjs
