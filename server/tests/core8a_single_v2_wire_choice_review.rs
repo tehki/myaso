@@ -3,7 +3,8 @@
 //! Combat4/Core8A old 0x11 LMB / 0x12 ACK vectors must remain unchanged;
 //! standalone KEY_E byte3=1 is a PROPOSED extension, currently REJECTED.
 use myaso_server::prealpha_lmb_gesture_proposal::{
-    decode_event, encode_ack, AckStatus, DecodeError, GestureAck, GestureAction,
+    decode_event, decode_typed_event, encode_ack, encode_typed_event, AckStatus, DecodeError,
+    GestureAck, GestureAction, GestureSource, TypedDecodeError, TypedGestureEvent,
 };
 
 const LMB_PRESS_T42: [u8; 16] = [2, 0x11, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 42, 0, 0, 0];
@@ -193,4 +194,67 @@ fn selected_family_shared_fixture_matches_original_combat4_rust_codec_and_review
     // The old Rust source does NOT implement an ACK decoder; source byte3=1
     // is specified as malformed for future ACK ingress and independently
     // rejected by the original JavaScript ACK decoder in the same fixture.
+}
+
+#[test]
+fn selected_main_draft_opt_in_rust_codec_matches_shared_js_vectors_without_live_enable() {
+    let cases = [
+        ("LMB_PRESS", GestureSource::Lmb, GestureAction::Press, 1, 1, 42),
+        ("LMB_RELEASE", GestureSource::Lmb, GestureAction::Release, 2, 1, 42),
+        ("KEY_E_PRESS", GestureSource::KeyE, GestureAction::Press, 3, 2, 43),
+        ("KEY_E_RELEASE", GestureSource::KeyE, GestureAction::Release, 4, 2, 44),
+        ("KEY_E_CANCEL", GestureSource::KeyE, GestureAction::Cancel, 5, 2, 45),
+        ("LMB_UPGRADE", GestureSource::Lmb, GestureAction::Upgrade, 6, 3, 42),
+        ("LMB_CANCEL", GestureSource::Lmb, GestureAction::Cancel, 7, 3, 42),
+    ];
+    for (name, source, action, sequence, gesture_id, client_tick) in cases {
+        let received = shared_selected_family_bytes(name);
+        let typed = TypedGestureEvent {
+            source,
+            event: myaso_server::prealpha_lmb_gesture_proposal::GestureEvent {
+                action,
+                sequence,
+                gesture_id,
+                client_tick,
+            },
+        };
+        assert_eq!(
+            encode_typed_event(typed),
+            Ok(received),
+            "{name} Rust encoding matches immutable JS fixture"
+        );
+        assert_eq!(
+            decode_typed_event(&received),
+            Ok(typed),
+            "{name} Rust opt-in decoding matches original bytes"
+        );
+        if source == GestureSource::KeyE {
+            assert_eq!(decode_event(&received), Err(DecodeError::Reserved));
+        }
+    }
+    for name in ["BAD_UNKNOWN_SOURCE", "BAD_KEY_E_UPGRADE", "BAD_UNSELECTED_52"] {
+        let received = shared_selected_family_bytes(name);
+        assert!(decode_typed_event(&received).is_err(), "{name} denied");
+    }
+    assert_eq!(
+        decode_typed_event(&shared_selected_family_bytes("BAD_KEY_E_UPGRADE")),
+        Err(TypedDecodeError::InvalidSourceAction)
+    );
+    assert_eq!(
+        decode_typed_event(&shared_selected_family_bytes("BAD_UNKNOWN_SOURCE")),
+        Err(TypedDecodeError::UnknownSource(2))
+    );
+    assert_eq!(
+        encode_typed_event(TypedGestureEvent {
+            source: GestureSource::KeyE,
+            event: myaso_server::prealpha_lmb_gesture_proposal::GestureEvent {
+                action: GestureAction::Upgrade,
+                sequence: 8,
+                gesture_id: 4,
+                client_tick: 0,
+            }
+        }),
+        Err(TypedDecodeError::InvalidSourceAction)
+    );
+    // No v2 QUIC route is linked: this tests byte grammar ONLY.
 }
