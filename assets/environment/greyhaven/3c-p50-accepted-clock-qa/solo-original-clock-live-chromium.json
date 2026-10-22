@@ -1,0 +1,464 @@
+{
+  "type": "P50 actual client+Rust local authoritative smoke and RAF gap telemetry",
+  "sourceHead": "e7fd51e3e423a9f04a62c187482820b14796a894",
+  "serverBinary": "myaso-server",
+  "host": "127.0.0.1",
+  "browsersIndependentHosts": false,
+  "serverAuthoritative": true,
+  "worldFlag": true,
+  "clientsRequested": 1,
+  "measureMs": 4500,
+  "results": [
+    {
+      "index": 1,
+      "errors": [],
+      "client": {
+        "status": "Online - player #1 - server tick 48",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #1 - server tick 90",
+        "scoreboard": [
+          "#10"
+        ],
+        "diagnostics": "Input→ACK p50 62ms · p95 63ms | Jitter p95 1ms | Snapshots p50 50ms · p95 51ms | Camera correction p95 14u | Stale-own ACKs 97 | Deferred reconciles 190 | Render catch-ups 0 | Extra render lag p50 0ms · p95 0ms | >33ms 0% (53 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2160,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.7,
+        "rAFGapMaxMs": 16.800000000000182,
+        "rAFSamples": 269,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 0.8,
+        "actualGameFrameMaxMs": 1,
+        "actualGameFrameSamples": 270,
+        "worldTileBlitMs": 28.6,
+        "worldTileBlitCalls": 2160,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "actualGameFrameGapOver33": 0,
+        "actualGameFrameGapOver50": 0,
+        "actualGameFrameGapOver100": 0,
+        "callbackOver16Ms": 0,
+        "severeFrameGapsWithTaskOverlap": 0,
+        "severeFrameGapsWithoutTaskOverlap": 0,
+        "severeFrameGapsWithShortNextCallback": 0,
+        "observedLongTaskCount": 0,
+        "observedLongTaskMaxMs": 0,
+        "longTaskObserverStatus": "observing",
+        "snapshotReaderHooks": 1,
+        "actualSnapshotPacketCount": 90,
+        "otherRealtimePacketCount": 90,
+        "ingressSource": "WebTransport.datagrams.readable.getReader() unmodified read results",
+        "ingressIntervals": 89,
+        "ingressGapP50Ms": 50,
+        "ingressGapP95Ms": 50.6,
+        "ingressGapMaxMs": 57.2,
+        "ingressTickJumpP95": 3,
+        "ingressTickJumpMax": 3,
+        "ingressIntervalsOver100Ms": 0,
+        "ingressIntervalsOver250Ms": 0,
+        "ingressIntervalsOver400Ms": 0,
+        "eventBursts": [],
+        "acceptedRealtimeCount": 90,
+        "acceptedReliableCount": 0,
+        "acceptedTotalCount": 90,
+        "acceptedGapP95Ms": 50.6,
+        "acceptedGapMaxMs": 57,
+        "acceptedTickJumpMax": 3,
+        "acceptedGapOver100": 0,
+        "acceptedGapOver400": 0,
+        "sampledClockCount": 45,
+        "sampledClockDebtP95Ms": 0,
+        "sampledClockDebtMaxMs": 0,
+        "sampledClockCatchupMax": 0,
+        "clockCorrelationWindows": [
+          {
+            "t": 1174.8,
+            "tick": 96,
+            "renderTick": 91.602,
+            "debtMs": 0,
+            "catchups": 0,
+            "nearbyAccepted": [
+              {
+                "t": 1204.1,
+                "kind": "realtime",
+                "tick": 99
+              },
+              {
+                "t": 1254.3,
+                "kind": "realtime",
+                "tick": 102
+              },
+              {
+                "t": 1303.7,
+                "kind": "realtime",
+                "tick": 105
+              },
+              {
+                "t": 1354,
+                "kind": "realtime",
+                "tick": 108
+              },
+              {
+                "t": 1403.7,
+                "kind": "realtime",
+                "tick": 111
+              },
+              {
+                "t": 1453.9,
+                "kind": "realtime",
+                "tick": 114
+              },
+              {
+                "t": 1504,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1553.5,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1604.2,
+                "kind": "realtime",
+                "tick": 123
+              }
+            ]
+          },
+          {
+            "t": 1274.8,
+            "tick": 102,
+            "renderTick": 97.602,
+            "debtMs": 0,
+            "catchups": 0,
+            "nearbyAccepted": [
+              {
+                "t": 1204.1,
+                "kind": "realtime",
+                "tick": 99
+              },
+              {
+                "t": 1254.3,
+                "kind": "realtime",
+                "tick": 102
+              },
+              {
+                "t": 1303.7,
+                "kind": "realtime",
+                "tick": 105
+              },
+              {
+                "t": 1354,
+                "kind": "realtime",
+                "tick": 108
+              },
+              {
+                "t": 1403.7,
+                "kind": "realtime",
+                "tick": 111
+              },
+              {
+                "t": 1453.9,
+                "kind": "realtime",
+                "tick": 114
+              },
+              {
+                "t": 1504,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1553.5,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1604.2,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1653.9,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1704.2,
+                "kind": "realtime",
+                "tick": 129
+              }
+            ]
+          },
+          {
+            "t": 1374.8,
+            "tick": 108,
+            "renderTick": 103.602,
+            "debtMs": 0,
+            "catchups": 0,
+            "nearbyAccepted": [
+              {
+                "t": 1204.1,
+                "kind": "realtime",
+                "tick": 99
+              },
+              {
+                "t": 1254.3,
+                "kind": "realtime",
+                "tick": 102
+              },
+              {
+                "t": 1303.7,
+                "kind": "realtime",
+                "tick": 105
+              },
+              {
+                "t": 1354,
+                "kind": "realtime",
+                "tick": 108
+              },
+              {
+                "t": 1403.7,
+                "kind": "realtime",
+                "tick": 111
+              },
+              {
+                "t": 1453.9,
+                "kind": "realtime",
+                "tick": 114
+              },
+              {
+                "t": 1504,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1553.5,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1604.2,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1653.9,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1704.2,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1753.4,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1804,
+                "kind": "realtime",
+                "tick": 135
+              }
+            ]
+          },
+          {
+            "t": 1474.7,
+            "tick": 114,
+            "renderTick": 109.596,
+            "debtMs": 0,
+            "catchups": 0,
+            "nearbyAccepted": [
+              {
+                "t": 1204.1,
+                "kind": "realtime",
+                "tick": 99
+              },
+              {
+                "t": 1254.3,
+                "kind": "realtime",
+                "tick": 102
+              },
+              {
+                "t": 1303.7,
+                "kind": "realtime",
+                "tick": 105
+              },
+              {
+                "t": 1354,
+                "kind": "realtime",
+                "tick": 108
+              },
+              {
+                "t": 1403.7,
+                "kind": "realtime",
+                "tick": 111
+              },
+              {
+                "t": 1453.9,
+                "kind": "realtime",
+                "tick": 114
+              },
+              {
+                "t": 1504,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1553.5,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1604.2,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1653.9,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1704.2,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1753.4,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1804,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1853.8,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1904.1,
+                "kind": "realtime",
+                "tick": 141
+              }
+            ]
+          },
+          {
+            "t": 1574.8,
+            "tick": 120,
+            "renderTick": 115.602,
+            "debtMs": 0,
+            "catchups": 0,
+            "nearbyAccepted": [
+              {
+                "t": 1204.1,
+                "kind": "realtime",
+                "tick": 99
+              },
+              {
+                "t": 1254.3,
+                "kind": "realtime",
+                "tick": 102
+              },
+              {
+                "t": 1303.7,
+                "kind": "realtime",
+                "tick": 105
+              },
+              {
+                "t": 1354,
+                "kind": "realtime",
+                "tick": 108
+              },
+              {
+                "t": 1403.7,
+                "kind": "realtime",
+                "tick": 111
+              },
+              {
+                "t": 1453.9,
+                "kind": "realtime",
+                "tick": 114
+              },
+              {
+                "t": 1504,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1553.5,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1604.2,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1653.9,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1704.2,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1753.4,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1804,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1853.8,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1904.1,
+                "kind": "realtime",
+                "tick": 141
+              },
+              {
+                "t": 1953.9,
+                "kind": "realtime",
+                "tick": 144
+              },
+              {
+                "t": 2004.2,
+                "kind": "realtime",
+                "tick": 147
+              }
+            ]
+          }
+        ],
+        "topFrameGaps": [],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    }
+  ],
+  "errors": [],
+  "serverSummary": {
+    "endpointLoopback": true,
+    "admittedPlayerIds": [
+      1
+    ],
+    "clientCount": 1
+  }
+}
