@@ -184,10 +184,6 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    // M343: strictly native-acceptance provenance; no event or attack replay.
-    recordM156NativeInputTrace({
-      kind: "light-commit", epochMs: Date.now(), clientTick, attackRequested,
-    });
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -198,14 +194,10 @@ const leftButtonCharge = createLeftButtonCharge({
       queueStaminaDenial("running-attack");
     }
     audio.play("light");
+    recordM156NativeInputTrace({ kind: "light-commit", epochMs: Date.now(), clientTick, attackRequested });
   },
-  onHeavy() {
-    heavyAttackRequested = true;
-    recordM156NativeInputTrace({
-      kind: "heavy-commit", epochMs: Date.now(), clientTick, heavyAttackRequested,
-    });
-    leftButtonPressMovement = null;
-    audio.play("heavy");
+  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy");
+    recordM156NativeInputTrace({ kind: "heavy-commit", epochMs: Date.now(), clientTick, heavyAttackRequested });
   },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
@@ -251,12 +243,12 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  leftButtonPressMovement = null;
   recordM156NativeInputTrace({
     kind: "pointer-up", epochMs: Date.now(), clientTick,
     pointerId: event.pointerId, trusted: event.isTrusted === true,
     classification: committed,
   });
-  leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
     audio.unlock();
