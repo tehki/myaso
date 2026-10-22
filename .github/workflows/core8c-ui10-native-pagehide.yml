@@ -1,0 +1,36 @@
+name: Core8C x UI10 native voluntary pagehide seat retirement (DRAFT ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/core8c_ui10_native_pagehide_departure.mjs"
+      - ".github/workflows/core8c-ui10-native-pagehide.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-voluntary-exit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate genuine browser harness
+        run: |
+          node --check scripts/core8c_ui10_native_pagehide_departure.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile original authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Native Firefox voluntarily navigates away; Chrome survivors and fifth seat
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 145s node scripts/core8c_ui10_native_pagehide_departure.mjs
+      - name: Native Chrome voluntarily navigates away; Firefox survivor and fifth seat
+        env:
+          C1_BROWSER_MATRIX: chrome,chrome,firefox,chrome
+        run: timeout --signal=TERM --kill-after=5s 145s node scripts/core8c_ui10_native_pagehide_departure.mjs
