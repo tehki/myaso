@@ -21,7 +21,7 @@ async function randomPort(){
   });
 }
 function launch(binary,args,opts={}){
-  const child=spawn(binary,args,{...opts,env:{...process.env,...opts.env},
+  const child=spawn(binary,args,{...opts,env:opts.env??process.env,
     detached:process.platform!=="win32"});
   processes.push(child);
   return child;
