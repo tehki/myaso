@@ -74,6 +74,10 @@ pub struct ReviewWorldLease {
 
 impl ReviewWorldLease {
     pub fn review_from_admitted_world(world: &World, actor: ReviewActorLease) -> Option<Self> {
+        // No new gesture lease may enter a completed match or span its reset.
+        if world.match_over() {
+            return None;
+        }
         let fighter = world.fighter(actor.actor_net_id)?;
         if fighter.action == Action::Dead || fighter.hp <= 0.0 {
             return None;
@@ -115,7 +119,11 @@ impl ReviewWorldLease {
             return false;
         }
         let current = world.fighter(self.actor.actor_net_id);
-        if current.is_none_or(|fighter| fighter.action == Action::Dead || fighter.hp <= 0.0) {
+        // World::reset_match revives living fighters without a Dead interval.
+        // Revoke ALL old-round queued input on the authoritative winning tick.
+        if world.match_over()
+            || current.is_none_or(|fighter| fighter.action == Action::Dead || fighter.hp <= 0.0)
+        {
             self.retire();
             return false;
         }
