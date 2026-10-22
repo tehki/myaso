@@ -164,7 +164,10 @@ fn four_real_world_actor_ids_remain_independently_bound_across_one_simulation_ti
     let mut adapters = (1..=4)
         .map(|actor| {
             let l = lease(actor, 1, actor as u64 + 100);
-            (l, ReviewWorldLease::review_from_admitted_world(&world, l).unwrap())
+            (
+                l,
+                ReviewWorldLease::review_from_admitted_world(&world, l).unwrap(),
+            )
         })
         .collect::<Vec<_>>();
     let distinct_spawns = world.fighters().iter().map(|f| f.x).collect::<Vec<_>>();
@@ -195,7 +198,11 @@ fn bounded_unconsumed_world_queue_retires_and_drops_all_intents() {
             ReviewEdgeStatus::Accepted(1)
         );
         assert_eq!(
-            adapter.review_ingest(&world, owner, &wire(GestureAction::Release, seq + 1, gesture_id)),
+            adapter.review_ingest(
+                &world,
+                owner,
+                &wire(GestureAction::Release, seq + 1, gesture_id)
+            ),
             ReviewEdgeStatus::Accepted(1)
         );
     }
@@ -249,10 +256,15 @@ fn server_world_death_event_retires_victims_gesture_before_followup_release() {
         for _ in 0..36 {
             let events = world.step();
             adapter.observe_world_tick(&world);
-            if events.iter().any(|event| matches!(
-                event,
-                CombatEvent::Death { fighter: 2, killer: 1 }
-            )) {
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Death {
+                        fighter: 2,
+                        killer: 1
+                    }
+                )
+            }) {
                 death_seen = true;
                 break;
             }
@@ -264,7 +276,10 @@ fn server_world_death_event_retires_victims_gesture_before_followup_release() {
         world.step();
         adapter.observe_world_tick(&world);
     }
-    assert!(death_seen, "real combat must defeat the actual World fighter");
+    assert!(
+        death_seen,
+        "real combat must defeat the actual World fighter"
+    );
     assert_eq!(world.fighter(2).unwrap().action, Action::Dead);
     assert!(adapter.is_retired());
     assert_eq!(adapter.pending_count(), 0);
