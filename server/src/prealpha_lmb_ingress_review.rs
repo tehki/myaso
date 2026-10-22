@@ -135,12 +135,16 @@ impl ReviewLmbIngress {
             // An ACK for a replay is safe only if its FULL original event
             // (including action and diagnostic clock) is byte-equivalent.
             // Never affirm an equivocal same-sequence mutation as duplicate.
-            if self.seen.iter().any(|saved| {
-                saved.sequence == event.sequence && *saved != event
-            }) {
+            if self
+                .seen
+                .iter()
+                .any(|saved| saved.sequence == event.sequence && *saved != event)
+            {
                 self.close();
                 return IngressResult::Rejected(Some(Self::ack(
-                    event, AckStatus::Rejected, server_tick,
+                    event,
+                    AckStatus::Rejected,
+                    server_tick,
                 )));
             }
             let previously_accepted = self.seen.contains(&event);
