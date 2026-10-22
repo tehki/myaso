@@ -1307,7 +1307,7 @@ jobs:
       - name: Refuse unauthenticated victim PNG and source substitution
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
-          node --test tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+          node --test tests/graphics3a-original-silver-native-archive.test.mjs tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
       - name: Verify native Chrome Firefox and Rust runtime
         run: |
           cargo --version
