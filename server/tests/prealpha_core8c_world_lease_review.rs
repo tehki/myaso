@@ -289,7 +289,6 @@ fn server_world_death_event_retires_victims_gesture_before_followup_release() {
     );
 }
 
-
 #[test]
 fn real_match_win_retires_unspent_spectator_press_before_next_round() {
     let mut world = World::new(900.0, 500.0);
@@ -334,8 +333,14 @@ fn real_match_win_retires_unspent_spectator_press_before_next_round() {
         assert!(death_seen, "real Combat World must resolve every kill");
     }
     assert_eq!(world.fighter(1).unwrap().kills, 5);
-    assert!(world.match_over(), "actual 5-kill FFA must enter match-over");
-    assert!(adapter.is_retired(), "past-round queued gestures must retire");
+    assert!(
+        world.match_over(),
+        "actual 5-kill FFA must enter match-over"
+    );
+    assert!(
+        adapter.is_retired(),
+        "past-round queued gestures must retire"
+    );
     assert_eq!(adapter.pending_count(), 0);
     assert_eq!(
         adapter.review_ingest(&world, observer, &wire(GestureAction::Release, 2, 1)),
