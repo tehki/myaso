@@ -1,0 +1,35 @@
+{
+  "authenticatedRustThreePlayerKnockdown": true,
+  "realSilverSourceAllBrowsers": true,
+  "screenshotAfterSynchronousCanvasCallback": true,
+  "inGameSoleContactProven": false,
+  "trueImpactMeshCollisionProven": false,
+  "humanArtApproved": false,
+  "preAlphaEnabled": false,
+  "images": [
+    {
+      "browser": "chrome",
+      "serverPlayerId": 1,
+      "originalSourceFrame": 3,
+      "filename": "original_silver_real_knockdown_chrome.png",
+      "bytes": 30358,
+      "sha256": "f8a2756e7e84f910c2d08235da380b53c6fac94e771a29dc90acd6980f71595a"
+    },
+    {
+      "browser": "firefox",
+      "serverPlayerId": 2,
+      "originalSourceFrame": 3,
+      "filename": "original_silver_real_knockdown_firefox.png",
+      "bytes": 25943,
+      "sha256": "2059562ac7c04f1787cd42320bcfec6a0ba719333ce211782a46c8b5cbecfd57"
+    },
+    {
+      "browser": "chrome2",
+      "serverPlayerId": 3,
+      "originalSourceFrame": 3,
+      "filename": "original_silver_real_knockdown_chrome2.png",
+      "bytes": 30410,
+      "sha256": "93843e589e3bbe52bdb59b74b35e64663c71239f9f3b31d94c3cc725dc199d8a"
+    }
+  ]
+}

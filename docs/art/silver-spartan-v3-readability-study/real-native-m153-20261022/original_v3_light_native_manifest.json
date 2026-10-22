@@ -1,0 +1,37 @@
+{
+  "actualThreeNativeBrowsers": true,
+  "realAuthoritativeM153": true,
+  "independentSourceSHA256": "3522f093a095a616dedf6f859c954553dd4832f8c1cbf655b644207faf239a79",
+  "previewOnly": true,
+  "actualGreyhavenGroundValidated": false,
+  "humanArtApproval": false,
+  "originalV3SourceAtlasUnchanged": true,
+  "originalV2VictimSourceUnchanged": true,
+  "preAlphaIncluded": false,
+  "images": [
+    {
+      "browser": "chrome",
+      "authenticatedServerId": 1,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_chrome.png",
+      "bytes": 30622,
+      "sha256": "3028f44287ca6b689e2d27fcbe4e01a3865f3ad66b8adf34797becfda43da88e"
+    },
+    {
+      "browser": "firefox",
+      "authenticatedServerId": 2,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_firefox.png",
+      "bytes": 27907,
+      "sha256": "c16789849e9b8af6399e443924dc2c32e187d1443b9de96d46a9278ddb1e20ff"
+    },
+    {
+      "browser": "chrome2",
+      "authenticatedServerId": 3,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_chrome2.png",
+      "bytes": 30960,
+      "sha256": "23bd0dc68921e0ea43a257106ed459a02ee802b34404320bd4c74cd8ff5a2ae1"
+    }
+  ]
+}
