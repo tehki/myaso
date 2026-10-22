@@ -517,7 +517,8 @@ impl OfflineClaimJournal {
 
     /// Trusted server-only revocation in this OFFLINE prototype. There is
     /// deliberately no client or public action that calls this method.
-    pub fn append_offline_tombstone(
+    #[cfg(test)]
+    pub(crate) fn append_offline_tombstone(
         &mut self,
         subject: CharacterId,
         event_id: u128,
@@ -567,20 +568,23 @@ impl OfflineClaimJournal {
     /// HISTORICAL INSPECTION ONLY. This unchecked local record is NOT a
     /// current authenticated observer view, verified identity or subscriber
     /// message. Use read_claim_for_current_viewer for a gated offline view.
-    pub fn observed_unverified_claim(
+    #[cfg(test)]
+    pub(crate) fn observed_unverified_claim(
         &self,
         observer: CharacterId,
         subject: CharacterId,
     ) -> Option<&ObservedClaim> {
         self.state.claims.get(&(observer, subject))
     }
-    pub fn retired(&self, subject: CharacterId) -> bool {
+    #[cfg(test)]
+    pub(crate) fn retired(&self, subject: CharacterId) -> bool {
         self.state.retired.contains(&subject)
     }
     pub fn head(&self) -> u64 {
         self.head
     }
-    pub fn verify_historical_event(
+    #[cfg(test)]
+    pub(crate) fn verify_historical_event(
         &self,
         event_id: u128,
         event: &OfflineIdentityEvent,
@@ -878,6 +882,34 @@ mod tests {
             "Tomas",
             "history is still present but must not leak as current",
         );
+        let historical = OfflineIdentityEvent::Claim {
+            speaker: source,
+            observer: viewer,
+            session_generation: 1,
+            appearance_epoch: 1,
+            name: "Tomas".to_owned(),
+        };
+        assert_eq!(
+            journal.verify_historical_event(1001, &historical).unwrap(),
+            Some(ClaimReceipt {
+                sequence: 1,
+                event_id: 1001
+            }),
+            "historical committed receipt is NOT a current-view authorization",
+        );
+        assert!(matches!(
+            journal.verify_historical_event(
+                1001,
+                &OfflineIdentityEvent::Claim {
+                    speaker: source,
+                    observer: viewer,
+                    session_generation: 1,
+                    appearance_epoch: 1,
+                    name: "Impostor".to_owned()
+                }
+            ),
+            Err(ClaimJournalError::ConflictingReplay)
+        ));
         journal
             .append_unverified_claim(OfflineClaimIntent {
                 bridge: &bridge,
