@@ -37,11 +37,11 @@ test("original World #521 and real Graphics3C P37 source owns art substitution",
  assert.match(viewer,/camera=\{x:4365,y:4075\}/);
  assert.match(viewer,/point\.x-114,point\.y-269/);
  assert.match(runner,/__world521__\/src\/world\/building-presentation\.mjs/);
- assert.match(runner,/__3cp37__\/src\/browser\/authored-world-renderer\.mjs/);
+ assert.match(viewer,/__3cp37__\/src\/browser\/authored-world-renderer\.mjs/);
 });
 test("new A2.32 actual scene is compared against genuine prior A2.31 pixels",()=>{
  assert.match(viewer,/priorSourceDifferencePixels/);
- assert.match(viewer,/Original A2\.31 source comparison unavailable/);
+ assert.match(viewer,/original A2\.31 source comparison unavailable/);
  assert.match(viewer,/changedRgb\+\+/);
  assert.match(viewer,/changedAlpha\+\+/);
  assert.match(runner,/changedRgb>100/);
