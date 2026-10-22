@@ -249,6 +249,27 @@ mod tests {
             offset_y_cm: 0,
         }
     }
+    /// TEST ONLY: a dropped POSIX writer may finish descriptor handoff just
+    /// after a sibling test's close under high parallelism. Never change
+    /// production `DurableItemJournal::open` single-writer fail-fast policy.
+    fn open_test_only_journal(root: &std::path::Path) -> crate::item_journal::DurableItemJournal {
+        use crate::item_journal::{DurableItemJournal, ItemJournalError};
+        use std::{
+            thread,
+            time::{Duration, Instant},
+        };
+        let deadline = Instant::now() + Duration::from_millis(500);
+        loop {
+            match DurableItemJournal::open(root) {
+                Ok(writer) => return writer,
+                Err(ItemJournalError::WriterBusy) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(e) => panic!("test-only Core journal writer: {e:?}"),
+            }
+        }
+    }
+
     fn fixture() -> Fixture {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let stamp = SystemTime::now()
@@ -482,12 +503,12 @@ mod tests {
     #[test]
     fn same_ground_rack_socket_two_canonical_items_must_reject_entire_review_after_restart() {
         use crate::{
-            item_journal::{DurableItemJournal, ItemJournalError},
+            item_journal::ItemJournalError,
             item_ownership::{ItemId, ItemLocation, OwnershipOp, OwnershipTxnId},
         };
         let f = fixture();
         let root = f.dir.join("one-core-writer-with-ambiguous-rack");
-        let mut journal = DurableItemJournal::open(&root).unwrap();
+        let mut journal = open_test_only_journal(&root);
         let proposal =
             review_offline_quiescent_greyhaven_rack(&f.checkpoint, &f.imported, mapping(), 2)
                 .unwrap();
@@ -554,7 +575,7 @@ mod tests {
             ))
         ));
         drop(journal);
-        let mut journal = DurableItemJournal::open(&root).unwrap();
+        let mut journal = open_test_only_journal(&root);
         assert!(
             matches!(
                 review_offline_rack_against_existing_core(
@@ -610,12 +631,11 @@ mod tests {
         use crate::{
             alpha_bound_pickup::ProposedRackPickupEnvelope,
             identity::CharacterId,
-            item_journal::DurableItemJournal,
             item_ownership::{ItemLocation, OwnershipOp, OwnershipTxnId},
         };
         let f = fixture();
         let root = f.dir.join("one-core-writer");
-        let mut journal = DurableItemJournal::open(&root).unwrap();
+        let mut journal = open_test_only_journal(&root);
         let offline =
             review_offline_quiescent_greyhaven_rack(&f.checkpoint, &f.imported, mapping(), 2)
                 .unwrap();
@@ -736,7 +756,7 @@ mod tests {
             Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
         ));
         drop(journal);
-        let reopened = DurableItemJournal::open(&root).unwrap();
+        let reopened = open_test_only_journal(&root);
         assert!(matches!(
             recheck_original_offline_core_rack_match(&reopened, &baseline),
             Err(OfflineCoreRackMatchError::ChangedLocalJournalHead)
