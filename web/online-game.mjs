@@ -184,6 +184,10 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    // M343: strictly native-acceptance provenance; no event or attack replay.
+    recordM156NativeInputTrace({
+      kind: "light-commit", epochMs: Date.now(), clientTick, attackRequested,
+    });
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -195,7 +199,14 @@ const leftButtonCharge = createLeftButtonCharge({
     }
     audio.play("light");
   },
-  onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
+  onHeavy() {
+    heavyAttackRequested = true;
+    recordM156NativeInputTrace({
+      kind: "heavy-commit", epochMs: Date.now(), clientTick, heavyAttackRequested,
+    });
+    leftButtonPressMovement = null;
+    audio.play("heavy");
+  },
 });
 const rightButtonGesture = installRightButtonGesture(canvas, {
   onKick: () => {
@@ -219,6 +230,10 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
+    recordM156NativeInputTrace({
+      kind: "pointer-down", epochMs: Date.now(), clientTick,
+      pointerId: event.pointerId, trusted: event.isTrusted === true,
+    });
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
@@ -236,6 +251,11 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  recordM156NativeInputTrace({
+    kind: "pointer-up", epochMs: Date.now(), clientTick,
+    pointerId: event.pointerId, trusted: event.isTrusted === true,
+    classification: committed,
+  });
   leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
@@ -757,7 +777,51 @@ function sampleInput() {
 // Combat4 M144/M143/M193: native-only original INPUT / processed ACK provenance.
 // All records are observations of the existing v1 sender and the real input ACK.
 // No synthetic events, retransmits, admission decisions or game rule changes.
+// M343: Only the ORIGINAL M156 three-browser acceptance scenario observes
+// native pointer commits, true 30Hz outgoing v1 samples and decoded real ACKs.
+// Save three genuine pre-click idle samples, then freeze after 12 true sends:
+// hundreds of later neutral frames cannot evict the 5ms W3C input evidence.
+function recordM156NativeInputTrace(entry) {
+  if (acceptanceScenario !== "uirollknockdownffahit") return;
+  const debug = window.__MYASO_ACCEPTANCE_STATE__;
+  if (!debug) return;
+  const records = debug.inputSubmissions ??= [];
+  const prior = debug.m156PriorSends ??= [];
+  if (entry.kind === "send") {
+    prior.push(entry);
+    if (prior.length > 3) prior.shift();
+  }
+  if (entry.kind === "pointer-down") {
+    records.length = 0;
+    records.push(...prior);
+    debug.m156TraceArmed = true;
+    debug.m156RemainingSends = 12;
+  } else if (entry.kind === "send") {
+    if (!debug.m156TraceArmed) {
+      records.push(entry);
+      if (records.length > 3) records.shift();
+      return;
+    }
+    if (debug.m156RemainingSends <= 0) return;
+    debug.m156RemainingSends -= 1;
+  } else if (entry.kind === "processed-ack") {
+    if (!debug.m156TraceArmed || debug.m156RemainingSends <= 0) return;
+  } else if (!debug.m156TraceArmed) {
+    // A genuine callback without native pointer-down is still crucial evidence.
+    records.length = 0;
+    records.push(...prior);
+    debug.m156TraceArmed = true;
+    debug.m156RemainingSends = 12;
+  }
+  records.push(entry);
+  if (records.length > 32) records.splice(0, records.length - 32);
+}
+
 function recordM144OriginalInputTrace(entry) {
+  if (acceptanceScenario === "uirollknockdownffahit") {
+    recordM156NativeInputTrace(entry);
+    return;
+  }
   if (acceptanceScenario !== "uimultirecoveryffa"
     && acceptanceScenario !== "uijumprecoveryffa"
     && acceptanceScenario !== "uiguardbreak"

@@ -1,0 +1,34 @@
+name: Combat4 M156 real three-browser short-click provenance (REVIEW ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "tests/m343-m156-authentic-click-input-ack-trace.test.mjs"
+      - ".github/workflows/combat4-m156-authentic-click-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-v1-three-browser-M156:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate original production syntax and M343 read-only evidence
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m343-m156-authentic-click-input-ack-trace.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile unchanged original Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: M156 real Chrome Firefox Chrome2 original strict 34HP third-party punish
+        env:
+          MYASO_PVP_SCENARIO: "uirollknockdownffahit"
+        run: timeout --signal=TERM --kill-after=5s 240s node scripts/pvp_browser_flight_runner.mjs
