@@ -130,29 +130,14 @@ try {
   before.push({labels:q.frames.slice(-8).map(f=>f.ids),roster:q.roster});
  }
  console.log("CORE8C_BROWSER_REAL_FOUR_ROSTER_BEFORE",JSON.stringify(before));
+
  // Real WebDriver session teardown closes authentic QUIC and original actor #2.
  await wd("DELETE","/session/"+b);
  console.log("CORE8C_BROWSER_REAL_PEER2_DISCONNECTED");
- // Three surviving genuine clients must continue moving and processing their
- // own real old-v1 INPUT_ACKs. An idle frozen status is not valid removal QA.
- for(const sid of surviving){
-  const ack=await realWasdAndAck(sid,"post-departure");
-  console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
- }
- const removed=[];
- for(const sid of surviving){
-  const q=await poll("native Canvas AND HUD remove peer #2",async()=>{
-   const v=await visible(sid);
-   const recent=v?.frames?.slice(-12)||[];
-   return {...v,ok:v?.roster?.length===3&&[1,3,4].every(id=>rosterHas(v.roster,id))
-     &&!rosterHas(v.roster,2)&&recent.length>=8
-     &&recent.filter(frame=>!frame.ids.includes("#2")&&frame.ids.length>=2).length>=8};
-  },18000);
-  removed.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids)});
- }
- console.log("CORE8C_BROWSER_REAL_GHOST_REMOVED",JSON.stringify(removed));
- // Refill only the freed original 4-slot server admission capacity with
- // a fresh REAL Chrome session and independent authenticated Rust net ID 5.
+ await delay(900);
+ // FIRST require a fresh genuine server-issued session under the original
+ // admission cap 4. This distinguishes a crashed server from stale client
+ // replication when the native #2 Firefox window closes.
  const newcomerCaps={browserName:"chrome","goog:chromeOptions":{args:[
   "--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1100,780"
  ]}};
@@ -164,6 +149,35 @@ try {
  const newConnected=await poll("fresh independent fifth player #5",()=>evaljs(newcomer,
   "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),status:x};"),15000);
  console.log("CORE8C_BROWSER_NEW_ACTOR_CONNECTED",JSON.stringify(newConnected));
+ // The original three authenticated sessions must also remain alive and
+ // continue processing genuine v1 input ACKs after peer #2 departed.
+ try {
+  for(const sid of surviving){
+   const ack=await realWasdAndAck(sid,"post-departure");
+   console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
+  }
+ }catch(error){
+  const clients=await Promise.all(surviving.map(sid=>evaljs(sid,
+   "return {status:document.querySelector('#event-text')?.textContent||'',roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.querySelector('span')?.textContent||''),diag:document.querySelector('#network-diagnostics')?.textContent||''}").catch(e=>({error:String(e)}))));
+  console.error("CORE8C_NATIVE_AFTER_PEER_CLOSE_DIAGNOSTIC",JSON.stringify({
+   error:String(error),serverExitCode:server.exitCode,serverSignalCode:server.signalCode,
+   serverStdoutTail:stdout.slice(-2000),serverStderrTail:stderr.slice(-2600),clients
+  }));
+  throw error;
+ }
+ const removed=[];
+ for(const sid of surviving){
+  const q=await poll("native Canvas AND HUD remove #2 and show authentic new #5",async()=>{
+   const v=await visible(sid);
+   const recent=v?.frames?.slice(-12)||[];
+   return {...v,ok:v?.roster?.length===4&&[1,3,4,5].every(id=>rosterHas(v.roster,id))
+      &&!rosterHas(v.roster,2)&&recent.length>=8
+      &&recent.filter(frame=>!frame.ids.includes("#2")&&frame.ids.includes("#5")
+        &&frame.ids.length>=3).length>=8};
+  },18000);
+  removed.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids)});
+ }
+ console.log("CORE8C_BROWSER_REAL_GHOST_REMOVED",JSON.stringify(removed));
  const rejoined=[];
  for(const sid of surviving){
   const q=await poll("original Canvas HUD removes #2 and renders fresh #5",async()=>{
