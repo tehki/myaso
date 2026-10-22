@@ -23,6 +23,16 @@ cargo fmt --manifest-path server/Cargo.toml --all -- --check
 cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
 ```
 
+### New real server QUIC admission/teardown acceptance
+
+`server/tests/core8c_real_quic_actor_departure.rs` starts the **unaltered original Rust server binary** on disposable loopback with a **real admission cap of four** and its actual generated TLS SHA-256 certificate pin. Four independently pinned native WebTransport clients establish real bidirectional `/game` streams and each must receive its own correct current original `v1 INPUT_ACK` (`player_id` 1,2,3,4), not a simulated actor or a forged server tick. Client #2 closes its real QUIC connection; an actual NEW independently pinned client connects under the same four-seat admission cap and MUST get ID **5**, never silently reuse retired ID 2. Existing clients #1,#3,#4 must continue to receive their correctly bound independent old-v1 server INPUT_ACK messages.
+
+This proves only original active server **session permit retirement + fresh ID allocation + surviving gameplay connections**, and does NOT prove that every snapshot removal was consumed by remote browsers, public reachability, future authenticated v2 lease/ACK, instant pointerDOWN combat or independent physical hosts. It does not activate optional Chat or any new networking endpoint.
+
+```bash
+cargo test --locked --manifest-path server/Cargo.toml --test core8c_real_quic_actor_departure
+```
+
 The new Rust integration suite uses genuine original `World` fighters and original `encode_event` packets. Cases: same-tick short press/release, duplicated terminal, gap/reordered release, stale actor/generation/nonce, explicit disconnect+rejoin, missing actor cleanup, missed-tick fail-close, four genuine distinct World actors, bounded queue, malformed/noncanonical v1/type0x52 input, and a **real World CombatEvent::Death** caused through normal attacks that must clear the victim's pending gesture before stale release. A separate *fail-first* World regression builds five legitimate kills to enter `match_over()` while a third living actor has an unspent PRESS; before the correction the strict test failed `past-round queued gestures must retire`. The adapter now refuses leases created during match-over and retires living actor queues on the actual winning tick, protecting them before the next round.
 
 **Evidence is NOT a live browser or authenticated transport test**, nor proof of instant LMB or qualified 4-human gameplay. Any failed Rust death or native test must be diagnosed, not weakened.
