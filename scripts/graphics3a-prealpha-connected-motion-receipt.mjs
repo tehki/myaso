@@ -39,6 +39,13 @@ export function qualifyPrealphaSilverConnectedMotions({players,phases}){
    const frames=[...new Set(c.draws.map(f=>f.sourceFrame))].sort((a,b)=>a-b);
    const epochs=c.draws.map(f=>f.epochMs);
    const paintedSpanMs=Math.max(...epochs)-Math.min(...epochs);
+   if(mode.label==="jump"){
+     // Original Silver jump atlas has six frames at 430ms presentation.
+     // Visibility of frame zero alone is NOT acceptable "full jump" evidence.
+     if(frames.length<4||frames[0]>1||frames.at(-1)<5||paintedSpanMs<220)
+       throw Error("jump incomplete original Silver playback in "+expected
+         +": "+JSON.stringify({frames,paintedSpanMs}));
+   }
    if(mode.label==="roll"){
      // Original 8-frame Silver roll authored presentation spans 350ms.
      // Seeing only source frame zero CANNOT certify the cycle.
@@ -53,6 +60,7 @@ export function qualifyPrealphaSilverConnectedMotions({players,phases}){
     sourceBothBrowsers:true,views:ordered});
  }
  return {genuineConnectedOriginalSilverJumpAndRoll:true,
+   originalSilverJumpLateFramesBothBrowsers:true,
    originalSilverRollLateFramesBothBrowsers:true,
    server350msActionTimingValidated:false,
    serverPlayers:players.map(x=>x.serverPlayerId),motions:summary,

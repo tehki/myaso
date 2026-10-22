@@ -7,11 +7,10 @@ const frames=(clip,d=0)=>(clip==="silver_roll"
    clip,sourceFrame:i,facing:(d+i)%8,x:120+i,y:140,
    epochMs:1792600000000+i*45
  }))
- : [{
-   clip,sourceFrame:0,facing:d,x:120,y:140,epochMs:1792600000000
-  },{
-   clip,sourceFrame:5,facing:(d+1)%8,x:180,y:240,epochMs:1792600000310
-  }]);
+ : Array.from({length:6},(_,i)=>({
+   clip,sourceFrame:i,facing:(d+i)%8,
+   x:120+i,y:140,epochMs:1792600000000+i*74
+  })));
 const mk=(label,clip,initiator)=>({
  label,clip,initiator,nativeGestureObserved:true,
  clients:[{engine:"chrome",draws:frames(clip,2)},
@@ -25,6 +24,8 @@ function fail(rx,mutate){const data=base();mutate(data);assert.throws(()=>qualif
 test("genuine native original Silver jump/roll gate is strict but does not assert Greyhaven or human operation",()=>{
  const value=qualifyPrealphaSilverConnectedMotions(base());
  assert.equal(value.genuineConnectedOriginalSilverJumpAndRoll,true);
+ assert.equal(value.originalSilverJumpLateFramesBothBrowsers,true);
+ assert.deepEqual(value.motions[0].views.map(x=>x.frames.at(-1)),[5,5]);
  assert.equal(value.originalSilverRollLateFramesBothBrowsers,true);
  assert.equal(value.server350msActionTimingValidated,false);
  assert.deepEqual(value.motions[1].views.map(x=>x.frames.at(-1)),[7,7]);
@@ -59,6 +60,20 @@ test("genuine source-only crop bounds, eight-way facings and real browser epochs
  fail("invalid",d=>d.phases[0].clients[0].draws[0].x=Infinity);
  fail("invalid",d=>d.phases[0].clients[1].draws[0].clip="sentinel_jump");
 });
+test("never count start-only or compressed original Silver jump as complete",()=>{
+ fail("jump incomplete",d=>{
+   d.phases[0].clients[0].draws=d.phases[0].clients[0].draws.slice(0,2);
+ });
+ fail("jump incomplete",d=>{
+   d.phases[0].clients[1].draws=d.phases[0].clients[1].draws.slice(0,5);
+ });
+ fail("jump incomplete",d=>{
+   d.phases[0].clients[0].draws.forEach((f,i)=>f.epochMs=1792600000000+i*17);
+ });
+ fail("jump incomplete",d=>{
+   d.phases[0].clients[1].draws.forEach(f=>f.sourceFrame=0);
+ });
+});
 test("never certify full 350ms Silver roll from only first/source middle frames or short span",()=>{
  fail("roll incomplete",d=>{
    d.phases[1].clients[0].draws=d.phases[1].clients[0].draws.slice(0,2);
@@ -80,6 +95,8 @@ test("proof comes from W3C real Rust server M47 opt-in; default renderer unchang
  assert.match(source,/prealphaSilverMotionFlight && !prealphaSilverFlight/);
  assert.match(source,/performArenaJumpPress\(chrome,90\)/);
  assert.match(source,/scrollArenaWheel\(firefox,element,-120,0\)/);
+ assert.match(source,/await sleep\(470\)/);
+ assert.match(source,/const jumping=await captured\(preJump,"silver_jump"\)/);
  assert.match(source,/await sleep\(490\)/);
  assert.match(source,/const rolling=await captured\(preRoll,"silver_roll"\)/);
  assert.match(source,/GRAPHICS3A_PREALPHA_CONNECTED_ROLL_JUMP/);
