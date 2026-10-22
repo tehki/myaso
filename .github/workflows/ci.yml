@@ -1263,4 +1263,5 @@ jobs:
           name: graphics3a-actual-four-silver-native
           path: .graphics3a-real-four-silver-native-png/
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 1
