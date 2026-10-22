@@ -60,6 +60,9 @@ test("exact Rust ACK frames parse in original JS codec and settle transport only
   const {outbox,trustedLease}=open();
   outbox.begin(0x11223344);
   outbox.release(0x11223344);
+  // Byte-for-byte ACK interchange is meaningful only after the actual
+  // original outbox offers BOTH matching edges to a transport owner.
+  assert.deepEqual(outbox.nextSendBatch().map(x=>x.sequence),[1,2]);
   const duplicate=Uint8Array.from(Buffer.from(fixtures.get("ACK_DUPLICATE_SECOND"),"hex"));
   const first=Uint8Array.from(Buffer.from(fixtures.get("ACK_ACCEPTED_FIRST"),"hex"));
   assert.deepEqual(decodeProposedGestureAck(duplicate),{
