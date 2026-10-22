@@ -48,6 +48,9 @@ const spartanV3Flight = process.env.MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT === "1";
 const spartanV3ContactPng = process.env.MYASO_GRAPHICS3A_V3_CONTACT_PNG === "1";
 const spartanV3KnockdownFlight = process.env.MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT === "1";
 const originalSilverVictimKnockdownFlight = process.env.MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT === "1";
+const silverVictimNativePng = process.env.MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG === "1";
+if (silverVictimNativePng && !originalSilverVictimKnockdownFlight)
+  throw new Error("real native victim image capture requires strict authentic 3-browser original Silver proof");
 if(originalSilverVictimKnockdownFlight && !spartanV3KnockdownFlight)
   throw new Error("Original Silver victim QA requires strict real M153 three-player V3 kick receipt");
 if (spartanV3KnockdownFlight && (spartanFlight || spartanV3Flight
@@ -432,6 +435,10 @@ try {
           nativeClients:observations});
         console.log("GRAPHICS3A_ORIGINAL_SILVER_VICTIM_REAL_KNOCKDOWN "
           +JSON.stringify(victimReceipt));
+        if(silverVictimNativePng){
+          const originals=await captureOriginalSilverVictimNativePngs(sessions,victimReceipt);
+          console.log("GRAPHICS3A_ORIGINAL_SILVER_VICTIM_NATIVE_PNG " + JSON.stringify(originals));
+        }
       }
     }
   } else if (scenario === "uikickknockdownffahit") {
@@ -6913,7 +6920,8 @@ async function installOriginalSilverKnockdownProbe(session) {
   return await execute(session.base,session.sessionId,`
     if (!window.__originalSilverVictimProbe) {
       const original=CanvasRenderingContext2D.prototype.drawImage;
-      const data={draws:[],installed:true};
+      const data={draws:[],installed:true,contactPng:null,contactFrame:null,
+        contactError:null,contactPending:false};
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string"?image.src:"";
         if(src.endsWith("/silver_knockdown.webp")&&args.length===8){
@@ -6921,13 +6929,72 @@ async function installOriginalSilverKnockdownProbe(session) {
             data.draws.push({sourceFile:src.split("/").at(-1),
               frame:args[0]/160,direction:args[1]/160,epochMs:Date.now()});
         }
-        return original.call(this,image,...args);
+        const result=original.call(this,image,...args);
+        // Capture ACTUAL running multiplayer game Canvas after the real
+        // victim source enters its low frame. A microtask lets the synchronous
+        // game renderer finish all fighters/HUD, unlike a mid-draw screenshot.
+        if(${silverVictimNativePng} && src.endsWith("/silver_knockdown.webp")
+          &&args.length===8 && (args[0]===480 || args[0]===640)
+          &&!data.contactPng && !data.contactPending){
+          data.contactPending=true;
+          const gameCanvas=this.canvas;
+          const actualSourceFrame=args[0]/160;
+          queueMicrotask(()=>{
+            try{
+              const raw=gameCanvas.toDataURL("image/png");
+              if(raw.startsWith("data:image/png;base64,")){
+                data.contactPng=raw;data.contactFrame=actualSourceFrame;
+              }
+            }catch(e){data.contactError=String(e);}
+          });
+        }
+        return result;
       };
       window.__originalSilverVictimProbe=data;
     }
     return window.__originalSilverVictimProbe.installed;
   `);
 }
+async function captureOriginalSilverVictimNativePngs(entries,receipt){
+  if(!receipt?.verifiedRealThreePlayerOriginalSilverVictimReaction
+    ||!receipt.originalSilverVictimSourceInAllNativeBrowsers
+    ||entries.length!==3)
+    throw Error("cannot capture images before genuine 3-person server knockdown");
+  const dir=path.join(root,".graphics3a-original-victim-native-png");
+  await mkdir(dir,{recursive:true});
+  const items=[];
+  for(const session of entries){
+    const observed=await execute(session.base,session.sessionId,`
+      const data=window.__originalSilverVictimProbe;
+      return {png:data?.contactPng??null,frame:data?.contactFrame??null,
+        error:data?.contactError??null};
+    `);
+    if(typeof observed?.png!=="string"
+      ||!observed.png.startsWith("data:image/png;base64,")
+      ||![3,4].includes(observed.frame))
+      throw Error("original victim full-frame image absent in "+session.name+": "+observed?.error);
+    const bytes=Buffer.from(observed.png.slice("data:image/png;base64,".length),"base64");
+    if(bytes.length<15000||bytes.subarray(0,8).toString("hex")!=="89504e470d0a1a0a"
+      ||bytes.readUInt32BE(16)<600||bytes.readUInt32BE(20)<400)
+      throw Error("authentic original victim screenshot PNG invalid in "+session.name);
+    const filename="original_silver_real_knockdown_"+session.name+".png";
+    await writeFile(path.join(dir,filename),bytes);
+    items.push({browser:session.name,
+      serverPlayerId:receipt.observations.find(x=>x.browser===session.name)?.serverId,
+      originalSourceFrame:observed.frame,
+      filename,bytes:bytes.length,
+      sha256:createHash("sha256").update(bytes).digest("hex")});
+  }
+  await writeFile(path.join(dir,"original_silver_victim_native_manifest.json"),
+    JSON.stringify({authenticatedRustThreePlayerKnockdown:true,
+      realSilverSourceAllBrowsers:true,
+      screenshotAfterSynchronousCanvasCallback:true,
+      inGameSoleContactProven:false,
+      trueImpactMeshCollisionProven:false,
+      humanArtApproved:false,preAlphaEnabled:false,images:items},null,2));
+  return items;
+}
+
 async function readOriginalSilverKnockdownProbe(session) {
   const receipt=await readSpartanKickDrawProbe(session);
   const data=await execute(session.base,session.sessionId,`
