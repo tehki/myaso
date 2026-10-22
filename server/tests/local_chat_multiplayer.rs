@@ -21,15 +21,24 @@ impl Drop for TestServer {
     }
 }
 fn start_server() -> (TestServer, String, Sha256Digest) {
-    let mut process = Command::new(env!("CARGO_BIN_EXE_myaso-server"))
+    start_server_with_chat_enabled(true)
+}
+
+// The release-critical negative test starts the ACTUAL same binary without
+// MYASO_CHAT_C1_ENABLED. All old positive tests still explicitly enable C1.
+fn start_server_with_chat_enabled(enabled: bool) -> (TestServer, String, Sha256Digest) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_myaso-server"));
+    command
         .env("MYASO_BIND", "127.0.0.1:0")
         .env("MYASO_CHAT_RADIUS", "160")
-        .env("MYASO_CHAT_C1_ENABLED", "1")
+        .env_remove("MYASO_CHAT_C1_ENABLED")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("start actual game server");
+        .stderr(Stdio::inherit());
+    if enabled {
+        command.env("MYASO_CHAT_C1_ENABLED", "1");
+    }
+    let mut process = command.spawn().expect("start actual game server");
     let output = process.stdout.take().expect("server output");
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || {
@@ -555,4 +564,129 @@ async fn repeated_chat_submissions_do_not_starve_authoritative_game_input_ack() 
     }
     assert!(accepted >= 1, "the server accepted initial live chat");
     assert!(rate_limited >= 1, "chat burst limit is still authoritative");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn prealpha_default_off_chat_stream_cannot_open_but_two_real_quic_fighters_keep_input_ack() {
+    // Negative release gate: the operator omits MYASO_CHAT_C1_ENABLED.
+    // No mock C1 handler, no lobby query flag, no "chat preview" fallback.
+    let (_server, url, digest) = start_server_with_chat_enabled(false);
+
+    async fn game_only_peer(
+        url: &str,
+        digest: &Sha256Digest,
+    ) -> (
+        Endpoint<endpoint_side::Client>,
+        Connection,
+        SendStream,
+        RecvStream,
+    ) {
+        let endpoint = Endpoint::client(
+            ClientConfig::builder()
+                .with_bind_default()
+                .with_server_certificate_hashes([digest.clone()])
+                .build(),
+        )
+        .expect("real client endpoint");
+        let connection = timeout(Duration::from_secs(8), endpoint.connect(url))
+            .await
+            .expect("genuine QUIC connection timeout")
+            .expect("genuine pinned QUIC connect");
+        let (send, recv) = timeout(Duration::from_secs(8), async {
+            connection
+                .open_bi()
+                .await
+                .expect("gameplay bi request")
+                .await
+                .expect("gameplay session")
+        })
+        .await
+        .expect("genuine game handshake timeout");
+        (endpoint, connection, send, recv)
+    }
+
+    let (_ep1, first, _send1, _recv1) = game_only_peer(&url, &digest).await;
+    let (_ep2, second, _send2, _recv2) = game_only_peer(&url, &digest).await;
+
+    // This is a REAL outgoing QUIC unidirectional chat stream, not a synthetic
+    // object. With C1 disabled the server MUST NOT accept it or create a
+    // responding stream, but gameplay cannot be shut down by that attempt.
+    let mut attempted_chat = timeout(Duration::from_secs(4), async {
+        first
+            .open_uni()
+            .await
+            .expect("native QUIC optional stream request")
+            .await
+            .expect("native QUIC optional stream open")
+    })
+    .await
+    .expect("optional stream creation bounded");
+    timeout(
+        Duration::from_secs(4),
+        attempted_chat.write_all(&[2, 0, 0x30, 1]),
+    )
+    .await
+    .expect("small versioned chat preface write bounded")
+    .expect("small native chat preface write");
+
+    let mut attempted_send = vec![0x31, 1, 1];
+    attempted_send.extend_from_slice(&9_u32.to_le_bytes());
+    attempted_send.extend_from_slice(&2_u16.to_le_bytes());
+    attempted_send.extend_from_slice(b"hi");
+    timeout(Duration::from_secs(4), async {
+        attempted_chat
+            .write_all(&(attempted_send.len() as u16).to_le_bytes())
+            .await
+            .expect("framed disabled chat length");
+        attempted_chat
+            .write_all(&attempted_send)
+            .await
+            .expect("framed disabled chat payload");
+    })
+    .await
+    .expect("disabled chat probe never blocks game indefinitely");
+
+    assert!(
+        timeout(Duration::from_millis(550), first.accept_uni())
+            .await
+            .is_err(),
+        "default-OFF genuine server must NOT emit optional ChatResult/reply stream"
+    );
+
+    // Both independent WebTransport clients must still send actual INPUT v1
+    // and receive separately addressed server-owned INPUT_ACK frames.
+    for (client, id, tick) in [(&first, 1_u32, 7001_u32), (&second, 2, 7002)] {
+        let mut input = [0_u8; 22];
+        input[0] = 1;
+        input[1] = 1;
+        input[2] = 1;
+        input[4..6].copy_from_slice(&1_u16.to_le_bytes());
+        input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+        input[8..12].copy_from_slice(&tick.to_le_bytes());
+        input[17] = 127;
+        client
+            .send_datagram(input)
+            .expect("actual gameplay input while optional chat disabled");
+
+        let ack = timeout(Duration::from_secs(5), async {
+            loop {
+                let packet = client
+                    .receive_datagram()
+                    .await
+                    .expect("gameplay QUIC remains connected with C1 OFF");
+                if packet.len() == 16 && packet[0] == 1 && packet[1] == 3
+                    && u32::from_le_bytes(packet[4..8].try_into().unwrap()) == tick
+                {
+                    break packet;
+                }
+            }
+        })
+        .await
+        .expect("default-OFF chat cannot interrupt actual server INPUT_ACK");
+        assert_eq!(
+            u32::from_le_bytes(ack[12..16].try_into().unwrap()),
+            id,
+            "INPUT_ACK belongs to the current authentic server player"
+        );
+    }
 }
