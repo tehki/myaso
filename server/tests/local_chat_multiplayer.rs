@@ -674,7 +674,9 @@ async fn prealpha_default_off_chat_stream_cannot_open_but_two_real_quic_fighters
                     .receive_datagram()
                     .await
                     .expect("gameplay QUIC remains connected with C1 OFF");
-                if packet.len() == 16 && packet[0] == 1 && packet[1] == 3
+                if packet.len() == 16
+                    && packet[0] == 1
+                    && packet[1] == 3
                     && u32::from_le_bytes(packet[4..8].try_into().unwrap()) == tick
                 {
                     break packet;
