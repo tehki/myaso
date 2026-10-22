@@ -17,3 +17,31 @@ Visual origin spacing from browser Canvas is **not proof of raw authoritative Wo
 ## 2026-10-22 Main follow-up collision-cost cap
 
 This replacement acceptance is stacked on Main's latest Physics integration commit 7d9f80a332fa9efd8d56335e6583f67de7e39a80, which bounds additional collision passes to at most 8192 pair checks per tick while retaining the base sweep and up to 64 passes for four players. The previous [UI #747](https://github.com/tehki/myaso/pull/747) exact-head native acceptance passed at 2aafba8a55c6f72207c6f3b3ecb76f5b98b118af, but full protected quality #39762547604 failed strict M121 left-sweep readability. Main's prior Physics branch #744 failed M16 under 512 occupants and has been updated for that, but this child and updated Main need their own full exact-head quality; none of those failures is waived. No game code is modified here. The browser script reuses the last passing QA from #747 with the original chat-near/far test performed BEFORE actual-player crowd movement.
+
+
+## P6 actual unquantized World audit (test-only, later child)
+The original browser-painted Silver positions are presentation/interpolation;
+the existing authentic QUIC snapshot codec v7 rounds positions to a compact
+2-unit world grid. For example two genuine radius18-separated fighters
+(100,100) and (132.4,116) have distance 36.135301, yet identical v7
+encoded/decoded browser positions (100,100) and (132,116) measure only
+35.777088. **Never use this replica distance alone to fail/pass 36-unit
+authoritative collider clearance.** The added real codec regression pins this.
+
+The dedicated test-only Cargo `p6-native-audit` feature is disabled in all
+default/release builds; only the ephemeral localhost four-browser test builds
+it and opts in with `MYASO_P6_NATIVE_AUDIT=1`. Nonloopback attempts fail
+closed. It reads actual post-step four-fighter Rust World positions once every
+three server ticks and writes bounded stdout only (no player/environment
+mutations, privileged browser packet, extra network service, live feature or
+production route). The native driver asserts 8-12 distinct *crowded* World
+snapshots from the same actual browser-operated Rust server, with every
+raw pair distance >=35.99 of diameter36 and maximum crowd diameter <=160.
+
+Isolated Serj Chromium×4 source trial: 12 distinct recent authoritative
+crowd ticks 1350..1383, min raw distance exactly 36, max 69.156342,
+real C1 sender/radius+UTF8/ACK and Silver WebP visual acceptance all PASS.
+That local trial reported an unusually high gameplay-ACK p95 of 2819ms;
+do not claim latency or multi-host performance qualification from it.
+Full new exact-head protected Chrome/Firefox and main CI remain required.
+This is **not** P0 instant-light/heavy-release proof or a live game release.
