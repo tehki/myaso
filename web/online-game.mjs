@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { appendM144InputSample } from "../src/browser/m144-input-sample-observer.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -777,7 +778,17 @@ function simulatePrediction(stepMs) {
         // M144: preserve even idle 30Hz samples, to distinguish an unsampled
         // real Space+LMB click from an accepted sample without World action.
         // M145 retains its previous action-only sample logging.
-        if (acceptanceScenario === "uimultirecoveryffa" || currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        const actionSample = currentInput.attack || currentInput.jump || currentInput.heavyAttack;
+        if (acceptanceScenario === "uimultirecoveryffa") {
+          debug.inputSubmissions ??= [];
+          appendM144InputSample(debug.inputSubmissions, {
+            clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
+            attack: Boolean(currentInput.attack),
+            jump: Boolean(currentInput.jump),
+            heavyAttack: Boolean(currentInput.heavyAttack),
+          });
+        } else if (actionSample) {
+          // M145 existing action-only original trace remains unchanged.
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
