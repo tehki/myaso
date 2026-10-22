@@ -37,6 +37,10 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
     std::thread::spawn(move || {
         let mut url = None;
         let mut digest = None;
+        let mut announced = false;
+        // Keep draining the REAL Rust server stdout until it exits.
+        // Closing the pipe after its startup banner makes its normal
+        // session/audit println panic with EPIPE, invalidating QUIC proof.
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if let Some(value) = line.split("listening on ").nth(1) {
                 url = Some(value.trim().to_owned());
@@ -49,9 +53,9 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
                         .expect("actual TLS pin"),
                 );
             }
-            if url.is_some() && digest.is_some() {
+            if !announced && url.is_some() && digest.is_some() {
                 let _ = tx.send((url.take().unwrap(), digest.take().unwrap()));
-                break;
+                announced = true;
             }
         }
     });
