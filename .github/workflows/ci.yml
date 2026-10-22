@@ -1173,6 +1173,9 @@ jobs:
           command -v geckodriver
           command -v firefox
 
+      - name: Prebuild exact local authoritative Rust flight server before timed startup
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+
       - name: Verify both authoritative human Silver bodies in real WebDriver browsers
         env:
           MYASO_PVP_SCENARIO: "uiidentity"
