@@ -1426,3 +1426,19 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
+
+  # Original 22-bone Blender Cycles source-only leg lighting. Dedicated art gate
+  # plus the existing independent mandatory "quality" job; no gameplay GO.
+  graphics3a-original-silver-v3-support-leg:
+    name: graphics3a-authentic-silver-v3-support-leg-blender-source
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-support-leg-fill-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact original 22-bone Blender source candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify original rig source artifacts, authentic frame SHA and phase timing
+        run: |
+          node --test tests/graphics3a-v3-support-leg-source.test.mjs tests/graphics3a-v3-readability-study.test.mjs tests/silver-spartan-contact-recoil-v3-source.test.mjs tests/silver-spartan-contact-recoil-v3-browser-evidence.test.mjs
