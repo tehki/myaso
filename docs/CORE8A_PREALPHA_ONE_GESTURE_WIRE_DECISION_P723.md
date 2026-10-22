@@ -120,6 +120,25 @@ and ACK encoder**, also independently requires KeyE denial. Neither
 runtime importer gains a new codec or stream. Golden vectors are
 review bytes, not live source auth or network tests.
 
+## New authentic QUIC default-v1 security gate (still NOT live v2)
+
+Beyond pure source goldens, `server/tests/core8a_v2_unnegotiated_real_quic.rs`
+builds/starts the real unchanged `myaso-server` with **two separate
+certificate-pinned WebTransport/QUIC clients** on disposable loopback.
+Both establish the original genuine game stream and send 16-byte
+Combat4/Core8A LMB type0x11, proposed typed KeyE type0x11, and
+the incompatible alternate 48-byte type0x52 datagrams **without any
+v2 negotiation**. Neither may cause a version2 type0x12 gesture ACK,
+and neither may close/disable the original two clients. Each then
+sends a genuine original v1 input datagram with a distinct client tick
+and MUST receive a correctly addressed server-owned v1 INPUT_ACK with
+its own assigned net player ID. This distinguishes *refused optional
+protocol* from broken gameplay service. The wire gate proves only
+current non-activation and safe legacy traffic: it does NOT prove
+future authenticated v2 negotiation, delivery, retransmission, actor
+fencing, real Combat commits, UI mouse input or independent hosts.
+The new step is part of the same exact-head dedicated Rust/JS workflow.
+
 **Owner sign-offs required IN #723 BEFORE proceeding:**
 Core8C confirms per-connection actor/epoch/world-tick fence,
 revocation on death/rejoin and source-specific KeyE treatment;
