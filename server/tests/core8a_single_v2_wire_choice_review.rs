@@ -153,7 +153,12 @@ fn selected_family_shared_fixture_matches_original_combat4_rust_codec_and_review
         } else {
             let original = decode_event(&bytes).expect("original source0 LMB codec");
             assert_eq!(
-                (original.action as u8, original.sequence, original.gesture_id, original.client_tick),
+                (
+                    original.action as u8,
+                    original.sequence,
+                    original.gesture_id,
+                    original.client_tick
+                ),
                 (action, sequence, gesture_id, tick)
             );
         }
