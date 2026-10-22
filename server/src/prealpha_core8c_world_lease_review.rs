@@ -22,9 +22,9 @@ const MAX_PENDING_WORLD_EDGES: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReviewActorLease {
-    pub actor_net_id: u32,
-    pub generation: u64,
-    pub connection_nonce: u64,
+    actor_net_id: u32,
+    generation: u64,
+    connection_nonce: u64,
 }
 
 impl ReviewActorLease {
