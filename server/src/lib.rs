@@ -163,6 +163,8 @@ pub enum DecodeError {
     UnsupportedProtocol(u8),
     WrongPacketType(u8),
     InvalidSampleCount(u8),
+    NonZeroReservedHeader(u8),
+    InvalidMovementAxis { sample_index: usize },
     InvalidLength { expected: usize, actual: usize },
 }
 
@@ -181,6 +183,9 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
     if !(1..=INPUT_REDUNDANCY_MAX).contains(&sample_count) {
         return Err(DecodeError::InvalidSampleCount(bytes[2]));
     }
+    if bytes[3] != 0 {
+        return Err(DecodeError::NonZeroReservedHeader(bytes[3]));
+    }
 
     let expected = INPUT_HEADER_BYTES + sample_count * INPUT_SAMPLE_BYTES;
     if bytes.len() != expected {
@@ -197,10 +202,17 @@ pub fn decode_input_packet(bytes: &[u8]) -> Result<InputPacket, DecodeError> {
 
     let mut samples = [EMPTY_INPUT_SAMPLE; INPUT_REDUNDANCY_MAX];
     let mut offset = INPUT_HEADER_BYTES;
-    for sample in samples.iter_mut().take(sample_count) {
+    for (sample_index, sample) in samples.iter_mut().take(sample_count).enumerate() {
         let tick_delta = bytes[offset] as u32;
-        let move_x = (bytes[offset + 1] as i8) as f32 / 127.0;
-        let move_y = (bytes[offset + 2] as i8) as f32 / 127.0;
+        let axis_x = bytes[offset + 1] as i8;
+        let axis_y = bytes[offset + 2] as i8;
+        // The v1 client encoder only emits [-127, 127]. The -128 code
+        // represents a movement magnitude beyond the negotiated range.
+        if axis_x == i8::MIN || axis_y == i8::MIN {
+            return Err(DecodeError::InvalidMovementAxis { sample_index });
+        }
+        let move_x = axis_x as f32 / 127.0;
+        let move_y = axis_y as f32 / 127.0;
         let facing_wire = u16::from_le_bytes([bytes[offset + 3], bytes[offset + 4]]);
         let buttons = bytes[offset + 5];
         *sample = InputSample {
@@ -460,6 +472,43 @@ mod tests {
             decode_input_packet(&packet),
             Err(DecodeError::InvalidSampleCount(4))
         );
+    }
+
+    #[test]
+    fn rejects_nonzero_reserved_input_header_byte() {
+        let mut packet = sample_packet();
+        packet[3] = 1;
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::NonZeroReservedHeader(1))
+        );
+        packet[3] = u8::MAX;
+        assert_eq!(
+            decode_input_packet(&packet),
+            Err(DecodeError::NonZeroReservedHeader(u8::MAX))
+        );
+    }
+
+    #[test]
+    fn rejects_out_of_range_axes_in_every_redundant_sample() {
+        for sample_index in 0..INPUT_REDUNDANCY_MAX {
+            for axis_byte_offset in [1_usize, 2_usize] {
+                let mut packet = sample_packet();
+                packet[INPUT_HEADER_BYTES + sample_index * INPUT_SAMPLE_BYTES + axis_byte_offset] =
+                    i8::MIN as u8;
+                assert_eq!(
+                    decode_input_packet(&packet),
+                    Err(DecodeError::InvalidMovementAxis { sample_index }),
+                );
+            }
+        }
+        // Both extremes of the valid v1 client quantization remain accepted.
+        let mut valid = sample_packet();
+        valid[INPUT_HEADER_BYTES + 1] = (-127_i8) as u8;
+        valid[INPUT_HEADER_BYTES + 2] = 127_u8;
+        let decoded = decode_input_packet(&valid).expect("valid signed 7-bit axes");
+        assert_eq!(decoded.samples()[0].move_x, -1.0);
+        assert_eq!(decoded.samples()[0].move_y, 1.0);
     }
 
     #[test]

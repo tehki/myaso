@@ -63,6 +63,7 @@ export function decodeInputPacket(buffer) {
   if (view.getUint8(1) !== PACKET_TYPE.INPUT) throw new Error("not an input packet");
   const count = view.getUint8(2);
   if (count < 1 || count > NETWORK.inputRedundancy) throw new RangeError("invalid input sample count");
+  if (view.getUint8(3) !== 0) throw new RangeError("nonzero reserved input header byte");
   if (view.byteLength !== HEADER_BYTES + count * SAMPLE_BYTES) throw new RangeError("invalid input packet length");
   const clientTick = view.getUint32(8, true);
 
@@ -70,11 +71,14 @@ export function decodeInputPacket(buffer) {
   let offset = HEADER_BYTES;
   for (let index = 0; index < count; index += 1) {
     const delta = view.getUint8(offset);
+    const axisX = view.getInt8(offset + 1);
+    const axisY = view.getInt8(offset + 2);
+    if (axisX === -128 || axisY === -128) throw new RangeError("invalid normalized movement axis");
     const buttons = view.getUint8(offset + 5);
     samples.push({
       tick: (clientTick - delta) >>> 0,
-      moveX: view.getInt8(offset + 1) / 127,
-      moveY: view.getInt8(offset + 2) / 127,
+      moveX: axisX / 127,
+      moveY: axisY / 127,
       facing: dequantizeAngle(view.getUint16(offset + 3, true)),
       attack: Boolean(buttons & BUTTON_ATTACK),
       heavyAttack: Boolean(buttons & BUTTON_HEAVY_ATTACK),
