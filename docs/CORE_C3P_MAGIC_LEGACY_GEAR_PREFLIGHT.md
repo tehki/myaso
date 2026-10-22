@@ -178,3 +178,28 @@ duplicated equipment positions/items, unsupported slot, zero ID, dangling
 source reference and >5 occupied entries. Original legacy format, writer,
 network, runtime World/Combat, actual item registry, production database and
 first combat-only Pre-Alpha remain untouched.
+
+## 2026-10-22 — kind-bound equipment slot preflight (child of #756)
+
+Actual Magic/Items #424 `server/src/loot.rs` defines **`ItemKind::fits(slot)`**
+for all 14 persisted codes. The Core8B #756 structural-only equipment
+preflight missed the source's kind→slot rule; previously it could propose
+mapping a Gold or SulfurAsh item into MainHand, or a helmet into MainHand,
+despite actual Magic equip operations rejecting these combinations.
+
+`LegacyEquippedRow` now requires the source checkpoint item's explicit
+`checkpoint_kind_code`. `preflight_equipment_manifest` rejects unknown
+kind codes, all non-equipment kinds and recognized-but-wrong combinations.
+Output preserves that kind next to the canonical typed item and slot.
+Source rule exactly: RustySword, IronSword, WoodenClub→MainHand;
+LeatherArmor, ChainmailArmor→Body; Spellbook, WoodenShield→OffHand;
+IronHelmet→Head; LeatherBoots→Feet. Rust regressions exhaustively check
+14 kinds × 5 slots and positive source metadata output.
+
+**Not an authorization or source attestation.** The Magic/Items owner
+still must certify this row's kind matches the actual saved unique item,
+including quantity and source checkpoint validity; Core8B does not supply
+cryptographic identity, real ownership or an item writer. Magic #424 still
+rejects 4/5 occupied slots on checkpoint decode and needs owner repair.
+No runtime Loot, Combat, database, World, first Pre-Alpha, migration or
+production side effects are introduced.
