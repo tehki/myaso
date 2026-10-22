@@ -69,7 +69,7 @@ pub struct ReviewLmbIngress {
     latest_gesture_id: u32,
     active: Option<ActiveGesture>,
     buffered: BTreeMap<u32, GestureEvent>,
-    seen: VecDeque<(u32, u32)>,
+    seen: VecDeque<GestureEvent>,
     closed: bool,
 }
 impl ReviewLmbIngress {
@@ -132,9 +132,18 @@ impl ReviewLmbIngress {
 
         let seq = u64::from(event.sequence);
         if seq < self.expected_seq {
-            let previously_accepted = self.seen.iter().any(|&(accepted_seq, accepted_id)| {
-                accepted_seq == event.sequence && accepted_id == event.gesture_id
-            });
+            // An ACK for a replay is safe only if its FULL original event
+            // (including action and diagnostic clock) is byte-equivalent.
+            // Never affirm an equivocal same-sequence mutation as duplicate.
+            if self.seen.iter().any(|saved| {
+                saved.sequence == event.sequence && *saved != event
+            }) {
+                self.close();
+                return IngressResult::Rejected(Some(Self::ack(
+                    event, AckStatus::Rejected, server_tick,
+                )));
+            }
+            let previously_accepted = self.seen.contains(&event);
             let status = if previously_accepted {
                 AckStatus::Duplicate
             } else {
@@ -232,7 +241,7 @@ impl ReviewLmbIngress {
         let mut accepted = Vec::with_capacity(batch.len());
         for edge in batch {
             self.buffered.remove(&edge.sequence);
-            self.seen.push_back((edge.sequence, edge.gesture_id));
+            self.seen.push_back(edge);
             if self.seen.len() > MAX_ACCEPTED_HISTORY {
                 self.seen.pop_front();
             }
