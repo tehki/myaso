@@ -1478,12 +1478,27 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
 fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
     let minimum_distance = FIGHTER_RADIUS * 2.0;
     let minimum_distance_sq = minimum_distance * minimum_distance;
-    // Resolving a later pair can re-overlap an earlier pair. Revisit only while
-    // there is meaningful penetration, with a strict cap on collision work.
-    // This retains the original first-pass two-fighter displacement.
+    // Resolving a later pair can re-overlap an earlier pair. Extra sweeps
+    // are needed for four-player crowding, but an unconditional 64 sweeps at
+    // 512 players can starve the realtime snapshot/reliable cadence.
+    //
+    // Preserve the original single pass for dense crowds and allow at most
+    // 8192 *additional* pair checks per tick, regardless of player count.
+    // Four fighters still receive up to 64 passes, with early exit as soon
+    // as meaningful overlap disappears. The first pass is unchanged.
     const MAX_SEPARATION_PASSES: usize = 64;
+    const MAX_ADDITIONAL_PAIR_CHECKS: usize = 8192;
     const SEPARATION_TOLERANCE: f32 = 0.005;
-    for _ in 0..MAX_SEPARATION_PASSES {
+    let pair_count = fighters
+        .len()
+        .saturating_mul(fighters.len().saturating_sub(1))
+        / 2;
+    let extra_passes = if pair_count == 0 {
+        0
+    } else {
+        (MAX_ADDITIONAL_PAIR_CHECKS / pair_count).min(MAX_SEPARATION_PASSES - 1)
+    };
+    for _ in 0..=extra_passes {
         let mut significant_overlap = false;
         for first_index in 0..fighters.len() {
             for second_index in (first_index + 1)..fighters.len() {
