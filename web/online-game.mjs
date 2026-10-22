@@ -260,6 +260,7 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  leftButtonPressMovement = null;
   if (acceptanceScenario === "uirollknockdownffahit") {
     m156LastPointerEpochMs = Date.now();
     observeM156OriginalInput("pointerup", {
@@ -269,7 +270,6 @@ function onLeftPointerUp(event) {
       canvasFocused:document.activeElement === canvas,
     });
   }
-  leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
     audio.unlock();
