@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+pub mod economic_market_lab;
 pub mod kill_event;
 pub mod reliable;
 pub mod simulation;
