@@ -1207,3 +1207,36 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
+
+  # REAL native three-player M153 server knockdown and original V3 kick source
+  # in all clients, on an isolated opt-in; never bypass full quality.
+  graphics3a-v3-native-real-knockdown:
+    name: graphics3a-native-v3-real-knockdown
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-real-knockdown-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact original V3 three-player source flight
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse absent authoritative knockdown or fabricated Silver kick source
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/graphics3a-v3-real-knockdown-receipt.mjs
+          node --test tests/graphics3a-v3-real-knockdown-receipt.test.mjs tests/graphics3a-spartan-v3-connected.test.mjs tests/graphics3a-connected-spartan-kick-receipt.test.mjs
+      - name: Verify native Chrome Firefox and Rust tools
+        run: |
+          cargo --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Prebuild genuine authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Three real network players kick knockdown with authentic V3 source
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs

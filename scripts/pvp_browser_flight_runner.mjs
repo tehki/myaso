@@ -15,6 +15,7 @@ import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { summarizeSpartanConnectedKickFlight } from "./graphics3a-spartan-connected-receipt.mjs";
 import { summarizeSpartanV3ConnectedKickFlight } from "./graphics3a-spartan-v3-source-receipt.mjs";
+import { summarizeSpartanV3RealKnockdown } from "./graphics3a-v3-real-knockdown-receipt.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
@@ -44,6 +45,11 @@ const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 const spartanFlight = process.env.MYASO_GRAPHICS3A_SPARTAN_FLIGHT === "1";
 const spartanV3Flight = process.env.MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT === "1";
 const spartanV3ContactPng = process.env.MYASO_GRAPHICS3A_V3_CONTACT_PNG === "1";
+const spartanV3KnockdownFlight = process.env.MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT === "1";
+if (spartanV3KnockdownFlight && (spartanFlight || spartanV3Flight
+  || spartanV3ContactPng || scenario !== "uikickknockdownffa")) {
+  throw new Error("Graphics3A V3 knockdown requires isolated M153 original authoritative FFA flight");
+}
 if (spartanV3ContactPng && !spartanV3Flight) {
   throw new Error("Graphics3A real V3 contact PNG requires genuine triple-opt-in native source flight");
 }
@@ -412,6 +418,11 @@ try {
   } else if (scenario === "uikickknockdownffa") {
     const results = await runOnlineUiKickKnockdownFfaFocusFlight(sessions);
     console.log(`M153_KICK_KNOCKDOWN_FFA_FOCUS ${JSON.stringify({ ok: true, results })}`);
+    if (spartanV3KnockdownFlight) {
+      const clients=await Promise.all(sessions.map(readSpartanKickDrawProbe));
+      const receipt=summarizeSpartanV3RealKnockdown({results,clients});
+      console.log("GRAPHICS3A_SPARTAN_V3_REAL_KNOCKDOWN " + JSON.stringify(receipt));
+    }
   } else if (scenario === "uikickknockdownffahit") {
     const results = await runOnlineUiKickKnockdownFfaHitFlight(sessions);
     console.log("M155_ACTIONABLE_THIRD_PARTY_KNOCKDOWN_PUNISH " + JSON.stringify({ ok: true, results }));
@@ -608,11 +619,12 @@ async function navigate(session, gameUrl, certificateHash) {
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
-  if (spartanFlight) {
-    // Existing client-double-opt-in only; never enable Knight source by default.
+  if (spartanFlight || spartanV3KnockdownFlight) {
+    // Separate explicit QA-only flags; all three game opt-ins needed.
     url.searchParams.set("knights", "1");
     url.searchParams.set("knightKickSource", "1");
-    if (spartanV3Flight) url.searchParams.set("knightKickV3", "1");
+    if (spartanV3Flight || spartanV3KnockdownFlight)
+      url.searchParams.set("knightKickV3", "1");
   }
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
@@ -6683,6 +6695,13 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
   const attacker = entries.find((entry) => entry.name === "chrome");
   const defender = entries.find((entry) => entry.name === "firefox");
   const bystander = entries.find((entry) => entry.name === "chrome2");
+  if (spartanV3KnockdownFlight) {
+    // Install original WebP Canvas observers BEFORE true M153 kick input.
+    for (const entry of entries) {
+      if (await installSpartanKickDrawProbe(entry) !== true)
+        throw Error("Graphics3A V3 FFA source observer failed in "+entry.name);
+    }
+  }
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
   const defenderReady = ready.find((entry) => entry.browser === defender?.name);
   const bystanderReady = ready.find((entry) => entry.browser === bystander?.name);
