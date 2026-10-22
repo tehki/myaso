@@ -20,7 +20,10 @@ jobs:
   quality:
     name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # P6-C03 source qualification reached 134 passing protected checks before
+    # the previous 30-minute job limit cancelled the native browser flight.
+    # Only extend the job budget; all original test steps/assertions are intact.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
