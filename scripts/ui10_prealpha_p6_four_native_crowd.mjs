@@ -66,92 +66,6 @@ try {
   const connected=await poll("player "+(i+1),()=>evaljs(session,"const x=document.querySelector('[data-local-chat]');return {ok:x?.dataset.connected==='true',status:x?.querySelector('.local-chat-status')?.textContent,event:document.querySelector('#event-text')?.textContent,connected:x?.dataset.connected};"),15000);
   console.log("PLAYER_READY",i+1,JSON.stringify(connected));
  }
- // P6-C02 actual-player crowd: observe real source-aligned 2D Silver sprite
- // origin positions from Canvas' own current transform, inside its original
- // animation-frame callback. Do not touch state, server, camera or actors.
- // Draw positions are presentation (interpolated/predicted), NOT raw World HP.
- const crowdObserve=[
-  "if(!window.__UI10_P6_CROWD__){",
-  "const canvas=document.querySelector('#arena'),ctx=CanvasRenderingContext2D.prototype;",
-  "const original=ctx.drawImage,raf=window.requestAnimationFrame;",
-  "const qa={totalFrames:0,fourFrames:0,crowdSamples:[],active:false,centers:[]};",
-  "window.requestAnimationFrame=function(cb){",
-  "return raf.call(window,function(t){",
-  "qa.active=true;qa.centers=[];",
-  "try{return cb(t);}finally{",
-  "qa.active=false;qa.totalFrames++;",
-  "if(qa.centers.length===4){",
-  "qa.fourFrames++;const c=qa.centers;",
-  "let min=Infinity,max=0;",
-  "for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){",
-  "const d=Math.hypot(c[i].x-c[j].x,c[i].y-c[j].y);",
-  "min=Math.min(min,d);max=Math.max(max,d);",
-  "}",
-  "qa.crowdSamples.push({min,max,centers:c.map(x=>({...x}))});",
-  "if(qa.crowdSamples.length>90)qa.crowdSamples.shift();",
-  "}",
-  "}",
-  "});",
-  "};",
-  "ctx.drawImage=function(...args){",
-  "const im=args[0],uri=im?.currentSrc||im?.src||'';",
-  "if(this.canvas===canvas&&qa.active&&uri.includes('/assets/knights/silver_')",
-  "&&uri.includes('.webp')){",
-  "const t=this.getTransform();qa.centers.push({x:t.e,y:t.f});",
-  "}",
-  "return original.apply(this,args);",
-  "};",
-  "window.__UI10_P6_CROWD__=()=>({totalFrames:qa.totalFrames,",
-  "fourFrames:qa.fourFrames,samples:qa.crowdSamples.slice(-60),",
-  "chatConnected:document.querySelector('[data-local-chat]')?.dataset.connected==='true',",
-  "roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.querySelector('span')?.textContent||''),",
-  "server:document.querySelector('#event-text')?.textContent||''});",
-  "}",
- ].join("");
- for(const id of sessions)await evaljs(id,crowdObserve);
- // Source World spawns four IDs at x42/138/234/330,y42; converge only
- // via REAL native WASD on the four OWNED connected Canvas clients.
- const movePlan=[
-  {key:"d",ms:640},{key:"d",ms:195},
-  {key:"a",ms:255},{key:"a",ms:655}
- ];
- for(let i=0;i<sessions.length;i++){
-  const id=sessions[i],p=movePlan[i];
-  await evaljs(id,"document.querySelector('#arena').focus()");
-  await wd("POST","/session/"+id+"/actions",{actions:[
-   {type:"key",id:"p6-native-crowd-"+i,actions:[
-    {type:"keyDown",value:p.key}]}]});
-  await delay(p.ms);
-  await wd("POST","/session/"+id+"/actions",{actions:[
-   {type:"key",id:"p6-native-crowd-"+i,actions:[
-    {type:"keyUp",value:p.key}]}]});
- }
- // Native movement must be visible to actual local player server clocks.
- // Allow real server corrections and remote interpolation to settle; report
- // the last qualifying four-image frames, not earlier arbitrary spawn frames.
- await delay(1100);
- const reports=[];
- for(let i=0;i<sessions.length;i++){
-  const result=await poll("P6 same real four-fighter crowd "+i,async()=>{
-   const q=await evaljs(sessions[i],"return window.__UI10_P6_CROWD__?.()");
-   const samples=q?.samples??[];
-   const recent=samples.slice(-12);
-   const good=recent.filter(f=>f.min>=26.0&&f.max<=135);
-   return {...q,recent,goodCount:good.length,ok:q?.fourFrames>=12&&
-    q?.roster?.length===4&&q?.chatConnected===true&&recent.length>=8&&
-    good.length>=8&&/Online - player #\d+ - server tick \d+/.test(q.server)};
-  },12000);
-  const latest=result.recent.at(-1);
-  reports.push({browser:browserMatrix[i],player:i+1,
-   minCssPx:latest.min,maxCssPx:latest.max,
-   qualifyingCrowdFrames:result.goodCount,fourFrames:result.fourFrames,
-   realRoster:result.roster,server:result.server});
- }
- console.log("UI10_P6_FOUR_REAL_NATIVE_CROWD_SEPARATION_PASS",
-  JSON.stringify({reports,worldCollisionDiameter:36,
-   presentationZoom:.84,browserObservedMinCss:26,
-   crowdObservedMaxCss:135,realWASDMovement:true,
-   worldAuthorityNotInferredFromPixels:true,noFakeFighters:true}));
  // Passive measurement only: unchanged Canvas/RAF and original 5 Silver WebPs.
  // Installed before Chat C1 actions, then measured AFTER real ACK/focus/input.
  const silverSourceProof = [
@@ -359,6 +273,92 @@ try {
   publicChatEnabled:false,noRealSwordsOrItems:true,
   releaseApproved:false
  }));
+ // P6-C02 actual-player crowd: observe real source-aligned 2D Silver sprite
+ // origin positions from Canvas' own current transform, inside its original
+ // animation-frame callback. Do not touch state, server, camera or actors.
+ // Draw positions are presentation (interpolated/predicted), NOT raw World HP.
+ const crowdObserve=[
+  "if(!window.__UI10_P6_CROWD__){",
+  "const canvas=document.querySelector('#arena'),ctx=CanvasRenderingContext2D.prototype;",
+  "const original=ctx.drawImage,raf=window.requestAnimationFrame;",
+  "const qa={totalFrames:0,fourFrames:0,crowdSamples:[],active:false,centers:[]};",
+  "window.requestAnimationFrame=function(cb){",
+  "return raf.call(window,function(t){",
+  "qa.active=true;qa.centers=[];",
+  "try{return cb(t);}finally{",
+  "qa.active=false;qa.totalFrames++;",
+  "if(qa.centers.length===4){",
+  "qa.fourFrames++;const c=qa.centers;",
+  "let min=Infinity,max=0;",
+  "for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){",
+  "const d=Math.hypot(c[i].x-c[j].x,c[i].y-c[j].y);",
+  "min=Math.min(min,d);max=Math.max(max,d);",
+  "}",
+  "qa.crowdSamples.push({min,max,centers:c.map(x=>({...x}))});",
+  "if(qa.crowdSamples.length>90)qa.crowdSamples.shift();",
+  "}",
+  "}",
+  "});",
+  "};",
+  "ctx.drawImage=function(...args){",
+  "const im=args[0],uri=im?.currentSrc||im?.src||'';",
+  "if(this.canvas===canvas&&qa.active&&uri.includes('/assets/knights/silver_')",
+  "&&uri.includes('.webp')){",
+  "const t=this.getTransform();qa.centers.push({x:t.e,y:t.f});",
+  "}",
+  "return original.apply(this,args);",
+  "};",
+  "window.__UI10_P6_CROWD__=()=>({totalFrames:qa.totalFrames,",
+  "fourFrames:qa.fourFrames,samples:qa.crowdSamples.slice(-60),",
+  "chatConnected:document.querySelector('[data-local-chat]')?.dataset.connected==='true',",
+  "roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.querySelector('span')?.textContent||''),",
+  "server:document.querySelector('#event-text')?.textContent||''});",
+  "}",
+ ].join("");
+ for(const id of sessions)await evaljs(id,crowdObserve);
+ // Source World spawns four IDs at x42/138/234/330,y42; converge only
+ // via REAL native WASD on the four OWNED connected Canvas clients.
+ const movePlan=[
+  {key:"d",ms:640},{key:"d",ms:195},
+  {key:"a",ms:255},{key:"a",ms:655}
+ ];
+ for(let i=0;i<sessions.length;i++){
+  const id=sessions[i],p=movePlan[i];
+  await evaljs(id,"document.querySelector('#arena').focus()");
+  await wd("POST","/session/"+id+"/actions",{actions:[
+   {type:"key",id:"p6-native-crowd-"+i,actions:[
+    {type:"keyDown",value:p.key}]}]});
+  await delay(p.ms);
+  await wd("POST","/session/"+id+"/actions",{actions:[
+   {type:"key",id:"p6-native-crowd-"+i,actions:[
+    {type:"keyUp",value:p.key}]}]});
+ }
+ // Native movement must be visible to actual local player server clocks.
+ // Allow real server corrections and remote interpolation to settle; report
+ // the last qualifying four-image frames, not earlier arbitrary spawn frames.
+ await delay(1100);
+ const reports=[];
+ for(let i=0;i<sessions.length;i++){
+  const result=await poll("P6 same real four-fighter crowd "+i,async()=>{
+   const q=await evaljs(sessions[i],"return window.__UI10_P6_CROWD__?.()");
+   const samples=q?.samples??[];
+   const recent=samples.slice(-12);
+   const good=recent.filter(f=>f.min>=26.0&&f.max<=135);
+   return {...q,recent,goodCount:good.length,ok:q?.fourFrames>=12&&
+    q?.roster?.length===4&&q?.chatConnected===true&&recent.length>=8&&
+    good.length>=8&&/Online - player #\d+ - server tick \d+/.test(q.server)};
+  },12000);
+  const latest=result.recent.at(-1);
+  reports.push({browser:browserMatrix[i],player:i+1,
+   minCssPx:latest.min,maxCssPx:latest.max,
+   qualifyingCrowdFrames:result.goodCount,fourFrames:result.fourFrames,
+   realRoster:result.roster,server:result.server});
+ }
+ console.log("UI10_P6_FOUR_REAL_NATIVE_CROWD_SEPARATION_PASS",
+  JSON.stringify({reports,worldCollisionDiameter:36,
+   presentationZoom:.84,browserObservedMinCss:26,
+   crowdObservedMaxCss:135,realWASDMovement:true,
+   worldAuthorityNotInferredFromPixels:true,noFakeFighters:true}));
  console.log("PASS real Rust server and "+sessions.length+" "+browserMatrix.join("/")+" WebTransport browser connections with pinned TLS: A↔B; C excluded from A; genuine ChatResult and continuing gameplay input ACKs");
 }finally{
  for(const session of sessions){try{await wd("DELETE","/session/"+session)}catch{}}
