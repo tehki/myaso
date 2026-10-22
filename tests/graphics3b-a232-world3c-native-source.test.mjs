@@ -66,7 +66,7 @@ test("real World3C compares new +24cm lower hinge against prior genuine Blender 
  assert.match(viewer,/priorHingeDifferencePixels=Object\.freeze\(\{changedRgb,changedAlpha\}\)/);
  assert.match(viewer,/raisedLowerHingeSourceZ:\.96/);
  assert.match(viewer,/unchangedUpperHingeSourceZ:1\.88/);
- assert.match(runner,/priorHingeDifferencePixels\.changedRgb>25/);
+ assert.match(runner,/priorHingeDifferencePixels\?\.changedRgb>25/);
  assert.match(runner,/priorHingeDifferencePixels\.changedAlpha,0/);
 });
 test("both real native Chrome and Firefox must fail closed on three actual error modes",()=>{
