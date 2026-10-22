@@ -310,3 +310,65 @@ async fn four_original_players_retain_distinct_acks_during_one_peer_v2_burst() {
     // Noisy actor remains a normal admitted v1 player after all invalid v2.
     assert_original_v1_input_ack(&noisy, 1, 1001).await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn short_v1_press_release_packets_get_a_server_receipt_but_not_a_hit_receipt() {
+    // Core8A diagnostic control for strict real-browser M156: if v1 INPUT
+    // datagrams are EXPLICITLY sent 10ms apart, a real authoritative QUIC
+    // connection can still return a processed-input ACK for the latest tick.
+    // Current v1 ACKs may coalesce several admitted samples into one newest
+    // clientTick; receiving this ACK does NOT prove both source DOM edges,
+    // either intermediate World action, or any Combat HIT/HP.
+    let (_server, url, digest) = start_server();
+    let (_ep1, actor, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, other, _send2, _recv2) = connect(&url, &digest).await;
+
+    let packet = |sequence: u16, tick: u32, attack: bool| {
+        let mut input = [0_u8; 22];
+        input[0] = 1; // original admitted v1 transport
+        input[1] = 1; // original INPUT packet
+        input[2] = 1; // one original compressed sample
+        input[4..6].copy_from_slice(&sequence.to_le_bytes());
+        input[6..8].copy_from_slice(&u16::MAX.to_le_bytes());
+        input[8..12].copy_from_slice(&tick.to_le_bytes());
+        input[21] = u8::from(attack); // original LMB light bit, not v2
+        input
+    };
+
+    actor
+        .send_datagram(packet(1, 1201, true))
+        .expect("genuine native first v1 PRESS sample sent");
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    actor
+        .send_datagram(packet(2, 1202, false))
+        .expect("genuine native v1 RELEASE sample 10ms later sent");
+
+    let (processed_tick, server_tick) = timeout(Duration::from_secs(5), async {
+        loop {
+            let message = actor
+                .receive_datagram()
+                .await
+                .expect("original QUIC session alive");
+            if message.len() != 16 || message[0] != 1 || message[1] != 3 {
+                continue; // real snapshots may be interleaved
+            }
+            assert_eq!(
+                u32::from_le_bytes(message[12..16].try_into().unwrap()),
+                1,
+                "receipt must be scoped to actor #1, never actor #2"
+            );
+            let tick = u32::from_le_bytes(message[4..8].try_into().unwrap());
+            if tick == 1202 {
+                break (tick, u32::from_le_bytes(message[8..12].try_into().unwrap()));
+            }
+            assert_eq!(tick, 1201, "unknown or cross-actor input receipt");
+        }
+    })
+    .await
+    .expect("real QUIC native 10ms packet pair must yield newest v1 ACK");
+    assert_eq!(processed_tick, 1202);
+    assert!(server_tick > 0, "only a real authoritative clock may ACK");
+
+    // A different concurrent authenticated actor still retains normal INPUT.
+    assert_original_v1_input_ack(&other, 2, 1203).await;
+}
