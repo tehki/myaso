@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -948,7 +949,40 @@ async function runOnlineUiFourSilverFlight(entries){
       rosterIds:state.scoreboardRows.map(x=>Number(x.label.replace("#",""))),
       ...paint});
   }
-  return qualifyPrealphaFourSilverClients(clients);
+  const receipt=qualifyPrealphaFourSilverClients(clients);
+  if(process.env.MYASO_GRAPHICS3A_FOUR_NATIVE_PNG==="1") {
+    // Genuine W3C full browser screenshot AFTER strict 4-player source
+    // acceptance, not a rebuilt sprite concept and not a simulated actor.
+    receipt.nativeBrowserEvidence=await captureGraphics3aFourNativeScreenshots(entries,receipt);
+  }
+  return receipt;
+}
+
+async function captureGraphics3aFourNativeScreenshots(entries,receipt){
+  if(!receipt?.realAuthoritativeFourBrowserSilver||entries.length!==4)
+    throw Error("Screenshots require completed genuine four-player Silver proof");
+  const out=path.join(root,".graphics3a-real-four-silver-native-png");
+  await mkdir(out,{recursive:true});
+  const items=[];
+  for(const session of entries) {
+    const base64=await webdriver(session.base,"GET",
+      "/session/"+session.sessionId+"/screenshot");
+    if(typeof base64!=="string"||base64.length<20000||
+      !/^[A-Za-z0-9+/=]+$/.test(base64))
+      throw Error("Native browser did not return a credible PNG screenshot: "+session.name);
+    const bytes=Buffer.from(base64,"base64");
+    if(bytes.length<15000||bytes.subarray(0,8).toString("hex")!=="89504e470d0a1a0a")
+      throw Error("Actual native W3C screenshot PNG bytes invalid: "+session.name);
+    const file="prealpha_real_four_silver_"+session.name+".png";
+    await writeFile(path.join(out,file),bytes);
+    items.push({browser:session.name,
+      originalServerId:receipt.observedPerClient.find(x=>x.browser===session.name)?.playerId,
+      filename:file,bytes:bytes.length,sha256:createHash("sha256").update(bytes).digest("hex")});
+  }
+  await writeFile(path.join(out,"native_browser_evidence.json"),
+    JSON.stringify({realServerFourPlayerAccepted:true,notHumanOperated:true,
+      screenshots:items,artSourceUnchanged:true,serverHitNotProven:true},null,2)+"\n");
+  return items;
 }
 
 async function runOnlineUiIdentityFlight(entries) {
