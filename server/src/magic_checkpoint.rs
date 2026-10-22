@@ -534,6 +534,103 @@ mod tests {
         assert!(!path.exists());
     }
 
+    /// Gate B NEGATIVE WITNESS, not a safe authorization rule. The dormant
+    /// checkpoint currently compares only a character's highest operation
+    /// sequence. An unrelated *legitimate sword drop* can therefore make an
+    /// uncosted pending Ember intent look backed by a committed operation.
+    /// This test documents the missing typed CAST receipt for Core 8B: when
+    /// that proof exists, change the expectation to a fail-closed rejection.
+    /// No live spell handler or damage execution is enabled by this fixture.
+    #[test]
+    fn sword_drop_watermark_can_currently_launder_uncosted_ember_intent() {
+        use crate::loot_transaction::{
+            commit_verified_equipped_sword_drop_checked, GroundSwordAuthority, PickupWorldTick,
+            VerifiedLootOperation,
+        };
+        use crate::simulation::World;
+
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        let sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        // This stages only an INTENT, with no Spellbook, reagent or mana debit.
+        // A real cast must instead use the dedicated resource transaction.
+        magic
+            .stage_ember_intent(hero, 7, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert_eq!(magic.mana(hero), 100);
+        assert_eq!(
+            magic.preview_cast(
+                SessionLease::new(1, 1).unwrap(),
+                &identity,
+                &loot,
+                Spell::Ember
+            ),
+            Err(MagicError::MissingSpellbook)
+        );
+        // Before any operation, the existing high-water guard correctly
+        // rejects the unbacked intent, without persisting it.
+        assert!(matches!(
+            bundle(&loot, &identity, &magic),
+            Err(JointCheckpointError::Corrupt)
+        ));
+
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let path = checkpoint_path();
+
+        // A genuinely committed, VERIFIED PHYSICAL action at seq7 is not
+        // a cast. Nevertheless its generic committed-operation watermark
+        // currently satisfies the unrelated magic pending-intent check.
+        let dropped = commit_verified_equipped_sword_drop_checked(
+            GroundSwordAuthority {
+                path: &path,
+                loot: &mut loot,
+                magic: &magic,
+                identity: &identity,
+                tick: PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation: VerifiedLootOperation {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 7,
+                },
+            },
+            |fighter, zone| {
+                assert_eq!(fighter.net_id, 1);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(dropped.expected_item_id, sword);
+        assert_eq!(loot.committed_operation_sequence(hero), Some(7));
+        let (recovered_loot, recovered_magic) = load_joint(&path).unwrap();
+        assert_eq!(recovered_loot.committed_operation_sequence(hero), Some(7));
+        assert_eq!(
+            recovered_loot.ground()[&dropped.ground_entity_id].item.id,
+            sword
+        );
+        assert_eq!(recovered_magic.mana(hero), 100);
+        assert!(recovered_magic.knows_spell(hero, Spell::Ember));
+        assert_eq!(recovered_magic.pending_ember_intents().count(), 1);
+        assert!(recovered_magic.ember_intent(hero, 7).is_some());
+        assert_eq!(
+            recovered_magic.encode_progression().unwrap(),
+            magic.encode_progression().unwrap()
+        );
+        let _ = fs::remove_file(&path);
+    }
+
     #[test]
     fn unmatched_ember_intent_cannot_enter_combined_checkpoint() {
         let (loot, mut magic, identity, hero) = fixtures();
