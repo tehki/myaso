@@ -1146,7 +1146,7 @@ jobs:
   # This is an ADDITIONAL required result, never a replacement for quality.
   graphics3a-silver-authenticated:
     name: graphics3a-real-silver-2p
-    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'graphics3a/p0-prealpha-silver-browser-review-') || startsWith(github.head_ref, 'graphics3a/p0-prealpha-silver-motion-') || startsWith(github.head_ref, 'graphics3a/p0-silver-full-motion-'))
+    if: github.event_name == 'pull_request' && (startsWith(github.head_ref, 'graphics3a/p0-prealpha-silver-browser-review-') || startsWith(github.head_ref, 'graphics3a/p0-prealpha-silver-motion-') || startsWith(github.head_ref, 'graphics3a/p0-silver-full-motion-') || startsWith(github.head_ref, 'graphics3a/p0-silver-full-jump-'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1172,6 +1172,9 @@ jobs:
           command -v chromedriver
           command -v geckodriver
           command -v firefox
+
+      - name: Prebuild exact local authoritative Rust flight server before timed startup
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
 
       - name: Verify both authoritative human Silver bodies in real WebDriver browsers
         env:

@@ -858,8 +858,12 @@ async function verifyConnectedPrealphaSilverMotions(sessions,connected){
   await execute(chrome.base,chrome.sessionId,
     "document.querySelector('#arena')?.focus(); return document.activeElement?.id;");
   await performArenaJumpPress(chrome,90);
-  const jumping=await awaitBoth(preJump,"silver_jump");
-  await sleep(820);
+  await awaitBoth(preJump,"silver_jump");
+  // Do not certify a 430ms source jump from its first frame. Continue
+  // recording the unchanged native sprite renderer through the late pose.
+  await sleep(470);
+  const jumping=await captured(preJump,"silver_jump");
+  await sleep(350);
   const preRoll=await offsets();
   const element=await resolveArenaElement(firefox,"Graphics3A independent W3C roll");
   await aimArena(firefox,element,130,0);
