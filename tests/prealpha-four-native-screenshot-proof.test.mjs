@@ -10,6 +10,9 @@ test("actual W3C browser PNG capture requires qualified real four-person roster"
  assert.match(runner,/\/screenshot/);
  assert.match(runner,/captureGraphics3aFourNativeScreenshots\(entries,receipt\)/);
  assert.match(runner,/prealpha_real_four_silver_/);
+ assert.match(runner,/resolveArenaElement\(session,/);
+ assert.match(runner,/\/element\/"\+arenaElement\+"\/screenshot/);
+ assert.match(runner,/view.kind==="arena"/);
  assert.match(runner,/89504e470d0a1a0a/);
  assert.match(runner,/createHash\("sha256"\)/);
  assert.match(runner,/notHumanOperated:true/);

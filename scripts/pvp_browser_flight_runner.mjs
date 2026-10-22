@@ -965,19 +965,31 @@ async function captureGraphics3aFourNativeScreenshots(entries,receipt){
   await mkdir(out,{recursive:true});
   const items=[];
   for(const session of entries) {
-    const base64=await webdriver(session.base,"GET",
-      "/session/"+session.sessionId+"/screenshot");
-    if(typeof base64!=="string"||base64.length<20000||
-      !/^[A-Za-z0-9+/=]+$/.test(base64))
-      throw Error("Native browser did not return a credible PNG screenshot: "+session.name);
-    const bytes=Buffer.from(base64,"base64");
-    if(bytes.length<15000||bytes.subarray(0,8).toString("hex")!=="89504e470d0a1a0a")
-      throw Error("Actual native W3C screenshot PNG bytes invalid: "+session.name);
-    const file="prealpha_real_four_silver_"+session.name+".png";
-    await writeFile(path.join(out,file),bytes);
-    items.push({browser:session.name,
-      originalServerId:receipt.observedPerClient.find(x=>x.browser===session.name)?.playerId,
-      filename:file,bytes:bytes.length,sha256:createHash("sha256").update(bytes).digest("hex")});
+    // Capture BOTH what the player actually sees (viewport) and the entire
+    // original arena Canvas. Firefox may start with its viewport scrolled at
+    // the document header; native element screenshots avoid that clipping.
+    const arenaElement=await resolveArenaElement(session,
+      "Graphics3A actual four-player Canvas screenshot");
+    const views=[
+      {kind:"viewport",endpoint:"/session/"+session.sessionId+"/screenshot"},
+      {kind:"arena",endpoint:"/session/"+session.sessionId+"/element/"+arenaElement+"/screenshot"}
+    ];
+    for(const view of views){
+      const base64=await webdriver(session.base,"GET",view.endpoint);
+      if(typeof base64!=="string"||base64.length<20000||
+        !/^[A-Za-z0-9+/=]+$/.test(base64))
+        throw Error("Native "+view.kind+" screenshot missing: "+session.name);
+      const bytes=Buffer.from(base64,"base64");
+      if(bytes.length<15000||
+        bytes.subarray(0,8).toString("hex")!=="89504e470d0a1a0a")
+        throw Error("Actual native W3C "+view.kind+" PNG invalid: "+session.name);
+      const file="prealpha_real_four_silver_"+session.name+
+        (view.kind==="arena"?"_arena":"")+".png";
+      await writeFile(path.join(out,file),bytes);
+      items.push({browser:session.name,kind:view.kind,
+        originalServerId:receipt.observedPerClient.find(x=>x.browser===session.name)?.playerId,
+        filename:file,bytes:bytes.length,sha256:createHash("sha256").update(bytes).digest("hex")});
+    }
   }
   await writeFile(path.join(out,"native_browser_evidence.json"),
     JSON.stringify({realServerFourPlayerAccepted:true,notHumanOperated:true,
