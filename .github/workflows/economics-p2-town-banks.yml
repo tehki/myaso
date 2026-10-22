@@ -1,0 +1,32 @@
+name: Economics P2 Local Town Banks Lab
+
+on:
+  pull_request:
+    paths:
+      - scripts/economics_town_banks_lab.py
+      - scripts/economics_bank_world_contract.py
+      - scripts/economics_bank_b3_sqlite_lab.py
+      - scripts/test_economics_bank_b3_sqlite_lab.py
+      - scripts/test_economics_bank_world_contract.py
+      - scripts/test_economics_town_banks_lab.py
+      - docs/ECONOMICS_P2_LOCAL_TOWN_BANKS.md
+      - docs/ECONOMICS_B1_WORLD_VAULT_BREACH_CONTRACT.md
+      - docs/ECONOMICS_B2_BANK_ROBBERY_RACE_HARDENING.md
+      - docs/ECONOMICS_B3_SQLITE_BANK_RECOVERY_LAB.md
+      - .github/workflows/economics-p2-town-banks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fictional-local-banks:
+    name: Disposable B0–B3 NPC town banks (offline only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify 87 B0–B3 isolated bank and cross-process recovery tests
+        run: |
+          python3 -m py_compile scripts/economics_town_banks_lab.py scripts/test_economics_town_banks_lab.py scripts/economics_bank_world_contract.py scripts/test_economics_bank_world_contract.py scripts/economics_bank_b3_sqlite_lab.py scripts/test_economics_bank_b3_sqlite_lab.py
+          python3 -m unittest discover -s scripts -p 'test_economics_*bank*py' -v
