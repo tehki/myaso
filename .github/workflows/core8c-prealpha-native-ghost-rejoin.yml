@@ -1,0 +1,34 @@
+name: Core 8C real native four-browser ghost removal and rejoin (REVIEW ONLY)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/core8c_prealpha_native_ghost_rejoin.mjs"
+      - ".github/workflows/core8c-prealpha-native-ghost-rejoin.yml"
+      - "server/src/main.rs"
+      - "server/src/snapshot.rs"
+      - "web/online-game.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-v1-native-ghost-retirement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate test code and installed real W3C browser drivers
+        run: |
+          node --check scripts/core8c_prealpha_native_ghost_rejoin.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build the original, unchanged Rust server binary
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four actual Chrome Firefox sessions must retire old Canvas/HUD identity and show fresh player
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 345s node scripts/core8c_prealpha_native_ghost_rejoin.mjs
