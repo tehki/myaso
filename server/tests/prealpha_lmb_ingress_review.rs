@@ -98,7 +98,10 @@ fn accepted_sequence_replay_with_changed_action_or_tick_is_not_a_duplicate_ack()
     ] {
         let l = lease(1, 5, 100);
         let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
-        accepted(gate.review_ingest(l, &event(GestureAction::Press, 1, 1, 777), 50), &[(1, 1)]);
+        accepted(
+            gate.review_ingest(l, &event(GestureAction::Press, 1, 1, 777), 50),
+            &[(1, 1)],
+        );
         match gate.review_ingest(l, &tampered, 51) {
             IngressResult::Rejected(Some(ack)) => {
                 assert_eq!(ack.status, AckStatus::Rejected);
