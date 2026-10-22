@@ -1,6 +1,57 @@
 # 🌕⚡️🚀 Core 8A — ONE v2 gesture wire candidate for Main #723
 
 
+## One bounded typed edge outbox — isolated Core8A review child
+
+The original dormant `src/network/prealpha-lmb-gesture-outbox-proposal.mjs`
+now also exports a **separate opt-in review** `ProposedSharedTypedGestureOutbox`
+that **composes the one shared ID allocator**, instead of constructing
+two independent LMB/KeyE sequence=1 queues. The original
+`ProposedLmbGestureOutbox` and its existing tests remain unchanged,
+and neither class has any live `web/` import.
+
+The typed review outbox implements original Core8A bounded
+`maxPending=16` (configurable 4–256) and `maxAttempts=3`
+(configurable 1–8); all source0/source1 edges use one pending map,
+same monotonic sequence ID and a single lease-private ACK router.
+New PRESS acceptance budgets queue room for all **other** active
+sources' terminals plus potential own LMB UPGRADE/terminal or
+KeyE terminal; refusing a new over-capacity PRESS leaves legitimate
+outstanding release paths open. Next-send chooses **unscheduled
+first attempts ahead of retries** without reordering the chosen
+packet batch. Return values are packet COPIES; this method neither
+transmits bytes nor authenticates a server.
+
+`receiveAck(bytes, trustedLease)` delegates to the original strict
+Combat4 `0x12` decoder (byte3 MUST be zero), denies foreign object
+tokens, unscheduled ACK, absent/replayed sequence and mismatched
+gesture. ACCEPTED/DUPLICATE settle transport receipt only;
+STALE/REJECTED closes and clears the entire lease. Retransmission
+exhaustion closes it as well, rather than dropping an unACKed
+terminal silently. The single ACK sequence+gesture pair is
+matched back to the exact *originally queued source*; no
+untrusted source field is reconstructed from the ACK.
+No `CombatEvent::Hit`, damage or World authority is exposed.
+
+The focused tests include: two 0x11 press/release edges in a
+single 30Hz tick; interleaved LMB/KeyE seq1…5 with disjoint
+gesture IDs; limit=1 first-send fairness; terminal capacity
+under both simultaneous sources; unscheduled/foreign/invalid
+ACK refusal; independently copied retransmits; bounded retry
+exhaustion; stale/retired lease; four independent hypothetical
+clients emitting identical KeyE bytes and isolated ACK handling.
+
+**Proof boundary:** this is one local, dormant JavaScript review
+state machine. An object `trustedLease` is NOT a real
+authenticated WebTransport actor identity. There is no true
+network writer, QUIC stream/handshake, durable replay window,
+Core8C actor/zone/World incarnation atomic fence, server hit,
+real W3C provenance, or current live v2 support. The final
+single integrated transport adapter may reuse this logic only
+after Main's exclusive branch/writer fence and cross-owner
+review. Original v1 and all strict Combat native gates remain
+untouched. **NO MERGE / DEPLOY / PROTOCOL ACTIVATE.**
+
 ## Shared typed-source ID allocator — review-only child of #809
 
 `src/network/prealpha-shared-source-allocator-proposal.mjs` now
