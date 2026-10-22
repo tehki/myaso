@@ -20,6 +20,27 @@ use std::{
 unsafe extern "C" {
     fn flock(fd: std::os::raw::c_int, operation: std::os::raw::c_int) -> std::os::raw::c_int;
 }
+#[cfg(target_os = "linux")]
+unsafe extern "C" {
+    fn openat(
+        dirfd: std::os::raw::c_int,
+        path: *const std::os::raw::c_char,
+        flags: std::os::raw::c_int,
+        mode: std::os::raw::c_uint,
+    ) -> std::os::raw::c_int;
+    fn renameat2(
+        olddirfd: std::os::raw::c_int,
+        oldpath: *const std::os::raw::c_char,
+        newdirfd: std::os::raw::c_int,
+        newpath: *const std::os::raw::c_char,
+        flags: std::os::raw::c_uint,
+    ) -> std::os::raw::c_int;
+    fn unlinkat(
+        dirfd: std::os::raw::c_int,
+        path: *const std::os::raw::c_char,
+        flags: std::os::raw::c_int,
+    ) -> std::os::raw::c_int;
+}
 fn exclusive_lock(file: &File) -> io::Result<bool> {
     #[cfg(unix)]
     {
@@ -54,6 +75,95 @@ fn exclusive_lock(file: &File) -> io::Result<bool> {
 const LINUX_O_NOFOLLOW: i32 = 0o400000;
 #[cfg(target_os = "linux")]
 const LINUX_O_DIRECTORY: i32 = 0o200000;
+#[cfg(target_os = "linux")]
+const LINUX_O_CLOEXEC: i32 = 0o2000000;
+#[cfg(target_os = "linux")]
+const LINUX_O_CREAT: i32 = 0o100;
+#[cfg(target_os = "linux")]
+const LINUX_O_EXCL: i32 = 0o200;
+#[cfg(target_os = "linux")]
+const LINUX_RENAME_NOREPLACE: u32 = 1;
+
+/// All MYID entry names are generated locally, single path components.
+/// Kernel openat/renameat2 bind writes and publication to the already
+/// validated journal directory descriptor, not a mutable root pathname.
+#[cfg(target_os = "linux")]
+fn anchored_create_new(dir: &File, name: &str) -> Result<File, ClaimJournalError> {
+    use std::{
+        ffi::CString,
+        os::fd::{AsRawFd, FromRawFd},
+    };
+    let path = CString::new(name).map_err(|_| ClaimJournalError::Invalid("bad MYID filename"))?;
+    if name.contains('/') || name == "." || name == ".." {
+        return Err(ClaimJournalError::Invalid(
+            "MYID entry not single component",
+        ));
+    }
+    // SAFETY: both the already-open dirfd and NUL-terminated path remain
+    // valid across this syscall; successful raw fd is uniquely owned by File.
+    let fd = unsafe {
+        openat(
+            dir.as_raw_fd(),
+            path.as_ptr(),
+            1 | LINUX_O_CREAT | LINUX_O_EXCL | LINUX_O_NOFOLLOW | LINUX_O_CLOEXEC,
+            0o600,
+        )
+    };
+    if fd < 0 {
+        return Err(ClaimJournalError::Io(io::Error::last_os_error()));
+    }
+    // SAFETY: newly created fd is returned by openat, not used elsewhere.
+    let file = unsafe { File::from_raw_fd(fd) };
+    check_regular_owned_storage_file(&file)?;
+    Ok(file)
+}
+
+#[cfg(target_os = "linux")]
+fn anchored_rename_noreplace(
+    dir: &File,
+    source: &str,
+    target: &str,
+) -> Result<(), ClaimJournalError> {
+    use std::{ffi::CString, os::fd::AsRawFd};
+    if source.contains('/') || target.contains('/') {
+        return Err(ClaimJournalError::Invalid(
+            "MYID rename includes path traversal",
+        ));
+    }
+    let from = CString::new(source).map_err(|_| ClaimJournalError::Invalid("bad staging name"))?;
+    let to = CString::new(target).map_err(|_| ClaimJournalError::Invalid("bad event name"))?;
+    // SAFETY: pinned directory descriptor and both NUL-terminated names
+    // survive the call. NOREPLACE prevents overwriting a competing commit.
+    if unsafe {
+        renameat2(
+            dir.as_raw_fd(),
+            from.as_ptr(),
+            dir.as_raw_fd(),
+            to.as_ptr(),
+            LINUX_RENAME_NOREPLACE,
+        )
+    } != 0
+    {
+        return Err(ClaimJournalError::Io(io::Error::last_os_error()));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn anchored_unlink(dir: &File, name: &str) -> Result<(), ClaimJournalError> {
+    use std::{ffi::CString, os::fd::AsRawFd};
+    if name.contains('/') {
+        return Err(ClaimJournalError::Invalid(
+            "MYID unlink includes path traversal",
+        ));
+    }
+    let path = CString::new(name).map_err(|_| ClaimJournalError::Invalid("bad staging name"))?;
+    // SAFETY: pinned directory descriptor + NUL-terminated filename valid.
+    if unsafe { unlinkat(dir.as_raw_fd(), path.as_ptr(), 0) } != 0 {
+        return Err(ClaimJournalError::Io(io::Error::last_os_error()));
+    }
+    Ok(())
+}
 
 #[cfg(unix)]
 fn check_regular_owned_storage_file(file: &File) -> Result<(), ClaimJournalError> {
@@ -554,34 +664,56 @@ impl OfflineClaimJournal {
     }
 
     fn persist(&self, rec: &Record) -> Result<(), ClaimJournalError> {
-        let final_path = self.root.join(filename(rec.sequence));
-        if final_path.exists() {
-            return Err(ClaimJournalError::Invalid("occupied sequence"));
-        }
+        self.persist_after_preflight(rec, || {})
+    }
+
+    /// The closure is a no-op in regular execution. A deliberately adversarial
+    /// UNIT TEST uses it to rebind the journal pathname AFTER validation but
+    /// BEFORE creation, proving the actual create/rename are dirfd-relative.
+    fn persist_after_preflight(
+        &self,
+        rec: &Record,
+        after_anchor_check: impl FnOnce(),
+    ) -> Result<(), ClaimJournalError> {
         self.ensure_writer_anchor()?;
-        let tmp = self.root.join(format!(
+        after_anchor_check();
+        let final_name = filename(rec.sequence);
+        let tmp_name = format!(
             ".staging-{}-{}",
             std::process::id(),
             TEMP.fetch_add(1, Ordering::Relaxed)
-        ));
-        let mut opts = OpenOptions::new();
-        opts.create_new(true).write(true);
-        #[cfg(unix)]
+        );
+
+        #[cfg(target_os = "linux")]
         {
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.mode(0o600);
+            let result = (|| {
+                let mut file = anchored_create_new(&self.root_dir, &tmp_name)?;
+                file.write_all(&encode(rec))?;
+                file.sync_all()?;
+                drop(file);
+                // Both names resolve under the original pinned directory.
+                // NOREPLACE refuses an already committed numbered event.
+                anchored_rename_noreplace(&self.root_dir, &tmp_name, &final_name)?;
+                self.root_dir.sync_all()?;
+                // If the named lock/root changed during a write, caller
+                // poisons the writer and never acknowledges this commit.
+                self.ensure_writer_anchor()
+            })();
+            if result.is_err() {
+                // Best-effort cleanup only the staging entry in the PINNED
+                // directory; never unlink another directory's same name.
+                let _ = anchored_unlink(&self.root_dir, &tmp_name);
+            }
+            result
         }
-        let mut f = opts.open(&tmp)?;
-        f.write_all(&encode(rec))?;
-        f.sync_all()?;
-        drop(f);
-        fs::rename(&tmp, final_path)?;
-        // fsync the EXACT pinned directory, never an arbitrary new path.
-        self.root_dir.sync_all()?;
-        // Never report ACK-success if another lock/root inode has replaced
-        // the pinned writer during the publication window.
-        self.ensure_writer_anchor()?;
-        Ok(())
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (final_name, tmp_name, rec);
+            Err(ClaimJournalError::Io(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "MYID pinned-dirfd commit requires Linux",
+            )))
+        }
     }
     fn append(
         &mut self,
@@ -1562,6 +1694,114 @@ mod tests {
         fs::set_permissions(&original, fs::Permissions::from_mode(0o600)).unwrap();
         let recovered = root.open();
         assert_eq!(recovered.head(), 1);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_rebind_between_preflight_and_create_writes_only_into_pinned_root() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let observer = actor(0x1234_0000_0000_0002);
+        let mut writer = root.open();
+        append(
+            &mut writer,
+            &bridge,
+            &leases,
+            lease,
+            (observer, 1, "Tomas", 301),
+        )
+        .unwrap();
+
+        let moved = root.0.with_extension("pinned-dirfd-old-root");
+        let target = Record {
+            sequence: 2,
+            event_id: 302,
+            event: OfflineIdentityEvent::Claim {
+                speaker: lease.character_id(),
+                observer,
+                session_generation: 1,
+                appearance_epoch: 1,
+                name: "Pinned Only".to_owned(),
+            },
+        };
+        // Deterministically rename the journal AFTER the production anchor
+        // preflight but BEFORE openat. Path-based OpenOptions would write
+        // under the replacement root. Dirfd-relative creation MUST NOT.
+        let outcome = writer.persist_after_preflight(&target, || {
+            fs::rename(&root.0, &moved).unwrap();
+            fs::create_dir(&root.0).unwrap();
+        });
+        assert!(matches!(
+            outcome,
+            Err(ClaimJournalError::Invalid(
+                "MYID writer lock/directory binding changed"
+            ))
+        ));
+        assert!(!root.0.join(filename(2)).exists());
+        assert!(!root.0.join(".identity-writer.lock").exists());
+        assert!(moved.join(filename(2)).exists());
+        assert_eq!(fs::read(moved.join(filename(2))).unwrap(), encode(&target));
+        assert_eq!(writer.head(), 1, "no uncommitted ACK/sequence advance");
+        drop(writer);
+
+        // Crash/reopen of the *original moved* directory replays both
+        // committed files exactly once. A successful caller ACK was never
+        // issued for the second record; this is a historical recovery event.
+        let recovered = OfflineClaimJournal::open(&moved).unwrap();
+        assert_eq!(recovered.head(), 2);
+        assert_eq!(
+            recovered
+                .observed_unverified_claim(observer, lease.character_id())
+                .unwrap()
+                .name,
+            "Pinned Only"
+        );
+        drop(recovered);
+        fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn pinned_rename_noreplace_preserves_existing_commit_and_cleans_staging() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let observer = actor(0x1234_0000_0000_0002);
+        let mut writer = root.open();
+        append(
+            &mut writer,
+            &bridge,
+            &leases,
+            lease,
+            (observer, 1, "Tomas", 401),
+        )
+        .unwrap();
+        let first_path = root.0.join(filename(1));
+        let committed = fs::read(&first_path).unwrap();
+        let conflicting = Record {
+            sequence: 1,
+            event_id: 402,
+            event: OfflineIdentityEvent::Claim {
+                speaker: lease.character_id(),
+                observer,
+                session_generation: 1,
+                appearance_epoch: 1,
+                name: "Replacement Forbidden".to_owned(),
+            },
+        };
+        assert!(matches!(
+            writer.persist_after_preflight(&conflicting, || {}),
+            Err(ClaimJournalError::Io(_))
+        ));
+        assert_eq!(fs::read(&first_path).unwrap(), committed);
+        assert_eq!(writer.head(), 1);
+        let entries: Vec<_> = fs::read_dir(&root.0)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().to_string())
+            .collect();
+        assert!(
+            entries.iter().all(|name| !name.starts_with(".staging-")),
+            "refused overwrite must clean up only its original staged entry"
+        );
     }
 
     #[cfg(target_os = "linux")]
