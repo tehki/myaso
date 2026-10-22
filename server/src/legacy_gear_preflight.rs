@@ -522,14 +522,50 @@ pub struct LegacySourceCustodyCatalog {
 // containers; the source owner must still attest empty parked characters and
 // containers, completeness and that no live player was left unparked.
 const LEGACY_BACKPACK_CAPACITY: usize = 64;
-const LEGACY_CORPSE_CAPACITY: usize = LEGACY_BACKPACK_CAPACITY + 3;
+const LEGACY_ORIGINAL_CORPSE_CAPACITY: usize = LEGACY_BACKPACK_CAPACITY + 3;
+const LEGACY_REPAIRED_CORPSE_CAPACITY: usize = LEGACY_BACKPACK_CAPACITY + 5;
 const LEGACY_MAX_CHARACTERS: usize = 4096;
 const LEGACY_MAX_WORLD_OBJECTS: usize = 100_000;
+
+/// Source codec provenance profile, NOT inferred from MYASOL03 magic bytes.
+/// Both original #424 and corrected Items #805 use the same disk signature,
+/// so only the independently reviewed checkpoint writer/reader build and
+/// source epoch can justify the higher bound. Never accept a client selector.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LegacySourceCapacityProfile {
+    OriginalCorpse67,
+    RepairedFiveSlotCorpse69,
+}
+
+impl LegacySourceCapacityProfile {
+    pub const fn corpse_stack_limit(self) -> usize {
+        match self {
+            Self::OriginalCorpse67 => LEGACY_ORIGINAL_CORPSE_CAPACITY,
+            Self::RepairedFiveSlotCorpse69 => LEGACY_REPAIRED_CORPSE_CAPACITY,
+        }
+    }
+}
 
 impl LegacySourceCustodyCatalog {
     pub fn new(
         import: &LegacyImportPreflight,
         source: &LegacySourceItemCatalog,
+        rows: impl IntoIterator<Item = LegacySourceCustodyRow>,
+    ) -> Result<Self, LegacyMigrationError> {
+        // Fail closed for unversioned callers. Older Magic source snapshots
+        // never accepted more than 67 physical items on a corpse.
+        Self::new_with_profile(
+            import,
+            source,
+            LegacySourceCapacityProfile::OriginalCorpse67,
+            rows,
+        )
+    }
+
+    pub fn new_with_profile(
+        import: &LegacyImportPreflight,
+        source: &LegacySourceItemCatalog,
+        source_profile: LegacySourceCapacityProfile,
         rows: impl IntoIterator<Item = LegacySourceCustodyRow>,
     ) -> Result<Self, LegacyMigrationError> {
         let mut locations = BTreeMap::new();
@@ -622,7 +658,7 @@ impl LegacySourceCustodyCatalog {
                     }
                     let count = corpse_counts.entry(legacy_corpse_id).or_default();
                     *count += 1;
-                    if *count > LEGACY_CORPSE_CAPACITY {
+                    if *count > source_profile.corpse_stack_limit() {
                         return Err(LegacyMigrationError::SourceCorpseCapacityExceeded);
                     }
                     if corpse_counts.len() > LEGACY_MAX_WORLD_OBJECTS {
@@ -1655,6 +1691,94 @@ mod tests {
         assert!(matches!(
             LegacySourceCustodyCatalog::new(&import, &source, (1..=68).map(corpse)),
             Err(LegacyMigrationError::SourceCorpseCapacityExceeded)
+        ));
+    }
+
+    #[test]
+    fn source_revision_attestation_preserves_old_67_and_corrected_69_corpse_limits() {
+        assert_eq!(
+            LegacySourceCapacityProfile::OriginalCorpse67.corpse_stack_limit(),
+            67
+        );
+        assert_eq!(
+            LegacySourceCapacityProfile::RepairedFiveSlotCorpse69.corpse_stack_limit(),
+            69
+        );
+        let mut import = LegacyImportPreflight::new(namespaces(), []).unwrap();
+        import.stage_owner(LegacyDomain::Corpse, 900).unwrap();
+        for id in 1..=70 {
+            import.stage_owner(LegacyDomain::Item, id).unwrap();
+        }
+        let source = LegacySourceItemCatalog::new(
+            &import,
+            901,
+            (1..=70).map(|id| LegacySourceItemRecord {
+                legacy_item_id: id,
+                checkpoint_kind_code: 8,
+                amount: 1,
+            }),
+        )
+        .unwrap();
+        let first_corpse = |id| LegacySourceCustodyRow {
+            legacy_item_id: id,
+            location: LegacySourceCustodyLocation::Corpse {
+                legacy_corpse_id: 900,
+            },
+        };
+        import.stage_owner(LegacyDomain::Character, 101).unwrap();
+        let backpack = |id| LegacySourceCustodyRow {
+            legacy_item_id: id,
+            location: LegacySourceCustodyLocation::ParkedBackpack {
+                legacy_character_id: 101,
+            },
+        };
+        for maximum in [67, 69] {
+            let rows = (1..=maximum)
+                .map(first_corpse)
+                .chain(((maximum + 1)..=70).map(backpack));
+            // Corrected reader supports both old and new valid source records.
+            assert!(LegacySourceCustodyCatalog::new_with_profile(
+                &import,
+                &source,
+                LegacySourceCapacityProfile::RepairedFiveSlotCorpse69,
+                rows
+            )
+            .is_ok());
+        }
+        assert!(LegacySourceCustodyCatalog::new(
+            &import,
+            &source,
+            (1..=67).map(first_corpse).chain((68..=70).map(backpack))
+        )
+        .is_ok());
+        for amount in [68, 69, 70] {
+            let rows = (1..=amount)
+                .map(first_corpse)
+                .chain(((amount + 1)..=70).map(backpack));
+            assert!(matches!(
+                LegacySourceCustodyCatalog::new(&import, &source, rows),
+                Err(LegacyMigrationError::SourceCorpseCapacityExceeded)
+            ));
+        }
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new_with_profile(
+                &import,
+                &source,
+                LegacySourceCapacityProfile::RepairedFiveSlotCorpse69,
+                (1..=70).map(first_corpse)
+            ),
+            Err(LegacyMigrationError::SourceCorpseCapacityExceeded)
+        ));
+        // Explicitly choosing the repaired profile must never loosen
+        // backpack capacity or any existing item/slot/collision validation.
+        assert!(matches!(
+            LegacySourceCustodyCatalog::new_with_profile(
+                &import,
+                &source,
+                LegacySourceCapacityProfile::RepairedFiveSlotCorpse69,
+                (1..=65).map(backpack).chain((66..=70).map(first_corpse))
+            ),
+            Err(LegacyMigrationError::SourceBackpackCapacityExceeded)
         ));
     }
 
