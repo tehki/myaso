@@ -1,0 +1,33 @@
+name: r0-public-probe-static
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/probe-r0-public.mjs'
+      - 'tests/r0-public-probe.test.mjs'
+      - '.github/workflows/r0-public-probe.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/probe-r0-public.mjs'
+      - 'tests/r0-public-probe.test.mjs'
+      - '.github/workflows/r0-public-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate read-only public probe
+        run: |
+          node --check scripts/probe-r0-public.mjs
+          node --test tests/r0-public-probe.test.mjs
+          # Offline contract tests do not contact production services.
