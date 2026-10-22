@@ -1,8 +1,8 @@
 // Core8C: actual native Chrome/Firefox Canvas actor identity removal and rejoin. Original v1 only.
 // Nonproduction, opt-in CLI only. Requires built server/target/debug/myaso-server,
 // Node >=20, python3, Chrome/Chromium and chromedriver on PATH.
-// Optional: C1_BROWSER_MATRIX=chrome,firefox,chrome with geckodriver and Firefox.
-// Run from repository root: node scripts/chat_c1_three_browser_acceptance.mjs
+// Browser matrix: C1_BROWSER_MATRIX=chrome,firefox,chrome,chrome with geckodriver and Firefox.
+// Run from repository root: node scripts/core8c_prealpha_native_ghost_rejoin.mjs
 // No mock adapter, public server, external port or production deployment.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -12,9 +12,9 @@ const root=process.cwd(), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const randomPort=()=>new Promise((resolve,reject)=>{const s=createServer();s.on("error",reject);s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const processes=[],sessions=[];
 const browserMatrix=(process.env.C1_BROWSER_MATRIX||"chrome,firefox,chrome,chrome").split(",").map(x=>x.trim().toLowerCase());
-if(browserMatrix.length!==4)throw Error("Joined C1/Silver requires exactly four authenticated native browser clients");
-if (![3,4].includes(browserMatrix.length) || browserMatrix.some(x=>!["chrome","firefox"].includes(x))) {
- throw Error("C1_BROWSER_MATRIX must contain three or four chrome/firefox entries");
+if(browserMatrix.length!==4)throw Error("Core8C native removal requires exactly four authenticated browser clients");
+if (browserMatrix.some(x=>!["chrome","firefox"].includes(x))) {
+ throw Error("C1_BROWSER_MATRIX must contain Chrome and Firefox browser types");
 }
 const sessionDriverPorts=new Map();
 const launch=(bin,args,extra={})=>{const p=spawn(bin,args,{...extra,env:{...process.env,...(extra.env||{})}});processes.push(p);return p;};
@@ -92,6 +92,28 @@ try {
  ].join("");
  const [a,b,c,d]=sessions;
  const surviving=[a,c,d];
+ async function realWasdAndAck(sid,label) {
+  const old=await evaljs(sid,
+   "const x=document.querySelector('#event-text')?.textContent||'';return Number(x.match(/server tick (\\d+)/)?.[1]||0)");
+  await evaljs(sid,"document.querySelector('#arena').focus()");
+  await wd("POST","/session/"+sid+"/actions",{actions:[{
+   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyDown",value:"w"}]
+  }]});
+  await delay(330);
+  await wd("POST","/session/"+sid+"/actions",{actions:[{
+   type:"key",id:"core8c-native-input-"+label,actions:[{type:"keyUp",value:"w"}]
+  }]});
+  return poll("real W3C native input produced fresh authoritative server tick "+label,
+   ()=>evaljs(sid,
+    "const x=document.querySelector('#event-text')?.textContent||'';const tick=Number(x.match(/server tick (\\d+)/)?.[1]||0);return {ok:tick>arguments[0]+3,status:x,oldTick:arguments[0],newTick:tick}",[old]),9000);
+ }
+ // Baseline ACK and realtime replication are driven by actual W3C gameplay.
+ // The real old-v1 client does not promise unsolicited snapshot delivery to
+ // an idle viewer that has never acknowledged its reliable initial baseline.
+ for(let i=0;i<sessions.length;i++){
+  const ack=await realWasdAndAck(sessions[i],"ready-"+(i+1));
+  console.log("CORE8C_BROWSER_REAL_INPUT_ACK_PRECONDITION",i+1,JSON.stringify(ack));
+ }
  for(const sid of surviving)await evaljs(sid,traceScript);
  function rosterHas(rows,id){return rows.some(r=>String(r).includes("#"+id));}
  async function visible(sid){
@@ -111,6 +133,12 @@ try {
  // Real WebDriver session teardown closes authentic QUIC and original actor #2.
  await wd("DELETE","/session/"+b);
  console.log("CORE8C_BROWSER_REAL_PEER2_DISCONNECTED");
+ // Three surviving genuine clients must continue moving and processing their
+ // own real old-v1 INPUT_ACKs. An idle frozen status is not valid removal QA.
+ for(const sid of surviving){
+  const ack=await realWasdAndAck(sid,"post-departure");
+  console.log("CORE8C_BROWSER_POST_DEPARTURE_ACK",JSON.stringify(ack));
+ }
  const removed=[];
  for(const sid of surviving){
   const q=await poll("native Canvas AND HUD remove peer #2",async()=>{
