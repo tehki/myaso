@@ -1,0 +1,1171 @@
+{
+  "type": "P52 native original Rust send and WebTransport accepted snapshot anomaly triage",
+  "qaOnly": true,
+  "realPacketsNotSynthetic": true,
+  "productionSourceChanged": false,
+  "sourceParent": "10183d131ea10f3f21a2647120f19a72debbf5b2",
+  "stagedServerIsInstrumented": true,
+  "browserResponseInstrumented": true,
+  "serverAndBrowsersOnePhysicalHost": true,
+  "noGpuPresentTiming": true,
+  "runs": [
+    {
+      "name": "independent-live-four-client-1",
+      "measuredMs": 15000,
+      "serverSimulationRefreshTicks": 428,
+      "simulationRefreshStepHistogram": {
+        "3": 427
+      },
+      "clients": [
+        {
+          "player": 1,
+          "authPlayerId": 1,
+          "received": 300,
+          "serverSentAll": 403,
+          "serverSentInAlignedWindow": 303,
+          "matchedAcceptedToServerSends": 300,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 302
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 299
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 51.113,
+          "maxClientReceiptGapMs": 166.5,
+          "receiptGapP95Ms": 50.9,
+          "serverOutputToClientObservedDeltaP95Ms": 0.562,
+          "serverOutputToClientObservedDeltaMaxMs": 116.236,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 55,
+          "originalGameFrameCallbackP95Ms": 2.6,
+          "callbackGapOver33": 1,
+          "longTasks": 1,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #1 - server tick 321",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 2,
+          "authPlayerId": 2,
+          "received": 301,
+          "serverSentAll": 387,
+          "serverSentInAlignedWindow": 304,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "0": 1,
+            "3": 302
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 300
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 54.861,
+          "maxClientReceiptGapMs": 135,
+          "receiptGapP95Ms": 52.2,
+          "serverOutputToClientObservedDeltaP95Ms": 7.87,
+          "serverOutputToClientObservedDeltaMaxMs": 94.313,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 21.66,
+          "originalGameFrameCallbackP95Ms": 2.5,
+          "callbackGapOver33": 1,
+          "longTasks": 1,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #2 - server tick 327",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 3,
+          "authPlayerId": 3,
+          "received": 301,
+          "serverSentAll": 372,
+          "serverSentInAlignedWindow": 304,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 303
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 300
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 51.787,
+          "maxClientReceiptGapMs": 163.8,
+          "receiptGapP95Ms": 50.7,
+          "serverOutputToClientObservedDeltaP95Ms": 0.779,
+          "serverOutputToClientObservedDeltaMaxMs": 114.194,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 55.15,
+          "originalGameFrameCallbackP95Ms": 2.6,
+          "callbackGapOver33": 2,
+          "longTasks": 1,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #3 - server tick 345",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 4,
+          "authPlayerId": 4,
+          "received": 301,
+          "serverSentAll": 351,
+          "serverSentInAlignedWindow": 304,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 303
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 300
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 51.249,
+          "maxClientReceiptGapMs": 70.9,
+          "receiptGapP95Ms": 50.8,
+          "serverOutputToClientObservedDeltaP95Ms": 0.748,
+          "serverOutputToClientObservedDeltaMaxMs": 34.79,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 0,
+          "originalGameFrameCallbackP95Ms": 2.7,
+          "callbackGapOver33": 2,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #4 - server tick 345",
+          "recordedPlayerInputs": true
+        }
+      ]
+    },
+    {
+      "name": "independent-live-four-client-2",
+      "measuredMs": 15000,
+      "serverSimulationRefreshTicks": 428,
+      "simulationRefreshStepHistogram": {
+        "3": 427
+      },
+      "clients": [
+        {
+          "player": 1,
+          "authPlayerId": 1,
+          "received": 300,
+          "serverSentAll": 402,
+          "serverSentInAlignedWindow": 303,
+          "matchedAcceptedToServerSends": 300,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 302
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 299
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 51.034,
+          "maxClientReceiptGapMs": 51,
+          "receiptGapP95Ms": 50.7,
+          "serverOutputToClientObservedDeltaP95Ms": 0.587,
+          "serverOutputToClientObservedDeltaMaxMs": 1.096,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 0,
+          "originalGameFrameCallbackP95Ms": 2.1,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #1 - server tick 315",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 2,
+          "authPlayerId": 2,
+          "received": 300,
+          "serverSentAll": 386,
+          "serverSentInAlignedWindow": 303,
+          "matchedAcceptedToServerSends": 300,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 302
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 299
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 56.099,
+          "maxClientReceiptGapMs": 60.6,
+          "receiptGapP95Ms": 58.9,
+          "serverOutputToClientObservedDeltaP95Ms": 8.783,
+          "serverOutputToClientObservedDeltaMaxMs": 10.361,
+          "sampledOriginalClockDebtP95Ms": 1.72,
+          "sampledOriginalClockDebtMaxMs": 1.82,
+          "originalGameFrameCallbackP95Ms": 2.2,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 9ms ",
+          "originalAuthStatus": "Online - player #2 - server tick 321",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 3,
+          "authPlayerId": 3,
+          "received": 301,
+          "serverSentAll": 369,
+          "serverSentInAlignedWindow": 304,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 303
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 300
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 55.123,
+          "maxClientReceiptGapMs": 61.5,
+          "receiptGapP95Ms": 53.4,
+          "serverOutputToClientObservedDeltaP95Ms": 7.642,
+          "serverOutputToClientObservedDeltaMaxMs": 12.744,
+          "sampledOriginalClockDebtP95Ms": 1.67,
+          "sampledOriginalClockDebtMaxMs": 1.72,
+          "originalGameFrameCallbackP95Ms": 2.1,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #3 - server tick 345",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 4,
+          "authPlayerId": 4,
+          "received": 302,
+          "serverSentAll": 350,
+          "serverSentInAlignedWindow": 305,
+          "matchedAcceptedToServerSends": 302,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 304
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 301
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 55.013,
+          "maxClientReceiptGapMs": 56.6,
+          "receiptGapP95Ms": 52.6,
+          "serverOutputToClientObservedDeltaP95Ms": 7.922,
+          "serverOutputToClientObservedDeltaMaxMs": 10.668,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 9.19,
+          "originalGameFrameCallbackP95Ms": 2.4,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #4 - server tick 345",
+          "recordedPlayerInputs": true
+        }
+      ]
+    },
+    {
+      "name": "independent-live-four-client-3",
+      "measuredMs": 15000,
+      "serverSimulationRefreshTicks": 425,
+      "simulationRefreshStepHistogram": {
+        "3": 424
+      },
+      "clients": [
+        {
+          "player": 1,
+          "authPlayerId": 1,
+          "received": 300,
+          "serverSentAll": 400,
+          "serverSentInAlignedWindow": 303,
+          "matchedAcceptedToServerSends": 300,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 302
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 299
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 56.106,
+          "maxClientReceiptGapMs": 57.4,
+          "receiptGapP95Ms": 52.6,
+          "serverOutputToClientObservedDeltaP95Ms": 7.261,
+          "serverOutputToClientObservedDeltaMaxMs": 10.399,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 1.82,
+          "originalGameFrameCallbackP95Ms": 2.1,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #1 - server tick 306",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 2,
+          "authPlayerId": 2,
+          "received": 300,
+          "serverSentAll": 387,
+          "serverSentInAlignedWindow": 302,
+          "matchedAcceptedToServerSends": 300,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "3": 301
+          },
+          "clientAcceptedTickStepHistogram": {
+            "3": 299
+          },
+          "totalOffCadenceClientTransitions": 0,
+          "actualTickJumpEvents": [],
+          "maxServerSendGapMs": 51.108,
+          "maxClientReceiptGapMs": 51.1,
+          "receiptGapP95Ms": 50.8,
+          "serverOutputToClientObservedDeltaP95Ms": 0.439,
+          "serverOutputToClientObservedDeltaMaxMs": 0.571,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 0,
+          "originalGameFrameCallbackP95Ms": 2.4,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #2 - server tick 315",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 3,
+          "authPlayerId": 3,
+          "received": 301,
+          "serverSentAll": 372,
+          "serverSentInAlignedWindow": 304,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "0": 1,
+            "3": 300,
+            "4": 1,
+            "6": 1
+          },
+          "clientAcceptedTickStepHistogram": {
+            "0": 1,
+            "3": 298,
+            "6": 1
+          },
+          "totalOffCadenceClientTransitions": 2,
+          "actualTickJumpEvents": [
+            {
+              "fromTick": 756,
+              "toTick": 762,
+              "step": 6,
+              "rxIntervalMs": 54.3,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 750,
+                  "msBeforeCurrentAccepted": -155.425
+                },
+                {
+                  "tick": 753,
+                  "msBeforeCurrentAccepted": -104.999
+                },
+                {
+                  "tick": 756,
+                  "msBeforeCurrentAccepted": -54.901
+                },
+                {
+                  "tick": 762,
+                  "msBeforeCurrentAccepted": -0.433
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 762,
+              "toTick": 762,
+              "step": 0,
+              "rxIntervalMs": 45.2,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 753,
+                  "msBeforeCurrentAccepted": -150.199
+                },
+                {
+                  "tick": 756,
+                  "msBeforeCurrentAccepted": -100.101
+                },
+                {
+                  "tick": 762,
+                  "msBeforeCurrentAccepted": -45.633
+                },
+                {
+                  "tick": 762,
+                  "msBeforeCurrentAccepted": -0.551
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            }
+          ],
+          "maxServerSendGapMs": 54.468,
+          "maxClientReceiptGapMs": 60.9,
+          "receiptGapP95Ms": 51,
+          "serverOutputToClientObservedDeltaP95Ms": 1.566,
+          "serverOutputToClientObservedDeltaMaxMs": 11.573,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 34.97,
+          "originalGameFrameCallbackP95Ms": 2.5,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #3 - server tick 339",
+          "recordedPlayerInputs": true
+        },
+        {
+          "player": 4,
+          "authPlayerId": 4,
+          "received": 301,
+          "serverSentAll": 349,
+          "serverSentInAlignedWindow": 303,
+          "matchedAcceptedToServerSends": 301,
+          "unmatchedAccepted": 0,
+          "serverTransmitTickStepHistogram": {
+            "0": 14,
+            "3": 275,
+            "6": 13
+          },
+          "clientAcceptedTickStepHistogram": {
+            "0": 13,
+            "3": 274,
+            "6": 13
+          },
+          "totalOffCadenceClientTransitions": 26,
+          "actualTickJumpEvents": [
+            {
+              "fromTick": 342,
+              "toTick": 342,
+              "step": 0,
+              "rxIntervalMs": 49.2,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 336,
+                  "msBeforeCurrentAccepted": -149.514
+                },
+                {
+                  "tick": 339,
+                  "msBeforeCurrentAccepted": -99.732
+                },
+                {
+                  "tick": 342,
+                  "msBeforeCurrentAccepted": -49.595
+                },
+                {
+                  "tick": 342,
+                  "msBeforeCurrentAccepted": -0.431
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 342,
+              "toTick": 348,
+              "step": 6,
+              "rxIntervalMs": 50.7,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 339,
+                  "msBeforeCurrentAccepted": -150.432
+                },
+                {
+                  "tick": 342,
+                  "msBeforeCurrentAccepted": -100.295
+                },
+                {
+                  "tick": 342,
+                  "msBeforeCurrentAccepted": -51.131
+                },
+                {
+                  "tick": 348,
+                  "msBeforeCurrentAccepted": -0.378
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 408,
+              "toTick": 408,
+              "step": 0,
+              "rxIntervalMs": 49.5,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 402,
+                  "msBeforeCurrentAccepted": -150.215
+                },
+                {
+                  "tick": 405,
+                  "msBeforeCurrentAccepted": -99.539
+                },
+                {
+                  "tick": 408,
+                  "msBeforeCurrentAccepted": -49.906
+                },
+                {
+                  "tick": 408,
+                  "msBeforeCurrentAccepted": -0.41
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 408,
+              "toTick": 414,
+              "step": 6,
+              "rxIntervalMs": 50.4,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 405,
+                  "msBeforeCurrentAccepted": -149.939
+                },
+                {
+                  "tick": 408,
+                  "msBeforeCurrentAccepted": -100.306
+                },
+                {
+                  "tick": 408,
+                  "msBeforeCurrentAccepted": -50.81
+                },
+                {
+                  "tick": 414,
+                  "msBeforeCurrentAccepted": -0.484
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 432,
+              "toTick": 432,
+              "step": 0,
+              "rxIntervalMs": 48.9,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 426,
+                  "msBeforeCurrentAccepted": -150.537
+                },
+                {
+                  "tick": 429,
+                  "msBeforeCurrentAccepted": -99.544
+                },
+                {
+                  "tick": 432,
+                  "msBeforeCurrentAccepted": -49.642
+                },
+                {
+                  "tick": 432,
+                  "msBeforeCurrentAccepted": -0.505
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 432,
+              "toTick": 438,
+              "step": 6,
+              "rxIntervalMs": 51,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 429,
+                  "msBeforeCurrentAccepted": -150.544
+                },
+                {
+                  "tick": 432,
+                  "msBeforeCurrentAccepted": -100.642
+                },
+                {
+                  "tick": 432,
+                  "msBeforeCurrentAccepted": -51.505
+                },
+                {
+                  "tick": 438,
+                  "msBeforeCurrentAccepted": -0.513
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 480,
+              "toTick": 480,
+              "step": 0,
+              "rxIntervalMs": 49.3,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 474,
+                  "msBeforeCurrentAccepted": -150.318
+                },
+                {
+                  "tick": 477,
+                  "msBeforeCurrentAccepted": -100.529
+                },
+                {
+                  "tick": 480,
+                  "msBeforeCurrentAccepted": -49.828
+                },
+                {
+                  "tick": 480,
+                  "msBeforeCurrentAccepted": -0.497
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 480,
+              "toTick": 486,
+              "step": 6,
+              "rxIntervalMs": 50.5,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 477,
+                  "msBeforeCurrentAccepted": -151.029
+                },
+                {
+                  "tick": 480,
+                  "msBeforeCurrentAccepted": -100.328
+                },
+                {
+                  "tick": 480,
+                  "msBeforeCurrentAccepted": -50.997
+                },
+                {
+                  "tick": 486,
+                  "msBeforeCurrentAccepted": -0.381
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 555,
+              "toTick": 555,
+              "step": 0,
+              "rxIntervalMs": 48.9,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 549,
+                  "msBeforeCurrentAccepted": -149.958
+                },
+                {
+                  "tick": 552,
+                  "msBeforeCurrentAccepted": -99.758
+                },
+                {
+                  "tick": 555,
+                  "msBeforeCurrentAccepted": -49.311
+                },
+                {
+                  "tick": 555,
+                  "msBeforeCurrentAccepted": -0.333
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 555,
+              "toTick": 561,
+              "step": 6,
+              "rxIntervalMs": 51,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 552,
+                  "msBeforeCurrentAccepted": -150.758
+                },
+                {
+                  "tick": 555,
+                  "msBeforeCurrentAccepted": -100.311
+                },
+                {
+                  "tick": 555,
+                  "msBeforeCurrentAccepted": -51.333
+                },
+                {
+                  "tick": 561,
+                  "msBeforeCurrentAccepted": -0.429
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 579,
+              "toTick": 579,
+              "step": 0,
+              "rxIntervalMs": 49.7,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 573,
+                  "msBeforeCurrentAccepted": -149.93
+                },
+                {
+                  "tick": 576,
+                  "msBeforeCurrentAccepted": -99.929
+                },
+                {
+                  "tick": 579,
+                  "msBeforeCurrentAccepted": -50.207
+                },
+                {
+                  "tick": 579,
+                  "msBeforeCurrentAccepted": -0.476
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 582,
+              "toTick": 588,
+              "step": 6,
+              "rxIntervalMs": 50.5,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 579,
+                  "msBeforeCurrentAccepted": -150.707
+                },
+                {
+                  "tick": 579,
+                  "msBeforeCurrentAccepted": -100.976
+                },
+                {
+                  "tick": 582,
+                  "msBeforeCurrentAccepted": -50.978
+                },
+                {
+                  "tick": 588,
+                  "msBeforeCurrentAccepted": -0.363
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 603,
+              "toTick": 603,
+              "step": 0,
+              "rxIntervalMs": 49.2,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 597,
+                  "msBeforeCurrentAccepted": -149.91
+                },
+                {
+                  "tick": 600,
+                  "msBeforeCurrentAccepted": -99.408
+                },
+                {
+                  "tick": 603,
+                  "msBeforeCurrentAccepted": -49.566
+                },
+                {
+                  "tick": 603,
+                  "msBeforeCurrentAccepted": -0.448
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 603,
+              "toTick": 609,
+              "step": 6,
+              "rxIntervalMs": 51,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 600,
+                  "msBeforeCurrentAccepted": -150.408
+                },
+                {
+                  "tick": 603,
+                  "msBeforeCurrentAccepted": -100.566
+                },
+                {
+                  "tick": 603,
+                  "msBeforeCurrentAccepted": -51.448
+                },
+                {
+                  "tick": 609,
+                  "msBeforeCurrentAccepted": -0.454
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 738,
+              "toTick": 738,
+              "step": 0,
+              "rxIntervalMs": 49.3,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 732,
+                  "msBeforeCurrentAccepted": -150.161
+                },
+                {
+                  "tick": 735,
+                  "msBeforeCurrentAccepted": -100.11
+                },
+                {
+                  "tick": 738,
+                  "msBeforeCurrentAccepted": -49.787
+                },
+                {
+                  "tick": 738,
+                  "msBeforeCurrentAccepted": -0.505
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 741,
+              "toTick": 747,
+              "step": 6,
+              "rxIntervalMs": 50.3,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 738,
+                  "msBeforeCurrentAccepted": -149.987
+                },
+                {
+                  "tick": 738,
+                  "msBeforeCurrentAccepted": -100.705
+                },
+                {
+                  "tick": 741,
+                  "msBeforeCurrentAccepted": -50.706
+                },
+                {
+                  "tick": 747,
+                  "msBeforeCurrentAccepted": -0.393
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 780,
+              "toTick": 780,
+              "step": 0,
+              "rxIntervalMs": 49.1,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 774,
+                  "msBeforeCurrentAccepted": -149.554
+                },
+                {
+                  "tick": 777,
+                  "msBeforeCurrentAccepted": -99.697
+                },
+                {
+                  "tick": 780,
+                  "msBeforeCurrentAccepted": -49.525
+                },
+                {
+                  "tick": 780,
+                  "msBeforeCurrentAccepted": -0.433
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 780,
+              "toTick": 786,
+              "step": 6,
+              "rxIntervalMs": 50.2,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 777,
+                  "msBeforeCurrentAccepted": -149.897
+                },
+                {
+                  "tick": 780,
+                  "msBeforeCurrentAccepted": -99.725
+                },
+                {
+                  "tick": 780,
+                  "msBeforeCurrentAccepted": -50.633
+                },
+                {
+                  "tick": 786,
+                  "msBeforeCurrentAccepted": -0.525
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 840,
+              "toTick": 840,
+              "step": 0,
+              "rxIntervalMs": 50,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 834,
+                  "msBeforeCurrentAccepted": -149.813
+                },
+                {
+                  "tick": 837,
+                  "msBeforeCurrentAccepted": -100.466
+                },
+                {
+                  "tick": 840,
+                  "msBeforeCurrentAccepted": -50.446
+                },
+                {
+                  "tick": 840,
+                  "msBeforeCurrentAccepted": -0.439
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 840,
+              "toTick": 846,
+              "step": 6,
+              "rxIntervalMs": 50.5,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 837,
+                  "msBeforeCurrentAccepted": -150.966
+                },
+                {
+                  "tick": 840,
+                  "msBeforeCurrentAccepted": -100.946
+                },
+                {
+                  "tick": 840,
+                  "msBeforeCurrentAccepted": -50.939
+                },
+                {
+                  "tick": 846,
+                  "msBeforeCurrentAccepted": -0.498
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 861,
+              "toTick": 861,
+              "step": 0,
+              "rxIntervalMs": 49.8,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 855,
+                  "msBeforeCurrentAccepted": -149.534
+                },
+                {
+                  "tick": 858,
+                  "msBeforeCurrentAccepted": -100.143
+                },
+                {
+                  "tick": 861,
+                  "msBeforeCurrentAccepted": -50.166
+                },
+                {
+                  "tick": 861,
+                  "msBeforeCurrentAccepted": -0.448
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 861,
+              "toTick": 867,
+              "step": 6,
+              "rxIntervalMs": 50.1,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 858,
+                  "msBeforeCurrentAccepted": -150.243
+                },
+                {
+                  "tick": 861,
+                  "msBeforeCurrentAccepted": -100.266
+                },
+                {
+                  "tick": 861,
+                  "msBeforeCurrentAccepted": -50.548
+                },
+                {
+                  "tick": 867,
+                  "msBeforeCurrentAccepted": -0.5
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 993,
+              "toTick": 993,
+              "step": 0,
+              "rxIntervalMs": 49.3,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 987,
+                  "msBeforeCurrentAccepted": -150.056
+                },
+                {
+                  "tick": 990,
+                  "msBeforeCurrentAccepted": -99.937
+                },
+                {
+                  "tick": 993,
+                  "msBeforeCurrentAccepted": -49.739
+                },
+                {
+                  "tick": 993,
+                  "msBeforeCurrentAccepted": -0.442
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 993,
+              "toTick": 999,
+              "step": 6,
+              "rxIntervalMs": 50.4,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 990,
+                  "msBeforeCurrentAccepted": -150.337
+                },
+                {
+                  "tick": 993,
+                  "msBeforeCurrentAccepted": -100.139
+                },
+                {
+                  "tick": 993,
+                  "msBeforeCurrentAccepted": -50.842
+                },
+                {
+                  "tick": 999,
+                  "msBeforeCurrentAccepted": -0.455
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 1029,
+              "toTick": 1029,
+              "step": 0,
+              "rxIntervalMs": 49.8,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 1023,
+                  "msBeforeCurrentAccepted": -149.638
+                },
+                {
+                  "tick": 1026,
+                  "msBeforeCurrentAccepted": -100.191
+                },
+                {
+                  "tick": 1029,
+                  "msBeforeCurrentAccepted": -50.301
+                },
+                {
+                  "tick": 1029,
+                  "msBeforeCurrentAccepted": -0.483
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "repeated-tick-was-transmitted-by-server"
+            },
+            {
+              "fromTick": 1029,
+              "toTick": 1035,
+              "step": 6,
+              "rxIntervalMs": 50.9,
+              "intermediateSuccessfulServerSends": [],
+              "actualServerTransmissionsAroundEvent": [
+                {
+                  "tick": 1026,
+                  "msBeforeCurrentAccepted": -151.091
+                },
+                {
+                  "tick": 1029,
+                  "msBeforeCurrentAccepted": -101.201
+                },
+                {
+                  "tick": 1029,
+                  "msBeforeCurrentAccepted": -51.383
+                },
+                {
+                  "tick": 1035,
+                  "msBeforeCurrentAccepted": -0.441
+                }
+              ],
+              "bothReceivedTicksMatchSuccessfulServerTx": true,
+              "classification": "six-tick-jump-was-transmitted-by-server"
+            }
+          ],
+          "maxServerSendGapMs": 51.046,
+          "maxClientReceiptGapMs": 51.4,
+          "receiptGapP95Ms": 50.8,
+          "serverOutputToClientObservedDeltaP95Ms": 0.541,
+          "serverOutputToClientObservedDeltaMaxMs": 2.256,
+          "sampledOriginalClockDebtP95Ms": 0,
+          "sampledOriginalClockDebtMaxMs": 27.55,
+          "originalGameFrameCallbackP95Ms": 1.8,
+          "callbackGapOver33": 0,
+          "longTasks": 0,
+          "originalHudSnapshot": "Extra render lag p50 0ms · p95 0ms ",
+          "originalAuthStatus": "Online - player #4 - server tick 339",
+          "recordedPlayerInputs": true
+        }
+      ]
+    }
+  ]
+}
