@@ -1,0 +1,68 @@
+{
+  "purpose": "source-only real browser Canvas art review—not gameplay",
+  "version": 1,
+  "sourceFiles": {
+    "/web/prealpha-arena-lite-review.html": "e706fa6073f36a0cdbe47d60cb85970cbb271ca679eb21a60ecadc91abeb8699",
+    "/src/browser/prealpha-arena-lite-floor.mjs": "1b8134a7daa8e833a0fe9fd24fb2c1e394a500aaaed36d8a4f4481e1a6880a9e"
+  },
+  "trials": [
+    {
+      "engine": "chrome",
+      "browser": "Chrome/154.0.8037.99",
+      "screenshot": "original_arena_vs_lite_chrome.png",
+      "screenshotSha256": "f0dac43831265b750d5f20d8da4c84a0df8093ba4e1c09dca801391d6b1ec1f6",
+      "pageErrors": [],
+      "pixels": {
+        "original": {
+          "width": 960,
+          "height": 540,
+          "meanLuminance": 26.925887524705377,
+          "centerLuminance": 26.086531372547327,
+          "minLuminance": 25.2046,
+          "maxLuminance": 70.5456
+        },
+        "candidate": {
+          "width": 960,
+          "height": 540,
+          "meanLuminance": 67.53117577777894,
+          "centerLuminance": 63.377496004898305,
+          "minLuminance": 29.4894,
+          "maxLuminance": 119.9588
+        }
+      },
+      "reviewOnly": true,
+      "gameplayModified": false
+    },
+    {
+      "engine": "firefox",
+      "browser": "firefox/153.4.0",
+      "screenshot": "original_arena_vs_lite_firefox.png",
+      "screenshotSha256": "9b840422dcf869407e1dcd0fce24fcc7e1a4e14deebca5c172d61bc78f04762b",
+      "pageErrors": [],
+      "pixels": {
+        "original": {
+          "width": 960,
+          "height": 540,
+          "meanLuminance": 26.908120611124982,
+          "centerLuminance": 26.084968137253217,
+          "minLuminance": 25.2046,
+          "maxLuminance": 70.33299999999998
+        },
+        "candidate": {
+          "width": 960,
+          "height": 540,
+          "meanLuminance": 67.70669523456876,
+          "centerLuminance": 63.730231789211246,
+          "minLuminance": 28.489399999999996,
+          "maxLuminance": 119.9588
+        }
+      },
+      "reviewOnly": true,
+      "gameplayModified": false
+    }
+  ],
+  "allNativeSucceeded": true,
+  "realMultiplayerAccepted": false,
+  "preAlphaDefaultChanged": false,
+  "productionApproved": false
+}
