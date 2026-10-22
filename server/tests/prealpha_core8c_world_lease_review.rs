@@ -288,3 +288,57 @@ fn server_world_death_event_retires_victims_gesture_before_followup_release() {
         ReviewEdgeStatus::Retired
     );
 }
+
+
+#[test]
+fn real_match_win_retires_unspent_spectator_press_before_next_round() {
+    let mut world = World::new(900.0, 500.0);
+    assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+    assert!(world.add_player_at(2, 236.0, 200.0, 0.0));
+    assert!(world.add_player_at(3, 700.0, 320.0, 0.0));
+    let observer = lease(3, 3, 300);
+    let mut adapter = ReviewWorldLease::review_from_admitted_world(&world, observer).unwrap();
+    assert_eq!(
+        adapter.review_ingest(&world, observer, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    for round in 0..5 {
+        if round != 0 {
+            assert!(world.remove_player(2));
+            assert!(world.add_player_at(2, 236.0, 200.0, 0.0));
+        }
+        let mut death_seen = false;
+        for tick in 0..220 {
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: tick % 35 == 0,
+                    ..InputIntent::default()
+                }
+            ));
+            let events = world.step();
+            adapter.observe_world_tick(&world);
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Death {
+                        fighter: 2,
+                        killer: 1
+                    }
+                )
+            }) {
+                death_seen = true;
+                break;
+            }
+        }
+        assert!(death_seen, "real Combat World must resolve every kill");
+    }
+    assert_eq!(world.fighter(1).unwrap().kills, 5);
+    assert!(world.match_over(), "actual 5-kill FFA must enter match-over");
+    assert!(adapter.is_retired(), "past-round queued gestures must retire");
+    assert_eq!(adapter.pending_count(), 0);
+    assert_eq!(
+        adapter.review_ingest(&world, observer, &wire(GestureAction::Release, 2, 1)),
+        ReviewEdgeStatus::Retired
+    );
+}
