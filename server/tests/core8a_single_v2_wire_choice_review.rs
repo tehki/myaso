@@ -103,3 +103,94 @@ fn unselected_core8c_wire_wrong_epoch_bad_source_and_zero_identity_stay_denied()
         Err("not a sixteen-byte envelope")
     );
 }
+
+fn shared_selected_family_bytes(name: &str) -> [u8; 16] {
+    let fixture = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/core8a-p723-selected-family-v2.golden"
+    ));
+    let hex = fixture
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .find_map(|(key, value)| (key == name).then_some(value))
+        .expect("named immutable JS/Rust golden fixture");
+    assert_eq!(hex.len(), 32, "exact 16-byte wire vector for {name}");
+    let mut result = [0u8; 16];
+    for (i, byte) in result.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
+            .expect("lowercase hex fixture is byte-aligned");
+    }
+    result
+}
+
+#[test]
+fn selected_family_shared_fixture_matches_original_combat4_rust_codec_and_review_only_key_e() {
+    // Exactly the same independent fixture Node reads. Original unchanged
+    // Combat4 decoder must continue refusing source=1, and runtime QUIC v2
+    // must remain disabled until Main and all source owners approve the ABI.
+    let cases = [
+        ("LMB_PRESS", 0, 1, 1, 1, 42),
+        ("LMB_RELEASE", 0, 3, 2, 1, 42),
+        ("KEY_E_PRESS", 1, 1, 3, 2, 43),
+        ("KEY_E_RELEASE", 1, 3, 4, 2, 44),
+        ("KEY_E_CANCEL", 1, 4, 5, 2, 45),
+        ("LMB_UPGRADE", 0, 2, 6, 3, 42),
+        ("LMB_CANCEL", 0, 4, 7, 3, 42),
+    ];
+    for (name, source, action, sequence, gesture_id, tick) in cases {
+        let bytes = shared_selected_family_bytes(name);
+        assert_eq!(
+            review_decode(&bytes),
+            Ok((source, action, sequence, gesture_id, tick)),
+            "{name} review layout"
+        );
+        if source == 1 {
+            assert_eq!(
+                decode_event(&bytes),
+                Err(DecodeError::Reserved),
+                "{name} must stay rejected by old decoder"
+            );
+        } else {
+            let original = decode_event(&bytes).expect("original source0 LMB codec");
+            assert_eq!(
+                (
+                    original.action as u8,
+                    original.sequence,
+                    original.gesture_id,
+                    original.client_tick
+                ),
+                (action, sequence, gesture_id, tick)
+            );
+        }
+    }
+    for (name, status) in [
+        ("ACK_ACCEPTED", AckStatus::Accepted),
+        ("ACK_DUPLICATE", AckStatus::Duplicate),
+        ("ACK_STALE", AckStatus::Stale),
+        ("ACK_REJECTED", AckStatus::Rejected),
+    ] {
+        let ack = GestureAck {
+            status,
+            sequence: 3,
+            gesture_id: 2,
+            server_tick: 50,
+        };
+        assert_eq!(
+            encode_ack(ack),
+            Ok(shared_selected_family_bytes(name)),
+            "{name} agrees with JS encoder"
+        );
+    }
+    for name in [
+        "BAD_KEY_E_UPGRADE",
+        "BAD_UNKNOWN_SOURCE",
+        "BAD_UNSELECTED_52",
+    ] {
+        assert!(review_decode(&shared_selected_family_bytes(name)).is_err());
+    }
+    let bad_ack = shared_selected_family_bytes("BAD_ACK_SOURCE");
+    assert_eq!((bad_ack[0], bad_ack[1], bad_ack[3]), (2, 0x12, 1));
+    // The old Rust source does NOT implement an ACK decoder; source byte3=1
+    // is specified as malformed for future ACK ingress and independently
+    // rejected by the original JavaScript ACK decoder in the same fixture.
+}
