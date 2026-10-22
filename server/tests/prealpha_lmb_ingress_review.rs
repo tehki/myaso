@@ -91,6 +91,27 @@ fn accepted_retransmit_acks_duplicate_not_second_combat_edge() {
 }
 
 #[test]
+fn accepted_sequence_replay_with_changed_action_or_tick_is_not_a_duplicate_ack() {
+    for tampered in [
+        event(GestureAction::Release, 1, 1, 777),
+        event(GestureAction::Press, 1, 1, 778),
+    ] {
+        let l = lease(1, 5, 100);
+        let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
+        accepted(gate.review_ingest(l, &event(GestureAction::Press, 1, 1, 777), 50), &[(1, 1)]);
+        match gate.review_ingest(l, &tampered, 51) {
+            IngressResult::Rejected(Some(ack)) => {
+                assert_eq!(ack.status, AckStatus::Rejected);
+                assert_eq!(ack.sequence, 1);
+            }
+            other => panic!("equivocal accepted-event replay was not denied: {other:?}"),
+        }
+        assert!(gate.is_closed());
+        assert_eq!(gate.accepted_count(), 1);
+    }
+}
+
+#[test]
 fn old_actor_lease_and_connection_nonce_can_never_drive_new_actor() {
     let old = lease(4, 8, 88);
     let current = lease(4, 9, 99);
