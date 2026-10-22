@@ -63,11 +63,21 @@ async function snapshot(session){
     +"const tick=status.match(/server tick ([0-9]+)/);"
     +"const samples=diag.match(/Samples ([0-9]+)/);"
     +"return {status,serverTick:tick?Number(tick[1]):0,samples:samples?Number(samples[1]):0,"
-    +"roster:rows.map(r=>r.textContent),own:rows.filter(r=>r.dataset.own==='true').length,"
+    +"roster:rows.map(r=>r.textContent),rosterIds:rows.map(r=>r.querySelector('span')?.textContent),"
+    +"own:rows.filter(r=>r.dataset.own==='true').length,"
+    +"ownedId:rows.find(r=>r.dataset.own==='true')?.querySelector('span')?.textContent,"
+    +"playerId:Number(status.match(/Online - player #([0-9]+)/)?.[1]||0),"
     +"canvas:!!document.querySelector('canvas#arena'),"
     +"chatRoot:!!document.querySelector('[data-local-chat],.local-chat'),"
     +"chatInput:!!document.querySelector('.local-chat-input'),"
     +"diagnostics:diag};");
+}
+function exactRustRoster(state,playerOrdinal,requireAllFour=false){
+  if(state.playerId!==playerOrdinal||state.own!==1
+    ||state.ownedId!=="#"+playerOrdinal)return false;
+  if(!requireAllFour)return true;
+  return state.rosterIds.length===4
+    &&state.rosterIds.every((label,index)=>label==="#"+(index+1));
 }
 async function nativeMove(session){
   await evaljs(session,"document.querySelector('#arena').focus();");
@@ -127,7 +137,7 @@ try{
     await wd("POST","/session/"+session+"/url",{url});
     const state=await poll("real admitted fighter "+(i+1),async()=>{
       const state=await snapshot(session);
-      return {ok:state.serverTick>0&&state.own===1&&state.canvas
+      return {ok:state.serverTick>0&&exactRustRoster(state,i+1)&&state.canvas
         &&state.samples>0,value:state};
     },18000);
     assert.equal(state.value.chatRoot,false,"unapproved URL chatC1=1 must not create chat UI");
@@ -138,7 +148,7 @@ try{
   const initial=await Promise.all(sessions.map((session,i)=>poll(
     "four genuine server fighters visible on "+browsers[i],async()=>{
       const s=await snapshot(session);
-      return {ok:s.roster.length===4&&s.own===1&&s.serverTick>0
+      return {ok:exactRustRoster(s,i+1,true)&&s.serverTick>0
         &&s.samples>0&&!s.chatRoot&&!s.chatInput,value:s};
     },15000)));
   for(let i=0;i<sessions.length;i++){
@@ -149,7 +159,7 @@ try{
       const now=await snapshot(session),before=initial[i].value;
       const advancingSamples=now.samples>before.samples;
       const cappedWindow=before.samples>=94&&now.samples===96;
-      return {ok:now.roster.length===4&&now.own===1&&!now.chatRoot&&!now.chatInput
+      return {ok:exactRustRoster(now,i+1,true)&&!now.chatRoot&&!now.chatInput
         &&now.serverTick>before.serverTick+3&&now.samples>0
         &&(advancingSamples||cappedWindow),value:now};
     },12000)));
@@ -160,6 +170,8 @@ try{
       originalServerTicksBefore:initial.map(v=>v.value.serverTick),
       originalServerTicksAfter:final.map(v=>v.value.serverTick),
       perBrowserAckSamples:final.map(v=>v.value.samples),
+      uniqueRealServerActorIds:final.map(v=>v.value.playerId),
+      exactFourServerScoreboard:true,
       physicalSwordEvidence:false,independentClientHosts:false,
       scope:"original Pre-Alpha arena, four actual W3C browsers, one local Rust server"}));
 }catch(error){
