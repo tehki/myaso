@@ -349,6 +349,51 @@ try {
   bothReturningAndRemainingClientsMovedWithServerAcks:true,
   bfcacheRestoreTested:false,
  }));
+ // Distinct history-navigation path: the real browser currently owns #7,
+ // navigates away and then presses the browser Back control. This can use a
+ // fresh document OR BFCache; in neither case may it reuse a retired QUIC
+ // connection, stale actor ID #7 or resurrect #2/#5/#6. The existing
+ // pageshow.persisted branch is defensive; do not claim BFCache restoration
+ // was actually observed unless a browser truly uses it.
+ const historyBackStart=Date.now();
+ await wd("POST","/session/"+b+"/url",{url:"about:blank"});
+ await wd("POST","/session/"+b+"/back",{});
+ const historyActor=await poll("authentic browser Back must admit fresh actor #8",
+   async()=>evaljs(b,
+    "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #8 - server tick \\d+/.test(x),status:x,navType:performance.getEntriesByType('navigation')?.[0]?.type||'unknown'};"),14000);
+ const historyBackElapsedMs=Date.now()-historyBackStart;
+ await originalShortUi(b,shortTargets[1],"browser genuine Back actor 8");
+ assert(historyBackElapsedMs<16000,
+   "Back after voluntary quit must not restore stale session or wait QUIC idle timeout");
+ console.log("CORE8C_UI10_HISTORY_BACK_NEW_ACTOR",JSON.stringify({
+  ...historyActor,elapsedMs:historyBackElapsedMs,retiredActor:7,returnedActor:8,
+ }));
+ const backReconciled=[];
+ for(const sid of surviving){
+  const q=await poll("real browser Back must remove #2/#5/#6/#7 and draw #8",
+   async()=>{
+    const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
+    return {...v,ok:v?.roster?.length===4&&[1,3,4,8].every(id=>rosterHas(v.roster,id))
+      &&[2,5,6,7].every(id=>!rosterHas(v.roster,id))&&frames.length>=8
+      &&frames.filter(frame=>frame.ids.includes("#8")
+        &&[2,5,6,7].every(id=>!frame.ids.includes("#"+id))&&frame.silvers===4
+        &&frame.ids.length>=3).length>=8};
+   },12000);
+  backReconciled.push({roster:q.roster,frames:q.frames.slice(-8).map(frame=>frame.ids)});
+  const ack=await realWasdAndAck(sid,"post-history-back","s");
+  console.log("CORE8C_HISTORY_BACK_SURVIVOR_ACK",JSON.stringify(ack));
+ }
+ const backClientAck=await realWasdAndAck(b,"history-back-actor8","s");
+ console.log("CORE8C_UI10_HISTORY_BACK_PASS",JSON.stringify({
+  actualNativeWebDriverBack:true,historyNavigationType:historyActor.navType,
+  previousActor:7,freshServerOwnedActor:8,elapsedMs:historyBackElapsedMs,
+  originalNativeMatrix:browserMatrix,
+  noRetiredActorGhosts:[2,5,6,7],
+  authoritativeCanvasesAndScoreboards:backReconciled,
+  bothReturningAndSurvivingClientInputAck:true,
+  bfcachePersistenceNotAsserted:true,
+  returningClientAck:backClientAck,
+ }));
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
   initialActorIds:[1,2,3,4],disconnectedActorId:2,replacementActorId:5,
