@@ -17,9 +17,11 @@ p.add_argument("--plant-kick",action="store_true",help="Correct original Blender
 p.add_argument("--spartan-kick",action="store_true",help="Opt-in cinematic high-knee front push-kick, grounded source-only; unchanged Combat authority")
 p.add_argument("--spartan-high-forward",action="store_true",help="Owner-approved silhouette: higher knee-to-chest chamber and farther boot thrust using natural 22-bone hip drive; preview only")
 p.add_argument("--spartan-contact-recoil-v3",action="store_true",help="Further refine authentic Silver armored high-knee contact and knee-return between exact Combat action phase boundaries; source art only")
+p.add_argument("--spartan-v3-readable-light",action="store_true",help="Isolated authentic V3 source lighting/contrast comparison; not default game art or approval")
 p.add_argument("--samples",type=int,default=1)
 p.add_argument("--engine",choices=["CYCLES","BLENDER_EEVEE_NEXT"],default="CYCLES")
 args=p.parse_args(argv)
+assert not args.spartan_v3_readable_light or args.spartan_contact_recoil_v3, "Readability study needs unchanged Spartan V3 source"
 source=Path(args.source).resolve();out=Path(args.output).resolve()
 assert source.is_file()
 out.mkdir(parents=True,exist_ok=True)
@@ -300,10 +302,10 @@ world=sc.world or bpy.data.worlds.new("P0 source-asset preview studio")
 sc.world=world;world.use_nodes=True
 bg=world.node_tree.nodes.get("Background")
 bg.inputs["Color"].default_value=(.45,.5,.57,1)
-bg.inputs["Strength"].default_value=.65
+bg.inputs["Strength"].default_value=.88 if args.spartan_v3_readable_light else .65
 for name,loc,power,color in [
- ("Key",(1.4,-1.7,3.3),210,(1,.90,.78)),
- ("Fill",(-1.4,1.1,2.7),180,(.73,.82,1))]:
+ ("Key",(1.4,-1.7,3.3),295 if args.spartan_v3_readable_light else 210,(1,.90,.78)),
+ ("Fill",(-1.4,1.1,2.7),280 if args.spartan_v3_readable_light else 180,(.73,.82,1))]:
  light=bpy.data.lights.new(name,"AREA")
  ob=bpy.data.objects.new(name,light);sc.collection.objects.link(ob)
  ob.location=loc
@@ -365,6 +367,7 @@ if not (args.smoke or args.smoke_fast):
  "spartanHighForwardRevisionOptIn":args.spartan_high_forward,
  "spartanContactRecoilV3OptIn":args.spartan_contact_recoil_v3,
  "sourceActionKeys":[{"blenderFrame":fr,"sourceMs":round((fr-1.0)/60*1000,3)} for fr,_,_ in kickKeys],
+ "sourceLightingStudy": {"enabled":args.spartan_v3_readable_light,"worldStrength":.88 if args.spartan_v3_readable_light else .65,"keyEnergy":295 if args.spartan_v3_readable_light else 210,"fillEnergy":280 if args.spartan_v3_readable_light else 180,"noGameplayOrPhysicsModification":True,"humanArtApproval":False},
  "worldGroundValidated":False,
  "originalArtReplaced":False,"realGreyhaven":False,"humanVisualApproved":False,
  "trueServerEvent":False,"sourceEditableBlend":not args.smoke,
