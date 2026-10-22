@@ -203,3 +203,36 @@ cryptographic identity, real ownership or an item writer. Magic #424 still
 rejects 4/5 occupied slots on checkpoint decode and needs owner repair.
 No runtime Loot, Combat, database, World, first Pre-Alpha, migration or
 production side effects are introduced.
+
+## 2026-10-22 — optional source ID/kind/amount/allocator consistency gate
+
+Original Magic #424 source `loot_persistence.rs` serializes **ItemStack** as
+`id:u64 little-endian`, `kind:u8`, `amount:u16 little-endian`; the
+`LootStateSnapshot` validator rejects zero item amounts and amounts >1
+for all non-stackable kinds, requires nonzero unique IDs strictly below its
+`next_id`, and refuses wrong kinds in equipped slots.
+
+The earlier #766 equipment preflight uses its `LegacyEquippedRow`'s own
+kind-code as caller-supplied data, so a valid slot could be paired with a
+*different* valid kind from the source, e.g. IronSword→WoodenClub in MainHand.
+This offline-only child adds `LegacySourceItemCatalog::new(import, next_id,
+source_item_rows)` and `preflight_equipment_manifest_against_source` to
+compare exact source ID + disk kind + amount + checked allocator-bound and
+registered canonical item ID before any *proposed* equipment mapping. The
+catalog rejects duplicate source item records, invalid ID/kind/amount and
+missing registrations; a bound equipment row cannot substitute another
+valid source kind or invent an absent record. Each equipped source item must
+have amount=1. Stackable source items may retain amount>1 as non-equipped
+records. The original simpler helper remains for comparative/offline tests.
+
+**Crucial trust limit:** both catalog and equipment rows are input from an
+external source scan. This check does not attest the scan, prove its
+completeness or freshness, authenticate the actor, validate World position,
+settle split writers or commit MYTX/PG. In particular an internally coherent
+forgery or rollback can still pass. Only a quiesced, authenticated,
+anti-rollback source with full active+retired inventory and one approved
+global epoch-fenced writer may be considered later for migration.
+
+No live Magic/Items serializer fix, item writer, protected workflow gate
+change, Combat, browser, server listener, database migration or Pre-Alpha
+release change is included.
