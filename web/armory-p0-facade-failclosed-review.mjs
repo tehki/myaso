@@ -1,4 +1,5 @@
 import {prepareRedLionSourceArt,createRedLionArtGatedWorldPainter} from "../src/browser/red-lion-original-art-readiness.mjs";
+import {paintRedLionFrameInScratch} from "../src/browser/red-lion-atomic-frame-qa.mjs";
 import {createAuthoredWorldRenderer} from "/__3cp37__/src/browser/authored-world-renderer.mjs";
 import {normalizeWorldBuildingReplacementIds} from "/__world521__/src/world/building-presentation.mjs";
 import {MAP_IDS} from "/__world521__/src/world/authored-maps.mjs";
@@ -30,19 +31,32 @@ try {
   options:{cacheCap:24,buildLimit:8}
  });
  const camera={x:4365,y:4075},w=640,z=.84;
- function frame(canvas,painter,fa=null){
-  const c=document.getElementById(canvas).getContext("2d",{willReadFrequently:true});
+ function frame(canvas,painter,fa=null,fault=false){
+  const c=canvas.getContext("2d",{willReadFrequently:true});
   c.save();c.translate(w/2,w/2);c.scale(z,z);c.translate(-w/2,-w/2);
   painter.draw(c,MAP_IDS.overworld,camera,w,w,z);c.restore();
   if(fa){
    const point=projectArenaPoint(4365,4075,camera.x,camera.y,w,w,z);
    c.drawImage(fa.day,point.x-114,point.y-269);
+   // QA-only deterministic late graphics exception AFTER the first real
+   // image was painted into a scratch buffer, not the visible destination.
+   if(fault)throw new Error("QA injected late Red Lion Canvas draw failure");
    c.drawImage(fa.roof,point.x-119,point.y-283);
   }
   return c.getImageData(0,0,w,w).data;
  }
- const baseline=frame("baseline",makePainter([]));
- const observed=frame("gated",decision.painter,decision.paintFacadeAllowed?art:null);
+ const baseline=frame(document.getElementById("baseline"),makePainter([]));
+ const injectedCanvasFailure=new URLSearchParams(location.search).get("lateCanvasFault")==="1";
+ const composed=paintRedLionFrameInScratch({
+  destinationCanvas:document.getElementById("gated"),
+  makeScratch:(width,height)=>{
+   const e=document.createElement("canvas");e.width=width;e.height=height;return e;
+  },
+  preferDetailed:decision.paintFacadeAllowed,
+  paintDetailed:canvas=>frame(canvas,decision.painter,art,injectedCanvasFailure),
+  paintPlaceholder:canvas=>frame(canvas,makePainter([]))
+ });
+ const observed=document.getElementById("gated").getContext("2d",{willReadFrequently:true}).getImageData(0,0,w,w).data;
  let changed=0;
  for(let i=0;i<baseline.length;i+=4)
   if(baseline[i]!==observed[i]||
@@ -53,11 +67,14 @@ try {
  window.__redLionFallbackReview=Object.freeze({
   ready:true,artReady:ready,
   actualBrowserImageDecode:ready,
-  fallbackDefaultPlaceholder:decision.fallbackDefaultPlaceholder,
-  replacementApplied:decision.paintFacadeAllowed,
-  replacedBuildingIds:[...decision.painter.replacedBuildingIds],
+  fallbackDefaultPlaceholder:composed.placeholderDrawn,
+  replacementApplied:composed.detailedDrawn,
+  replacedBuildingIds:composed.detailedDrawn?[...decision.painter.replacedBuildingIds]:[],
+  recoveredLateDrawError:composed.recoveredLateDetailedFailure,
+  injectedCanvasFailure,
+  stagingScratchOnly:true,
   originalFacadePixelsDifferentFromPlaceholder:changed,
-  fallbackPixelsIdenticalToOriginal:!ready&&changed===0,
+  fallbackPixelsIdenticalToOriginal:composed.placeholderDrawn&&changed===0,
   browserSourcePaths:paths,
   actorDepthVerified:false,
   gameRendererIntegrated:false,
@@ -65,7 +82,10 @@ try {
   lowEndChromiumIssueResolved:false,
   releaseApproved:false
  });
- status.textContent=ready?"All authentic facade images decoded; World validator enabled one replacement.":
+ status.textContent=composed.recoveredLateDetailedFailure?
+  "Original images decoded but late Canvas paint failed; entire World placeholder frame retained.":
+  composed.detailedDrawn?
+  "All authentic facade images decoded; World validator enabled one replacement.":
   "One original facade asset failed; World original placeholder kept.";
 }catch(e){
  status.textContent="Source contract error: "+String(e);
