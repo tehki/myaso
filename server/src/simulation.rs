@@ -1478,47 +1478,71 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
 fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
     let minimum_distance = FIGHTER_RADIUS * 2.0;
     let minimum_distance_sq = minimum_distance * minimum_distance;
-    for first_index in 0..fighters.len() {
-        for second_index in (first_index + 1)..fighters.len() {
-            let (first, second) = two_mut(fighters, first_index, second_index);
-            if first.action == Action::Dead || second.action == Action::Dead {
-                continue;
+    // Resolving a later pair can re-overlap an earlier pair. Revisit only while
+    // there is meaningful penetration, with a strict cap on collision work.
+    // This retains the original first-pass two-fighter displacement.
+    const MAX_SEPARATION_PASSES: usize = 64;
+    const SEPARATION_TOLERANCE: f32 = 0.005;
+    for _ in 0..MAX_SEPARATION_PASSES {
+        let mut significant_overlap = false;
+        for first_index in 0..fighters.len() {
+            for second_index in (first_index + 1)..fighters.len() {
+                let (first, second) = two_mut(fighters, first_index, second_index);
+                if first.action == Action::Dead || second.action == Action::Dead {
+                    continue;
+                }
+                let mut dx = second.x - first.x;
+                let mut dy = second.y - first.y;
+                if dx.abs() >= minimum_distance || dy.abs() >= minimum_distance {
+                    continue;
+                }
+                let distance_sq = dx * dx + dy * dy;
+                if distance_sq >= minimum_distance_sq {
+                    continue;
+                }
+                let mut distance = distance_sq.sqrt();
+                if distance_sq <= EPSILON * EPSILON {
+                    // Two coincident fighters at an arena edge must not keep
+                    // pushing into a clamped wall indefinitely.
+                    if first.x <= FIGHTER_RADIUS + EPSILON {
+                        dx = 1.0;
+                        dy = 0.0;
+                    } else if first.x >= width - FIGHTER_RADIUS - EPSILON {
+                        dx = -1.0;
+                        dy = 0.0;
+                    } else {
+                        dx = first.facing.cos();
+                        dy = first.facing.sin();
+                    }
+                    distance = 1.0;
+                }
+                let overlap = minimum_distance - distance;
+                if overlap > SEPARATION_TOLERANCE {
+                    significant_overlap = true;
+                }
+                let nx = dx / distance;
+                let ny = dy / distance;
+                let shift = overlap / 2.0;
+                first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
+                first.y = clamp(
+                    first.y - ny * shift,
+                    FIGHTER_RADIUS,
+                    height - FIGHTER_RADIUS,
+                );
+                second.x = clamp(
+                    second.x + nx * shift,
+                    FIGHTER_RADIUS,
+                    width - FIGHTER_RADIUS,
+                );
+                second.y = clamp(
+                    second.y + ny * shift,
+                    FIGHTER_RADIUS,
+                    height - FIGHTER_RADIUS,
+                );
             }
-            let mut dx = second.x - first.x;
-            let mut dy = second.y - first.y;
-            if dx.abs() >= minimum_distance || dy.abs() >= minimum_distance {
-                continue;
-            }
-            let distance_sq = dx * dx + dy * dy;
-            if distance_sq >= minimum_distance_sq {
-                continue;
-            }
-            let mut distance = distance_sq.sqrt();
-            if distance_sq <= EPSILON * EPSILON {
-                dx = first.facing.cos();
-                dy = first.facing.sin();
-                distance = 1.0;
-            }
-            let overlap = minimum_distance - distance;
-            let nx = dx / distance;
-            let ny = dy / distance;
-            let shift = overlap / 2.0;
-            first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
-            first.y = clamp(
-                first.y - ny * shift,
-                FIGHTER_RADIUS,
-                height - FIGHTER_RADIUS,
-            );
-            second.x = clamp(
-                second.x + nx * shift,
-                FIGHTER_RADIUS,
-                width - FIGHTER_RADIUS,
-            );
-            second.y = clamp(
-                second.y + ny * shift,
-                FIGHTER_RADIUS,
-                height - FIGHTER_RADIUS,
-            );
+        }
+        if !significant_overlap {
+            break;
         }
     }
 }
