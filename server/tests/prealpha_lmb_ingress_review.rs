@@ -144,7 +144,10 @@ fn stale_malformed_packets_cannot_poison_live_lease_or_held_out_of_order_edges()
     let release = event(GestureAction::Release, 2, 10, 1);
 
     // Hold a real future RELEASE until the current lease's PRESS arrives.
-    assert_eq!(gate.review_ingest(current, &release, 30), IngressResult::Deferred);
+    assert_eq!(
+        gate.review_ingest(current, &release, 30),
+        IngressResult::Deferred
+    );
     assert_eq!(gate.buffered_count(), 1);
 
     let mut wrong_version = press;
