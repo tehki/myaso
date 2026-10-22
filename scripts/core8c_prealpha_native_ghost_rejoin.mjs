@@ -146,24 +146,44 @@ try {
  sessionDriverPorts.set(newcomer,driverPorts.chrome);
  sessions.push(newcomer);
  await wd("POST","/session/"+newcomer+"/url",{url});
- // Browser termination is not a graceful QUIC close. Preserve a strict
- // real admission check but allow the actual QUIC idle-loss detector to run
- // instead of mislabeling a 15-second pre-timeout window as a permanent ghost.
- // Every retry is a real native browser navigation to the ORIGINAL lobby URL:
- // no server injection, actor creation, fixture, or artificial disconnect.
+ // Browser termination is not a graceful QUIC close; the kernel can
+ // discard the peer without a QUIC CONNECTION_CLOSE. Give each REAL
+ // WebDriver navigation a full bounded chance to reach either original
+ // "Online #5" OR server-reported admission failure, instead of reloading
+ // a possibly already-accepted client every 1.5 seconds and creating a
+ // false test-owned ghost in the scarce four-player admission gate.
  const disconnectedAt=Date.now();
  let newConnected=null;
- for(let attempt=1;attempt<=38;attempt++){
-  const q=await evaljs(newcomer,
-   "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),status:x};");
-  if(q.ok){newConnected={...q,attempt,elapsedMs:Date.now()-disconnectedAt};break;}
+ for(let attempt=1;attempt<=14&&Date.now()-disconnectedAt<94000;attempt++){
+  let observed={status:"uninitialized",ok:false};
+  const terminalAt=Date.now()+8200;
+  while(Date.now()<terminalAt){
+   observed=await evaljs(newcomer,
+    "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),failed:/Multiplayer connection failed/.test(x),status:x};");
+   if(observed.ok || observed.failed)break;
+   await delay(260);
+  }
+  if(observed.ok){
+   newConnected={...observed,attempt,elapsedMs:Date.now()-disconnectedAt};
+   break;
+  }
   console.log("CORE8C_BROWSER_FIFTH_CAPACITY_PENDING",JSON.stringify({
-   attempt,status:q.status,serverExited:server.exitCode!==null
+   attempt,elapsedMs:Date.now()-disconnectedAt,status:observed.status,
+   serverExited:server.exitCode!==null,
+   serverActorAnnouncements:[...stdout.matchAll(/assigned player (\\d+)/g)].map(x=>Number(x[1]))
   }));
-  await delay(1500);
-  await wd("POST","/session/"+newcomer+"/url",{url});
+  if(attempt<14&&Date.now()-disconnectedAt<94000){
+   await delay(700);
+   await wd("POST","/session/"+newcomer+"/url",{url});
+  }
  }
- assert(newConnected?.ok,"fifth real native browser must eventually admit under four-seat limit");
+ if(!newConnected?.ok){
+  console.error("CORE8C_FIFTH_ADMISSION_REAL_BROWSER_FAILURE",JSON.stringify({
+   serverExitCode:server.exitCode,serverStderrTail:stderr.slice(-2300),
+   serverStdoutTail:stdout.slice(-2300),elapsedMs:Date.now()-disconnectedAt
+  }));
+ }
+ assert(newConnected?.ok,"fifth real native browser must admit under original four-seat limit");
  console.log("CORE8C_BROWSER_NEW_ACTOR_CONNECTED",JSON.stringify(newConnected));
  // The original three authenticated sessions must also remain alive and
  // continue processing genuine v1 input ACKs after peer #2 departed.
