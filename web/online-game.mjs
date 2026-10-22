@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import { createPagehideTransportFence } from "../src/browser/pagehide-transport-fence.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -173,6 +174,7 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+const pagehideTransportFence = createPagehideTransportFence();
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -338,7 +340,11 @@ canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 // A voluntary tab/navigation exit should promptly retire its server-owned
 // gameplay admission lease. Losing OS/browser process still uses QUIC timeout.
-window.addEventListener("pagehide", () => networkClient?.close("pagehide"));
+window.addEventListener("pagehide", () => {
+  pagehideTransportFence.depart();
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  animationFrameId = 0;
+});
 // The closed transport cannot be reused if the browser restores a BFCache page.
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();
@@ -397,12 +403,14 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+// A departed page may complete authenticated QUIC admission late.
+const activeAfterAdmission = pagehideTransportFence.bind(networkClient);
 
 // Chat C1 uses the current authenticated WebTransport connection and separate
 // bounded reliable streams. Public requests require the operator-served
 // chatC1=1 config; localhost chatC1Preview=1 remains nonproduction-only.
 // Never let a missing/failed chat stream block damage, input or rendering.
-void import("../src/browser/chat-c1-activation.mjs")
+if (activeAfterAdmission) void import("../src/browser/chat-c1-activation.mjs")
   .then(({ isChatC1Eligible, activateChatC1Preview }) =>
     isChatC1Eligible(window.location)
       ? activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient })
@@ -773,6 +781,7 @@ function sampleInput() {
 }
 
 function simulatePrediction(stepMs) {
+  if (pagehideTransportFence.departed) return;
   sampleInput();
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
@@ -1844,7 +1853,10 @@ function createArenaLayer() {
 }
 
 function frame(now) {
-  if (document.hidden) return;
+  if (pagehideTransportFence.departed || document.hidden) {
+    animationFrameId = 0;
+    return;
+  }
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);
@@ -1859,6 +1871,7 @@ function frame(now) {
 
 function handleVisibilityChange() {
   releaseInputs();
+  if (pagehideTransportFence.departed) return;
   if (document.hidden) {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
@@ -1879,6 +1892,9 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-render();
-frameBudget.reset(performance.now());
-animationFrameId = requestAnimationFrame(frame);
+// Never start live Canvas/input or optional Chat on a departed connection.
+if (activeAfterAdmission) {
+  render();
+  frameBudget.reset(performance.now());
+  animationFrameId = requestAnimationFrame(frame);
+}
