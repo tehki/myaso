@@ -126,9 +126,7 @@ impl ReviewLmbIngress {
         let decoded = decode_event(packet);
         if current_trusted_lease != self.lease {
             return match decoded {
-                Ok(event) => {
-                    IngressResult::Stale(Self::ack(event, AckStatus::Stale, server_tick))
-                }
+                Ok(event) => IngressResult::Stale(Self::ack(event, AckStatus::Stale, server_tick)),
                 Err(_) => IngressResult::Rejected(None),
             };
         }
