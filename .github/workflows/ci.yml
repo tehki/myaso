@@ -1140,3 +1140,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
+
+  # P0 art proof must reach the REAL Rust server + two native browsers even
+  # when an independent, pre-existing Combat quality gate fails earlier.
+  # This is an ADDITIONAL required result, never a replacement for quality.
+  graphics3a-silver-authenticated:
+    name: graphics3a-real-silver-2p
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/p0-prealpha-silver-browser-review-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the exact review head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate original Silver real-server receipt rejects fabricated observations
+        run: |
+          node --check scripts/graphics3a-prealpha-silver-connected-receipt.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/prealpha-silver-connected-browser-receipt.test.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-silver-native-browser-evidence.test.mjs
+
+      - name: Validate native Chrome and Firefox can launch against local Rust server
+        run: |
+          node --version
+          rustc --version
+          cargo --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+
+      - name: Verify both authoritative human Silver bodies in real WebDriver browsers
+        env:
+          MYASO_PVP_SCENARIO: "uiidentity"
+          MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+        run: node scripts/pvp_browser_flight_runner.mjs
