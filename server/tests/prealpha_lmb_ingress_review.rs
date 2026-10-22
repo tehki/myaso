@@ -135,6 +135,51 @@ fn old_actor_lease_and_connection_nonce_can_never_drive_new_actor() {
 }
 
 #[test]
+fn stale_malformed_packets_cannot_poison_live_lease_or_held_out_of_order_edges() {
+    let current = lease(9, 11, 999);
+    let stale_generation = lease(9, 10, 998);
+    let different_actor = lease(10, 11, 999);
+    let mut gate = ReviewLmbIngress::new_from_trusted_admission(current);
+    let press = event(GestureAction::Press, 1, 10, 1);
+    let release = event(GestureAction::Release, 2, 10, 1);
+
+    // Hold a real future RELEASE until the current lease's PRESS arrives.
+    assert_eq!(gate.review_ingest(current, &release, 30), IngressResult::Deferred);
+    assert_eq!(gate.buffered_count(), 1);
+
+    let mut wrong_version = press;
+    wrong_version[0] = 1;
+    let mut wrong_wire_family = press;
+    wrong_wire_family[1] = 0x52;
+    for old in [stale_generation, different_actor] {
+        for malformed in [&[][..], &wrong_version[..], &wrong_wire_family[..]] {
+            // No ACK possible for malformed events, but the current lease
+            // MUST NOT be retired by bytes from another trusted connection.
+            assert_eq!(
+                gate.review_ingest(old, malformed, 31),
+                IngressResult::Rejected(None)
+            );
+            assert!(!gate.is_closed());
+            assert_eq!(gate.buffered_count(), 1);
+            assert_eq!(gate.accepted_count(), 0);
+        }
+    }
+
+    // Valid packets from a stale lease retain the existing STALE response,
+    // without consuming either pending event or changing the active lease.
+    match gate.review_ingest(stale_generation, &press, 32) {
+        IngressResult::Stale(ack) => assert_eq!(ack.status, AckStatus::Stale),
+        other => panic!("stale valid event had unexpected result: {other:?}"),
+    }
+    assert!(!gate.is_closed());
+
+    accepted(gate.review_ingest(current, &press, 33), &[(1, 10), (2, 10)]);
+    assert_eq!(gate.buffered_count(), 0);
+    assert_eq!(gate.accepted_count(), 2);
+    assert!(!gate.is_closed());
+}
+
+#[test]
 fn buffered_duplicate_keeps_one_edge_and_equivocal_payload_closes_fail_closed() {
     let l = lease(1, 1, 1);
     let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
