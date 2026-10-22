@@ -7,6 +7,9 @@ on:
       - "tests/fixtures/core8a-prealpha-v2-js-rust-wire.hex"
       - "tests/core8a-prealpha-v2-js-rust-wire.test.mjs"
       - "tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs"
+      - "tests/fixtures/core8a-prealpha-v2-22edge-window.hex"
+      - "tests/core8a-prealpha-v2-22edge-window.test.mjs"
+      - "server/tests/prealpha_lmb_22edge_wire_window_review.rs"
       - "server/tests/prealpha_lmb_js_wire_bridge_review.rs"
 
 permissions:
@@ -27,11 +30,13 @@ jobs:
           node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
       - name: Original Combat and Core 8A outbox plus new exact JS golden bytes
         run: |
-          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/core8a-prealpha-v2-js-rust-wire.test.mjs tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs
+          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/core8a-prealpha-v2-js-rust-wire.test.mjs tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs tests/core8a-prealpha-v2-22edge-window.test.mjs
       - name: All original Rust source formatting
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
       - name: Exact JavaScript event bytes enter original Rust review gate and ACK bytes return
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_js_wire_bridge_review
+      - name: Original 22 JS edge bytes obey Rust bounded gap, negative 18-ahead and duplicate ACK
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_22edge_wire_window_review
       - name: Original Rust replay regressions cannot regress
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
       - name: Strict Rust Clippy
