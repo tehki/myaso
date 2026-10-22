@@ -23,7 +23,7 @@ test("M144 sender telemetry includes idle samples and enforces prior 32-record c
 });
 
 test("M144 authentic input ACK observation remains read-only, bounded and actor-owned",()=>{
-  assert.match(browser,/onAck\(ack\) \{\s*\/\/ M144 only:/);
+  assert.match(browser,/onAck\(ack\) \{\s*\/\/ M144\/M156 only:/);
   assert.match(browser,/debug\.inputAckReceipts\s*\?\?= \[\];/);
   assert.match(browser,/processedClientTick: networkClient\?\.processedClientTick \?\? null/);
   assert.match(browser,/serverTick: networkClient\?\.latestServerTick \?\? null/);
