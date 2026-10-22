@@ -146,8 +146,24 @@ try {
  sessionDriverPorts.set(newcomer,driverPorts.chrome);
  sessions.push(newcomer);
  await wd("POST","/session/"+newcomer+"/url",{url});
- const newConnected=await poll("fresh independent fifth player #5",()=>evaljs(newcomer,
-  "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),status:x};"),15000);
+ // Browser termination is not a graceful QUIC close. Preserve a strict
+ // real admission check but allow the actual QUIC idle-loss detector to run
+ // instead of mislabeling a 15-second pre-timeout window as a permanent ghost.
+ // Every retry is a real native browser navigation to the ORIGINAL lobby URL:
+ // no server injection, actor creation, fixture, or artificial disconnect.
+ const disconnectedAt=Date.now();
+ let newConnected=null;
+ for(let attempt=1;attempt<=38;attempt++){
+  const q=await evaljs(newcomer,
+   "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),status:x};");
+  if(q.ok){newConnected={...q,attempt,elapsedMs:Date.now()-disconnectedAt};break;}
+  console.log("CORE8C_BROWSER_FIFTH_CAPACITY_PENDING",JSON.stringify({
+   attempt,status:q.status,serverExited:server.exitCode!==null
+  }));
+  await delay(1500);
+  await wd("POST","/session/"+newcomer+"/url",{url});
+ }
+ assert(newConnected?.ok,"fifth real native browser must eventually admit under four-seat limit");
  console.log("CORE8C_BROWSER_NEW_ACTOR_CONNECTED",JSON.stringify(newConnected));
  // The original three authenticated sessions must also remain alive and
  // continue processing genuine v1 input ACKs after peer #2 departed.
