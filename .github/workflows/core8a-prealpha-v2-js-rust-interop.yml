@@ -6,6 +6,7 @@ on:
       - ".github/workflows/core8a-prealpha-v2-js-rust-interop.yml"
       - "tests/fixtures/core8a-prealpha-v2-js-rust-wire.hex"
       - "tests/core8a-prealpha-v2-js-rust-wire.test.mjs"
+      - "tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs"
       - "server/tests/prealpha_lmb_js_wire_bridge_review.rs"
 
 permissions:
@@ -26,7 +27,7 @@ jobs:
           node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
       - name: Original Combat and Core 8A outbox plus new exact JS golden bytes
         run: |
-          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/core8a-prealpha-v2-js-rust-wire.test.mjs
+          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/core8a-prealpha-v2-js-rust-wire.test.mjs tests/core8a-prealpha-v2-unsent-ack-fence.test.mjs
       - name: All original Rust source formatting
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
       - name: Exact JavaScript event bytes enter original Rust review gate and ACK bytes return
