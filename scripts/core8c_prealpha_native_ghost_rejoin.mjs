@@ -146,36 +146,42 @@ try {
  sessionDriverPorts.set(newcomer,driverPorts.chrome);
  sessions.push(newcomer);
  await wd("POST","/session/"+newcomer+"/url",{url});
- // Browser termination is not a graceful QUIC close; the kernel can
- // discard the peer without a QUIC CONNECTION_CLOSE. Give each REAL
- // WebDriver navigation a full bounded chance to reach either original
- // "Online #5" OR server-reported admission failure, instead of reloading
- // a possibly already-accepted client every 1.5 seconds and creating a
- // false test-owned ghost in the scarce four-player admission gate.
+ // A killed browser process may not emit QUIC CONNECTION_CLOSE. Unlike
+ // a graceful Rust QUIC close, the server must discover dead peer #2 using
+ // its transport idle timer. The original server emits KEEPALIVE every 2s;
+ // repeatedly reconnecting a replacement before its first admission result
+ // would falsely compete for a scarce four-seat permit. Probe the same
+ // honest W3C browser at deliberate elapsed-time boundaries.
  const disconnectedAt=Date.now();
  let newConnected=null;
- for(let attempt=1;attempt<=14&&Date.now()-disconnectedAt<94000;attempt++){
-  let observed={status:"uninitialized",ok:false};
-  const terminalAt=Date.now()+8200;
+ const attemptAtElapsedMs=[0,15000,35000,55000,75000];
+ for(let attempt=0;attempt<attemptAtElapsedMs.length;attempt++){
+  const remaining=attemptAtElapsedMs[attempt]-(Date.now()-disconnectedAt);
+  if(remaining>0)await delay(remaining);
+  if(attempt>0){
+   // The prior attempt must have failed definitively (never reload a
+   // "Connecting" or authenticated session merely because it is slow).
+   await wd("POST","/session/"+newcomer+"/url",{url});
+  }
+  let observed={ok:false,failed:false,status:"uninitialized"};
+  const terminalAt=Date.now()+11000;
   while(Date.now()<terminalAt){
    observed=await evaljs(newcomer,
     "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #5 - server tick \\d+/.test(x),failed:/Multiplayer connection failed/.test(x),status:x};");
-   if(observed.ok || observed.failed)break;
-   await delay(260);
+   if(observed.ok||observed.failed)break;
+   await delay(220);
   }
+  console.log("CORE8C_BROWSER_FIFTH_CAPACITY_PROBE",JSON.stringify({
+   attempt:attempt+1,elapsedMs:Date.now()-disconnectedAt,
+   status:observed.status,accepted:observed.ok,failed:observed.failed,
+   serverExited:server.exitCode!==null,
+   serverEvents:stdout.split("\\n").filter(x=>/assigned player|session ended|admission cap/.test(x)).slice(-9)
+  }));
   if(observed.ok){
-   newConnected={...observed,attempt,elapsedMs:Date.now()-disconnectedAt};
+   newConnected={...observed,attempt:attempt+1,elapsedMs:Date.now()-disconnectedAt};
    break;
   }
-  console.log("CORE8C_BROWSER_FIFTH_CAPACITY_PENDING",JSON.stringify({
-   attempt,elapsedMs:Date.now()-disconnectedAt,status:observed.status,
-   serverExited:server.exitCode!==null,
-   serverActorAnnouncements:[...stdout.matchAll(/assigned player (\\d+)/g)].map(x=>Number(x[1]))
-  }));
-  if(attempt<14&&Date.now()-disconnectedAt<94000){
-   await delay(700);
-   await wd("POST","/session/"+newcomer+"/url",{url});
-  }
+  assert(observed.failed,"failed admission must be observed before reload");
  }
  if(!newConnected?.ok){
   console.error("CORE8C_FIFTH_ADMISSION_REAL_BROWSER_FAILURE",JSON.stringify({
