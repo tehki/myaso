@@ -2,9 +2,7 @@
 //! Rust consumes byte-identical fixture exported from the actual JS outbox.
 //! No live QUIC, Combat HIT, World lease, browser or packet negotiation.
 use myaso_server::{
-    prealpha_lmb_gesture_proposal::{
-        decode_event, encode_ack, AckStatus, GestureAction, BYTES,
-    },
+    prealpha_lmb_gesture_proposal::{decode_event, encode_ack, AckStatus, GestureAction, BYTES},
     prealpha_lmb_ingress_review::{IngressResult, ReviewLmbIngress, TrustedLeaseKey},
 };
 
@@ -54,12 +52,19 @@ fn original_js_same_tick_press_release_survives_reverse_wire_arrival_without_two
     let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
     let press = fixture("TAP_PRESS");
     let release = fixture("TAP_RELEASE");
-    assert_eq!(decode_event(&press).expect("JS press").client_tick, 0x11223344);
-    assert_eq!(decode_event(&release).expect("JS release").client_tick, 0x11223344);
-    assert_eq!(gate.review_ingest(l, &release, 0x0a0b0c0d), IngressResult::Deferred);
-    let IngressResult::Accepted(edges) =
-        gate.review_ingest(l, &press, 0x0a0b0c0d)
-    else {
+    assert_eq!(
+        decode_event(&press).expect("JS press").client_tick,
+        0x11223344
+    );
+    assert_eq!(
+        decode_event(&release).expect("JS release").client_tick,
+        0x11223344
+    );
+    assert_eq!(
+        gate.review_ingest(l, &release, 0x0a0b0c0d),
+        IngressResult::Deferred
+    );
+    let IngressResult::Accepted(edges) = gate.review_ingest(l, &press, 0x0a0b0c0d) else {
         panic!("real JS press must release the buffered exact matching up event");
     };
     assert_eq!(edges.len(), 2);
@@ -86,17 +91,33 @@ fn original_js_held_press_upgrade_release_is_one_ordered_gesture_despite_reorder
     let press = fixture("HOLD_PRESS");
     let upgrade = fixture("HOLD_UPGRADE");
     let release = fixture("HOLD_RELEASE");
-    assert_eq!(decode_event(&press).expect("press").gesture_id,1);
-    assert_eq!(decode_event(&upgrade).expect("upgrade").client_tick,0x66778899);
-    assert_eq!(decode_event(&release).expect("release").client_tick,0x99aabbcc);
-    assert_eq!(gate.review_ingest(l,&release,111),IngressResult::Deferred);
-    assert_eq!(gate.review_ingest(l,&upgrade,112),IngressResult::Deferred);
+    assert_eq!(decode_event(&press).expect("press").gesture_id, 1);
+    assert_eq!(
+        decode_event(&upgrade).expect("upgrade").client_tick,
+        0x66778899
+    );
+    assert_eq!(
+        decode_event(&release).expect("release").client_tick,
+        0x99aabbcc
+    );
+    assert_eq!(
+        gate.review_ingest(l, &release, 111),
+        IngressResult::Deferred
+    );
+    assert_eq!(
+        gate.review_ingest(l, &upgrade, 112),
+        IngressResult::Deferred
+    );
     accepted(
-        gate.review_ingest(l,&press,113),
-        &[GestureAction::Press,GestureAction::Upgrade,GestureAction::Release],
+        gate.review_ingest(l, &press, 113),
+        &[
+            GestureAction::Press,
+            GestureAction::Upgrade,
+            GestureAction::Release,
+        ],
         113,
     );
-    assert_eq!(gate.accepted_count(),3);
+    assert_eq!(gate.accepted_count(), 3);
     assert!(!gate.is_closed());
     // No server Combat timing or damage authority is claimed by this gate.
 }
@@ -104,28 +125,39 @@ fn original_js_held_press_upgrade_release_is_one_ordered_gesture_despite_reorder
 fn original_js_cancel_is_not_promoted_to_release_or_legacy_standalone_keye() {
     let l = lease();
     let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
-    accepted(gate.review_ingest(l,&fixture("CANCEL_PRESS"),1),&[GestureAction::Press],1);
-    accepted(gate.review_ingest(l,&fixture("CANCEL_CANCEL"),2),&[GestureAction::Cancel],2);
-    assert_eq!(gate.accepted_count(),2);
+    accepted(
+        gate.review_ingest(l, &fixture("CANCEL_PRESS"), 1),
+        &[GestureAction::Press],
+        1,
+    );
+    accepted(
+        gate.review_ingest(l, &fixture("CANCEL_CANCEL"), 2),
+        &[GestureAction::Cancel],
+        2,
+    );
+    assert_eq!(gate.accepted_count(), 2);
     let stale = fixture("TAP_RELEASE");
     assert!(matches!(
-        gate.review_ingest(l,&stale,3),
+        gate.review_ingest(l, &stale, 3),
         IngressResult::Stale(_) | IngressResult::Rejected(_)
     ));
 }
 #[test]
 fn real_js_event_bytes_refuse_wrong_authenticated_actor_generation_and_8c_alternative() {
     let l = lease();
-    let stale = TrustedLeaseKey::review_from_admission(4,2,123).expect("old lease");
+    let stale = TrustedLeaseKey::review_from_admission(4, 2, 123).expect("old lease");
     let mut gate = ReviewLmbIngress::new_from_trusted_admission(l);
     assert!(matches!(
-        gate.review_ingest(stale,&fixture("TAP_PRESS"),20),
+        gate.review_ingest(stale, &fixture("TAP_PRESS"), 20),
         IngressResult::Stale(_)
     ));
-    assert_eq!(gate.accepted_count(),0);
+    assert_eq!(gate.accepted_count(), 0);
     let mut other = fixture("TAP_PRESS");
-    other[1]=0x52;
-    assert_eq!(gate.review_ingest(l,&other,20),IngressResult::Rejected(None));
-    assert_eq!(gate.accepted_count(),0);
+    other[1] = 0x52;
+    assert_eq!(
+        gate.review_ingest(l, &other, 20),
+        IngressResult::Rejected(None)
+    );
+    assert_eq!(gate.accepted_count(), 0);
     assert!(gate.is_closed());
 }
