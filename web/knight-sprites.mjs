@@ -112,18 +112,20 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
   presentationScale = KNIGHT_PRESENTATION_SCALE,
   sourceKickPreview = false,
   sourceKickVariant = "v2",
+  sourceKickLightStudy = false,
   sourceKnockdownPreview = false } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
   // This changes ONLY the explicit source-art preview texture. Never grant
   // a kick action, override a server phase, or activate V3 in Pre-Alpha.
-  if (!["v2","v3"].includes(sourceKickVariant)
-    || (sourceKickVariant === "v3" && sourceKickPreview !== true)) {
+  if (!["v2","v3","v3lit"].includes(sourceKickVariant)
+    || (sourceKickVariant !== "v2" && sourceKickPreview !== true)
+    || (sourceKickVariant === "v3lit" && sourceKickLightStudy !== true)) {
     throw new RangeError("Spartan V3 requires opt-in source kick rendering");
   }
   if (sourceKnockdownPreview
-    && (!sourceKickPreview || sourceKickVariant !== "v3"))
+    && (!sourceKickPreview || !["v3","v3lit"].includes(sourceKickVariant)))
     throw new RangeError("Silver victim knockdown requires original V3 kick QA preview gates");
   const atlases = new Map();
   const states = new Map();
@@ -140,8 +142,10 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     };
     image.onerror = () => { atlas.ready = false; };
     image.decoding = "async";
-    image.src = new URL(name === "silver_kick" && sourceKickVariant === "v3"
-      ? "silver_kick_v3.webp" : name + ".webp", assetBase).href;
+    // Fifth QA gate selects a study atlas; original/default source retained.
+    const kickSource = sourceKickVariant === "v3lit" ? "silver_kick_v3_lit.webp"
+      : sourceKickVariant === "v3" ? "silver_kick_v3.webp" : "silver_kick.webp";
+    image.src = new URL(name === "silver_kick" ? kickSource : name + ".webp", assetBase).href;
     atlases.set(name, atlas);
   }
   return {
