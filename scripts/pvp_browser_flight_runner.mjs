@@ -6835,7 +6835,7 @@ async function installSpartanKickDrawProbe(session) {
   return await execute(session.base, session.sessionId, `
     if (!window.__graphics3aSpartanDrawProbe) {
       const original=CanvasRenderingContext2D.prototype.drawImage;
-      const data={draws:[],installed:true,contactPng:null,contactError:null};
+      const data={draws:[],installed:true,contactPng:null,contactError:null,contactPending:false};
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string" ? image.src : "";
         if((src.endsWith("/silver_kick_v3.webp") || src.endsWith("/silver_kick.webp")) && args.length===8) {
@@ -6848,13 +6848,21 @@ async function installSpartanKickDrawProbe(session) {
         // Only QA native V3 contact visual frame. Actual game Canvas pixels,
         // no regenerated art, no hit or remote action forged.
         if(${spartanV3ContactPng} && src.endsWith("/silver_kick_v3.webp")
-          && args.length===8 && (args[0]===480 || args[0]===640) && !data.contactPng) {
-          try {
-            const raw=this.canvas.toDataURL("image/png");
-            if(raw.startsWith("data:image/png;base64,")) data.contactPng=raw;
-          } catch(e) {
-            data.contactError=String(e);
-          }
+          && args.length===8 && (args[0]===480 || args[0]===640)
+          && !data.contactPng && !data.contactPending) {
+          data.contactPending=true;
+          const gameCanvas=this.canvas;
+          // The current game-render JS callback finishes before this
+          // microtask, so capture other fighters and existing HUD overlays
+          // rather than freezing in the middle of a single drawImage call.
+          queueMicrotask(()=>{
+            try {
+              const raw=gameCanvas.toDataURL("image/png");
+              if(raw.startsWith("data:image/png;base64,")) data.contactPng=raw;
+            } catch(e) {
+              data.contactError=String(e);
+            }
+          });
         }
         return result;
       };

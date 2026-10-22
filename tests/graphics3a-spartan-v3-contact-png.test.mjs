@@ -8,7 +8,9 @@ test("V3 real in-game PNG requires BOTH independent native server authentication
  assert.match(src,/spartanV3ContactPng && !spartanV3Flight/);
  assert.match(src,/src.endsWith\("\/silver_kick_v3\.webp"\)/);
  assert.match(src,/args\[0\]===480 \|\| args\[0\]===640/);
- assert.match(src,/this\.canvas\.toDataURL\("image\/png"\)/);
+ assert.match(src,/queueMicrotask\(\(\)=>\{/);
+ assert.match(src,/gameCanvas\.toDataURL\("image\/png"\)/);
+ assert.match(src,/contactPending:true|contactPending:false/);
  assert.match(src,/const result=original\.call\(this,image,\.\.\.args\)/);
  assert.match(src,/captureSpartanV3RealContactPngs\(/);
  assert.match(src,/receipt\.authenticOriginalSilverV3AtlasBothBrowsers!==true/);
