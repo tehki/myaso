@@ -193,7 +193,6 @@ impl ReviewWorldLease {
     }
 }
 
-
 // Dormant server-side ownership wrapper. The single process-wide allocator is
 // authoritative ONLY for review fixtures in this Rust process. A real cluster
 // needs the Core8B/zone owner authority and nonreusable session epoch.
@@ -244,7 +243,7 @@ impl ReviewOwnedWorld {
     }
 
     pub fn review_step(&mut self) {
-        self.world.step();
+        let _ = self.world.step();
     }
 
     pub fn review_remove_player(&mut self, actor: u32) -> bool {
@@ -319,6 +318,7 @@ impl ReviewWorldOwnerLease {
         if !self.verify_owner(owner) || presented_actor != self.actor {
             return Vec::new();
         }
-        self.inner.review_drain_for_world(owner.world(), presented_actor)
+        self.inner
+            .review_drain_for_world(owner.world(), presented_actor)
     }
 }
