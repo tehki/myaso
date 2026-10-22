@@ -286,3 +286,33 @@ character/container records are not attested here. The source owner remains
 responsible for actual quiesced authentic checkpoint bytes, completeness and
 item/ground/corpse entities, plus its original >3-equipped decoder bug. No
 active item writer, network admission or Combat Pre-Alpha logic is altered.
+
+## 2026-10-22 — explicit old vs corrected MYASOL03 capacity provenance
+
+Items 2B shipped a *draft* five-equipped-slot source decoder forward-port in
+[#791](https://github.com/tehki/myaso/pull/791) (full protected green), then
+its direct descendant [#805](https://github.com/tehki/myaso/pull/805)
+corrected the REAL corpse item maximum from old `64+3=67` to
+`64+5=69` (full protected green at exact `33c16a9`), without changing the
+MYASOL03 file signature or item/slot codes. Historic Magic #424 valid snapshots
+still use the original 67-cap. **The disk magic does not distinguish these
+source generations.** The previous Core8B capacity guard hard-coded 67,
+which rejects 68/69 legitimate full-equipment source corpses from the repaired
+source, and unconditionally accepting 69 would enlarge the old source's legal
+input set without provenance.
+
+`LegacySourceCapacityProfile` now requires an *explicit* reviewer-selected
+source compatibility profile to admit 68/69. The existing
+`LegacySourceCustodyCatalog::new` is backward compatible, always enforcing
+`OriginalCorpse67` fail-closed. Only `new_with_profile(...,
+RepairedFiveSlotCorpse69, ...)` permits up to 69, while 70 fails; the backpack
+maximum 64, slot mapping and provenance constraints remain unchanged. The
+selection MUST come from separately attested source reader/writer build,
+quiescence and epoch rather than a client, file-header magic, loose label or
+inventory item count. Tests assert both boundary profiles and reject implicit
+cap relaxation.
+
+This remains read-only offline compatibility *testing*, NOT a versioned disk
+decoder, source proof, migration authority or a second writer. Both Items #791
+and #805 are DRAFT/unmerged, not Main availability, and only their actual
+source evidence authorizes eventual review of the revised profile.
