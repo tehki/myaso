@@ -1,0 +1,62 @@
+{
+  "schema": "core-x1-character-identity-v1",
+  "source_contracts": [
+    "Core 8B #365: 36-byte MYCH character record, version 1, little-endian ID and generation",
+    "Core 8C #393: PostgreSQL bytea 16-byte big-endian entity and mutation ID"
+  ],
+  "character_id_bits": 128,
+  "record_layout": {
+    "magic": "MYCH",
+    "bytes": 36,
+    "version": 1,
+    "id_offset": 8,
+    "id_bytes": 16,
+    "id_endianness": "little",
+    "generation_offset": 24,
+    "generation_bytes": 8,
+    "generation_endianness": "little",
+    "checksum_offset": 32,
+    "checksum_algorithm": "fnv1a32",
+    "checksum_endianness": "little",
+    "checksum_covers_first_bytes": 32
+  },
+  "postgres_layout": {
+    "id_bytes": 16,
+    "id_endianness": "big",
+    "kind_character": 1,
+    "kind_ground_item": 2,
+    "integer_max": "9223372036854775807"
+  },
+  "vectors": [
+    {
+      "name": "low",
+      "character_hex": "00000000000000000000000000000001",
+      "generation": "1",
+      "core_record_le_id_hex": "01000000000000000000000000000000",
+      "postgres_be_hex": "00000000000000000000000000000001",
+      "record_hex": "4d5943480100000001000000000000000000000000000000010000000000000099b62575"
+    },
+    {
+      "name": "full",
+      "character_hex": "0102030405060708090a0b0c0d0e0f10",
+      "generation": "7",
+      "core_record_le_id_hex": "100f0e0d0c0b0a090807060504030201",
+      "postgres_be_hex": "0102030405060708090a0b0c0d0e0f10",
+      "record_hex": "4d59434801000000100f0e0d0c0b0a09080706050403020107000000000000007e4ee07b"
+    },
+    {
+      "name": "high",
+      "character_hex": "80000000000000000000000000000001",
+      "generation": "72623859790382856",
+      "core_record_le_id_hex": "01000000000000000000000000000080",
+      "postgres_be_hex": "80000000000000000000000000000001",
+      "record_hex": "4d5943480100000001000000000000000000000000000080080706050403020100680099"
+    }
+  ],
+  "negative_cases": {
+    "zero_character": "00000000000000000000000000000000",
+    "too_wide_for_legacy_u64": "0102030405060708090a0b0c0d0e0f10",
+    "postgres_integer_overflow": "9223372036854775808",
+    "postgres_integer_zero": "0"
+  }
+}
