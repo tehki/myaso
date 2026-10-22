@@ -178,7 +178,7 @@ test("test-only counter seam refuses invalid values and never grants authorizati
     "starting KeyE requires PRESS and terminal, not just one last sequence");
   assert.equal(q.snapshot.nextSequence,0xffff_ffff);
   assert.equal(q.snapshot.nextGestureId,1);
-  assert.equal(q.snapshot.closed,false,
-    "denying an unstarted source is not a Combat or ACK receipt");
+  assert.equal(q.snapshot.closed,true,
+    "no active source remains: an exhausted lease retires rather than wraps");
   assert.equal(q.receiveAck,undefined);
 });
