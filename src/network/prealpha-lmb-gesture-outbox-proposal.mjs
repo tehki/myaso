@@ -6,6 +6,7 @@ import {
   PROPOSED_GESTURE_VERSION, GESTURE_ACTION, GESTURE_ACK_STATUS,
   encodeProposedGestureEvent, decodeProposedGestureAck,
 } from "./prealpha-lmb-gesture-proposal.mjs";
+import {ProposedSharedSourceGestureAllocator} from "./prealpha-shared-source-allocator-proposal.mjs";
 
 const U32_MAX = 0xffff_ffff;
 const validTick = tick => Number.isInteger(tick) && tick >= 0 && tick <= U32_MAX;
@@ -154,6 +155,154 @@ export class ProposedLmbGestureOutbox {
       pending:this.#pending.size,activeGestureId:this.#active?.gestureId??null,
       closed:this.#closed,
       nextSequence:this.#nextSequence,nextGestureId:this.#nextGestureId,
+    });
+  }
+}
+
+// DORMANT / REVIEW-ONLY candidate for ONE future per-connection typed edge
+// outbox. Reuses the existing Core8A outbox's bounded resend and ACK semantics
+// and the Main #723 shared LMB+KeyE identifier allocator, not a new codec or
+// second independently numbered KeyE queue. No gameplay or QUIC imports.
+export class ProposedSharedTypedGestureOutbox {
+  #trustedLease;
+  #allocator;
+  #pending = new Map();
+  #reservations = new Map();
+  #maxPending;
+  #maxAttempts;
+  #closed = false;
+
+  constructor({reviewVersion, trustedLease, maxPending = 16, maxAttempts = 3} = {}) {
+    // reviewVersion != authenticated QUIC handshake/capability grant.
+    this.#allocator = new ProposedSharedSourceGestureAllocator({
+      reviewVersion, trustedLease,
+    });
+    requireUsable(maxPending,4,256,"maxPending");
+    requireUsable(maxAttempts,1,8,"maxAttempts");
+    this.#trustedLease = trustedLease;
+    this.#maxPending = maxPending;
+    this.#maxAttempts = maxAttempts;
+  }
+  #requireOpen() {
+    if (this.#closed) throw new Error("typed gesture review lease closed");
+  }
+  #reservedCount() {
+    return [...this.#reservations.values()].reduce((total,n)=>total+n,0);
+  }
+  #track(event) {
+    const {source, action, sequence, gestureId, bytes} = event;
+    if (this.#pending.has(sequence) || this.#pending.size >= this.#maxPending) {
+      this.retire();
+      throw new Error("typed review queue cannot safely admit an edge");
+    }
+    this.#pending.set(sequence, {
+      source, action, sequence, gestureId, bytes:new Uint8Array(bytes), attempts:0,
+    });
+    return Object.freeze({source, action, sequence, gestureId});
+  }
+
+  begin(source, clientTick = 0) {
+    this.#requireOpen();
+    if (this.#reservations.has(source))
+      throw new Error("source already owns an active typed gesture");
+    // Reserve 3 slots total for a potential LMB press+upgrade+terminal;
+    // KeyE reserves 2 slots for press+terminal. Include ALL existing
+    // source reservations so one source can never strand another's RELEASE.
+    // Reject a new PRESS without retiring an older still-valid gesture.
+    const newSlots = source === 0 ? 3 : source === 1 ? 2 : 0;
+    if (newSlots && this.#pending.size + this.#reservedCount() + newSlots > this.#maxPending)
+      throw new Error("bounded typed queue lacks terminal capacity");
+    const event = this.#allocator.begin(source,clientTick);
+    this.#reservations.set(source,newSlots-1);
+    return this.#track(event);
+  }
+  upgrade(clientTick = 0) {
+    this.#requireOpen();
+    if (this.#reservations.get(0) !== 2)
+      throw new Error("LMB upgrade must be once, with preserved terminal reservation");
+    const event = this.#allocator.upgrade(clientTick);
+    this.#reservations.set(0,1);
+    return this.#track(event);
+  }
+  release(source, clientTick = 0) {
+    return this.#terminal(source,false,clientTick);
+  }
+  cancel(source, clientTick = 0) {
+    return this.#terminal(source,true,clientTick);
+  }
+  #terminal(source, cancel, clientTick) {
+    this.#requireOpen();
+    if (!this.#reservations.has(source))
+      throw new Error("terminal requires an active matching source");
+    // One guaranteed reserved queue slot exists for each active source.
+    const event = cancel ? this.#allocator.cancel(source,clientTick)
+      : this.#allocator.release(source,clientTick);
+    this.#reservations.delete(source);
+    return this.#track(event);
+  }
+
+  // Preserve Core8A first-send priority: a legitimate RELEASE cannot be
+  // indefinitely hidden behind repeated older PRESS retries in limit=1.
+  // Returning a COPY is NOT confirmation that future QUIC sent it.
+  nextSendBatch(limit = 4) {
+    this.#requireOpen();
+    requireUsable(limit,1,this.#maxPending,"send limit");
+    const pending = [...this.#pending.values()];
+    const first = pending.filter(e=>e.attempts===0);
+    const retry = pending.filter(e=>e.attempts>0);
+    const selected = [...first,...retry].slice(0,limit)
+      .sort((a,b)=>a.sequence-b.sequence);
+    if (selected.some(e=>e.attempts>=this.#maxAttempts)) {
+      this.retire();
+      throw new Error("typed review retransmission attempts exhausted");
+    }
+    for (const e of selected) e.attempts++;
+    return selected.map(e=>Object.freeze({
+      source:e.source, action:e.action, sequence:e.sequence,
+      gestureId:e.gestureId, attempt:e.attempts,
+      bytes:new Uint8Array(e.bytes),
+    }));
+  }
+
+  // Only the future authenticated connection owner may call this with its
+  // PRIVATE lease object. An opaque JS token by itself proves no identity.
+  // 0x12 ACK has NO source byte: sequence+gesture identify pending source
+  // within the trusted connection. Never interpret ACK as a Combat hit.
+  receiveAck(bytes, trustedLease) {
+    this.#requireOpen();
+    if (trustedLease !== this.#trustedLease)
+      throw new Error("foreign connection lease ACK denied");
+    const ack = decodeProposedGestureAck(bytes);
+    const event = this.#pending.get(ack.sequence);
+    if (!event) throw new Error("replayed, unexpected or retired typed ACK");
+    if (event.gestureId !== ack.gestureId)
+      throw new Error("typed ACK does not identify pending gesture");
+    if (event.attempts === 0)
+      throw new Error("unscheduled typed edge cannot be ACKed");
+    this.#pending.delete(event.sequence);
+    const transportSettled = ack.status === GESTURE_ACK_STATUS.ACCEPTED
+      || ack.status === GESTURE_ACK_STATUS.DUPLICATE;
+    if (!transportSettled) this.retire();
+    return Object.freeze({
+      source:event.source,action:event.action,sequence:event.sequence,
+      gestureId:event.gestureId,status:ack.status,serverTick:ack.serverTick,
+      transportSettled,combatCommitted:false,
+    });
+  }
+  retire() {
+    this.#closed = true;
+    this.#allocator.retire();
+    this.#pending.clear();
+    this.#reservations.clear();
+  }
+  get snapshot() {
+    return Object.freeze({
+      pending:this.#pending.size,
+      reservedTerminalCapacity:this.#reservedCount(),
+      activeSources:Object.freeze([...this.#reservations.keys()]),
+      closed:this.#closed,
+      nextSequence:this.#allocator.snapshot.nextSequence,
+      nextGestureId:this.#allocator.snapshot.nextGestureId,
     });
   }
 }
