@@ -5,6 +5,14 @@
 **Source base:** Core 8A [draft #724](https://github.com/tehki/myaso/pull/724), initial exact `7c012c8551809b800889d7a78c1bc540a208c52b`.
 **Main authority:** [#360](https://github.com/tehki/myaso/issues/360), [Pre-Alpha #695](https://github.com/tehki/myaso/issues/695), [one-wire decision #723](https://github.com/tehki/myaso/issues/723).
 
+## World owner epoch ABA negative proof — review-only child
+
+The dormant `ReviewOwnedWorld` wrapper now pairs a **real original Rust `World`** with a process-local nonzero 64-bit owner epoch. Creating a distinct owner or replacing an entire `World` consumes a new epoch; if the counter exhausts, ownership replacement fails closed rather than wrapping. Unlike `Fighter::world_incarnation()` alone, this rejects an OLD World lease even if a newly constructed `World` begins with identical actor ID, actor life token, `tick=0`, and the same numeric fixture generation/nonce. `ReviewWorldOwnerLease` must check both the wrapper's epoch and the existing actor/World-tick life fence on every review ingest and drain, dropping all pending gesture edges when ownership differs. Same-tick actor remove/add and skipped World tick checks are retained.
+
+Three new genuine `World` Rust regression tests cover (1) two separately created owners with identical World actor/tick/life counters, (2) same-owner entire World replacement between PRESS and RELEASE at tick0, and (3) foreign actor, same-tick member ABA, and missed two-tick retirement. These checks do **not** simulate a wire admission or a HIT.
+
+**Proof limits:** the epoch allocator is ONLY process-local dormant fixture support; the live game has not been migrated into `ReviewOwnedWorld`. Across different server hosts/restarts, a server-issued zone/World authority generation and Core8B authenticated session/actor nonce remain mandatory. Nor does this adapter apply Combat commands while holding the live `Arc<Mutex<World>>` guard. Future Core8C integration MUST check actual transport authorization, current owner epoch, fighter life, and World mutation in the **same server lock**, then retire stale pending edges/ACK/outbox on disconnect/death/respawn/reset/zone move. A transport ACK is never a HIT, and legacy v1 is unchanged. Keep dormant review PR DRAFT, no merge/deploy/protocol GO.
+
 ## Boundaries and what this implements
 
 - `server/src/prealpha_core8c_world_lease_review.rs` is exported but **NEVER CALLED** by `server/src/main.rs`; `PROTOCOL_VERSION=1` and original 34-byte INPUT are unchanged.
