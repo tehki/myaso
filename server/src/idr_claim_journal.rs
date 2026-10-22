@@ -149,6 +149,92 @@ fn anchored_rename_noreplace(
     Ok(())
 }
 
+/// Linux pinned-inode lookup for a single canonical event name or lock.
+/// `O_NOFOLLOW` prevents final-component symlink redirection even when
+/// directory contents change after enumeration.
+#[cfg(target_os = "linux")]
+fn anchored_open_existing(dir: &File, name: &str) -> Result<File, ClaimJournalError> {
+    use std::{
+        ffi::CString,
+        os::fd::{AsRawFd, FromRawFd},
+    };
+    if name.contains('/') || name == "." || name == ".." {
+        return Err(ClaimJournalError::Invalid(
+            "MYID lookup includes path traversal",
+        ));
+    }
+    let path =
+        CString::new(name).map_err(|_| ClaimJournalError::Invalid("bad MYID lookup name"))?;
+    // SAFETY: pin and CString remain valid; returned descriptor is uniquely
+    // owned by the newly-created File, if the syscall succeeds.
+    let fd = unsafe {
+        openat(
+            dir.as_raw_fd(),
+            path.as_ptr(),
+            LINUX_O_NOFOLLOW | LINUX_O_CLOEXEC,
+            0,
+        )
+    };
+    if fd < 0 {
+        return Err(ClaimJournalError::Io(io::Error::last_os_error()));
+    }
+    let file = unsafe { File::from_raw_fd(fd) };
+    check_regular_owned_storage_file(&file)?;
+    Ok(file)
+}
+
+#[cfg(target_os = "linux")]
+fn anchored_open_writer_lock(dir: &File) -> Result<File, ClaimJournalError> {
+    use std::{
+        ffi::CString,
+        os::fd::{AsRawFd, FromRawFd},
+    };
+    let name = CString::new(".identity-writer.lock").expect("constant lock name");
+    // Open/create and lock the SAME pinned root, never an independently
+    // resolved path after the trusted directory has been validated.
+    let fd = unsafe {
+        openat(
+            dir.as_raw_fd(),
+            name.as_ptr(),
+            2 | LINUX_O_CREAT | LINUX_O_NOFOLLOW | LINUX_O_CLOEXEC,
+            0o600,
+        )
+    };
+    if fd < 0 {
+        return Err(ClaimJournalError::Io(io::Error::last_os_error()));
+    }
+    let file = unsafe { File::from_raw_fd(fd) };
+    check_regular_owned_storage_file(&file)?;
+    Ok(file)
+}
+
+#[cfg(target_os = "linux")]
+fn pinned_directory_entries(dir: &File) -> Result<Vec<String>, ClaimJournalError> {
+    use std::os::fd::AsRawFd;
+    // Linux procfs resolves /proc/self/fd/N to the open directory inode,
+    // even if its original pathname is renamed/replaced. Never use entry
+    // paths below: event opens are always openat(dirfd, literal filename).
+    let proc_fd = format!("/proc/self/fd/{}", dir.as_raw_fd());
+    let mut names = Vec::new();
+    for entry in fs::read_dir(proc_fd)? {
+        let entry = entry?;
+        if entry.file_type()?.is_symlink() {
+            return Err(ClaimJournalError::Invalid(
+                "MYID directory contains linked storage",
+            ));
+        }
+        let name = entry.file_name();
+        names.push(
+            name.into_string()
+                .map_err(|_| ClaimJournalError::Invalid("invalid filename"))?,
+        );
+        if names.len() > MAX_IDR_OFFLINE_EVENTS + 2 {
+            return Err(ClaimJournalError::Capacity);
+        }
+    }
+    Ok(names)
+}
+
 #[cfg(target_os = "linux")]
 fn anchored_unlink(dir: &File, name: &str) -> Result<(), ClaimJournalError> {
     use std::{ffi::CString, os::fd::AsRawFd};
@@ -175,30 +261,6 @@ fn check_regular_owned_storage_file(file: &File) -> Result<(), ClaimJournalError
         ));
     }
     Ok(())
-}
-
-/// Never follow an attacker-provided symlink to an unrelated file while
-/// recovering a claimed identity or inspecting a lock. Metadata alone would
-/// race, so the opened file also uses kernel-enforced O_NOFOLLOW on Linux.
-fn open_existing_record_nofollow(path: &Path) -> Result<File, ClaimJournalError> {
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let file = OpenOptions::new()
-            .read(true)
-            .custom_flags(LINUX_O_NOFOLLOW)
-            .open(path)?;
-        check_regular_owned_storage_file(&file)?;
-        Ok(file)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = path;
-        Err(ClaimJournalError::Io(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "review MYID NOFOLLOW on this platform before activation",
-        )))
-    }
 }
 
 const MAGIC: &[u8; 4] = b"MYID";
@@ -532,6 +594,16 @@ impl OfflineClaimJournal {
     }
 
     pub fn open(root: impl AsRef<Path>) -> Result<Self, ClaimJournalError> {
+        Self::open_with_pinned_hook(root, || {})
+    }
+
+    /// Test interleaving hook is always a no-op in live code. Allows a
+    /// deterministic root-path replacement after FD pin but before lock
+    /// acquisition and recovery in an OFFLINE adversarial unit test.
+    fn open_with_pinned_hook(
+        root: impl AsRef<Path>,
+        after_root_pinned: impl FnOnce(),
+    ) -> Result<Self, ClaimJournalError> {
         let root = root.as_ref();
         fs::create_dir_all(root)?;
         // Reject a linked root BEFORE chmod: set_permissions follows a
@@ -571,23 +643,21 @@ impl OfflineClaimJournal {
             io::ErrorKind::Unsupported,
             "MYID root pinning requires Linux",
         )));
-        let mut options = OpenOptions::new();
-        options.create(true).read(true).write(true);
+        after_root_pinned();
+        // The lock is acquired IN the pinned verified root, regardless of
+        // whether its pathname is rebound between validation and opening.
+        let lock: File;
         #[cfg(target_os = "linux")]
         {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600).custom_flags(LINUX_O_NOFOLLOW);
+            lock = anchored_open_writer_lock(&root_dir)?;
         }
-        #[cfg(all(unix, not(target_os = "linux")))]
+        #[cfg(not(target_os = "linux"))]
         {
             return Err(ClaimJournalError::Io(io::Error::new(
                 io::ErrorKind::Unsupported,
-                "MYID linked-storage guard requires Linux",
+                "MYID pinned writer acquisition requires Linux",
             )));
         }
-        let lock = options.open(root.join(".identity-writer.lock"))?;
-        #[cfg(unix)]
-        check_regular_owned_storage_file(&lock)?;
         if !exclusive_lock(&lock)? {
             return Err(ClaimJournalError::WriterBusy);
         }
@@ -601,17 +671,7 @@ impl OfflineClaimJournal {
             poisoned: false,
         };
         let mut paths = Vec::new();
-        for entry in fs::read_dir(root)? {
-            let entry = entry?;
-            let name = entry.file_name();
-            let name = name
-                .to_str()
-                .ok_or(ClaimJournalError::Invalid("invalid filename"))?;
-            if entry.file_type()?.is_symlink() {
-                return Err(ClaimJournalError::Invalid(
-                    "MYID directory contains linked storage",
-                ));
-            }
+        for name in pinned_directory_entries(&out.root_dir)? {
             if name == ".identity-writer.lock" || name.starts_with(".staging-") {
                 continue;
             }
@@ -624,18 +684,18 @@ impl OfflineClaimJournal {
             let n: u64 = name[..20]
                 .parse()
                 .map_err(|_| ClaimJournalError::Invalid("sequence overflow"))?;
-            paths.push((n, entry.path()));
+            paths.push((n, name));
         }
         paths.sort_by_key(|(n, _)| *n);
         if paths.len() > MAX_IDR_OFFLINE_EVENTS {
             return Err(ClaimJournalError::Capacity);
         }
-        for (n, path) in paths {
+        for (n, name) in paths {
             if out.head.checked_add(1) != Some(n) {
                 return Err(ClaimJournalError::SequenceGap);
             }
             let mut bytes = Vec::new();
-            open_existing_record_nofollow(&path)?
+            anchored_open_existing(&out.root_dir, &name)?
                 .take(LEN as u64 + 1)
                 .read_to_end(&mut bytes)?;
             let rec = decode(&bytes)?;
@@ -646,6 +706,9 @@ impl OfflineClaimJournal {
             out.records.insert(rec.event_id, rec);
             out.head = n;
         }
+        // The caller cannot adopt claims from an old moved directory as
+        // CURRENT merely because that inode was valid at its earlier path.
+        out.ensure_writer_anchor()?;
         Ok(out)
     }
     /// A trusted coordinator may supply a minimum durable sequence from an
@@ -1698,6 +1761,55 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn directory_rebind_after_root_pin_cannot_move_recovered_identity_to_new_path() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let observer = actor(0x1234_0000_0000_0002);
+        let mut j = root.open();
+        append(&mut j, &bridge, &leases, lease, (observer, 1, "Tomas", 501)).unwrap();
+        drop(j);
+
+        let moved = root.0.with_extension("pinned-recovery-original");
+        // The hook runs AFTER the real O_DIRECTORY|O_NOFOLLOW pin but
+        // BEFORE acquiring the lock or listing MYID event names.
+        let open_result = OfflineClaimJournal::open_with_pinned_hook(&root.0, || {
+            fs::rename(&root.0, &moved).unwrap();
+            fs::create_dir(&root.0).unwrap();
+        });
+        assert!(matches!(
+            open_result,
+            Err(ClaimJournalError::Invalid(
+                "MYID writer lock/directory binding changed"
+            ))
+        ));
+        assert!(
+            !root.0.join(".identity-writer.lock").exists(),
+            "replaced path did not receive a misdirected lock"
+        );
+        assert!(
+            !root.0.join(filename(1)).exists(),
+            "replacement directory did not inherit private identity data"
+        );
+        assert!(moved.join(".identity-writer.lock").is_file());
+        assert!(moved.join(filename(1)).is_file());
+        // Once opened by its ACTUAL new name, the same original committed
+        // claim is still recovered exactly once.
+        let restored =
+            Root::with_bounded_writer_handoff(|| OfflineClaimJournal::open(&moved)).unwrap();
+        assert_eq!(restored.head(), 1);
+        assert_eq!(
+            restored
+                .observed_unverified_claim(observer, lease.character_id())
+                .unwrap()
+                .name,
+            "Tomas",
+        );
+        drop(restored);
+        fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn directory_rebind_between_preflight_and_create_writes_only_into_pinned_root() {
         let root = Root::new();
         let (bridge, leases, lease) = fixture(1, 51);
@@ -1747,7 +1859,8 @@ mod tests {
         // Crash/reopen of the *original moved* directory replays both
         // committed files exactly once. A successful caller ACK was never
         // issued for the second record; this is a historical recovery event.
-        let recovered = OfflineClaimJournal::open(&moved).unwrap();
+        let recovered =
+            Root::with_bounded_writer_handoff(|| OfflineClaimJournal::open(&moved)).unwrap();
         assert_eq!(recovered.head(), 2);
         assert_eq!(
             recovered
