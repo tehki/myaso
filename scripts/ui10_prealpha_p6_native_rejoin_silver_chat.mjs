@@ -389,7 +389,9 @@ try {
   const beforeBack=await visible(sid);
   console.log("UI10_BACK_SOURCE_SILVER_BEFORE",JSON.stringify({
    status:beforeBack?.status,frames:beforeBack?.frames?.slice(-2)}));
-  const q=await poll("real browser Back must remove #2/#5/#6/#7 and draw #8",
+  let q;
+  try {
+   q=await poll("real browser Back must remove #2/#5/#6/#7 and draw #8",
    async()=>{
     const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
     return {...v,ok:v?.roster?.length===4&&[1,3,4,8].every(id=>rosterHas(v.roster,id))
@@ -398,6 +400,13 @@ try {
         &&[2,5,6,7].every(id=>!frame.ids.includes("#"+id))&&frame.silvers===4
         &&frame.ids.length>=3).length>=8};
    },12000);
+  } catch(error) {
+   const reality=await visible(sid).catch(e=>({readError:String(e)}));
+   console.log("UI10_BACK_FOUR_SOURCE_SILVER_STRICT_FAILURE_PROVENANCE",JSON.stringify({
+    error:String(error).slice(0,240),status:reality?.status,roster:reality?.roster,
+    recentFrames:reality?.frames?.slice(-4),silverFourFrames:reality?.silverFourFrames}));
+   throw error;
+  }
   console.log("UI10_BACK_FOUR_SOURCE_SILVER_PASS",JSON.stringify({
    roster:q.roster,frames:q.frames.slice(-3)}));
   backReconciled.push({roster:q.roster,frames:q.frames.slice(-8).map(frame=>frame.ids)});
