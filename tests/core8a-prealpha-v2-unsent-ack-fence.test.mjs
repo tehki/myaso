@@ -147,6 +147,9 @@ test("two distinct quick taps drain first presses and releases before retrying o
 
 
 test("large first-send batch stays within Rust 16-edge forward-gap, not configured 32-pending capacity",()=>{
+  const rust=readFileSync(new URL("../server/src/prealpha_lmb_ingress_review.rs",import.meta.url),"utf8");
+  assert.match(rust,/const MAX_GAP: u32 = 16;/);
+  assert.match(rust,/const MAX_BUFFERED: usize = 16;/);
   const lease=newLease(),queue=new ProposedLmbGestureOutbox({
     negotiatedVersion:PROPOSED_GESTURE_VERSION,trustedLease:lease,maxPending:32,maxAttempts:3,
   });
