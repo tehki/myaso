@@ -1,0 +1,2540 @@
+{
+  "type": "P51 actual client+Rust local authoritative smoke and RAF gap telemetry",
+  "sourceHead": "05f577b7fb8d97ef33c6ddcf9699a3d6432db909",
+  "serverBinary": "myaso-server",
+  "host": "127.0.0.1",
+  "browsersIndependentHosts": false,
+  "serverAuthoritative": true,
+  "worldFlag": true,
+  "clientsRequested": 1,
+  "measureMs": 4500,
+  "results": [
+    {
+      "index": 1,
+      "errors": [],
+      "client": {
+        "status": "Online - player #1 - server tick 54",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #1 - server tick 108",
+        "scoreboard": [
+          "#10"
+        ],
+        "diagnostics": "Input→ACK p50 50ms · p95 67ms | Jitter p95 17ms | Snapshots p50 50ms · p95 51ms | Camera correction p95 10.6u | Stale-own ACKs 97 | Deferred reconciles 191 | Render catch-ups 8 | Extra render lag p50 0ms · p95 0ms | >33ms 0% (52 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2160,
+        "rAFGapP51Ms": 16.7,
+        "rAFGapP95Ms": 16.7,
+        "rAFGapMaxMs": 16.800000000000182,
+        "rAFSamples": 269,
+        "actualGameFrameP51Ms": 0.6,
+        "actualGameFrameP95Ms": 0.8,
+        "actualGameFrameMaxMs": 1,
+        "actualGameFrameSamples": 270,
+        "worldTileBlitMs": 26.6,
+        "worldTileBlitCalls": 2160,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "actualGameFrameGapOver33": 0,
+        "actualGameFrameGapOver50": 0,
+        "actualGameFrameGapOver100": 0,
+        "callbackOver16Ms": 0,
+        "severeFrameGapsWithTaskOverlap": 0,
+        "severeFrameGapsWithoutTaskOverlap": 0,
+        "severeFrameGapsWithShortNextCallback": 0,
+        "observedLongTaskCount": 0,
+        "observedLongTaskMaxMs": 0,
+        "longTaskObserverStatus": "observing",
+        "snapshotReaderHooks": 1,
+        "actualSnapshotPacketCount": 90,
+        "otherRealtimePacketCount": 90,
+        "ingressSource": "WebTransport.datagrams.readable.getReader() unmodified read results",
+        "ingressIntervals": 89,
+        "ingressGapP51Ms": 50.1,
+        "ingressGapP95Ms": 50.6,
+        "ingressGapMaxMs": 55,
+        "ingressTickJumpP95": 3,
+        "ingressTickJumpMax": 3,
+        "ingressIntervalsOver100Ms": 0,
+        "ingressIntervalsOver250Ms": 0,
+        "ingressIntervalsOver400Ms": 0,
+        "eventBursts": [],
+        "acceptedTimeline": [
+          {
+            "t": 1408.9,
+            "epochMs": 1792687635101.6,
+            "kind": "realtime",
+            "tick": 117
+          },
+          {
+            "t": 1459,
+            "epochMs": 1792687635151.7,
+            "kind": "realtime",
+            "tick": 120
+          },
+          {
+            "t": 1508.2,
+            "epochMs": 1792687635200.9,
+            "kind": "realtime",
+            "tick": 123
+          },
+          {
+            "t": 1558,
+            "epochMs": 1792687635250.7,
+            "kind": "realtime",
+            "tick": 126
+          },
+          {
+            "t": 1608.3,
+            "epochMs": 1792687635301,
+            "kind": "realtime",
+            "tick": 129
+          },
+          {
+            "t": 1658.8,
+            "epochMs": 1792687635351.5,
+            "kind": "realtime",
+            "tick": 132
+          },
+          {
+            "t": 1708.6,
+            "epochMs": 1792687635401.3,
+            "kind": "realtime",
+            "tick": 135
+          },
+          {
+            "t": 1759,
+            "epochMs": 1792687635451.7,
+            "kind": "realtime",
+            "tick": 138
+          },
+          {
+            "t": 1809.2,
+            "epochMs": 1792687635501.9,
+            "kind": "realtime",
+            "tick": 141
+          },
+          {
+            "t": 1858.9,
+            "epochMs": 1792687635551.6,
+            "kind": "realtime",
+            "tick": 144
+          },
+          {
+            "t": 1909.2,
+            "epochMs": 1792687635601.9,
+            "kind": "realtime",
+            "tick": 147
+          },
+          {
+            "t": 1959.1,
+            "epochMs": 1792687635651.8,
+            "kind": "realtime",
+            "tick": 150
+          },
+          {
+            "t": 2008.2,
+            "epochMs": 1792687635700.9,
+            "kind": "realtime",
+            "tick": 153
+          },
+          {
+            "t": 2058.6,
+            "epochMs": 1792687635751.3,
+            "kind": "realtime",
+            "tick": 156
+          },
+          {
+            "t": 2108.5,
+            "epochMs": 1792687635801.2,
+            "kind": "realtime",
+            "tick": 159
+          },
+          {
+            "t": 2159.1,
+            "epochMs": 1792687635851.8,
+            "kind": "realtime",
+            "tick": 162
+          },
+          {
+            "t": 2208.8,
+            "epochMs": 1792687635901.5,
+            "kind": "realtime",
+            "tick": 165
+          },
+          {
+            "t": 2259,
+            "epochMs": 1792687635951.7,
+            "kind": "realtime",
+            "tick": 168
+          },
+          {
+            "t": 2314,
+            "epochMs": 1792687636006.7,
+            "kind": "realtime",
+            "tick": 171
+          },
+          {
+            "t": 2359.1,
+            "epochMs": 1792687636051.8,
+            "kind": "realtime",
+            "tick": 174
+          },
+          {
+            "t": 2409.1,
+            "epochMs": 1792687636101.8,
+            "kind": "realtime",
+            "tick": 177
+          },
+          {
+            "t": 2458.9,
+            "epochMs": 1792687636151.6,
+            "kind": "realtime",
+            "tick": 180
+          },
+          {
+            "t": 2508,
+            "epochMs": 1792687636200.7,
+            "kind": "realtime",
+            "tick": 183
+          },
+          {
+            "t": 2558.9,
+            "epochMs": 1792687636251.6,
+            "kind": "realtime",
+            "tick": 186
+          },
+          {
+            "t": 2608.7,
+            "epochMs": 1792687636301.4,
+            "kind": "realtime",
+            "tick": 189
+          },
+          {
+            "t": 2658.8,
+            "epochMs": 1792687636351.5,
+            "kind": "realtime",
+            "tick": 192
+          },
+          {
+            "t": 2708.6,
+            "epochMs": 1792687636401.3,
+            "kind": "realtime",
+            "tick": 195
+          },
+          {
+            "t": 2759.1,
+            "epochMs": 1792687636451.8,
+            "kind": "realtime",
+            "tick": 198
+          },
+          {
+            "t": 2809.1,
+            "epochMs": 1792687636501.8,
+            "kind": "realtime",
+            "tick": 201
+          },
+          {
+            "t": 2858.8,
+            "epochMs": 1792687636551.5,
+            "kind": "realtime",
+            "tick": 204
+          },
+          {
+            "t": 2909.1,
+            "epochMs": 1792687636601.8,
+            "kind": "realtime",
+            "tick": 207
+          },
+          {
+            "t": 2958.9,
+            "epochMs": 1792687636651.6,
+            "kind": "realtime",
+            "tick": 210
+          },
+          {
+            "t": 3009.2,
+            "epochMs": 1792687636701.9,
+            "kind": "realtime",
+            "tick": 213
+          },
+          {
+            "t": 3058.9,
+            "epochMs": 1792687636751.6,
+            "kind": "realtime",
+            "tick": 216
+          },
+          {
+            "t": 3108.3,
+            "epochMs": 1792687636801,
+            "kind": "realtime",
+            "tick": 219
+          },
+          {
+            "t": 3158.8,
+            "epochMs": 1792687636851.5,
+            "kind": "realtime",
+            "tick": 222
+          },
+          {
+            "t": 3209.2,
+            "epochMs": 1792687636901.9,
+            "kind": "realtime",
+            "tick": 225
+          },
+          {
+            "t": 3258.4,
+            "epochMs": 1792687636951.1,
+            "kind": "realtime",
+            "tick": 228
+          },
+          {
+            "t": 3308.6,
+            "epochMs": 1792687637001.3,
+            "kind": "realtime",
+            "tick": 231
+          },
+          {
+            "t": 3358.8,
+            "epochMs": 1792687637051.5,
+            "kind": "realtime",
+            "tick": 234
+          },
+          {
+            "t": 3409.1,
+            "epochMs": 1792687637101.8,
+            "kind": "realtime",
+            "tick": 237
+          },
+          {
+            "t": 3458.9,
+            "epochMs": 1792687637151.6,
+            "kind": "realtime",
+            "tick": 240
+          },
+          {
+            "t": 3509.2,
+            "epochMs": 1792687637201.9,
+            "kind": "realtime",
+            "tick": 243
+          },
+          {
+            "t": 3559,
+            "epochMs": 1792687637251.7,
+            "kind": "realtime",
+            "tick": 246
+          },
+          {
+            "t": 3608.6,
+            "epochMs": 1792687637301.3,
+            "kind": "realtime",
+            "tick": 249
+          },
+          {
+            "t": 3658.9,
+            "epochMs": 1792687637351.6,
+            "kind": "realtime",
+            "tick": 252
+          },
+          {
+            "t": 3709.1,
+            "epochMs": 1792687637401.8,
+            "kind": "realtime",
+            "tick": 255
+          },
+          {
+            "t": 3758.8,
+            "epochMs": 1792687637451.5,
+            "kind": "realtime",
+            "tick": 258
+          },
+          {
+            "t": 3809.2,
+            "epochMs": 1792687637501.9,
+            "kind": "realtime",
+            "tick": 261
+          },
+          {
+            "t": 3858.7,
+            "epochMs": 1792687637551.4,
+            "kind": "realtime",
+            "tick": 264
+          },
+          {
+            "t": 3908.1,
+            "epochMs": 1792687637600.8,
+            "kind": "realtime",
+            "tick": 267
+          },
+          {
+            "t": 3958.4,
+            "epochMs": 1792687637651.1,
+            "kind": "realtime",
+            "tick": 270
+          },
+          {
+            "t": 4009.2,
+            "epochMs": 1792687637701.9,
+            "kind": "realtime",
+            "tick": 273
+          },
+          {
+            "t": 4058.2,
+            "epochMs": 1792687637750.9,
+            "kind": "realtime",
+            "tick": 276
+          },
+          {
+            "t": 4108.4,
+            "epochMs": 1792687637801.1,
+            "kind": "realtime",
+            "tick": 279
+          },
+          {
+            "t": 4158.8,
+            "epochMs": 1792687637851.5,
+            "kind": "realtime",
+            "tick": 282
+          },
+          {
+            "t": 4209.2,
+            "epochMs": 1792687637901.9,
+            "kind": "realtime",
+            "tick": 285
+          },
+          {
+            "t": 4258.8,
+            "epochMs": 1792687637951.5,
+            "kind": "realtime",
+            "tick": 288
+          },
+          {
+            "t": 4309.2,
+            "epochMs": 1792687638001.9,
+            "kind": "realtime",
+            "tick": 291
+          },
+          {
+            "t": 4358.9,
+            "epochMs": 1792687638051.6,
+            "kind": "realtime",
+            "tick": 294
+          },
+          {
+            "t": 4409.1,
+            "epochMs": 1792687638101.8,
+            "kind": "realtime",
+            "tick": 297
+          },
+          {
+            "t": 4458.9,
+            "epochMs": 1792687638151.6,
+            "kind": "realtime",
+            "tick": 300
+          },
+          {
+            "t": 4509.1,
+            "epochMs": 1792687638201.8,
+            "kind": "realtime",
+            "tick": 303
+          },
+          {
+            "t": 4558.8,
+            "epochMs": 1792687638251.5,
+            "kind": "realtime",
+            "tick": 306
+          },
+          {
+            "t": 4608.3,
+            "epochMs": 1792687638301,
+            "kind": "realtime",
+            "tick": 309
+          },
+          {
+            "t": 4658.7,
+            "epochMs": 1792687638351.4,
+            "kind": "realtime",
+            "tick": 312
+          },
+          {
+            "t": 4709.1,
+            "epochMs": 1792687638401.8,
+            "kind": "realtime",
+            "tick": 315
+          },
+          {
+            "t": 4758.7,
+            "epochMs": 1792687638451.4,
+            "kind": "realtime",
+            "tick": 318
+          },
+          {
+            "t": 4808.8,
+            "epochMs": 1792687638501.5,
+            "kind": "realtime",
+            "tick": 321
+          },
+          {
+            "t": 4858.8,
+            "epochMs": 1792687638551.5,
+            "kind": "realtime",
+            "tick": 324
+          },
+          {
+            "t": 4909.1,
+            "epochMs": 1792687638601.8,
+            "kind": "realtime",
+            "tick": 327
+          },
+          {
+            "t": 4958.8,
+            "epochMs": 1792687638651.5,
+            "kind": "realtime",
+            "tick": 330
+          },
+          {
+            "t": 5009,
+            "epochMs": 1792687638701.7,
+            "kind": "realtime",
+            "tick": 333
+          },
+          {
+            "t": 5058.7,
+            "epochMs": 1792687638751.4,
+            "kind": "realtime",
+            "tick": 336
+          },
+          {
+            "t": 5108.3,
+            "epochMs": 1792687638801,
+            "kind": "realtime",
+            "tick": 339
+          },
+          {
+            "t": 5158.6,
+            "epochMs": 1792687638851.3,
+            "kind": "realtime",
+            "tick": 342
+          },
+          {
+            "t": 5209,
+            "epochMs": 1792687638901.7,
+            "kind": "realtime",
+            "tick": 345
+          },
+          {
+            "t": 5258.8,
+            "epochMs": 1792687638951.5,
+            "kind": "realtime",
+            "tick": 348
+          },
+          {
+            "t": 5309.1,
+            "epochMs": 1792687639001.8,
+            "kind": "realtime",
+            "tick": 351
+          },
+          {
+            "t": 5358.9,
+            "epochMs": 1792687639051.6,
+            "kind": "realtime",
+            "tick": 354
+          },
+          {
+            "t": 5409,
+            "epochMs": 1792687639101.7,
+            "kind": "realtime",
+            "tick": 357
+          },
+          {
+            "t": 5458.2,
+            "epochMs": 1792687639150.9,
+            "kind": "realtime",
+            "tick": 360
+          },
+          {
+            "t": 5508.5,
+            "epochMs": 1792687639201.2,
+            "kind": "realtime",
+            "tick": 363
+          },
+          {
+            "t": 5558.9,
+            "epochMs": 1792687639251.6,
+            "kind": "realtime",
+            "tick": 366
+          },
+          {
+            "t": 5608.2,
+            "epochMs": 1792687639300.9,
+            "kind": "realtime",
+            "tick": 369
+          },
+          {
+            "t": 5658.8,
+            "epochMs": 1792687639351.5,
+            "kind": "realtime",
+            "tick": 372
+          },
+          {
+            "t": 5708.8,
+            "epochMs": 1792687639401.5,
+            "kind": "realtime",
+            "tick": 375
+          },
+          {
+            "t": 5758.1,
+            "epochMs": 1792687639450.8,
+            "kind": "realtime",
+            "tick": 378
+          },
+          {
+            "t": 5808.5,
+            "epochMs": 1792687639501.2,
+            "kind": "realtime",
+            "tick": 381
+          },
+          {
+            "t": 5858.7,
+            "epochMs": 1792687639551.4,
+            "kind": "realtime",
+            "tick": 384
+          }
+        ],
+        "clockTimeline": [
+          {
+            "t": 1392.3,
+            "epochMs": 1792687635085,
+            "tick": 114,
+            "renderTick": 110.604,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1492.3,
+            "epochMs": 1792687635185,
+            "tick": 120,
+            "renderTick": 116.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1592.3,
+            "epochMs": 1792687635285,
+            "tick": 126,
+            "renderTick": 122.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1692.3,
+            "epochMs": 1792687635385,
+            "tick": 132,
+            "renderTick": 128.604,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1792.3,
+            "epochMs": 1792687635485,
+            "tick": 138,
+            "renderTick": 134.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1892.3,
+            "epochMs": 1792687635585,
+            "tick": 144,
+            "renderTick": 140.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 1992.2,
+            "epochMs": 1792687635684.9,
+            "tick": 150,
+            "renderTick": 146.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 2092.3,
+            "epochMs": 1792687635785,
+            "tick": 156,
+            "renderTick": 152.604,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 2192.2,
+            "epochMs": 1792687635884.9,
+            "tick": 162,
+            "renderTick": 158.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 2292.2,
+            "epochMs": 1792687635984.9,
+            "tick": 168,
+            "renderTick": 164.598,
+            "debtMs": 0,
+            "catchups": 6
+          },
+          {
+            "t": 2392.2,
+            "epochMs": 1792687636084.9,
+            "tick": 174,
+            "renderTick": 170.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2492.3,
+            "epochMs": 1792687636185,
+            "tick": 180,
+            "renderTick": 176.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2592.2,
+            "epochMs": 1792687636284.9,
+            "tick": 186,
+            "renderTick": 182.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2692.2,
+            "epochMs": 1792687636384.9,
+            "tick": 192,
+            "renderTick": 188.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2792.2,
+            "epochMs": 1792687636484.9,
+            "tick": 198,
+            "renderTick": 194.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2892.2,
+            "epochMs": 1792687636584.9,
+            "tick": 204,
+            "renderTick": 200.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 2992.2,
+            "epochMs": 1792687636684.9,
+            "tick": 210,
+            "renderTick": 206.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3092.2,
+            "epochMs": 1792687636784.9,
+            "tick": 216,
+            "renderTick": 212.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3192.2,
+            "epochMs": 1792687636884.9,
+            "tick": 222,
+            "renderTick": 218.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3292.2,
+            "epochMs": 1792687636984.9,
+            "tick": 228,
+            "renderTick": 224.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3392.2,
+            "epochMs": 1792687637084.9,
+            "tick": 234,
+            "renderTick": 230.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3492.2,
+            "epochMs": 1792687637184.9,
+            "tick": 240,
+            "renderTick": 236.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3592.2,
+            "epochMs": 1792687637284.9,
+            "tick": 246,
+            "renderTick": 242.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3692.2,
+            "epochMs": 1792687637384.9,
+            "tick": 252,
+            "renderTick": 248.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3792.1,
+            "epochMs": 1792687637484.8,
+            "tick": 258,
+            "renderTick": 254.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3892.2,
+            "epochMs": 1792687637584.9,
+            "tick": 264,
+            "renderTick": 260.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 3992.1,
+            "epochMs": 1792687637684.8,
+            "tick": 270,
+            "renderTick": 266.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4092.2,
+            "epochMs": 1792687637784.9,
+            "tick": 276,
+            "renderTick": 272.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4192.2,
+            "epochMs": 1792687637884.9,
+            "tick": 282,
+            "renderTick": 278.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4292.2,
+            "epochMs": 1792687637984.9,
+            "tick": 288,
+            "renderTick": 284.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4392.2,
+            "epochMs": 1792687638084.9,
+            "tick": 294,
+            "renderTick": 290.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4492.1,
+            "epochMs": 1792687638184.8,
+            "tick": 300,
+            "renderTick": 296.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4592.2,
+            "epochMs": 1792687638284.9,
+            "tick": 306,
+            "renderTick": 302.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4692.1,
+            "epochMs": 1792687638384.8,
+            "tick": 312,
+            "renderTick": 308.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4792.2,
+            "epochMs": 1792687638484.9,
+            "tick": 318,
+            "renderTick": 314.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4892.1,
+            "epochMs": 1792687638584.8,
+            "tick": 324,
+            "renderTick": 320.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 4992.1,
+            "epochMs": 1792687638684.8,
+            "tick": 330,
+            "renderTick": 326.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5092.1,
+            "epochMs": 1792687638784.8,
+            "tick": 336,
+            "renderTick": 332.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5192.2,
+            "epochMs": 1792687638884.9,
+            "tick": 342,
+            "renderTick": 338.61,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5292.1,
+            "epochMs": 1792687638984.8,
+            "tick": 348,
+            "renderTick": 344.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5392.1,
+            "epochMs": 1792687639084.8,
+            "tick": 354,
+            "renderTick": 350.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5492.1,
+            "epochMs": 1792687639184.8,
+            "tick": 360,
+            "renderTick": 356.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5592.1,
+            "epochMs": 1792687639284.8,
+            "tick": 366,
+            "renderTick": 362.604,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5692.1,
+            "epochMs": 1792687639384.8,
+            "tick": 372,
+            "renderTick": 368.598,
+            "debtMs": 0,
+            "catchups": 8
+          },
+          {
+            "t": 5792.1,
+            "epochMs": 1792687639484.8,
+            "tick": 378,
+            "renderTick": 374.604,
+            "debtMs": 0,
+            "catchups": 8
+          }
+        ],
+        "acceptedRealtimeCount": 90,
+        "acceptedReliableCount": 0,
+        "acceptedTotalCount": 90,
+        "acceptedGapP95Ms": 50.6,
+        "acceptedGapMaxMs": 55,
+        "acceptedTickJumpMax": 3,
+        "acceptedGapOver100": 0,
+        "acceptedGapOver400": 0,
+        "sampledClockCount": 45,
+        "sampledClockDebtP95Ms": 0,
+        "sampledClockDebtMaxMs": 0,
+        "sampledClockCatchupMax": 8,
+        "clockCorrelationWindows": [
+          {
+            "t": 1392.3,
+            "epochMs": 1792687635085,
+            "tick": 114,
+            "renderTick": 110.604,
+            "debtMs": 0,
+            "catchups": 6,
+            "nearbyAccepted": [
+              {
+                "t": 1408.9,
+                "epochMs": 1792687635101.6,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1459,
+                "epochMs": 1792687635151.7,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1508.2,
+                "epochMs": 1792687635200.9,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1558,
+                "epochMs": 1792687635250.7,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1608.3,
+                "epochMs": 1792687635301,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1658.8,
+                "epochMs": 1792687635351.5,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1708.6,
+                "epochMs": 1792687635401.3,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1759,
+                "epochMs": 1792687635451.7,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1809.2,
+                "epochMs": 1792687635501.9,
+                "kind": "realtime",
+                "tick": 141
+              }
+            ]
+          },
+          {
+            "t": 1492.3,
+            "epochMs": 1792687635185,
+            "tick": 120,
+            "renderTick": 116.598,
+            "debtMs": 0,
+            "catchups": 6,
+            "nearbyAccepted": [
+              {
+                "t": 1408.9,
+                "epochMs": 1792687635101.6,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1459,
+                "epochMs": 1792687635151.7,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1508.2,
+                "epochMs": 1792687635200.9,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1558,
+                "epochMs": 1792687635250.7,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1608.3,
+                "epochMs": 1792687635301,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1658.8,
+                "epochMs": 1792687635351.5,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1708.6,
+                "epochMs": 1792687635401.3,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1759,
+                "epochMs": 1792687635451.7,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1809.2,
+                "epochMs": 1792687635501.9,
+                "kind": "realtime",
+                "tick": 141
+              },
+              {
+                "t": 1858.9,
+                "epochMs": 1792687635551.6,
+                "kind": "realtime",
+                "tick": 144
+              },
+              {
+                "t": 1909.2,
+                "epochMs": 1792687635601.9,
+                "kind": "realtime",
+                "tick": 147
+              }
+            ]
+          },
+          {
+            "t": 1592.3,
+            "epochMs": 1792687635285,
+            "tick": 126,
+            "renderTick": 122.598,
+            "debtMs": 0,
+            "catchups": 6,
+            "nearbyAccepted": [
+              {
+                "t": 1408.9,
+                "epochMs": 1792687635101.6,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1459,
+                "epochMs": 1792687635151.7,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1508.2,
+                "epochMs": 1792687635200.9,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1558,
+                "epochMs": 1792687635250.7,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1608.3,
+                "epochMs": 1792687635301,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1658.8,
+                "epochMs": 1792687635351.5,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1708.6,
+                "epochMs": 1792687635401.3,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1759,
+                "epochMs": 1792687635451.7,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1809.2,
+                "epochMs": 1792687635501.9,
+                "kind": "realtime",
+                "tick": 141
+              },
+              {
+                "t": 1858.9,
+                "epochMs": 1792687635551.6,
+                "kind": "realtime",
+                "tick": 144
+              },
+              {
+                "t": 1909.2,
+                "epochMs": 1792687635601.9,
+                "kind": "realtime",
+                "tick": 147
+              },
+              {
+                "t": 1959.1,
+                "epochMs": 1792687635651.8,
+                "kind": "realtime",
+                "tick": 150
+              },
+              {
+                "t": 2008.2,
+                "epochMs": 1792687635700.9,
+                "kind": "realtime",
+                "tick": 153
+              }
+            ]
+          },
+          {
+            "t": 1692.3,
+            "epochMs": 1792687635385,
+            "tick": 132,
+            "renderTick": 128.604,
+            "debtMs": 0,
+            "catchups": 6,
+            "nearbyAccepted": [
+              {
+                "t": 1408.9,
+                "epochMs": 1792687635101.6,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1459,
+                "epochMs": 1792687635151.7,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1508.2,
+                "epochMs": 1792687635200.9,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1558,
+                "epochMs": 1792687635250.7,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1608.3,
+                "epochMs": 1792687635301,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1658.8,
+                "epochMs": 1792687635351.5,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1708.6,
+                "epochMs": 1792687635401.3,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1759,
+                "epochMs": 1792687635451.7,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1809.2,
+                "epochMs": 1792687635501.9,
+                "kind": "realtime",
+                "tick": 141
+              },
+              {
+                "t": 1858.9,
+                "epochMs": 1792687635551.6,
+                "kind": "realtime",
+                "tick": 144
+              },
+              {
+                "t": 1909.2,
+                "epochMs": 1792687635601.9,
+                "kind": "realtime",
+                "tick": 147
+              },
+              {
+                "t": 1959.1,
+                "epochMs": 1792687635651.8,
+                "kind": "realtime",
+                "tick": 150
+              },
+              {
+                "t": 2008.2,
+                "epochMs": 1792687635700.9,
+                "kind": "realtime",
+                "tick": 153
+              },
+              {
+                "t": 2058.6,
+                "epochMs": 1792687635751.3,
+                "kind": "realtime",
+                "tick": 156
+              },
+              {
+                "t": 2108.5,
+                "epochMs": 1792687635801.2,
+                "kind": "realtime",
+                "tick": 159
+              }
+            ]
+          },
+          {
+            "t": 1792.3,
+            "epochMs": 1792687635485,
+            "tick": 138,
+            "renderTick": 134.598,
+            "debtMs": 0,
+            "catchups": 6,
+            "nearbyAccepted": [
+              {
+                "t": 1408.9,
+                "epochMs": 1792687635101.6,
+                "kind": "realtime",
+                "tick": 117
+              },
+              {
+                "t": 1459,
+                "epochMs": 1792687635151.7,
+                "kind": "realtime",
+                "tick": 120
+              },
+              {
+                "t": 1508.2,
+                "epochMs": 1792687635200.9,
+                "kind": "realtime",
+                "tick": 123
+              },
+              {
+                "t": 1558,
+                "epochMs": 1792687635250.7,
+                "kind": "realtime",
+                "tick": 126
+              },
+              {
+                "t": 1608.3,
+                "epochMs": 1792687635301,
+                "kind": "realtime",
+                "tick": 129
+              },
+              {
+                "t": 1658.8,
+                "epochMs": 1792687635351.5,
+                "kind": "realtime",
+                "tick": 132
+              },
+              {
+                "t": 1708.6,
+                "epochMs": 1792687635401.3,
+                "kind": "realtime",
+                "tick": 135
+              },
+              {
+                "t": 1759,
+                "epochMs": 1792687635451.7,
+                "kind": "realtime",
+                "tick": 138
+              },
+              {
+                "t": 1809.2,
+                "epochMs": 1792687635501.9,
+                "kind": "realtime",
+                "tick": 141
+              },
+              {
+                "t": 1858.9,
+                "epochMs": 1792687635551.6,
+                "kind": "realtime",
+                "tick": 144
+              },
+              {
+                "t": 1909.2,
+                "epochMs": 1792687635601.9,
+                "kind": "realtime",
+                "tick": 147
+              },
+              {
+                "t": 1959.1,
+                "epochMs": 1792687635651.8,
+                "kind": "realtime",
+                "tick": 150
+              },
+              {
+                "t": 2008.2,
+                "epochMs": 1792687635700.9,
+                "kind": "realtime",
+                "tick": 153
+              },
+              {
+                "t": 2058.6,
+                "epochMs": 1792687635751.3,
+                "kind": "realtime",
+                "tick": 156
+              },
+              {
+                "t": 2108.5,
+                "epochMs": 1792687635801.2,
+                "kind": "realtime",
+                "tick": 159
+              },
+              {
+                "t": 2159.1,
+                "epochMs": 1792687635851.8,
+                "kind": "realtime",
+                "tick": 162
+              },
+              {
+                "t": 2208.8,
+                "epochMs": 1792687635901.5,
+                "kind": "realtime",
+                "tick": 165
+              }
+            ]
+          }
+        ],
+        "topFrameGaps": [],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    }
+  ],
+  "errors": [],
+  "serverSummary": {
+    "endpointLoopback": true,
+    "admittedPlayerIds": [
+      1
+    ],
+    "clientCount": 1
+  },
+  "serverTransmit": [
+    {
+      "player": 1,
+      "tick": 48,
+      "epochMs": 1792687633950.5
+    },
+    {
+      "player": 1,
+      "tick": 51,
+      "epochMs": 1792687634000.214
+    },
+    {
+      "player": 1,
+      "tick": 54,
+      "epochMs": 1792687634050.443
+    },
+    {
+      "player": 1,
+      "tick": 57,
+      "epochMs": 1792687634100.561
+    },
+    {
+      "player": 1,
+      "tick": 60,
+      "epochMs": 1792687634150.137
+    },
+    {
+      "player": 1,
+      "tick": 63,
+      "epochMs": 1792687634200.918
+    },
+    {
+      "player": 1,
+      "tick": 66,
+      "epochMs": 1792687634250.224
+    },
+    {
+      "player": 1,
+      "tick": 69,
+      "epochMs": 1792687634300.457
+    },
+    {
+      "player": 1,
+      "tick": 72,
+      "epochMs": 1792687634350.96
+    },
+    {
+      "player": 1,
+      "tick": 75,
+      "epochMs": 1792687634401.221
+    },
+    {
+      "player": 1,
+      "tick": 78,
+      "epochMs": 1792687634450.924
+    },
+    {
+      "player": 1,
+      "tick": 81,
+      "epochMs": 1792687634500.347
+    },
+    {
+      "player": 1,
+      "tick": 84,
+      "epochMs": 1792687634550.263
+    },
+    {
+      "player": 1,
+      "tick": 87,
+      "epochMs": 1792687634600.428
+    },
+    {
+      "player": 1,
+      "tick": 90,
+      "epochMs": 1792687634650.302
+    },
+    {
+      "player": 1,
+      "tick": 93,
+      "epochMs": 1792687634700.307
+    },
+    {
+      "player": 1,
+      "tick": 96,
+      "epochMs": 1792687634751.039
+    },
+    {
+      "player": 1,
+      "tick": 99,
+      "epochMs": 1792687634800.226
+    },
+    {
+      "player": 1,
+      "tick": 102,
+      "epochMs": 1792687634850.995
+    },
+    {
+      "player": 1,
+      "tick": 105,
+      "epochMs": 1792687634900.19
+    },
+    {
+      "player": 1,
+      "tick": 108,
+      "epochMs": 1792687634950.775
+    },
+    {
+      "player": 1,
+      "tick": 111,
+      "epochMs": 1792687635000.167
+    },
+    {
+      "player": 1,
+      "tick": 114,
+      "epochMs": 1792687635050.977
+    },
+    {
+      "player": 1,
+      "tick": 117,
+      "epochMs": 1792687635101.032
+    },
+    {
+      "player": 1,
+      "tick": 120,
+      "epochMs": 1792687635150.88
+    },
+    {
+      "player": 1,
+      "tick": 123,
+      "epochMs": 1792687635200.234
+    },
+    {
+      "player": 1,
+      "tick": 126,
+      "epochMs": 1792687635250.079
+    },
+    {
+      "player": 1,
+      "tick": 129,
+      "epochMs": 1792687635300.414
+    },
+    {
+      "player": 1,
+      "tick": 132,
+      "epochMs": 1792687635350.746
+    },
+    {
+      "player": 1,
+      "tick": 135,
+      "epochMs": 1792687635400.424
+    },
+    {
+      "player": 1,
+      "tick": 138,
+      "epochMs": 1792687635450.832
+    },
+    {
+      "player": 1,
+      "tick": 141,
+      "epochMs": 1792687635501.103
+    },
+    {
+      "player": 1,
+      "tick": 144,
+      "epochMs": 1792687635550.867
+    },
+    {
+      "player": 1,
+      "tick": 147,
+      "epochMs": 1792687635601.116
+    },
+    {
+      "player": 1,
+      "tick": 150,
+      "epochMs": 1792687635650.961
+    },
+    {
+      "player": 1,
+      "tick": 153,
+      "epochMs": 1792687635700.138
+    },
+    {
+      "player": 1,
+      "tick": 156,
+      "epochMs": 1792687635750.47
+    },
+    {
+      "player": 1,
+      "tick": 159,
+      "epochMs": 1792687635800.334
+    },
+    {
+      "player": 1,
+      "tick": 162,
+      "epochMs": 1792687635850.971
+    },
+    {
+      "player": 1,
+      "tick": 165,
+      "epochMs": 1792687635900.694
+    },
+    {
+      "player": 1,
+      "tick": 168,
+      "epochMs": 1792687635950.887
+    },
+    {
+      "player": 1,
+      "tick": 171,
+      "epochMs": 1792687636000.395
+    },
+    {
+      "player": 1,
+      "tick": 174,
+      "epochMs": 1792687636051.012
+    },
+    {
+      "player": 1,
+      "tick": 177,
+      "epochMs": 1792687636101.124
+    },
+    {
+      "player": 1,
+      "tick": 180,
+      "epochMs": 1792687636150.669
+    },
+    {
+      "player": 1,
+      "tick": 183,
+      "epochMs": 1792687636200.033
+    },
+    {
+      "player": 1,
+      "tick": 186,
+      "epochMs": 1792687636250.744
+    },
+    {
+      "player": 1,
+      "tick": 189,
+      "epochMs": 1792687636300.614
+    },
+    {
+      "player": 1,
+      "tick": 192,
+      "epochMs": 1792687636350.736
+    },
+    {
+      "player": 1,
+      "tick": 195,
+      "epochMs": 1792687636400.526
+    },
+    {
+      "player": 1,
+      "tick": 198,
+      "epochMs": 1792687636450.961
+    },
+    {
+      "player": 1,
+      "tick": 201,
+      "epochMs": 1792687636501.1
+    },
+    {
+      "player": 1,
+      "tick": 204,
+      "epochMs": 1792687636550.78
+    },
+    {
+      "player": 1,
+      "tick": 207,
+      "epochMs": 1792687636601.027
+    },
+    {
+      "player": 1,
+      "tick": 210,
+      "epochMs": 1792687636650.895
+    },
+    {
+      "player": 1,
+      "tick": 213,
+      "epochMs": 1792687636701.122
+    },
+    {
+      "player": 1,
+      "tick": 216,
+      "epochMs": 1792687636750.79
+    },
+    {
+      "player": 1,
+      "tick": 219,
+      "epochMs": 1792687636800.208
+    },
+    {
+      "player": 1,
+      "tick": 222,
+      "epochMs": 1792687636850.69
+    },
+    {
+      "player": 1,
+      "tick": 225,
+      "epochMs": 1792687636901.098
+    },
+    {
+      "player": 1,
+      "tick": 228,
+      "epochMs": 1792687636950.274
+    },
+    {
+      "player": 1,
+      "tick": 231,
+      "epochMs": 1792687637000.531
+    },
+    {
+      "player": 1,
+      "tick": 234,
+      "epochMs": 1792687637050.693
+    },
+    {
+      "player": 1,
+      "tick": 237,
+      "epochMs": 1792687637101.001
+    },
+    {
+      "player": 1,
+      "tick": 240,
+      "epochMs": 1792687637150.777
+    },
+    {
+      "player": 1,
+      "tick": 243,
+      "epochMs": 1792687637201.124
+    },
+    {
+      "player": 1,
+      "tick": 246,
+      "epochMs": 1792687637251.033
+    },
+    {
+      "player": 1,
+      "tick": 249,
+      "epochMs": 1792687637300.669
+    },
+    {
+      "player": 1,
+      "tick": 252,
+      "epochMs": 1792687637350.783
+    },
+    {
+      "player": 1,
+      "tick": 255,
+      "epochMs": 1792687637401.027
+    },
+    {
+      "player": 1,
+      "tick": 258,
+      "epochMs": 1792687637450.696
+    },
+    {
+      "player": 1,
+      "tick": 261,
+      "epochMs": 1792687637501.016
+    },
+    {
+      "player": 1,
+      "tick": 264,
+      "epochMs": 1792687637550.69
+    },
+    {
+      "player": 1,
+      "tick": 267,
+      "epochMs": 1792687637600.07
+    },
+    {
+      "player": 1,
+      "tick": 270,
+      "epochMs": 1792687637650.316
+    },
+    {
+      "player": 1,
+      "tick": 273,
+      "epochMs": 1792687637701.032
+    },
+    {
+      "player": 1,
+      "tick": 276,
+      "epochMs": 1792687637750.184
+    },
+    {
+      "player": 1,
+      "tick": 279,
+      "epochMs": 1792687637800.264
+    },
+    {
+      "player": 1,
+      "tick": 282,
+      "epochMs": 1792687637850.722
+    },
+    {
+      "player": 1,
+      "tick": 285,
+      "epochMs": 1792687637901.069
+    },
+    {
+      "player": 1,
+      "tick": 288,
+      "epochMs": 1792687637950.655
+    },
+    {
+      "player": 1,
+      "tick": 291,
+      "epochMs": 1792687638001.11
+    },
+    {
+      "player": 1,
+      "tick": 294,
+      "epochMs": 1792687638050.782
+    },
+    {
+      "player": 1,
+      "tick": 297,
+      "epochMs": 1792687638101
+    },
+    {
+      "player": 1,
+      "tick": 300,
+      "epochMs": 1792687638150.808
+    },
+    {
+      "player": 1,
+      "tick": 303,
+      "epochMs": 1792687638200.999
+    },
+    {
+      "player": 1,
+      "tick": 306,
+      "epochMs": 1792687638250.891
+    },
+    {
+      "player": 1,
+      "tick": 309,
+      "epochMs": 1792687638300.238
+    },
+    {
+      "player": 1,
+      "tick": 312,
+      "epochMs": 1792687638350.658
+    },
+    {
+      "player": 1,
+      "tick": 315,
+      "epochMs": 1792687638400.983
+    },
+    {
+      "player": 1,
+      "tick": 318,
+      "epochMs": 1792687638450.598
+    },
+    {
+      "player": 1,
+      "tick": 321,
+      "epochMs": 1792687638500.732
+    },
+    {
+      "player": 1,
+      "tick": 324,
+      "epochMs": 1792687638550.647
+    },
+    {
+      "player": 1,
+      "tick": 327,
+      "epochMs": 1792687638600.995
+    },
+    {
+      "player": 1,
+      "tick": 330,
+      "epochMs": 1792687638650.689
+    },
+    {
+      "player": 1,
+      "tick": 333,
+      "epochMs": 1792687638700.839
+    },
+    {
+      "player": 1,
+      "tick": 336,
+      "epochMs": 1792687638750.653
+    },
+    {
+      "player": 1,
+      "tick": 339,
+      "epochMs": 1792687638800.221
+    },
+    {
+      "player": 1,
+      "tick": 342,
+      "epochMs": 1792687638850.498
+    },
+    {
+      "player": 1,
+      "tick": 345,
+      "epochMs": 1792687638900.85
+    },
+    {
+      "player": 1,
+      "tick": 348,
+      "epochMs": 1792687638950.705
+    },
+    {
+      "player": 1,
+      "tick": 351,
+      "epochMs": 1792687639000.929
+    },
+    {
+      "player": 1,
+      "tick": 354,
+      "epochMs": 1792687639050.785
+    },
+    {
+      "player": 1,
+      "tick": 357,
+      "epochMs": 1792687639100.93
+    },
+    {
+      "player": 1,
+      "tick": 360,
+      "epochMs": 1792687639150.167
+    },
+    {
+      "player": 1,
+      "tick": 363,
+      "epochMs": 1792687639200.448
+    },
+    {
+      "player": 1,
+      "tick": 366,
+      "epochMs": 1792687639250.885
+    },
+    {
+      "player": 1,
+      "tick": 369,
+      "epochMs": 1792687639300.206
+    },
+    {
+      "player": 1,
+      "tick": 372,
+      "epochMs": 1792687639350.819
+    },
+    {
+      "player": 1,
+      "tick": 375,
+      "epochMs": 1792687639400.905
+    },
+    {
+      "player": 1,
+      "tick": 378,
+      "epochMs": 1792687639450.268
+    },
+    {
+      "player": 1,
+      "tick": 381,
+      "epochMs": 1792687639500.433
+    },
+    {
+      "player": 1,
+      "tick": 384,
+      "epochMs": 1792687639550.619
+    },
+    {
+      "player": 1,
+      "tick": 387,
+      "epochMs": 1792687639600.233
+    }
+  ],
+  "serverSimulation": [
+    {
+      "tick": 3,
+      "epochMs": 1792687633154.883
+    },
+    {
+      "tick": 6,
+      "epochMs": 1792687633204.493
+    },
+    {
+      "tick": 9,
+      "epochMs": 1792687633254.132
+    },
+    {
+      "tick": 12,
+      "epochMs": 1792687633304.669
+    },
+    {
+      "tick": 15,
+      "epochMs": 1792687633354.341
+    },
+    {
+      "tick": 18,
+      "epochMs": 1792687633404.072
+    },
+    {
+      "tick": 21,
+      "epochMs": 1792687633455.123
+    },
+    {
+      "tick": 24,
+      "epochMs": 1792687633503.846
+    },
+    {
+      "tick": 27,
+      "epochMs": 1792687633554.371
+    },
+    {
+      "tick": 30,
+      "epochMs": 1792687633604.569
+    },
+    {
+      "tick": 33,
+      "epochMs": 1792687633654.217
+    },
+    {
+      "tick": 36,
+      "epochMs": 1792687633704.878
+    },
+    {
+      "tick": 39,
+      "epochMs": 1792687633754.462
+    },
+    {
+      "tick": 42,
+      "epochMs": 1792687633804.353
+    },
+    {
+      "tick": 45,
+      "epochMs": 1792687633854.319
+    },
+    {
+      "tick": 48,
+      "epochMs": 1792687633904.647
+    },
+    {
+      "tick": 51,
+      "epochMs": 1792687633954.511
+    },
+    {
+      "tick": 54,
+      "epochMs": 1792687634004.687
+    },
+    {
+      "tick": 57,
+      "epochMs": 1792687634054.94
+    },
+    {
+      "tick": 60,
+      "epochMs": 1792687634103.918
+    },
+    {
+      "tick": 63,
+      "epochMs": 1792687634154.103
+    },
+    {
+      "tick": 66,
+      "epochMs": 1792687634204.43
+    },
+    {
+      "tick": 69,
+      "epochMs": 1792687634254.277
+    },
+    {
+      "tick": 72,
+      "epochMs": 1792687634304.134
+    },
+    {
+      "tick": 75,
+      "epochMs": 1792687634354.4
+    },
+    {
+      "tick": 78,
+      "epochMs": 1792687634404.631
+    },
+    {
+      "tick": 81,
+      "epochMs": 1792687634454.193
+    },
+    {
+      "tick": 84,
+      "epochMs": 1792687634503.955
+    },
+    {
+      "tick": 87,
+      "epochMs": 1792687634554.427
+    },
+    {
+      "tick": 90,
+      "epochMs": 1792687634604.589
+    },
+    {
+      "tick": 93,
+      "epochMs": 1792687634654.674
+    },
+    {
+      "tick": 96,
+      "epochMs": 1792687634703.985
+    },
+    {
+      "tick": 99,
+      "epochMs": 1792687634753.975
+    },
+    {
+      "tick": 102,
+      "epochMs": 1792687634803.976
+    },
+    {
+      "tick": 105,
+      "epochMs": 1792687634854.868
+    },
+    {
+      "tick": 108,
+      "epochMs": 1792687634904.448
+    },
+    {
+      "tick": 111,
+      "epochMs": 1792687634954.099
+    },
+    {
+      "tick": 114,
+      "epochMs": 1792687635004.074
+    },
+    {
+      "tick": 117,
+      "epochMs": 1792687635053.947
+    },
+    {
+      "tick": 120,
+      "epochMs": 1792687635103.905
+    },
+    {
+      "tick": 123,
+      "epochMs": 1792687635154.226
+    },
+    {
+      "tick": 126,
+      "epochMs": 1792687635203.909
+    },
+    {
+      "tick": 129,
+      "epochMs": 1792687635254.643
+    },
+    {
+      "tick": 132,
+      "epochMs": 1792687635304.215
+    },
+    {
+      "tick": 135,
+      "epochMs": 1792687635353.865
+    },
+    {
+      "tick": 138,
+      "epochMs": 1792687635404.02
+    },
+    {
+      "tick": 141,
+      "epochMs": 1792687635454.076
+    },
+    {
+      "tick": 144,
+      "epochMs": 1792687635504.159
+    },
+    {
+      "tick": 147,
+      "epochMs": 1792687635554.086
+    },
+    {
+      "tick": 150,
+      "epochMs": 1792687635604.187
+    },
+    {
+      "tick": 153,
+      "epochMs": 1792687635653.924
+    },
+    {
+      "tick": 156,
+      "epochMs": 1792687635703.981
+    },
+    {
+      "tick": 159,
+      "epochMs": 1792687635754.402
+    },
+    {
+      "tick": 162,
+      "epochMs": 1792687635804.444
+    },
+    {
+      "tick": 165,
+      "epochMs": 1792687635853.919
+    },
+    {
+      "tick": 168,
+      "epochMs": 1792687635904.868
+    },
+    {
+      "tick": 171,
+      "epochMs": 1792687635953.999
+    },
+    {
+      "tick": 174,
+      "epochMs": 1792687636003.837
+    },
+    {
+      "tick": 177,
+      "epochMs": 1792687636053.993
+    },
+    {
+      "tick": 180,
+      "epochMs": 1792687636104.564
+    },
+    {
+      "tick": 183,
+      "epochMs": 1792687636153.969
+    },
+    {
+      "tick": 186,
+      "epochMs": 1792687636204.919
+    },
+    {
+      "tick": 189,
+      "epochMs": 1792687636254.003
+    },
+    {
+      "tick": 192,
+      "epochMs": 1792687636304.637
+    },
+    {
+      "tick": 195,
+      "epochMs": 1792687636353.905
+    },
+    {
+      "tick": 198,
+      "epochMs": 1792687636403.874
+    },
+    {
+      "tick": 201,
+      "epochMs": 1792687636453.884
+    },
+    {
+      "tick": 204,
+      "epochMs": 1792687636504.014
+    },
+    {
+      "tick": 207,
+      "epochMs": 1792687636554.868
+    },
+    {
+      "tick": 210,
+      "epochMs": 1792687636604.647
+    },
+    {
+      "tick": 213,
+      "epochMs": 1792687636654.311
+    },
+    {
+      "tick": 216,
+      "epochMs": 1792687636703.947
+    },
+    {
+      "tick": 219,
+      "epochMs": 1792687636753.991
+    },
+    {
+      "tick": 222,
+      "epochMs": 1792687636803.896
+    },
+    {
+      "tick": 225,
+      "epochMs": 1792687636854.372
+    },
+    {
+      "tick": 228,
+      "epochMs": 1792687636903.895
+    },
+    {
+      "tick": 231,
+      "epochMs": 1792687636954.536
+    },
+    {
+      "tick": 234,
+      "epochMs": 1792687637004.789
+    },
+    {
+      "tick": 237,
+      "epochMs": 1792687637053.896
+    },
+    {
+      "tick": 240,
+      "epochMs": 1792687637103.875
+    },
+    {
+      "tick": 243,
+      "epochMs": 1792687637154.007
+    },
+    {
+      "tick": 246,
+      "epochMs": 1792687637204.237
+    },
+    {
+      "tick": 249,
+      "epochMs": 1792687637254.556
+    },
+    {
+      "tick": 252,
+      "epochMs": 1792687637304.126
+    },
+    {
+      "tick": 255,
+      "epochMs": 1792687637354.134
+    },
+    {
+      "tick": 258,
+      "epochMs": 1792687637404.024
+    },
+    {
+      "tick": 261,
+      "epochMs": 1792687637454.129
+    },
+    {
+      "tick": 264,
+      "epochMs": 1792687637504.011
+    },
+    {
+      "tick": 267,
+      "epochMs": 1792687637554.9
+    },
+    {
+      "tick": 270,
+      "epochMs": 1792687637604.846
+    },
+    {
+      "tick": 273,
+      "epochMs": 1792687637653.981
+    },
+    {
+      "tick": 276,
+      "epochMs": 1792687637703.87
+    },
+    {
+      "tick": 279,
+      "epochMs": 1792687637753.863
+    },
+    {
+      "tick": 282,
+      "epochMs": 1792687637804.795
+    },
+    {
+      "tick": 285,
+      "epochMs": 1792687637854.844
+    },
+    {
+      "tick": 288,
+      "epochMs": 1792687637904.107
+    },
+    {
+      "tick": 291,
+      "epochMs": 1792687637954.343
+    },
+    {
+      "tick": 294,
+      "epochMs": 1792687638004.909
+    },
+    {
+      "tick": 297,
+      "epochMs": 1792687638054.214
+    },
+    {
+      "tick": 300,
+      "epochMs": 1792687638104.637
+    },
+    {
+      "tick": 303,
+      "epochMs": 1792687638154.036
+    },
+    {
+      "tick": 306,
+      "epochMs": 1792687638203.95
+    },
+    {
+      "tick": 309,
+      "epochMs": 1792687638254.242
+    },
+    {
+      "tick": 312,
+      "epochMs": 1792687638304.479
+    },
+    {
+      "tick": 315,
+      "epochMs": 1792687638354.363
+    },
+    {
+      "tick": 318,
+      "epochMs": 1792687638403.871
+    },
+    {
+      "tick": 321,
+      "epochMs": 1792687638453.878
+    },
+    {
+      "tick": 324,
+      "epochMs": 1792687638504.771
+    },
+    {
+      "tick": 327,
+      "epochMs": 1792687638554.872
+    },
+    {
+      "tick": 330,
+      "epochMs": 1792687638604.325
+    },
+    {
+      "tick": 333,
+      "epochMs": 1792687638654.904
+    },
+    {
+      "tick": 336,
+      "epochMs": 1792687638704.497
+    },
+    {
+      "tick": 339,
+      "epochMs": 1792687638754.003
+    },
+    {
+      "tick": 342,
+      "epochMs": 1792687638804.147
+    },
+    {
+      "tick": 345,
+      "epochMs": 1792687638854.878
+    },
+    {
+      "tick": 348,
+      "epochMs": 1792687638904.332
+    },
+    {
+      "tick": 351,
+      "epochMs": 1792687638954.71
+    },
+    {
+      "tick": 354,
+      "epochMs": 1792687639004.27
+    },
+    {
+      "tick": 357,
+      "epochMs": 1792687639053.976
+    },
+    {
+      "tick": 360,
+      "epochMs": 1792687639104.868
+    },
+    {
+      "tick": 363,
+      "epochMs": 1792687639154.883
+    },
+    {
+      "tick": 366,
+      "epochMs": 1792687639204.823
+    },
+    {
+      "tick": 369,
+      "epochMs": 1792687639254.258
+    },
+    {
+      "tick": 372,
+      "epochMs": 1792687639303.909
+    },
+    {
+      "tick": 375,
+      "epochMs": 1792687639354.754
+    },
+    {
+      "tick": 378,
+      "epochMs": 1792687639404.827
+    },
+    {
+      "tick": 381,
+      "epochMs": 1792687639454.598
+    },
+    {
+      "tick": 384,
+      "epochMs": 1792687639504.787
+    },
+    {
+      "tick": 387,
+      "epochMs": 1792687639554.853
+    },
+    {
+      "tick": 390,
+      "epochMs": 1792687639604.649
+    },
+    {
+      "tick": 393,
+      "epochMs": 1792687639654.291
+    },
+    {
+      "tick": 396,
+      "epochMs": 1792687639704.339
+    }
+  ]
+}
