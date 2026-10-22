@@ -1,8 +1,8 @@
 # 🌕⚡️🚀 Core 8C Pre-Alpha 0.1 — World Actor Lease & Retirement (DORMANT REVIEW)
 
-**Department:** Core 8C / World Runtime & Authority\
-**Release:** Existing 2–4-player Combat Pre-Alpha arena, not Greyhaven/Items.\
-**Source base:** Core 8A [draft #724](https://github.com/tehki/myaso/pull/724), initial exact `7c012c8551809b800889d7a78c1bc540a208c52b`.\
+**Department:** Core 8C / World Runtime & Authority
+**Release:** Existing 2–4-player Combat Pre-Alpha arena, not Greyhaven/Items.
+**Source base:** Core 8A [draft #724](https://github.com/tehki/myaso/pull/724), initial exact `7c012c8551809b800889d7a78c1bc540a208c52b`.
 **Main authority:** [#360](https://github.com/tehki/myaso/issues/360), [Pre-Alpha #695](https://github.com/tehki/myaso/issues/695), [one-wire decision #723](https://github.com/tehki/myaso/issues/723).
 
 ## Boundaries and what this implements
