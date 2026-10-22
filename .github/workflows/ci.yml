@@ -1183,3 +1183,43 @@ jobs:
           MYASO_GRAPHICS3A_PREALPHA_MOTION_FLIGHT: "1"
           MYASO_PVP_FLIGHT_DURATION_MS: "8500"
         run: node scripts/pvp_browser_flight_runner.mjs
+
+  # Four real browser clients in parallel with full quality. THIS IS NOT
+  # an override, merge bypass or substitute for all Combat release gates.
+  graphics3a-silver-four-authenticated:
+    name: graphics3a-real-silver-4p
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/p0-original-silver-4p-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact four-browser QA head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify four-player Silver acceptance rejects synthetic evidence
+        run: |
+          node --check scripts/graphics3a-prealpha-four-silver-receipt.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/prealpha-silver-four-connected-receipt.test.mjs
+          node --test tests/prealpha-silver-knight.test.mjs
+
+      - name: Verify native Chrome Firefox and Rust toolchain
+        run: |
+          cargo --version
+          rustc --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+
+      - name: Build authentic authoritative arena before timed startup
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+
+      - name: Four independently joined real browser human Silver renderers
+        env:
+          MYASO_PVP_SCENARIO: "uiidentity"
+          MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT: "1"
+          MYASO_GRAPHICS3A_PREALPHA_FOUR_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs

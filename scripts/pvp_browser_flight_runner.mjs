@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { qualifyPrealphaSilverConnectedClients } from "./graphics3a-prealpha-silver-connected-receipt.mjs";
 import { qualifyPrealphaSilverConnectedMotions } from "./graphics3a-prealpha-connected-motion-receipt.mjs";
+import { qualifyPrealphaFourSilverClients } from "./graphics3a-prealpha-four-silver-receipt.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
@@ -44,6 +45,9 @@ const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 const prealphaSilverFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT === "1";
 const prealphaSilverMotionFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_MOTION_FLIGHT === "1";
+const prealphaSilverFourFlight = process.env.MYASO_GRAPHICS3A_PREALPHA_FOUR_FLIGHT === "1";
+if (prealphaSilverFourFlight && (!prealphaSilverFlight || prealphaSilverMotionFlight || scenario !== "uiidentity"))
+  throw new Error("Graphics3A four-browser check requires Silver uiidentity only (not the two-person motion test)");
 if (prealphaSilverMotionFlight && !prealphaSilverFlight)
   throw new Error("Graphics 3A roll/jump test requires real connected Silver gate");
 if (prealphaSilverFlight && scenario !== "uiidentity")
@@ -96,7 +100,7 @@ const browsers = [
     },
   },
 ];
-if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa") {
+if (prealphaSilverFourFlight || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa") {
   browsers.push({
     name: "chrome2",
     port: 9517,
@@ -119,7 +123,7 @@ if (scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus"
   });
 }
 
-if (scenario === "uimultiknockdownffahit") {
+if (scenario === "uimultiknockdownffahit" || prealphaSilverFourFlight) {
   browsers.push({
     name: "chrome3",
     port: 9518,
@@ -193,6 +197,10 @@ try {
     console.log(`M46_FFA_SPATIAL_VITALS ${JSON.stringify({ ok: true, results })}`);
   } else if (scenario === "uiidentity") {
     if (prealphaSilverFlight) await Promise.all(sessions.map(installPrealphaSilverDrawProbe));
+    if(prealphaSilverFourFlight) {
+      const result=await runOnlineUiFourSilverFlight(sessions);
+      console.log("GRAPHICS3A_PREALPHA_CONNECTED_FOUR_SILVER "+JSON.stringify(result));
+    } else {
     const results = await runOnlineUiIdentityFlight(sessions);
     if (prealphaSilverFlight) {
       const receipt = await verifyConnectedPrealphaSilverDraws(sessions,results);
@@ -203,6 +211,7 @@ try {
       }
     }
     console.log(`M47_FFA_PLAYER_IDENTITY ${JSON.stringify({ ok: true, results })}`);
+    }
   } else if (scenario === "uiscore") {
     const results = await runOnlineUiScoreFlight(sessions);
     console.log(`M48_FFA_KILL_SCORE ${JSON.stringify({ ok: true, results })}`);
@@ -891,6 +900,55 @@ async function verifyConnectedPrealphaSilverMotions(sessions,connected){
         nativeGestureObserved:realRoll,clients:rolling}
     ]
   });
+}
+
+// Genuine four-client browser acceptance. Existing M47 two-person and M159
+// four-person combat remain unchanged when this new flag is OFF.
+async function runOnlineUiFourSilverFlight(entries){
+  const ordered=["chrome","firefox","chrome2","chrome3"];
+  if(entries.length!==4||entries.some((x,i)=>x.name!==ordered[i]))
+    throw Error("Graphics3A exact 4 native browser sessions required");
+  await Promise.all(entries.map(installUiObserver));
+  const ready=await waitForUiReady(entries);
+  const ids=ready.map(x=>x.playerNetId);
+  if(new Set(ids).size!==4||ids.some(x=>!Number.isInteger(x)||x<=0))
+    throw Error("four distinct authoritative Rust player IDs not assigned");
+  let converged=null;
+  const deadline=Date.now()+5500;
+  while(Date.now()<deadline){
+    const states=await Promise.all(entries.map(readUiEvidence));
+    if(states.every(state=>state.scoreboardRows?.length===4
+      &&state.scoreboardRows.every(x=>x.kills===0)
+      &&state.scoreboardRows.map(x=>Number(x.label.replace("#","")))
+           .every(x=>ids.includes(x))))
+      {converged=states;break;}
+    await sleep(70);
+  }
+  if(!converged)throw Error("four browser server-authoritative scoreboard roster not converged");
+  await Promise.all(entries.map(x=>execute(x.base,x.sessionId,
+    "document.querySelector('#arena')?.focus(); return document.activeElement?.id;")));
+  // Actual W3C keyboard input. Other three clients must see the source
+  // walk/sprint, not a simulated local actor state.
+  await pulseMovementKey(entries[0],"d",480);
+  await sleep(950);
+  const clients=[];
+  for(const entry of entries){
+    const state=converged.find(x=>x.browser===entry.name);
+    const paint=await execute(entry.base,entry.sessionId,`
+      return {
+        connected:document.querySelector("#event-text")?.textContent?.includes("Online - player #")===true,
+        mockedState:false,
+        knightsFlag:new URL(location.href).searchParams.get("knights")==="1",
+        draws:window.__graphics3aPrealphaSilverDraws?.draws??[]
+      };
+    `);
+    if(!paint.knightsFlag)throw Error("genuine original Knight toggle absent in "+entry.name);
+    clients.push({engine:entry.name,serverPlayerId:state.playerNetId,
+      serverTick:Number((state.eventText??"").split("server tick ").at(-1)),
+      rosterIds:state.scoreboardRows.map(x=>Number(x.label.replace("#",""))),
+      ...paint});
+  }
+  return qualifyPrealphaFourSilverClients(clients);
 }
 
 async function runOnlineUiIdentityFlight(entries) {
