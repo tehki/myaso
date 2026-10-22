@@ -144,7 +144,10 @@ fn same_tick_actor_slot_replacement_cannot_inherit_retired_gestures() {
     assert!(world.add_player(1));
     assert_eq!(world.tick, 0);
     assert_ne!(world.fighter(1).unwrap().world_incarnation(), former_life);
-    assert_eq!(world.fighter(2).unwrap().world_incarnation(), unaffected_life);
+    assert_eq!(
+        world.fighter(2).unwrap().world_incarnation(),
+        unaffected_life
+    );
 
     assert!(old.review_drain_for_world(&world, prior).is_empty());
     assert!(old.is_retired());
