@@ -455,3 +455,41 @@ movement authority, real map, world items, or production flag. It is
 still **not** a complete authenticated live map snapshot, dynamic
 obstacle list, or an approved Sentinel collision body: Physics 6 and
 Core 8C must own those before patrol activation.
+
+
+## P0 route identity — same revision must mean exactly the same collider window
+
+The prospective server-side `RevisionedRoute::advance` previously compared
+the `NavigationSpace` and numeric `revision` but did not confirm that the
+actual collision bounds and blockers matched those used to authorize the
+stored path. In a focused regression, two separately built Moonvale
+windows with **revision 7**, one with an off-route additional wall and
+one without it, were both accepted. The actor advanced on a route
+from the old window despite a different manifest. Even though the new
+wall was off-route and the immediate waypoint remained clear, this
+violated the intended versioned-authority contract.
+
+The route now pins the exact original `NavBounds`, agent clearance and
+bounded `Collider` slice (at most 48 rectangles). Every step compares
+all three *before* accepting even one waypoint. A mismatch clears the
+path and halts the actor; the original same-revision window cannot
+resume it. Only a genuinely higher revision from the same navigation
+space can start a new validated route. An out-of-order collider list
+also fails closed: the manifest publisher must supply stable canonical
+ordering. This is deterministic exact comparison, not a potentially
+colliding geometry hash.
+
+Exact-head Rust tests exercise an off-route wall introduced without a
+revision increment, a shifted window with the old revision, recovery
+via a strictly newer valid manifest, and preservation of the previous
+11 bounded-navigation cases. An independent pre-fix Rust regression
+failed because the actor **did move** on the changed manifest;
+the same regression passed after the fix.
+
+**Scope limit:** a colliding manifest with equal geometry but a
+different server/worker epoch cannot be detected by these fields. This
+is *not* a signed epoch or a complete live Greyhaven geometry witness.
+Core 8A/8C and World 9 must supply trusted map/worker lifecycle,
+dynamic collision completeness, authoritative zone membership and
+real session fencing before any visible Sentinel patrol. All NPC
+pilot flags stay OFF for the First Playable four-Knight sword/PvP gate.
