@@ -25,7 +25,7 @@ test("A2.32 original editable Blender authoring has actual independent 20 iron m
  assert.ok(statSync(new URL(source.derivedBlend,root)).size>100000);
 });
 test("A2.32 original Cycles frames, non-roof geometry, 640 to original 228x297 game-crop",()=>{
- assert.equal(report.changedRgbPixels,6697);
+ assert.equal(report.changedRgbPixels,6582); // source-authentic rebuilt, mounted hinges
  assert.equal(report.changedAlphaPixels,0);
  assert.equal(report.changedBoundaryAlphaPixels,0);
  assert.deepEqual(report.croppedPixels,[228,297]);

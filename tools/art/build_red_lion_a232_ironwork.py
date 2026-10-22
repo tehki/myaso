@@ -35,13 +35,20 @@ def bar(name,loc,dim,bevel=.011):
 def rivet(name,xyz,r=.022):
  bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=6,radius=r,location=xyz)
  o=bpy.context.object;o.name=prefix+name;o.data.materials.append(iron);details.append(o)
+# Real Red Lion / door_front face is at WORLD Y=-2.030 (Blender A2.30
+# source mesh inspected directly), NOT Y=-1.4. Fasteners must physically
+# intersect that wood: faceward (negative Y) straps back to -2.0175 (12.5mm
+# embedded); barrels cross that face; peens bite into the real iron straps.
+DOOR_FACE_Y=-2.030
+HINGE_STRAP_Y=DOOR_FACE_Y-.015
+HINGE_BARREL_Y=DOOR_FACE_Y-.020
+HINGE_PEEN_Y=DOOR_FACE_Y-.045
 for label,z in (("lower",.72),("upper",1.88)):
- # Two physical surface-mounted old-iron straps, on original timber door.
- # Hinge-knuckle at door jamb, not floating in empty wall.
- bar("door hinge strap "+label,(-.36,-1.397,z),(.61,.055,.072),.012)
- bar("hinge barrel "+label,(-.70,-1.367,z),(.075,.084,.16),.016)
+ # Keep original left-edge X, upper/lower Z, width, thickness, and silhouette.
+ bar("door hinge strap "+label,(-.36,HINGE_STRAP_Y,z),(.61,.055,.072),.012)
+ bar("hinge barrel "+label,(-.70,HINGE_BARREL_Y,z),(.075,.084,.16),.016)
  for i,x in enumerate((-.51,-.32,-.13)):
-  rivet("hinge peen "+label+" "+str(i),(x,-1.359,z),.018)
+  rivet("hinge peen "+label+" "+str(i),(x,HINGE_PEEN_Y,z),.018)
 # A single forged door pull/knocker on the real door face; XZ plane.
 bpy.ops.mesh.primitive_torus_add(major_radius=.112,minor_radius=.017,major_segments=28,minor_segments=8,location=(.29,-1.376,1.37),rotation=(math.pi/2,0,0))
 o=bpy.context.object;o.name=prefix+"door knocker ring";o.data.materials.append(iron);details.append(o)
@@ -70,6 +77,20 @@ def deform(v,name):
  lift=.85*max(0,v.z)
  if (name.startswith("Red Lion / roof_") or name.startswith("Red Lion A2.1 / batched individually coloured clay roof tiles") or name=="Red Lion / gables") and v.z>3.45:
   lift=.85*(3.45+.45*(v.z-3.45))
+ # The saved editable 3D .blend retains REAL mounted -2.03-door geometry.
+ # The existing 2.5D Cycles sprite projection is intentionally flattened:
+ # without this render-ONLY compensation, moving the source hinges onto the
+ # real 3D door shifts their projected pixels downward behind the wall.
+ # Restore source-art visual height and bring hinge silhouettes 8cm inboard.
+ # This changes neither the .blend locations nor World collision/portal.
+ if name.startswith(prefix):
+  part=name[len(prefix):]
+  if part.startswith("door hinge strap "):
+   return Vector((v.x+.08,v.y-lift+.648,v.z*.05))
+  if part.startswith("hinge barrel "):
+   return Vector((v.x+.08,v.y-lift+.683,v.z*.05))
+  if part.startswith("hinge peen "):
+   return Vector((v.x+.08,v.y-lift+.716,v.z*.05))
  return Vector((v.x,v.y-lift,v.z*.05))
 for ob in oldmesh+details:
  inv=ob.matrix_world.inverted();ob.data=ob.data.copy()

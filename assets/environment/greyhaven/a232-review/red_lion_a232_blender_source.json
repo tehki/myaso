@@ -4,7 +4,7 @@
   "sourceSha256": "61620d76fafa75bbe26c8fd92fde4da5e79e8cc88132100ebb651fc52e5eef61",
   "sourceUntouched": true,
   "derivedBlend": "red_lion_a232_wrought_ironwork.blend",
-  "derivedSha256": "db773404e917213ecd2eddfb0314a3ab19a09d97cf70cf42780211d864c0eaf4",
+  "derivedSha256": "1f18f67a0d0ed3a117549e42e6a760cb85938cdb937d422f62ed03d114115557",
   "addedMeshes": 20,
   "objectNames": [
     "A2.32 wrought fittings / door hinge strap lower",
@@ -33,13 +33,13 @@
   "render640": {
     "baseline": {
       "file": "red_lion_a232_baseline_640.png",
-      "bytes": 186015,
-      "sha256": "d031b0a0f8cabe79d3b73e62adc55ecb9f788ac9d75690b5aaf17700e413d307"
+      "bytes": 186013,
+      "sha256": "7c4f7e8f9a6f9efbf680e4e556886d8fd79ec1dc056e2659af4fb8cb80018673"
     },
     "ironwork": {
       "file": "red_lion_a232_ironwork_640.png",
-      "bytes": 186910,
-      "sha256": "8795ed8037fa489c068ad37d64721dc2369b49abb40884c640fbd4d1fbb4e90c"
+      "bytes": 186854,
+      "sha256": "2b846e7b6a3fbe044658b8bc64b56d028d0b68d40b68bbce7252235b6aed3cac"
     }
   },
   "dayNightOrWorldChanged": false,
