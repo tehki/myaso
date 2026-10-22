@@ -856,13 +856,23 @@ impl World {
 
         resolve_roll_collisions(self.width, self.height, &mut self.fighters);
         separate_fighters(self.width, self.height, &mut self.fighters);
-        if let Some(winner) = resolve_attacks(
+        // Combat knockback occurs after the movement body pass. Without a
+        // final collision settle, a true hit can publish penetrating fighter
+        // bodies for one entire authoritative tick (P6-C03). Only do this
+        // additional bounded settle on ticks that actually applied knockback.
+        let mut attack_displaced_fighter = false;
+        let winner = resolve_attacks(
             self.width,
             self.height,
             self.now_ms,
             &mut self.fighters,
             events,
-        ) {
+            &mut attack_displaced_fighter,
+        );
+        if attack_displaced_fighter {
+            separate_fighters(self.width, self.height, &mut self.fighters);
+        }
+        if let Some(winner) = winner {
             self.winner = Some(winner);
             self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
         }
@@ -1478,47 +1488,86 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
 fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
     let minimum_distance = FIGHTER_RADIUS * 2.0;
     let minimum_distance_sq = minimum_distance * minimum_distance;
-    for first_index in 0..fighters.len() {
-        for second_index in (first_index + 1)..fighters.len() {
-            let (first, second) = two_mut(fighters, first_index, second_index);
-            if first.action == Action::Dead || second.action == Action::Dead {
-                continue;
+    // Resolving a later pair can re-overlap an earlier pair. Extra sweeps
+    // are needed for four-player crowding, but an unconditional 64 sweeps at
+    // 512 players can starve the realtime snapshot/reliable cadence.
+    //
+    // Preserve the original single pass for dense crowds and allow at most
+    // 8192 *additional* pair checks per tick, regardless of player count.
+    // Four fighters still receive up to 64 passes, with early exit as soon
+    // as meaningful overlap disappears. The first pass is unchanged.
+    const MAX_SEPARATION_PASSES: usize = 64;
+    const MAX_ADDITIONAL_PAIR_CHECKS: usize = 8192;
+    const SEPARATION_TOLERANCE: f32 = 0.005;
+    let pair_count = fighters
+        .len()
+        .saturating_mul(fighters.len().saturating_sub(1))
+        / 2;
+    let extra_passes = if pair_count == 0 {
+        0
+    } else {
+        (MAX_ADDITIONAL_PAIR_CHECKS / pair_count).min(MAX_SEPARATION_PASSES - 1)
+    };
+    for _ in 0..=extra_passes {
+        let mut significant_overlap = false;
+        for first_index in 0..fighters.len() {
+            for second_index in (first_index + 1)..fighters.len() {
+                let (first, second) = two_mut(fighters, first_index, second_index);
+                if first.action == Action::Dead || second.action == Action::Dead {
+                    continue;
+                }
+                let mut dx = second.x - first.x;
+                let mut dy = second.y - first.y;
+                if dx.abs() >= minimum_distance || dy.abs() >= minimum_distance {
+                    continue;
+                }
+                let distance_sq = dx * dx + dy * dy;
+                if distance_sq >= minimum_distance_sq {
+                    continue;
+                }
+                let mut distance = distance_sq.sqrt();
+                if distance_sq <= EPSILON * EPSILON {
+                    // Two coincident fighters at an arena edge must not keep
+                    // pushing into a clamped wall indefinitely.
+                    if first.x <= FIGHTER_RADIUS + EPSILON {
+                        dx = 1.0;
+                        dy = 0.0;
+                    } else if first.x >= width - FIGHTER_RADIUS - EPSILON {
+                        dx = -1.0;
+                        dy = 0.0;
+                    } else {
+                        dx = first.facing.cos();
+                        dy = first.facing.sin();
+                    }
+                    distance = 1.0;
+                }
+                let overlap = minimum_distance - distance;
+                if overlap > SEPARATION_TOLERANCE {
+                    significant_overlap = true;
+                }
+                let nx = dx / distance;
+                let ny = dy / distance;
+                let shift = overlap / 2.0;
+                first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
+                first.y = clamp(
+                    first.y - ny * shift,
+                    FIGHTER_RADIUS,
+                    height - FIGHTER_RADIUS,
+                );
+                second.x = clamp(
+                    second.x + nx * shift,
+                    FIGHTER_RADIUS,
+                    width - FIGHTER_RADIUS,
+                );
+                second.y = clamp(
+                    second.y + ny * shift,
+                    FIGHTER_RADIUS,
+                    height - FIGHTER_RADIUS,
+                );
             }
-            let mut dx = second.x - first.x;
-            let mut dy = second.y - first.y;
-            if dx.abs() >= minimum_distance || dy.abs() >= minimum_distance {
-                continue;
-            }
-            let distance_sq = dx * dx + dy * dy;
-            if distance_sq >= minimum_distance_sq {
-                continue;
-            }
-            let mut distance = distance_sq.sqrt();
-            if distance_sq <= EPSILON * EPSILON {
-                dx = first.facing.cos();
-                dy = first.facing.sin();
-                distance = 1.0;
-            }
-            let overlap = minimum_distance - distance;
-            let nx = dx / distance;
-            let ny = dy / distance;
-            let shift = overlap / 2.0;
-            first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
-            first.y = clamp(
-                first.y - ny * shift,
-                FIGHTER_RADIUS,
-                height - FIGHTER_RADIUS,
-            );
-            second.x = clamp(
-                second.x + nx * shift,
-                FIGHTER_RADIUS,
-                width - FIGHTER_RADIUS,
-            );
-            second.y = clamp(
-                second.y + ny * shift,
-                FIGHTER_RADIUS,
-                height - FIGHTER_RADIUS,
-            );
+        }
+        if !significant_overlap {
+            break;
         }
     }
 }
@@ -1617,6 +1666,7 @@ fn resolve_attacks(
     now_ms: f32,
     fighters: &mut [Fighter],
     events: &mut Vec<CombatEvent>,
+    attack_displaced_fighter: &mut bool,
 ) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
         let Some(profile) = attack_profile(fighters[attacker_index].action) else {
@@ -1695,12 +1745,14 @@ fn resolve_attacks(
 
             if profile.kick {
                 knock_back(width, height, attacker, target, profile.knockback);
+                *attack_displaced_fighter = true;
                 target.set_action(Action::Knockdown, KICK_KNOCKDOWN_MS);
                 continue;
             }
 
             target.hp = (target.hp - profile.damage).max(0.0);
             knock_back(width, height, attacker, target, profile.knockback);
+            *attack_displaced_fighter = true;
             events.push(CombatEvent::Hit {
                 attacker: attacker.net_id,
                 target: target.net_id,
