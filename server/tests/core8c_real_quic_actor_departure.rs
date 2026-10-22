@@ -176,7 +176,7 @@ async fn actual_initial_game_baseline(recv: &mut RecvStream) -> DecodedSnapshot 
         .expect("original game reliable header read");
     let bytes_len = u16::from_le_bytes(length) as usize;
     assert!(
-        bytes_len >= 14 && bytes_len <= 1100,
+        (14..=1100).contains(&bytes_len),
         "real full baseline bounded"
     );
     let mut bytes = vec![0_u8; bytes_len];
