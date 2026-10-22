@@ -260,6 +260,50 @@ try {
   originalSurvivingNativeBrowsers:browserMatrix,
   realCanvasAndHudAfterSecond:twiceRemoved,
  }));
+
+ // The exact native browser that voluntarily left as actor #2 now RETURNS
+ // to its game URL after the replacement actor #6 also voluntarily leaves.
+ // The same *browser session* must authenticate as FRESH actor #7, never
+ // restore old actor #2 or attach to a retired WebTransport/World lease.
+ const originalBrowserRejoinAt=Date.now();
+ await wd("POST","/session/"+sixth+"/url",{url:"about:blank"});
+ await wd("POST","/session/"+b+"/url",{url});
+ const realReturn=await poll("original browser rejoins as fresh original-v1 actor #7",
+   async()=>evaljs(b,
+    "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #7 - server tick \\d+/.test(x),status:x};"),7000);
+ const returnElapsedMs=Date.now()-originalBrowserRejoinAt;
+ assert(returnElapsedMs<9000,
+  "returning native browser must create fresh server session before 9s");
+ console.log("CORE8C_PAGEHIDE_ORIGINAL_BROWSER_RETURN",JSON.stringify({
+  ...realReturn,returnElapsedMs,originalActor:2,returnedAsActor:7,
+ }));
+ const thirdRemoval=[];
+ for(const sid of surviving){
+  const q=await poll("no #2/#5/#6 ghosts after original browser returns with ID #7",
+   async()=>{
+    const view=await visible(sid),frames=view?.frames?.slice(-12)||[];
+    return {...view,ok:view?.roster?.length===4
+     &&[1,3,4,7].every(id=>rosterHas(view.roster,id))
+     &&[2,5,6].every(id=>!rosterHas(view.roster,id))
+     &&frames.length>=8
+     &&frames.filter(f=>f.ids.includes("#7")
+       &&[2,5,6].every(id=>!f.ids.includes("#"+id))
+       &&f.ids.length>=3).length>=8};
+   },11000);
+  thirdRemoval.push({roster:q.roster,frames:q.frames.slice(-8).map(f=>f.ids)});
+  const ack=await realWasdAndAck(sid,"post-native-rejoin","s");
+  console.log("CORE8C_PAGEHIDE_RETURN_SURVIVOR_ACK",JSON.stringify(ack));
+ }
+ const returningActorAck=await realWasdAndAck(b,"returned-browser-actor7","s");
+ console.log("CORE8C_PAGEHIDE_RETURNED_ACTOR_ACK",JSON.stringify(returningActorAck));
+ console.log("CORE8C_UI10_SAME_BROWSER_FRESH_REJOIN_PASS",JSON.stringify({
+  returnedExistingBrowserSession:true,oldIdentity2Rejected:true,
+  returnedActorServerIdentity:7,realNativeRoundTripMs:returnElapsedMs,
+  retiredIds:[2,5,6],survivors:[1,3,4,7],
+  genuineCanvasHudAfterThirdRotation:thirdRemoval,
+  bothReturningAndRemainingClientsMovedWithServerAcks:true,
+  bfcacheRestoreTested:false,
+ }));
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
   initialActorIds:[1,2,3,4],disconnectedActorId:2,replacementActorId:5,
