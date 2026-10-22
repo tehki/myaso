@@ -109,6 +109,9 @@ test("non-optin Combat runtime remains verbatim default, optin requires BOTH wor
  assert.match(src,/fixedWorldEnabled && params.get\("redlion"\) === "1"/);
  assert.match(src,/if \(originalRedLionArt\) void originalRedLionArt.load\(\)/);
  assert.match(src,/else if \(authoredWorld && local.initialized\)/);
+ const qa=readFileSync(new URL("../web/graphics3b-red-lion-live-art-smoke.mjs",import.meta.url),"utf8");
+ assert.match(qa,/const defaultWorld=createAuthoredWorldRenderer\(\);/);
+ assert.doesNotMatch(qa,/createAuthoredWorldRenderer\(\{buildLimit:8\}\)/);
  assert.match(src,/redLionActorsInFront/);
  assert.match(src,/originalRedLionArt.behindFacade/);
  assert.doesNotMatch(src,/sendTryPickup\(|grantSword\(|teleport.*RedLion/i);

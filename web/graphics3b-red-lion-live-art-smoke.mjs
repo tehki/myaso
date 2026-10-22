@@ -7,7 +7,9 @@ window.__graphics3bLiveArtSmoke=null;
 try{
  const before=document.getElementById("baseline").getContext("2d",{willReadFrequently:true});
  before.save();before.translate(w/2,h/2);before.scale(z,z);before.translate(-w/2,-h/2);
- const defaultWorld=createAuthoredWorldRenderer({buildLimit:8});
+ // Compare like-for-like: actual live default and detailed World caches share
+ // the same canonical three-tile warm-up budget (not 8 vs 3).
+ const defaultWorld=createAuthoredWorldRenderer();
  defaultWorld.draw(before,MAP_IDS.overworld,camera,w,h,z);
  before.restore();
  const art=createOriginalRedLionLiveArt();
