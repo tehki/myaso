@@ -1,0 +1,512 @@
+{
+  "sourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "originalRigBones": 22,
+  "blenderKnockdownClipMs": 360,
+  "authoritativeKickKnockdownMs": 360,
+  "sourceEditableBlend": true,
+  "actorRootTranslationChanged": false,
+  "ownerApprovedGameplay": false,
+  "authoritativeStateChanged": false,
+  "originalMeshRedistributed": false,
+  "worldFloorBootSoleValidated": false,
+  "sourceMeshMinZAlignedToOriginalStandingContact": true,
+  "sourceFloorMaxDeviation": 0.011022,
+  "lowestPoseHeadToArmorFloor": 0.233759,
+  "sourceContactMeasurements": [
+    {
+      "sourceFrame": 1.0,
+      "lowestOriginalArmorZ": -0.512254,
+      "headJointWorldZ": 0.211997
+    },
+    {
+      "sourceFrame": 3.0,
+      "lowestOriginalArmorZ": -0.501533,
+      "headJointWorldZ": 0.198334
+    },
+    {
+      "sourceFrame": 5.4,
+      "lowestOriginalArmorZ": -0.509734,
+      "headJointWorldZ": 0.112652
+    },
+    {
+      "sourceFrame": 8.0,
+      "lowestOriginalArmorZ": -0.501232,
+      "headJointWorldZ": -0.176837
+    },
+    {
+      "sourceFrame": 10.6,
+      "lowestOriginalArmorZ": -0.518533,
+      "headJointWorldZ": -0.284774
+    },
+    {
+      "sourceFrame": 14.2,
+      "lowestOriginalArmorZ": -0.518533,
+      "headJointWorldZ": -0.284774
+    },
+    {
+      "sourceFrame": 18.2,
+      "lowestOriginalArmorZ": -0.508105,
+      "headJointWorldZ": 0.12688
+    },
+    {
+      "sourceFrame": 22.6,
+      "lowestOriginalArmorZ": -0.512254,
+      "headJointWorldZ": 0.211997
+    }
+  ],
+  "impactMeshCollisionValidated": false,
+  "normalGameRendererUnchanged": true,
+  "rendered": [
+    {
+      "direction": 0,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 22399
+    },
+    {
+      "direction": 0,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 23724
+    },
+    {
+      "direction": 0,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 24005
+    },
+    {
+      "direction": 0,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 22672
+    },
+    {
+      "direction": 0,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21466
+    },
+    {
+      "direction": 0,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21466
+    },
+    {
+      "direction": 0,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 24265
+    },
+    {
+      "direction": 0,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 22399
+    },
+    {
+      "direction": 1,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20704
+    },
+    {
+      "direction": 1,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 22025
+    },
+    {
+      "direction": 1,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 22867
+    },
+    {
+      "direction": 1,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21513
+    },
+    {
+      "direction": 1,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 20587
+    },
+    {
+      "direction": 1,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 20587
+    },
+    {
+      "direction": 1,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 22846
+    },
+    {
+      "direction": 1,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20704
+    },
+    {
+      "direction": 2,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20711
+    },
+    {
+      "direction": 2,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20746
+    },
+    {
+      "direction": 2,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 21229
+    },
+    {
+      "direction": 2,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21809
+    },
+    {
+      "direction": 2,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21608
+    },
+    {
+      "direction": 2,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21608
+    },
+    {
+      "direction": 2,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20906
+    },
+    {
+      "direction": 2,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20711
+    },
+    {
+      "direction": 3,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 21351
+    },
+    {
+      "direction": 3,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 21013
+    },
+    {
+      "direction": 3,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20179
+    },
+    {
+      "direction": 3,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21526
+    },
+    {
+      "direction": 3,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21995
+    },
+    {
+      "direction": 3,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21995
+    },
+    {
+      "direction": 3,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20271
+    },
+    {
+      "direction": 3,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 21351
+    },
+    {
+      "direction": 4,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 21079
+    },
+    {
+      "direction": 4,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20564
+    },
+    {
+      "direction": 4,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20139
+    },
+    {
+      "direction": 4,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 21838
+    },
+    {
+      "direction": 4,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 21952
+    },
+    {
+      "direction": 4,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 21952
+    },
+    {
+      "direction": 4,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20280
+    },
+    {
+      "direction": 4,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 21079
+    },
+    {
+      "direction": 5,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20723
+    },
+    {
+      "direction": 5,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 20178
+    },
+    {
+      "direction": 5,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 20565
+    },
+    {
+      "direction": 5,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 22056
+    },
+    {
+      "direction": 5,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 22133
+    },
+    {
+      "direction": 5,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 22133
+    },
+    {
+      "direction": 5,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 20580
+    },
+    {
+      "direction": 5,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20723
+    },
+    {
+      "direction": 6,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 20967
+    },
+    {
+      "direction": 6,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 22250
+    },
+    {
+      "direction": 6,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 23339
+    },
+    {
+      "direction": 6,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 23437
+    },
+    {
+      "direction": 6,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 22730
+    },
+    {
+      "direction": 6,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 22730
+    },
+    {
+      "direction": 6,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 23229
+    },
+    {
+      "direction": 6,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 20967
+    },
+    {
+      "direction": 7,
+      "frame": 0,
+      "blenderFrame": 1.0,
+      "bytes": 22202
+    },
+    {
+      "direction": 7,
+      "frame": 1,
+      "blenderFrame": 3.0,
+      "bytes": 23869
+    },
+    {
+      "direction": 7,
+      "frame": 2,
+      "blenderFrame": 5.4,
+      "bytes": 24501
+    },
+    {
+      "direction": 7,
+      "frame": 3,
+      "blenderFrame": 8.0,
+      "bytes": 23334
+    },
+    {
+      "direction": 7,
+      "frame": 4,
+      "blenderFrame": 10.6,
+      "bytes": 22242
+    },
+    {
+      "direction": 7,
+      "frame": 5,
+      "blenderFrame": 14.2,
+      "bytes": 22242
+    },
+    {
+      "direction": 7,
+      "frame": 6,
+      "blenderFrame": 18.2,
+      "bytes": 24563
+    },
+    {
+      "direction": 7,
+      "frame": 7,
+      "blenderFrame": 22.6,
+      "bytes": 22202
+    }
+  ],
+  "sourceKeyframes": [
+    {
+      "frame": 1.0,
+      "ms": 0.0
+    },
+    {
+      "frame": 3.0,
+      "ms": 33.333
+    },
+    {
+      "frame": 5.4,
+      "ms": 73.333
+    },
+    {
+      "frame": 8.0,
+      "ms": 116.667
+    },
+    {
+      "frame": 10.6,
+      "ms": 160.0
+    },
+    {
+      "frame": 14.2,
+      "ms": 220.0
+    },
+    {
+      "frame": 18.2,
+      "ms": 286.667
+    },
+    {
+      "frame": 22.6,
+      "ms": 360.0
+    }
+  ],
+  "sourceRigMeasurements": {
+    "headStartZ": 0.2119968831539154,
+    "headDownZ": -0.2847735583782196,
+    "spineStartZ": -0.08906330913305283,
+    "spineDownZ": -0.11627253144979477
+  },
+  "realSourceAtlasSha256": "5b3af4e2124a6b1315d0c14396eaaf3815fcf6af21d0662592d9e448e39f7bc9",
+  "realEditableSourceBlendSha256": "db13098b7f341eecd921de2850608d480b52a117073c7b5b576935232bfbed47",
+  "eightFacingAnimatedReviewGifSha256": "41182e34f948b6507960edbf6238599b950911bbcad2ecf7c6dc1f196c009d3b",
+  "atlasPx": [
+    1280,
+    1280
+  ],
+  "sourceCellPx": [
+    160,
+    160
+  ],
+  "sourceClipFrames": 8,
+  "directionCount": 8,
+  "reviewGifDurationsMs": [
+    35,
+    40,
+    45,
+    45,
+    60,
+    70,
+    45,
+    20
+  ],
+  "all64AtlasCellsFromRealBlenderSource": true,
+  "humanArtApproval": false,
+  "sourceOnly": true,
+  "worldContactValidated": false
+}

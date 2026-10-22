@@ -49,6 +49,10 @@ const spartanV3ContactPng = process.env.MYASO_GRAPHICS3A_V3_CONTACT_PNG === "1";
 const spartanV3KnockdownFlight = process.env.MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT === "1";
 const originalSilverVictimKnockdownFlight = process.env.MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT === "1";
 const silverVictimNativePng = process.env.MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG === "1";
+const groundedOriginalSilverV2Flight = process.env.MYASO_GRAPHICS3A_GROUNDED_V2_FLIGHT === "1";
+if (groundedOriginalSilverV2Flight && (!silverVictimNativePng
+  || !originalSilverVictimKnockdownFlight || scenario !== "uikickknockdownffa"))
+  throw Error("Grounded Silver V2 requires actual M153 three-browser victim PNG acceptance");
 if (silverVictimNativePng && !originalSilverVictimKnockdownFlight)
   throw new Error("real native victim image capture requires strict authentic 3-browser original Silver proof");
 if(originalSilverVictimKnockdownFlight && !spartanV3KnockdownFlight)
@@ -438,6 +442,17 @@ try {
         if(silverVictimNativePng){
           const originals=await captureOriginalSilverVictimNativePngs(sessions,victimReceipt);
           console.log("GRAPHICS3A_ORIGINAL_SILVER_VICTIM_NATIVE_PNG " + JSON.stringify(originals));
+          if (groundedOriginalSilverV2Flight) {
+            const atlas=await readFile(path.join(root,"web/assets/knights/silver_knockdown.webp"));
+            const digest=createHash("sha256").update(atlas).digest("hex");
+            if(digest!=="5b3af4e2124a6b1315d0c14396eaaf3815fcf6af21d0662592d9e448e39f7bc9")
+              throw Error("genuine 22-bone V2 grounded source atlas checksum mismatch");
+            console.log("GRAPHICS3A_GROUNDED_V2_REAL_KNOCKDOWN_PNG "
+              +JSON.stringify({verifiedRealThreePlayerKnockdown:true,
+                sourceRigGroundedV2AtlasSha256:digest,
+                actualGreyhavenFloorValidated:false,
+                originalNativeGamePngs:originals}));
+          }
         }
       }
     }

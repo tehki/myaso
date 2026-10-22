@@ -1,0 +1,75 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
+const root=new URL("../",import.meta.url);
+const base="docs/art/silver-victim-grounded-v2-360ms/";
+const data=n=>readFileSync(new URL(base+n,root));
+const manifest=JSON.parse(data("original_silver_knockdown_source_manifest.json"));
+const audit=JSON.parse(data("independent_grounded_v2_reopen.json"));
+const hash=v=>createHash("sha256").update(v).digest("hex");
+test("V2 grounded source is exactly the authorized original Blender Silver 22-bone armature, no substituted meshes",()=>{
+ assert.equal(manifest.sourceSha256,"d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f");
+ assert.equal(manifest.originalRigBones,22);
+ assert.equal(manifest.blenderKnockdownClipMs,360);
+ assert.equal(manifest.authoritativeKickKnockdownMs,360);
+ assert.equal(manifest.sourceMeshMinZAlignedToOriginalStandingContact,true);
+ assert.equal(manifest.originalMeshRedistributed,false);
+ assert.equal(manifest.actorRootTranslationChanged,false);
+ assert.equal(manifest.normalGameRendererUnchanged,true);
+ assert.equal(manifest.worldFloorBootSoleValidated,false);
+ assert.equal(manifest.ownerApprovedGameplay,false);
+});
+test("actual 64 original 8x8 source cells and editable Blender action are byte-accountable and distinct from rejected V1",()=>{
+ const atlas=data("original_silver_knockdown_grounded_v2_360ms_8way.webp");
+ assert.equal(hash(atlas),manifest.realSourceAtlasSha256);
+ assert.equal(hash(atlas),"5b3af4e2124a6b1315d0c14396eaaf3815fcf6af21d0662592d9e448e39f7bc9");
+ assert.equal(atlas.subarray(8,12).toString("ascii"),"WEBP");
+ assert.deepEqual(manifest.atlasPx,[1280,1280]);
+ assert.equal(manifest.rendered.length,64);
+ assert.equal(new Set(manifest.rendered.map(x=>x.direction)).size,8);
+ assert.ok(manifest.rendered.every(x=>x.bytes>400));
+ assert.notEqual(hash(atlas),hash(readFileSync(new URL("docs/art/silver-victim-knockdown-360ms/original_silver_knockdown_360ms_8way.webp",root))));
+ const gif=data("original_silver_victim_grounded_v2_8way_360ms.gif");
+ assert.equal(hash(gif),manifest.eightFacingAnimatedReviewGifSha256);
+ assert.equal(gif.subarray(0,4).toString("ascii"),"GIF8");
+ const blend=data("Graphics3A_Original_Silver_Victim_Knockdown_360ms_GroundedV2_source.blend");
+ assert.ok(blend.length>100000);
+ assert.equal(hash(blend),audit.sourceBlendSha256);
+ assert.equal(hash(blend),manifest.realEditableSourceBlendSha256);
+ assert.equal(audit.originalOwnerMeshBundled,false);
+});
+test("deformed actual original armor mesh occupies source floor across eight poses without moving actor root",()=>{
+ assert.equal(manifest.sourceContactMeasurements.length,8);
+ assert.ok(manifest.sourceFloorMaxDeviation<.025);
+ assert.ok(manifest.sourceFloorMaxDeviation>=0);
+ const ref=manifest.sourceContactMeasurements[0].lowestOriginalArmorZ;
+ for(const x of manifest.sourceContactMeasurements){
+  assert.ok(Math.abs(x.lowestOriginalArmorZ-ref)<.025);
+  assert.ok(Number.isFinite(x.headJointWorldZ));
+ }
+ assert.ok(manifest.lowestPoseHeadToArmorFloor<.25&&manifest.lowestPoseHeadToArmorFloor>.16);
+ assert.ok(manifest.sourceFloorMaxDeviation<=.01103);
+ assert.equal(audit.actorRootWorldTransformUnchanged,true);
+ assert.equal(audit.originalArmatureBones,22);
+ assert.equal(audit.actionName,"Graphics3A_Silver_Victim_Knockdown_360ms_GroundedV2");
+ assert.equal(audit.actionNominalDurationMs,360);
+ assert.ok(audit.headWorldZDropSourceUnits>.49&&audit.headWorldZDropSourceUnits<.51);
+ assert.equal(audit.realTerrainSoleContactTested,false);
+ assert.equal(audit.clientServerKnockdownSyncTested,false);
+ assert.equal(audit.gameplayIntegrated,false);
+ assert.equal(audit.humanVisualApproved,false);
+});
+test("V2 floor-aware source only: cannot promote itself to real in-game terrain, boot damage or production approval",()=>{
+ assert.equal(manifest.impactMeshCollisionValidated,false);
+ assert.equal(manifest.worldFloorBootSoleValidated,false);
+ assert.equal(manifest.ownerApprovedGameplay,false);
+ assert.equal(audit.realTerrainSoleContactTested,false);
+ const txt=readFileSync(new URL("tools/art/author_original_silver_knockdown_grounded_v2.py",root),"utf8");
+ assert.match(txt,/skinned=\[x for x in bpy\.data\.objects/);
+ assert.match(txt,/lowestOriginalArmorZ/);
+ assert.match(txt,/actual_armor_floor/);
+ assert.match(txt,/sourceFloorMaxDeviation/);
+ assert.match(txt,/genuine Blender-source/i);
+ assert.match(txt,/actorRootAtImport/);
+});

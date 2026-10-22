@@ -1332,3 +1332,48 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 1
+
+  # Compare newly grounded original 22-bone V2 victim source against the
+  # unchanged genuine M153 Rust knockdown, including three real browser PNGs.
+  # Separate protected full quality stays required; never a Pre-Alpha switch.
+  graphics3a-grounded-v2-native-original-silver:
+    name: graphics3a-grounded-v2-source-and-real-three-browser
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/grounded-original-silver-victim-v2-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact original 22-bone grounded-V2 QA candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify original 3D source floor and fail-closed real-native receipt
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          python3 -m py_compile tools/art/author_original_silver_knockdown_grounded_v2.py tools/art/pack_original_silver_knockdown_grounded_v2.py tools/art/audit_original_silver_knockdown_grounded_v2.py
+          node --test tests/graphics3a-original-silver-grounded-v2-source.test.mjs tests/graphics3a-grounded-v2-native-contract.test.mjs tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-original-silver-victim-native-png.test.mjs tests/graphics3a-original-silver-native-archive.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+      - name: Verify native Chrome Firefox and Rust QA tools
+        run: |
+          cargo --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Prebuild exact native Rust authoritative server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Prove grounded V2 source during genuine victim server knockdown in three browsers
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
+          MYASO_GRAPHICS3A_VICTIM_NATIVE_PNG: "1"
+          MYASO_GRAPHICS3A_GROUNDED_V2_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Publish original three-browser grounded V2 visual compare PNGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-grounded-v2-real-arena
+          path: .graphics3a-original-victim-native-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1

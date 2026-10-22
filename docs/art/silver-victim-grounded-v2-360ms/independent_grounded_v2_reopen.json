@@ -1,0 +1,35 @@
+{
+  "sourceBlendSha256": "db13098b7f341eecd921de2850608d480b52a117073c7b5b576935232bfbed47",
+  "originalArmatureBones": 22,
+  "originalOwnerMeshBundled": false,
+  "actionName": "Graphics3A_Silver_Victim_Knockdown_360ms_GroundedV2",
+  "actionFrameRange": [
+    1.0,
+    22.600000381469727
+  ],
+  "actionNominalDurationMs": 360,
+  "headWorldZDropSourceUnits": 0.49677,
+  "neutralReference": {
+    "headZ": 0.2119968831539154,
+    "leftToeZ": -0.5046107769012451,
+    "rightToeZ": -0.5016154646873474,
+    "spineZ": -0.08906330913305283
+  },
+  "collapseReference": {
+    "headZ": -0.2847735583782196,
+    "leftToeZ": -0.3623085916042328,
+    "rightToeZ": -0.48135048151016235,
+    "spineZ": -0.11627253144979477
+  },
+  "recoveryReference": {
+    "headZ": 0.2119968831539154,
+    "leftToeZ": -0.5046107769012451,
+    "rightToeZ": -0.5016154646873474,
+    "spineZ": -0.08906330913305283
+  },
+  "actorRootWorldTransformUnchanged": true,
+  "realTerrainSoleContactTested": false,
+  "clientServerKnockdownSyncTested": false,
+  "gameplayIntegrated": false,
+  "humanVisualApproved": false
+}
