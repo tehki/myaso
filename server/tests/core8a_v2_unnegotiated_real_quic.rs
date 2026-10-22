@@ -184,3 +184,49 @@ async fn current_v1_server_rejects_both_unnegotiated_v2_proposals_but_keeps_two_
     assert_original_v1_input_ack(&one, 1, 501).await;
     assert_original_v1_input_ack(&two, 2, 502).await;
 }
+
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn current_v1_server_ignores_unnegotiated_reliable_gesture_streams_without_closing_game() {
+    // The proposed future v2 delivery path is a separate, reliable stream
+    // within an ALREADY-admitted WebTransport session. Prove the current
+    // default-off v1 server does NOT accidentally activate such a stream.
+    // This is an actual two-client native QUIC test, not a codec unit mock.
+    let (_server, url, digest) = start_server();
+    let (_ep1, one, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, two, _send2, _recv2) = connect(&url, &digest).await;
+    let lmb: [u8; 16] = [2, 0x11, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 42, 0, 0, 0];
+    let key_e: [u8; 16] = [2, 0x11, 1, 1, 3, 0, 0, 0, 2, 0, 0, 0, 43, 0, 0, 0];
+    let alt: [u8; 16] = [2, 0x52, 1, 0, 1, 0, 0, 0, 2, 0, 0, 0, 44, 0, 0, 0];
+
+    for (client, frames) in [(&one, [lmb, key_e]), (&two, [alt, lmb])] {
+        let mut stream = timeout(Duration::from_secs(4), async {
+            client
+                .open_uni()
+                .await
+                .expect("actual same-session client uni stream")
+                .await
+                .expect("QUIC uni stream open")
+        })
+        .await
+        .expect("genuine optional gesture stream opening bounded");
+        for event in frames {
+            timeout(Duration::from_secs(4), stream.write_all(&event))
+                .await
+                .expect("bounded illegal frame stream send")
+                .expect("real stream write");
+        }
+        // Keeping the SendStream live allows the original game to continue;
+        // a browser cannot force capability negotiation by sending bytes.
+        // No response means NO v2 activation, but the proof also requires
+        // two real subsequent v1 INPUT_ACKs below.
+        let unwanted = timeout(Duration::from_millis(550), client.accept_uni()).await;
+        assert!(
+            unwanted.is_err(),
+            "original default-v1 server MUST NOT issue a v2 reply/ACK stream"
+        );
+        drop(stream);
+    }
+    assert_original_v1_input_ack(&one, 1, 701).await;
+    assert_original_v1_input_ack(&two, 2, 702).await;
+}
