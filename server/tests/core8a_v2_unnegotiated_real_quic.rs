@@ -154,9 +154,9 @@ async fn current_v1_server_rejects_both_unnegotiated_v2_proposals_but_keeps_two_
         one_key_e.as_slice(),
         alternative.as_slice(),
     ] {
-        one.send_datagram(packet.to_vec())
+        one.send_datagram(packet)
             .expect("actual injected v2 QUIC datagram");
-        two.send_datagram(packet.to_vec())
+        two.send_datagram(packet)
             .expect("second actual client independently sends v2");
     }
 
