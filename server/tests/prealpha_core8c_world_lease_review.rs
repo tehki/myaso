@@ -390,3 +390,133 @@ fn real_match_win_retires_unspent_spectator_press_before_next_round() {
         ReviewEdgeStatus::Retired
     );
 }
+
+
+#[test]
+fn two_distinct_worlds_with_identical_actor_incarnation_and_tick_cannot_replay() {
+    use myaso_server::prealpha_core8c_world_lease_review::{
+        ReviewOwnedWorld, ReviewWorldOwnerLease,
+    };
+
+    let first = ReviewOwnedWorld::review_new(world_with_players(2)).unwrap();
+    let second = ReviewOwnedWorld::review_new(world_with_players(2)).unwrap();
+    assert_ne!(first.owner_epoch(), second.owner_epoch());
+    assert_eq!(first.world().tick, second.world().tick);
+    assert_eq!(
+        first.world().fighter(1).unwrap().world_incarnation(),
+        second.world().fighter(1).unwrap().world_incarnation(),
+        "both new World objects restart their local life counter, so that alone cannot fence ABA"
+    );
+    let same_numeric_lease = lease(1, 50, 900);
+    let mut stale =
+        ReviewWorldOwnerLease::review_from_current_owner(&first, same_numeric_lease).unwrap();
+    assert_eq!(
+        stale.review_ingest(
+            &first,
+            same_numeric_lease,
+            &wire(GestureAction::Press, 1, 7)
+        ),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(stale.pending_count(), 1);
+    assert!(stale
+        .review_drain_for_owner(&second, same_numeric_lease)
+        .is_empty());
+    assert!(stale.is_retired());
+    assert_eq!(stale.pending_count(), 0);
+    assert_eq!(
+        stale.review_ingest(
+            &second,
+            same_numeric_lease,
+            &wire(GestureAction::Release, 2, 7)
+        ),
+        ReviewEdgeStatus::Retired
+    );
+
+    let mut current =
+        ReviewWorldOwnerLease::review_from_current_owner(&second, same_numeric_lease).unwrap();
+    assert_eq!(
+        current.review_ingest(
+            &second,
+            same_numeric_lease,
+            &wire(GestureAction::Press, 1, 7)
+        ),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(
+        current
+            .review_drain_for_owner(&second, same_numeric_lease)
+            .len(),
+        1
+    );
+    assert_eq!(second.world().fighter(2).unwrap().hp, 100.0);
+}
+
+#[test]
+fn entire_world_replacement_same_tick_retires_stale_pending_edges() {
+    use myaso_server::prealpha_core8c_world_lease_review::{
+        ReviewOwnedWorld, ReviewWorldOwnerLease,
+    };
+
+    let mut owner = ReviewOwnedWorld::review_new(world_with_players(2)).unwrap();
+    let lease_key = lease(1, 1, 2);
+    let mut old = ReviewWorldOwnerLease::review_from_current_owner(&owner, lease_key).unwrap();
+    let former_epoch = owner.owner_epoch();
+    let former_life = owner.world().fighter(1).unwrap().world_incarnation();
+    assert_eq!(
+        old.review_ingest(&owner, lease_key, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+
+    assert!(owner.review_replace_world(world_with_players(2)));
+    assert_ne!(owner.owner_epoch(), former_epoch);
+    assert_eq!(owner.world().tick, 0);
+    assert_eq!(owner.world().fighter(1).unwrap().world_incarnation(), former_life);
+
+    assert!(old.review_drain_for_owner(&owner, lease_key).is_empty());
+    assert!(old.is_retired());
+    assert_eq!(old.pending_count(), 0);
+    let next = lease(1, 2, 3);
+    let mut fresh = ReviewWorldOwnerLease::review_from_current_owner(&owner, next).unwrap();
+    assert_eq!(
+        fresh.review_ingest(&owner, next, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(fresh.review_drain_for_owner(&owner, next).len(), 1);
+}
+
+#[test]
+fn same_owner_uses_real_world_actor_incarnation_and_tick_fence() {
+    use myaso_server::prealpha_core8c_world_lease_review::{
+        ReviewOwnedWorld, ReviewWorldOwnerLease,
+    };
+
+    let mut owner = ReviewOwnedWorld::review_new(world_with_players(2)).unwrap();
+    let actor = lease(1, 1, 10);
+    let foreign = lease(2, 1, 10);
+    let mut gate = ReviewWorldOwnerLease::review_from_current_owner(&owner, actor).unwrap();
+    assert_eq!(
+        gate.review_ingest(&owner, foreign, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Stale
+    );
+    assert_eq!(gate.pending_count(), 0);
+    assert_eq!(
+        gate.review_ingest(&owner, actor, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert!(owner.review_remove_player(1));
+    assert!(owner.review_add_player(1));
+    assert!(gate.review_drain_for_owner(&owner, actor).is_empty());
+    assert!(gate.is_retired());
+
+    let current = lease(1, 2, 11);
+    let mut alive = ReviewWorldOwnerLease::review_from_current_owner(&owner, current).unwrap();
+    assert_eq!(
+        alive.review_ingest(&owner, current, &wire(GestureAction::Press, 1, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    owner.review_step();
+    owner.review_step();
+    assert!(alive.review_drain_for_owner(&owner, current).is_empty());
+    assert!(alive.is_retired(), "missed World tick retires stale intent");
+}
