@@ -52,6 +52,8 @@ fn exclusive_lock(file: &File) -> io::Result<bool> {
 /// replaces them after our metadata preflight and before open().
 #[cfg(target_os = "linux")]
 const LINUX_O_NOFOLLOW: i32 = 0o400000;
+#[cfg(target_os = "linux")]
+const LINUX_O_DIRECTORY: i32 = 0o200000;
 
 #[cfg(unix)]
 fn check_regular_owned_storage_file(file: &File) -> Result<(), ClaimJournalError> {
@@ -361,6 +363,7 @@ fn decode(b: &[u8]) -> Result<Record, ClaimJournalError> {
 /// opcode, or live integration is claimed.
 pub struct OfflineClaimJournal {
     root: PathBuf,
+    root_dir: File,
     _lock: File,
     records: BTreeMap<u128, Record>,
     head: u64,
@@ -368,6 +371,56 @@ pub struct OfflineClaimJournal {
     poisoned: bool,
 }
 impl OfflineClaimJournal {
+    /// Local offline fence against an active writer's POSIX lock inode
+    /// being unlinked/replaced (which permits a second different flock)
+    /// or against replacement of its journal directory path. This pins
+    /// filesystem identity, NOT a cross-host epoch or atomic openat2 path.
+    fn ensure_writer_anchor(&self) -> Result<(), ClaimJournalError> {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let pinned_dir = self.root_dir.metadata()?;
+            let named_dir = fs::symlink_metadata(&self.root)?;
+            if !named_dir.is_dir()
+                || pinned_dir.dev() != named_dir.dev()
+                || pinned_dir.ino() != named_dir.ino()
+            {
+                return Err(ClaimJournalError::Invalid(
+                    "MYID writer lock/directory binding changed",
+                ));
+            }
+            let pinned_lock = self._lock.metadata()?;
+            let named_lock = match fs::symlink_metadata(self.root.join(".identity-writer.lock")) {
+                Ok(meta) => meta,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                    return Err(ClaimJournalError::Invalid(
+                        "MYID writer lock/directory binding changed",
+                    ));
+                }
+                Err(e) => return Err(ClaimJournalError::Io(e)),
+            };
+            if !named_lock.is_file()
+                || pinned_lock.dev() != named_lock.dev()
+                || pinned_lock.ino() != named_lock.ino()
+                || pinned_lock.nlink() != 1
+                || named_lock.nlink() != 1
+                || named_lock.mode() & 0o077 != 0
+            {
+                return Err(ClaimJournalError::Invalid(
+                    "MYID writer lock/directory binding changed",
+                ));
+            }
+            Ok(())
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            Err(ClaimJournalError::Io(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "MYID local writer anchor requires Linux",
+            )))
+        }
+    }
+
     pub fn open(root: impl AsRef<Path>) -> Result<Self, ClaimJournalError> {
         let root = root.as_ref();
         fs::create_dir_all(root)?;
@@ -379,11 +432,35 @@ impl OfflineClaimJournal {
                 "MYID root must be a real directory, not a symlink",
             ));
         }
-        #[cfg(unix)]
+        // Pin the ACTUAL directory inode and chmod through that FD, not
+        // a second path traversal that an attacker could replace.
+        // Keep declarations portable: the unsupported-platform branch
+        // returns before any attempt to use an uninitialized directory.
+        let root_dir: File;
+        #[cfg(target_os = "linux")]
         {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+            use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+            let dir = OpenOptions::new()
+                .read(true)
+                .custom_flags(LINUX_O_NOFOLLOW | LINUX_O_DIRECTORY)
+                .open(root)?;
+            let pinned = dir.metadata()?;
+            if !pinned.is_dir()
+                || pinned.ino() != root_meta.ino()
+                || pinned.dev() != root_meta.dev()
+            {
+                return Err(ClaimJournalError::Invalid(
+                    "MYID root changed during opening",
+                ));
+            }
+            dir.set_permissions(fs::Permissions::from_mode(0o700))?;
+            root_dir = dir;
         }
+        #[cfg(not(target_os = "linux"))]
+        return Err(ClaimJournalError::Io(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "MYID root pinning requires Linux",
+        )));
         let mut options = OpenOptions::new();
         options.create(true).read(true).write(true);
         #[cfg(target_os = "linux")]
@@ -406,6 +483,7 @@ impl OfflineClaimJournal {
         }
         let mut out = Self {
             root: root.to_path_buf(),
+            root_dir,
             _lock: lock,
             records: BTreeMap::new(),
             head: 0,
@@ -480,6 +558,7 @@ impl OfflineClaimJournal {
         if final_path.exists() {
             return Err(ClaimJournalError::Invalid("occupied sequence"));
         }
+        self.ensure_writer_anchor()?;
         let tmp = self.root.join(format!(
             ".staging-{}-{}",
             std::process::id(),
@@ -497,7 +576,11 @@ impl OfflineClaimJournal {
         f.sync_all()?;
         drop(f);
         fs::rename(&tmp, final_path)?;
-        File::open(&self.root)?.sync_all()?;
+        // fsync the EXACT pinned directory, never an arbitrary new path.
+        self.root_dir.sync_all()?;
+        // Never report ACK-success if another lock/root inode has replaced
+        // the pinned writer during the publication window.
+        self.ensure_writer_anchor()?;
         Ok(())
     }
     fn append(
@@ -507,6 +590,10 @@ impl OfflineClaimJournal {
     ) -> Result<ClaimReceipt, ClaimJournalError> {
         if self.poisoned {
             return Err(ClaimJournalError::Poisoned);
+        }
+        if let Err(err) = self.ensure_writer_anchor() {
+            self.poisoned = true;
+            return Err(err);
         }
         if event_id == 0 {
             return Err(ClaimJournalError::Invalid("zero event ID"));
@@ -1475,6 +1562,95 @@ mod tests {
         fs::set_permissions(&original, fs::Permissions::from_mode(0o600)).unwrap();
         let recovered = root.open();
         assert_eq!(recovered.head(), 1);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn unlinked_and_recreated_writer_lock_does_not_let_original_writer_append() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let mut first = root.open();
+        let observer = actor(0x1234_0000_0000_0002);
+        append(
+            &mut first,
+            &bridge,
+            &leases,
+            lease,
+            (observer, 1, "Tomas", 100),
+        )
+        .unwrap();
+        assert_eq!(first.head(), 1);
+
+        // POSIX flock binds to an OPEN INODE. Unlinking its directory entry
+        // and recreating a fresh same-name lock can allow another process
+        // to acquire an independent lock while the first writer lives.
+        fs::remove_file(root.0.join(".identity-writer.lock")).unwrap();
+        let second = OfflineClaimJournal::open(&root.0).unwrap();
+        assert_eq!(second.head(), 1);
+        assert_eq!(
+            second.head(),
+            first.head(),
+            "a second unrelated lock can reopen the same historical head",
+        );
+
+        assert!(matches!(
+            append(
+                &mut first,
+                &bridge,
+                &leases,
+                lease,
+                (observer, 1, "Danger", 101)
+            ),
+            Err(ClaimJournalError::Invalid(
+                "MYID writer lock/directory binding changed"
+            ))
+        ));
+        assert_eq!(first.head(), 1);
+        assert!(!root.0.join(filename(2)).exists());
+        assert!(matches!(
+            append(
+                &mut first,
+                &bridge,
+                &leases,
+                lease,
+                (observer, 1, "Denied", 102)
+            ),
+            Err(ClaimJournalError::Poisoned)
+        ));
+        drop(second);
+        drop(first);
+        assert_eq!(root.open().head(), 1, "no competing first-writer ACK");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn renamed_and_rebound_journal_root_cannot_redirect_old_writer_commit() {
+        let root = Root::new();
+        let (bridge, leases, lease) = fixture(1, 51);
+        let mut j = root.open();
+        let observer = actor(0x1234_0000_0000_0002);
+        append(&mut j, &bridge, &leases, lease, (observer, 1, "Tomas", 201)).unwrap();
+        let moved = root.0.with_extension("renamed-writer-root");
+        fs::rename(&root.0, &moved).unwrap();
+        fs::create_dir(&root.0).unwrap();
+        assert!(matches!(
+            append(
+                &mut j,
+                &bridge,
+                &leases,
+                lease,
+                (observer, 1, "No Rebind", 202)
+            ),
+            Err(ClaimJournalError::Invalid(
+                "MYID writer lock/directory binding changed"
+            ))
+        ));
+        assert_eq!(j.head(), 1);
+        assert!(!root.0.join(filename(2)).exists());
+        assert!(!moved.join(filename(2)).exists());
+        assert_eq!(fs::read(moved.join(filename(1))).unwrap().len(), LEN);
+        drop(j);
+        fs::remove_dir_all(moved).unwrap();
     }
 
     #[cfg(unix)]
