@@ -1,0 +1,40 @@
+import {createOriginalRedLionLiveArt} from "../src/browser/red-lion-live-art.mjs";
+import {createAuthoredWorldRenderer} from "../src/browser/authored-world-renderer.mjs";
+import {MAP_IDS} from "../src/world/authored-maps.mjs";
+const w=640,h=640,z=.84,camera={x:4365,y:4075};
+const result=document.querySelector("#status");
+window.__graphics3bLiveArtSmoke=null;
+try{
+ const before=document.getElementById("baseline").getContext("2d",{willReadFrequently:true});
+ before.save();before.translate(w/2,h/2);before.scale(z,z);before.translate(-w/2,-h/2);
+ const defaultWorld=createAuthoredWorldRenderer({buildLimit:8});
+ defaultWorld.draw(before,MAP_IDS.overworld,camera,w,h,z);
+ before.restore();
+ const art=createOriginalRedLionLiveArt();
+ const ok=await art.load();
+ const after=document.getElementById("composed").getContext("2d",{willReadFrequently:true});
+ let frame=null;
+ if(ok)frame=art.prepare(camera,w,h,z);
+ if(frame){
+  after.drawImage(frame.world,0,0);
+  after.drawImage(frame.facade,0,0);
+ }else{
+  after.drawImage(document.getElementById("baseline"),0,0);
+ }
+ const aa=before.getImageData(0,0,w,h).data;
+ const bb=after.getImageData(0,0,w,h).data;
+ let changed=0,changedAlpha=0;
+ for(let i=0;i<aa.length;i+=4){
+  if(aa[i]!==bb[i]||aa[i+1]!==bb[i+1]||aa[i+2]!==bb[i+2])changed++;
+  if(aa[i+3]!==bb[i+3])changedAlpha++;
+ }
+ const outcome=Object.freeze({
+  ready:true,sourceArtState:art.state().phase,originalSourceHashValidated:!!frame,
+  canonicalReplacement:!!frame,changedRgb:changed,changedAlpha,
+  unchangedWorldFallback:!frame && changed===0,worldReplaceOnlyRedLion:true,
+  realGameAuthority:false,realMultiplayerActors:false,originalSourceBlender:true
+ });
+ window.__graphics3bLiveArtSmoke=outcome;
+ result.textContent=JSON.stringify(outcome);
+}catch(error){window.__graphics3bLiveArtSmoke={ready:false,error:String(error)};
+ result.textContent="Source contract failure: "+String(error);}

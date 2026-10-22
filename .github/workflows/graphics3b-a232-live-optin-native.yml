@@ -1,0 +1,47 @@
+name: Graphics3B P0 original Blender Red Lion live opt-in World9 3C smoke
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "src/browser/red-lion-live-art.mjs"
+      - "web/graphics3b-red-lion-live-art-smoke.html"
+      - "web/graphics3b-red-lion-live-art-smoke.mjs"
+      - "tools/art/verify_a232_live_optin_native_browsers.mjs"
+      - "tests/graphics3b-red-lion-live-art-optin.test.mjs"
+      - "assets/environment/greyhaven/a232-review/**"
+      - ".github/workflows/graphics3b-a232-live-optin-native.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  actual-original-world3c-live-art-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static source, original Blender hashes, canonical World and fail-closed offline tests
+        run: |
+          node --check src/browser/red-lion-live-art.mjs
+          node --check web/online-game.mjs
+          node --check web/graphics3b-red-lion-live-art-smoke.mjs
+          node --check tools/art/verify_a232_live_optin_native_browsers.mjs
+          node --test tests/graphics3b-red-lion-live-art-optin.test.mjs tests/world-building-presentation.test.mjs
+      - name: Require native Chrome Firefox and local W3C drivers
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Native browsers check real detailed World replacement and pixel-identical original fallback
+        run: timeout --signal=TERM --kill-after=5s 480s node tools/art/verify_a232_live_optin_native_browsers.mjs
+      - name: Preserve actual browser source screenshots and SHA256 provenance
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-a232-real-original-greyhaven-live-optin
+          path: graphics3b-a232-live-optin-native-evidence/*
+          if-no-files-found: ignore
+          retention-days: 7
