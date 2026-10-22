@@ -753,8 +753,7 @@ impl World {
             fighter.clear_pending_actions();
             fighter.guard_regen_blocked_until_ms = 0.0;
             fighter.stamina_regen_blocked_until_ms = 0.0;
-            fighter.world_incarnation =
-                reserve_world_incarnation(&mut self.next_world_incarnation);
+            fighter.world_incarnation = reserve_world_incarnation(&mut self.next_world_incarnation);
             respawn_fighter(fighter);
         }
     }
@@ -764,7 +763,9 @@ impl World {
 // remove/re-add and respawn. Never wrap: aliasing an earlier life is unsafe.
 fn reserve_world_incarnation(next: &mut u64) -> u64 {
     let value = *next;
-    *next = next.checked_add(1).expect("World actor incarnation exhausted");
+    *next = next
+        .checked_add(1)
+        .expect("World actor incarnation exhausted");
     value
 }
 
