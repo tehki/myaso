@@ -1,0 +1,37 @@
+name: Core 8A Pre-Alpha v2 JavaScript-Rust wire interop review
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core8a-prealpha-v2-js-rust-interop.yml"
+      - "tests/fixtures/core8a-prealpha-v2-js-rust-wire.hex"
+      - "tests/core8a-prealpha-v2-js-rust-wire.test.mjs"
+      - "server/tests/prealpha_lmb_js_wire_bridge_review.rs"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-js-wire-into-rust-ack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve default-OFF original v1 gameplay and strict fixture structure
+        run: |
+          ! grep -q 'prealpha_lmb_ingress_review' server/src/main.rs
+          ! grep -q 'prealpha-lmb-gesture-outbox-proposal' web/online-game.mjs
+          ! grep -q 'prealpha-lmb-gesture-proposal' web/online-game.mjs
+          node --check tests/core8a-prealpha-v2-js-rust-wire.test.mjs
+          node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
+      - name: Original Combat and Core 8A outbox plus new exact JS golden bytes
+        run: |
+          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/core8a-prealpha-v2-js-rust-wire.test.mjs
+      - name: All original Rust source formatting
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Exact JavaScript event bytes enter original Rust review gate and ACK bytes return
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_js_wire_bridge_review
+      - name: Original Rust replay regressions cannot regress
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_lmb_ingress_review
+      - name: Strict Rust Clippy
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
