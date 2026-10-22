@@ -29,6 +29,8 @@ cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warn
 
 This proves only original active server **session permit retirement + fresh ID allocation + surviving gameplay connections**, and does NOT prove that every snapshot removal was consumed by remote browsers, public reachability, future authenticated v2 lease/ACK, instant pointerDOWN combat or independent physical hosts. It does not activate optional Chat or any new networking endpoint.
 
+**New actual no-ghost server-replication proof, same test binary:** A second test observes the *fourth real QUIC player's original reliable, length-prefixed full baseline* decoded with the actual `decode_snapshot` implementation, verifying actual original World IDs #1–#4. It authenticates that baseline via the real v1 INPUT's acknowledged sequence. After the real #2 QUIC disconnect and fresh #5 admission, it consumes this surviving viewer's actual authoritative **delta datagrams**, requiring `SNAPSHOT_FIELD_REMOVED` for #2 and a real positive #5 record, with monotonic server ticks, and verifies continuing authentic server-owned v1 ACKs for #1,#3,#4. No fabricated packets or World actors, no client overlay inference and no v2 feature flag. This closes the narrow **server-emitted ghost tombstone** gap but does **not** prove browser-side draw removal or reliable delivery/ACK of every snapshot under packet loss.
+
 ```bash
 cargo test --locked --manifest-path server/Cargo.toml --test core8c_real_quic_actor_departure
 ```
