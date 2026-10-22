@@ -44,6 +44,9 @@ const knightSprites = knightQuery.get("knights") === "1"
       // True original Spartan source render requires TWO explicit opt-ins.
       // No default activation while strict Greyhaven/authority gates remain.
       sourceKickPreview: knightQuery.get("knightKickSource") === "1",
+      // THIRD explicit QA flag chooses the authentic V3 original Blender atlas.
+      // Requires knights=1 and knightKickSource=1; all defaults remain V2/off.
+      sourceKickVariant: knightQuery.get("knightKickV3") === "1" ? "v3" : "v2",
     }) : null;
 const eventText = document.querySelector("#event-text");
 const arenaStage = document.querySelector(".arena-stage");

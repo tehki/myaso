@@ -13,6 +13,7 @@ import { summarizeM215SuccessfulRollLatency } from "./m215-successful-roll-laten
 import { summarizeM216ParryPunishLatency } from "./m216-successful-parry-punish-latency.mjs";
 import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-latency.mjs";
 import { summarizeSpartanConnectedKickFlight } from "./graphics3a-spartan-connected-receipt.mjs";
+import { summarizeSpartanV3ConnectedKickFlight } from "./graphics3a-spartan-v3-source-receipt.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
@@ -40,6 +41,10 @@ const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 // Manually executed Graphics 3A acceptance extension; existing protected
 // Combat flights remain EXACTLY unchanged when this environment variable is off.
 const spartanFlight = process.env.MYASO_GRAPHICS3A_SPARTAN_FLIGHT === "1";
+const spartanV3Flight = process.env.MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT === "1";
+if (spartanV3Flight && !spartanFlight) {
+  throw new Error("Graphics3A V3 requires the strict connected Spartan source-flight opt-in");
+}
 if (spartanFlight && scenario !== "uikickbuffer") {
   throw new Error("Graphics3A actual server flight requires MYASO_PVP_SCENARIO=uikickbuffer");
 }
@@ -602,6 +607,7 @@ async function navigate(session, gameUrl, certificateHash) {
     // Existing client-double-opt-in only; never enable Knight source by default.
     url.searchParams.set("knights", "1");
     url.searchParams.set("knightKickSource", "1");
+    if (spartanV3Flight) url.searchParams.set("knightKickV3", "1");
   }
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
@@ -6827,10 +6833,11 @@ async function installSpartanKickDrawProbe(session) {
       const data={draws:[],installed:true};
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string" ? image.src : "";
-        if(src.endsWith("/silver_kick.webp") && args.length===8) {
+        if((src.endsWith("/silver_kick_v3.webp") || src.endsWith("/silver_kick.webp")) && args.length===8) {
           const frame=args[0]/160, direction=args[1]/160;
           if (data.draws.length<2048) data.draws.push({
-            frame,direction,epochMs:Date.now()});
+            frame,direction,epochMs:Date.now(),
+            sourceFile:src.split("/").at(-1)});
         }
         return original.call(this,image,...args);
       };
@@ -7043,8 +7050,17 @@ async function runOnlineUiKickBufferFlight(entries) {
       defenderTransitions: focusTransitions,
       clients: observations,
     });
-    console.log("GRAPHICS3A_SPARTAN_CONNECTED_KICK_FLIGHT "
-      + JSON.stringify(spartanReceipt));
+    if (spartanV3Flight) {
+      spartanReceipt = summarizeSpartanV3ConnectedKickFlight({
+        attackerTransitions: ownTransitions, defenderTransitions: focusTransitions,
+        clients: observations,
+      });
+      console.log("GRAPHICS3A_SPARTAN_V3_CONNECTED_KICK_FLIGHT "
+        + JSON.stringify(spartanReceipt));
+    } else {
+      console.log("GRAPHICS3A_SPARTAN_CONNECTED_KICK_FLIGHT "
+        + JSON.stringify(spartanReceipt));
+    }
   }
   return evidence.map((entry) => ({
     ...entry,

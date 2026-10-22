@@ -1,0 +1,616 @@
+{
+  "source": "Owner Silver original 22-bone GLB (not bundled or modified)",
+  "sourceSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "clipKeyframesMs": {
+    "silver_kick_p0": [
+      0,
+      45,
+      90,
+      125,
+      160,
+      208,
+      283,
+      380
+    ],
+    "silver_dash_p0": [
+      0,
+      18,
+      45,
+      65,
+      83,
+      110,
+      122,
+      140
+    ]
+  },
+  "authoritativePhases": {
+    "kickMs": [
+      90,
+      70,
+      220
+    ],
+    "dashMs": 140
+  },
+  "framesPerDirection": 8,
+  "directions": 8,
+  "sourceFramePx": 160,
+  "sourceRigBones": 22,
+  "spartanHighKneeKickOptIn": true,
+  "spartanHighForwardRevisionOptIn": true,
+  "spartanContactRecoilV3OptIn": true,
+  "sourceActionKeys": [
+    {
+      "blenderFrame": 1,
+      "sourceMs": 0.0
+    },
+    {
+      "blenderFrame": 3.7,
+      "sourceMs": 45.0
+    },
+    {
+      "blenderFrame": 6.4,
+      "sourceMs": 90.0
+    },
+    {
+      "blenderFrame": 8.1,
+      "sourceMs": 118.333
+    },
+    {
+      "blenderFrame": 9.35,
+      "sourceMs": 139.167
+    },
+    {
+      "blenderFrame": 10.6,
+      "sourceMs": 160.0
+    },
+    {
+      "blenderFrame": 11.3,
+      "sourceMs": 171.667
+    },
+    {
+      "blenderFrame": 13.5,
+      "sourceMs": 208.333
+    },
+    {
+      "blenderFrame": 18.0,
+      "sourceMs": 283.333
+    },
+    {
+      "blenderFrame": 23.8,
+      "sourceMs": 380.0
+    }
+  ],
+  "worldGroundValidated": false,
+  "originalArtReplaced": false,
+  "realGreyhaven": false,
+  "humanVisualApproved": false,
+  "trueServerEvent": false,
+  "sourceEditableBlend": true,
+  "kickSupportFootSourceOnly": {
+    "method": "Blender original 22-bone LeftToeBase held by source Hips pose origin correction; not World IK",
+    "sampleCount": 32,
+    "originalKickToeMaxDeviation": 0.175987,
+    "plantedKickToeMaxDeviation": 2e-05,
+    "sourceFootAnchor": [
+      0.136,
+      -0.19469,
+      -0.50461
+    ],
+    "serverRootTranslation": false,
+    "actualFloorProven": false
+  },
+  "rendered": [
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22381
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 22811
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 23038
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 22997
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 22676
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 22816
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 22747
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 0,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 22381
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20686
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21437
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 21933
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 22114
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21793
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21345
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20957
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 1,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20686
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20693
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 20349
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20949
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 21376
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21404
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 20572
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20993
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 2,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20693
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21333
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21310
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20956
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20987
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21167
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21570
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21855
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 3,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 21333
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 21061
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21199
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20457
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20769
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20908
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 21235
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21255
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 4,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 21061
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20705
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21017
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20618
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 21018
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20988
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 20829
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 20843
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 5,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20705
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 20949
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 21115
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 20514
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 20526
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 20342
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 20900
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 21223
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 6,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 20949
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 0,
+      "sourceFrame": 1,
+      "sampledBlenderFrame": 1,
+      "bytes": 22184
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 1,
+      "sourceFrame": 3.7,
+      "sampledBlenderFrame": 3.7,
+      "bytes": 22621
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 2,
+      "sourceFrame": 6.4,
+      "sampledBlenderFrame": 6.4,
+      "bytes": 22334
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 3,
+      "sourceFrame": 8.5,
+      "sampledBlenderFrame": 8.5,
+      "bytes": 22248
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 4,
+      "sourceFrame": 10.6,
+      "sampledBlenderFrame": 10.6,
+      "bytes": 21847
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 5,
+      "sourceFrame": 13.5,
+      "sampledBlenderFrame": 13.5,
+      "bytes": 22400
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 6,
+      "sourceFrame": 18.0,
+      "sampledBlenderFrame": 18.0,
+      "bytes": 22577
+    },
+    {
+      "clip": "silver_kick_p0",
+      "direction": 7,
+      "phase": 7,
+      "sourceFrame": 23.8,
+      "sampledBlenderFrame": 23.8,
+      "bytes": 22184
+    }
+  ]
+}
