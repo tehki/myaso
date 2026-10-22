@@ -332,7 +332,11 @@ window.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 // A voluntary tab/navigation exit should promptly retire its server-owned
 // gameplay admission lease. Losing OS/browser process still uses QUIC timeout.
-window.addEventListener("pagehide", () => pagehideTransportFence.depart());
+window.addEventListener("pagehide", () => {
+  pagehideTransportFence.depart();
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  animationFrameId = 0;
+});
 // The closed transport cannot be reused if the browser restores a BFCache page.
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();
@@ -391,7 +395,7 @@ networkClient = await connectAuthoritativeClient({
 });
 // The user may have navigated away while authenticated admission awaited.
 // Retire that freshly resolved client before its first gameplay input.
-pagehideTransportFence.bind(networkClient);
+const activeAfterAdmission = pagehideTransportFence.bind(networkClient);
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
@@ -757,6 +761,8 @@ function sampleInput() {
 }
 
 function simulatePrediction(stepMs) {
+  // Never transmit a stale input after a pagehide, even if an old RAF ran late.
+  if (pagehideTransportFence.departed) return;
   sampleInput();
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
@@ -1813,7 +1819,10 @@ function createArenaLayer() {
 }
 
 function frame(now) {
-  if (document.hidden) return;
+  if (pagehideTransportFence.departed || document.hidden) {
+    animationFrameId = 0;
+    return;
+  }
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);
@@ -1828,6 +1837,7 @@ function frame(now) {
 
 function handleVisibilityChange() {
   releaseInputs();
+  if (pagehideTransportFence.departed) return;
   if (document.hidden) {
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = 0;
@@ -1848,6 +1858,10 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-render();
-frameBudget.reset(performance.now());
-animationFrameId = requestAnimationFrame(frame);
+// The page may have left while awaiting the authenticated QUIC admission.
+// A rejected late bind already closed its seat; do not start an orphaned RAF.
+if (activeAfterAdmission) {
+  render();
+  frameBudget.reset(performance.now());
+  animationFrameId = requestAnimationFrame(frame);
+}
