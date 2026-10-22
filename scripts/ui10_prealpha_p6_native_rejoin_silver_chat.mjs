@@ -109,23 +109,36 @@ try {
  // ctx.fillText("#id") while the ORIGINAL requestAnimationFrame paints.
  const traceScript=[
   "if(!window.__CORE8C_VISIBLE_IDS__){",
-  "const ctx=CanvasRenderingContext2D.prototype,oldText=ctx.fillText,oldImage=ctx.drawImage;",
+  "const ctx=CanvasRenderingContext2D.prototype,oldText=ctx.fillText,oldImage=ctx.drawImage,oldEllipse=ctx.ellipse;",
   "const raf=window.requestAnimationFrame;",
-  "const q={active:false,labels:[],frames:[],frameCount:0,silverDraws:0,silverFourFrames:0};",
+  "const q={active:false,labels:[],labelPoints:[],spritePoints:[],fallbackPoints:[],frames:[],frameCount:0,silverDraws:0,silverFourFrames:0,fallbackBodies:0};",
   "window.requestAnimationFrame=function(cb){return raf.call(window,function(t){",
-  "q.active=true;q.labels=[];q.silverDraws=0;",
+  "q.active=true;q.labels=[];q.labelPoints=[];q.spritePoints=[];q.fallbackPoints=[];q.silverDraws=0;q.fallbackBodies=0;",
   "try{return cb(t);}finally{",
   "q.active=false;q.frameCount++;if(q.silverDraws===4)q.silverFourFrames++;",
-  "q.frames.push({t,ids:[...new Set(q.labels)].sort(),silvers:q.silverDraws});",
+  "q.frames.push({t,ids:[...new Set(q.labels)].sort(),silvers:q.silverDraws,fallbackBodies:q.fallbackBodies,",
+  "labels:q.labelPoints,sprites:q.spritePoints,fallback:q.fallbackPoints});",
   "if(q.frames.length>80)q.frames.shift();",
   "}});};",
   "ctx.fillText=function(text,...args){",
-  "if(q.active&&this.canvas?.id==='arena'&&/^#[0-9]+$/.test(String(text)))q.labels.push(String(text));",
+  "if(q.active&&this.canvas?.id==='arena'&&/^#[0-9]+$/.test(String(text))){",
+  "q.labels.push(String(text));const p=this.getTransform();",
+  "q.labelPoints.push({id:String(text),x:p.e+Number(args[0]||0),y:p.f+Number(args[1]||0),font:this.font});",
+  "}",
   "return oldText.call(this,text,...args);};",
   "ctx.drawImage=function(...args){",
   "const image=args[0],uri=image?.currentSrc||image?.src||'';",
-  "if(q.active&&this.canvas?.id==='arena'&&uri.includes('/assets/knights/silver_')&&uri.endsWith('.webp'))q.silverDraws++;",
+  "if(q.active&&this.canvas?.id==='arena'&&uri.includes('/assets/knights/silver_')&&uri.endsWith('.webp')){",
+  "q.silverDraws++;const p=this.getTransform();",
+  "q.spritePoints.push({clip:uri.split('/').at(-1),x:Math.round(p.e),y:Math.round(p.f)});",
+  "}",
   "return oldImage.apply(this,args);};",
+  "ctx.ellipse=function(x,y,rx,ry,rot,start,end,...rest){",
+  "if(q.active&&this.canvas?.id==='arena'&&x===-2&&y===8&&rx===20&&ry===13){",
+  "q.fallbackBodies++;const p=this.getTransform();",
+  "q.fallbackPoints.push({x:Math.round(p.e),y:Math.round(p.f)});",
+  "}",
+  "return oldEllipse.call(this,x,y,rx,ry,rot,start,end,...rest);};",
   "window.__CORE8C_VISIBLE_IDS__=()=>({frameCount:q.frameCount,",
   "frames:q.frames.slice(-25),silverFourFrames:q.silverFourFrames,",
   "roster:[...document.querySelectorAll('#scoreboard-list li')].map(li=>li.querySelector('span')?.textContent||''),",
@@ -348,6 +361,101 @@ try {
   genuineCanvasHudAfterThirdRotation:thirdRemoval,
   bothReturningAndRemainingClientsMovedWithServerAcks:true,
   bfcacheRestoreTested:false,
+ }));
+ // Distinct history-navigation path: the real browser currently owns #7,
+ // navigates away and then presses the browser Back control. This can use a
+ // fresh document OR BFCache; in neither case may it reuse a retired QUIC
+ // connection, stale actor ID #7 or resurrect #2/#5/#6. The existing
+ // pageshow.persisted branch is defensive; do not claim BFCache restoration
+ // was actually observed unless a browser truly uses it.
+ const historyBackStart=Date.now();
+ await wd("POST","/session/"+b+"/url",{url:"about:blank"});
+ await wd("POST","/session/"+b+"/back",{});
+ const historyActor=await poll("authentic browser Back must admit fresh actor #8",
+   async()=>evaljs(b,
+    "const x=document.querySelector('#event-text')?.textContent||'';return {ok:/Online - player #8 - server tick \\d+/.test(x),status:x,navType:performance.getEntriesByType('navigation')?.[0]?.type||'unknown'};"),14000);
+ const historyBackElapsedMs=Date.now()-historyBackStart;
+ await originalShortUi(b,shortTargets[1],"browser genuine Back actor 8");
+ assert(historyBackElapsedMs<16000,
+   "Back after voluntary quit must not restore stale session or wait QUIC idle timeout");
+ console.log("CORE8C_UI10_HISTORY_BACK_NEW_ACTOR",JSON.stringify({
+  ...historyActor,elapsedMs:historyBackElapsedMs,retiredActor:7,returnedActor:8,
+ }));
+ const backReconciled=[];
+ // Both genuine draw outcomes matter: a visible actor must paint an original
+ // Silver WebP, while a server-owned actor outside a particular spectator's
+ // viewport must emit the authentic #id offscreen pointer instead. Source:
+ // drawOffscreenEnemyPointers uses 9px; drawRemoteIdentity uses 10px.
+ function actor8View(frame){
+  const labels=frame.labels||[];
+  const isOffscreen=labels.some(p=>p.id==="#8"&&p.font?.startsWith("9px "));
+  const onCanvas=labels.some(p=>p.id==="#8"&&p.font?.startsWith("10px "));
+  const hasDeparted=[2,5,6,7].some(id=>frame.ids.includes("#"+id));
+  return {mode:isOffscreen&&!onCanvas?"original-edge-pointer":
+   onCanvas&&!isOffscreen?"original-onscreen-identity":"invalid",
+   valid:frame.ids.includes("#8")&&!hasDeparted&&
+    ((isOffscreen&&!onCanvas&&frame.silvers===3&&frame.fallbackBodies===0)
+    ||(onCanvas&&!isOffscreen&&frame.silvers===4&&frame.fallbackBodies===0))};
+ }
+ for(const [viewerIndex,sid] of surviving.entries()){
+  const q=await poll("real browser Back must show #8 as Silver or genuine offscreen pointer",
+   async()=>{
+    const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
+    const observations=frames.map(actor8View);
+    return {...v,observations,ok:v?.roster?.length===4
+      &&[1,3,4,8].every(id=>rosterHas(v.roster,id))
+      &&[2,5,6,7].every(id=>!rosterHas(v.roster,id))
+      &&frames.length>=8&&observations.filter(x=>x.valid).length>=8};
+   },12000);
+  const recent=q.observations.slice(-8);
+  console.log("UI10_BACK_ORIGINAL_VIEWPORT_OR_SILVER_PASS",JSON.stringify({
+   viewerIndex,originalWorldRoster:q.roster,observations:recent,
+   frames:q.frames.slice(-3)}));
+  backReconciled.push({viewerIndex,roster:q.roster,
+   initialMode:recent.at(-1).mode,
+   frames:q.frames.slice(-8).map(frame=>({ids:frame.ids,silvers:frame.silvers}))});
+  const ack=await realWasdAndAck(sid,"post-history-back","s");
+  console.log("CORE8C_HISTORY_BACK_SURVIVOR_ACK",JSON.stringify(ack));
+ }
+ // Native authorized #8 now genuinely moves toward its former spectator's
+ // viewport; prove the edge arrow is replaced by the actual Silver source
+ // atlas without a fake packet, reloading, altered camera, or test harness
+ // position mutation. Crucially this is a SECOND independent strict boundary,
+ // not an allowance for a missing on-screen player.
+ const movedActor8=[
+  await realWasdAndAck(b,"history-back-8-comes-into-view-first","a"),
+  await realWasdAndAck(b,"history-back-8-comes-into-view-second","a")
+ ];
+ const inView=[];
+ for(const [viewerIndex,sid] of surviving.entries()){
+  const q=await poll("real #8 now in view, source Silver drawn four-in-one RAF",
+   async()=>{
+    const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
+    const visibleFrames=frames.filter(f=>
+      f.ids.includes("#8")&&[2,5,6,7].every(id=>!f.ids.includes("#"+id))
+      &&f.labels?.some(p=>p.id==="#8"&&p.font?.startsWith("10px "))
+      &&!f.labels?.some(p=>p.id==="#8"&&p.font?.startsWith("9px "))
+      &&f.silvers===4&&f.fallbackBodies===0);
+    return {...v,visibleFrames:visibleFrames.length,ok:v?.roster?.length===4
+      &&[1,3,4,8].every(id=>rosterHas(v.roster,id))
+      &&visibleFrames.length>=8};
+   },12000);
+  inView.push({viewerIndex,roster:q.roster,
+   realFourSilverFrames:q.visibleFrames,draws:q.frames.slice(-3)});
+ }
+ console.log("UI10_BACK_ACTOR8_REAL_WASD_TO_ALL_SILVER_PASS",
+  JSON.stringify({nativeRealActorMovementAcks:movedActor8,
+   authenticatedAllFourVisibleSourceSprites:true,views:inView}));
+ const backClientAck=await realWasdAndAck(b,"history-back-actor8","s");
+ console.log("CORE8C_UI10_HISTORY_BACK_PASS",JSON.stringify({
+  actualNativeWebDriverBack:true,historyNavigationType:historyActor.navType,
+  previousActor:7,freshServerOwnedActor:8,elapsedMs:historyBackElapsedMs,
+  originalNativeMatrix:browserMatrix,
+  noRetiredActorGhosts:[2,5,6,7],
+  authoritativeCanvasesAndScoreboards:backReconciled,
+  bothReturningAndSurvivingClientInputAck:true,
+  bfcachePersistenceNotAsserted:true,
+  returningClientAck:backClientAck,
  }));
  console.log("CORE8C_UI10_GRACEFUL_PAGEHIDE_PASS",JSON.stringify({
   genuineWebTransport:true,chromeFirefoxNativeBrowsers:browserMatrix,
