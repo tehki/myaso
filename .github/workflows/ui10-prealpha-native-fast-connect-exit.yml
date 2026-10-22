@@ -1,0 +1,32 @@
+name: UI10 P0 real browser fast Connecting exit under four seat Rust admission (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui10_native_fast_connect_exit.mjs"
+      - ".github/workflows/ui10-prealpha-native-fast-connect-exit.yml"
+      - "web/online-game.mjs"
+      - "src/browser/pagehide-transport-fence.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-fast-connect-pagehide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real native browser script and source fence invariant
+        run: |
+          node --check scripts/ui10_native_fast_connect_exit.mjs
+          node --test tests/core8c-pagehide-transport-fence.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile real original Rust QUIC multiplayer server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Native Chrome Connecting-stage exit, then four Chrome Firefox clients and denied fifth
+        run: timeout --signal=TERM --kill-after=5s 195s node scripts/ui10_native_fast_connect_exit.mjs
