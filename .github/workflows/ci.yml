@@ -1160,6 +1160,8 @@ jobs:
           node --check scripts/graphics3a-prealpha-silver-connected-receipt.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --test tests/prealpha-silver-connected-browser-receipt.test.mjs
+          node --check scripts/graphics3a-prealpha-connected-motion-receipt.mjs
+          node --test tests/prealpha-silver-connected-motion-receipt.test.mjs
           node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-silver-native-browser-evidence.test.mjs
 
       - name: Validate native Chrome and Firefox can launch against local Rust server
@@ -1175,5 +1177,6 @@ jobs:
         env:
           MYASO_PVP_SCENARIO: "uiidentity"
           MYASO_GRAPHICS3A_PREALPHA_SILVER_FLIGHT: "1"
-          MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+          MYASO_GRAPHICS3A_PREALPHA_MOTION_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "8500"
         run: node scripts/pvp_browser_flight_runner.mjs
