@@ -28,6 +28,7 @@ const routes={
  ...Object.fromEntries(["armory-p0-facade-failclosed-review.html","armory-p0-facade-failclosed-review.mjs"].map(f=>
   ["/web/"+f,join(repo,"web",f)])),
  "/src/browser/red-lion-original-art-readiness.mjs":join(repo,"src/browser/red-lion-original-art-readiness.mjs"),
+ "/src/browser/red-lion-atomic-frame-qa.mjs":join(repo,"src/browser/red-lion-atomic-frame-qa.mjs"),
  "/src/browser/arena-viewport.mjs":join(repo,"src/browser/arena-viewport.mjs")
 };
 const sha=async p=>createHash("sha256").update(await readFile(p)).digest("hex");
@@ -65,24 +66,37 @@ try{
    if(engine==="chrome")cfg.args=["--no-sandbox"];
    else{cfg.browser="firefox";cfg.protocol="webDriverBiDi";}
    browser=await puppeteer.launch(cfg);
-   for(const situation of ["normal","fail-day","fail-roof"]){
+   for(const situation of ["normal","fail-day","fail-roof","fail-draw"]){
     mode.current=situation;
     const page=await browser.newPage(),pageErrors=[],httpErrors=[];
     try{
      page.on("pageerror",e=>pageErrors.push(e.message));
      page.on("response",r=>{if(r.status()>=400)httpErrors.push({status:r.status(),path:new URL(r.url()).pathname});});
      await page.setViewport({width:1320,height:775,deviceScaleFactor:1});
-     await page.goto(url,{waitUntil:"networkidle0",timeout:18000});
+     await page.goto(url+(situation==="fail-draw"?"?lateCanvasFault=1":""),{waitUntil:"networkidle0",timeout:18000});
      await page.waitForFunction(()=>window.__redLionFallbackReview?.ready,{timeout:15000});
      const data=await page.evaluate(()=>window.__redLionFallbackReview);
      assert.deepEqual(pageErrors,[]);
      if(situation==="normal"){
+      assert.equal(data.recoveredLateDrawError,false);
       assert.equal(data.artReady,true);
       assert.equal(data.replacementApplied,true);
       assert.deepEqual(data.replacedBuildingIds,["red-lion"]);
       assert.ok(data.originalFacadePixelsDifferentFromPlaceholder>10000);
       assert.deepEqual(httpErrors,[]);
+     }else if(situation==="fail-draw"){
+      assert.equal(data.artReady,true);
+      assert.equal(data.actualBrowserImageDecode,true);
+      assert.equal(data.injectedCanvasFailure,true);
+      assert.equal(data.recoveredLateDrawError,true);
+      assert.equal(data.fallbackDefaultPlaceholder,true);
+      assert.equal(data.replacementApplied,false);
+      assert.equal(data.fallbackPixelsIdenticalToOriginal,true);
+      assert.equal(data.originalFacadePixelsDifferentFromPlaceholder,0);
+      assert.deepEqual(data.replacedBuildingIds,[]);
+      assert.deepEqual(httpErrors,[]);
      }else{
+      assert.equal(data.recoveredLateDrawError,false);
       assert.equal(data.artReady,false);
       assert.equal(data.fallbackDefaultPlaceholder,true);
       assert.equal(data.fallbackPixelsIdenticalToOriginal,true);
