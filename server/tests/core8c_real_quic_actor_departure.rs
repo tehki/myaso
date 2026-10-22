@@ -278,6 +278,73 @@ async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcome
     .expect("real server must replicate old actor removal and fresh actor admission");
     assert!(saw_departed_removal && saw_fresh_actor);
 
+    // Deliberately WITHHOLD a delta ACK. The true server must repeat both
+    // the removed #2 tombstone and admitted #5 entity against the unchanged
+    // acknowledged initial baseline, or a lost delta could leave ghost #2
+    // on a surviving client forever. No packet faults are fabricated.
+    let mut last_unacked_sequence = None;
+    for _ in 0..3 {
+        let snapshot = timeout(Duration::from_secs(3), async {
+            loop {
+                let frame = viewer
+                    .receive_datagram()
+                    .await
+                    .expect("surviving genuine viewer retains gameplay QUIC");
+                if frame.len() >= 2 && frame[0] == 1 && frame[1] == 2 {
+                    break decode_snapshot(&frame).expect("actual original Rust snapshot");
+                }
+            }
+        })
+        .await
+        .expect("authoritative repeated delta without client ACK");
+        assert!(!snapshot.full, "initial baseline must still be acknowledged");
+        assert_eq!(
+            snapshot.baseline_sequence, initial.sequence,
+            "without a new ACK each delta must compare to original baseline"
+        );
+        assert!(
+            snapshot
+                .records
+                .iter()
+                .any(|r| r.net_id == 2 && r.mask & SNAPSHOT_FIELD_REMOVED != 0),
+            "lost removal delta must NOT erase the next authoritative tombstone"
+        );
+        assert!(
+            snapshot
+                .records
+                .iter()
+                .any(|r| r.net_id == 5 && r.mask & SNAPSHOT_FIELD_REMOVED == 0),
+            "new player entity must continue replicating without ACK"
+        );
+        last_unacked_sequence = Some(snapshot.sequence);
+    }
+    let acknowledged_removal = last_unacked_sequence.expect("observed actual delta");
+    // Now confirm a real authoritative delta; the server must move the
+    // baseline forward and no longer re-issue the retired actor as if alive.
+    send_v1_with_baseline_ack(&viewer, 2, acknowledged_removal, 709);
+    let confirmed = timeout(Duration::from_secs(5), async {
+        loop {
+            let frame = viewer
+                .receive_datagram()
+                .await
+                .expect("viewer remains live after removal ACK");
+            if frame.len() < 2 || frame[0] != 1 || frame[1] != 2 {
+                continue;
+            }
+            let snapshot = decode_snapshot(&frame).expect("original Rust delta after ACK");
+            if snapshot.baseline_sequence == acknowledged_removal {
+                break snapshot;
+            }
+        }
+    })
+    .await
+    .expect("actual server advanced the acknowledged snapshot baseline");
+    assert!(!confirmed.full, "acknowledged snapshot must remain incremental");
+    assert!(
+        confirmed.records.iter().all(|r| r.net_id != 2),
+        "after acknowledged removal old actor cannot reappear in live deltas"
+    );
+
     assert_original_v1_input_ack(&one, 1, 711).await;
     assert_original_v1_input_ack(&three, 3, 713).await;
     // The actual viewer remains able to play after observing the tombstone.
