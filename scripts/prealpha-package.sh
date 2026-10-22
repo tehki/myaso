@@ -46,6 +46,9 @@ for required in \
   web/audio/music/moonlight-sonata-adagio.mp3 \
   web/audio/music/vivaldi-autumn-adagio.mp3 \
   web/audio/music/vivaldi-winter.mp3 web/audio/music/track-04-untitled.mp3 \
+  web/local-chat.css src/browser/local-chat.mjs \
+  src/browser/chat-c1-activation.mjs src/network/chat-codec.mjs \
+  src/network/local-chat-ui-bridge.mjs \
   src/browser/game-audio.mjs src/browser/combat-readability.mjs; do
   [[ -s "$scratch/$required" ]] || {
     echo "Pre-Alpha ready-content missing: $required" >&2
