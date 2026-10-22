@@ -336,6 +336,15 @@ window.addEventListener("blur", releaseInputs);
 // Chat composer focus must release held game inputs, not trap a charge.
 canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
+// A voluntary tab/navigation exit should promptly retire its server-owned
+// gameplay admission lease. Losing OS/browser process still uses QUIC timeout.
+window.addEventListener("pagehide", () => networkClient?.close("pagehide"));
+// The closed transport cannot be reused if the browser restores a BFCache page.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) window.location.reload();
+});
+
+
 
 setStatus("Connecting to authoritative server…");
 networkClient = await connectAuthoritativeClient({

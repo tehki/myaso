@@ -1,0 +1,40 @@
+name: UI10 Pre-Alpha Silver Chat short-screen native voluntary seat rejoin (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/ui10_prealpha_p6_native_rejoin_silver_chat.mjs"
+      - ".github/workflows/ui10-prealpha-p6-native-pagehide-rejoin.yml"
+      - "src/browser/local-chat.mjs"
+      - "web/index.html"
+      - "web/styles.css"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-browser-silver-chat-seat-rotation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify unchanged original native source and real browsers
+        run: |
+          node --check scripts/ui10_prealpha_p6_native_rejoin_silver_chat.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build original authoritative Rust Physics6 game server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Firefox actor voluntarily leaves and returns, Chrome survivors retain Silver and C1
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 185s node scripts/ui10_prealpha_p6_native_rejoin_silver_chat.mjs
+      - name: Chrome actor voluntarily leaves and returns, Firefox survivor retains Silver and C1
+        env:
+          C1_BROWSER_MATRIX: chrome,chrome,firefox,chrome
+        run: timeout --signal=TERM --kill-after=5s 185s node scripts/ui10_prealpha_p6_native_rejoin_silver_chat.mjs
