@@ -8,6 +8,8 @@ use crate::simulation::{Action, Fighter};
 use crate::zone::ZoneId;
 
 pub const BACKPACK_CAPACITY: usize = 64;
+/// Physical equipment locations in the five-slot contract.
+pub const EQUIPMENT_SLOT_COUNT: usize = 5;
 pub const PICKUP_REACH: f32 = 56.0;
 pub const GROUND_DECAY_MS: u64 = 15 * 60 * 1000;
 pub const CORPSE_DECAY_MS: u64 = 20 * 60 * 1000;
@@ -1433,7 +1435,7 @@ impl LootStateSnapshot {
             if corpse.entity_id != *entity_id
                 || corpse.victim == 0
                 || !corpse.at.in_zone(corpse.zone)
-                || corpse.items.len() > BACKPACK_CAPACITY + 3
+                || corpse.items.len() > BACKPACK_CAPACITY + EQUIPMENT_SLOT_COUNT
             {
                 return Err(LootError::InvalidState);
             }
