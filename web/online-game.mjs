@@ -182,9 +182,24 @@ let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 let middleBlockHeld = false;
+// M156 ONLY: bounded, read-only provenance for genuine fast third-party LMB.
+// No client packet, event handler, movement or Combat timing changes.
+let m156LastPointerEpochMs = -Infinity;
+function observeM156OriginalInput(phase, values = {}) {
+  if (acceptanceScenario !== "uirollknockdownffahit") return;
+  const debug = window.__MYASO_ACCEPTANCE_STATE__;
+  if (!debug) return;
+  debug.m156InputTrace ??= [];
+  debug.m156InputTrace.push({
+    phase, epochMs: Date.now(), actorNetId: networkClient?.playerNetId ?? null,
+    ...values,
+  });
+  if (debug.m156InputTrace.length > 32) debug.m156InputTrace.shift();
+}
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    observeM156OriginalInput("onLight", {attackRequested:true});
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -225,6 +240,14 @@ canvas.addEventListener("pointerdown", (event) => {
     leftButtonCharge.press(event.pointerId, {
       immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
+    if (acceptanceScenario === "uirollknockdownffahit") {
+      m156LastPointerEpochMs = Date.now();
+      observeM156OriginalInput("pointerdown", {
+        pointerId:event.pointerId, button:event.button,
+        chargePressed:leftButtonCharge.isPressed(),
+        canvasFocused:document.activeElement === canvas,
+      });
+    }
     return;
   }
 });
@@ -237,6 +260,15 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  if (acceptanceScenario === "uirollknockdownffahit") {
+    m156LastPointerEpochMs = Date.now();
+    observeM156OriginalInput("pointerup", {
+      pointerId:event.pointerId, button:event.button,
+      committed:committed ?? null, attackRequested,
+      chargePressed:leftButtonCharge.isPressed(),
+      canvasFocused:document.activeElement === canvas,
+    });
+  }
   leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
@@ -279,6 +311,7 @@ canvas.addEventListener("pointercancel", (event) => {
     leftButtonDown = false;
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
+    observeM156OriginalInput("pointercancel", {pointerId:event.pointerId});
   }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
@@ -286,8 +319,10 @@ canvas.addEventListener("lostpointercapture", (event) => {
   if (event.pointerId !== undefined && !(event.buttons & 1)) {
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
+    observeM156OriginalInput("lostpointercapture", {pointerId:event.pointerId});
   }
 });
+window.addEventListener("blur", () => observeM156OriginalInput("window-blur"));
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
   canvas.focus();
@@ -360,9 +395,10 @@ networkClient = await connectAuthoritativeClient({
     recordKillEvent(event);
   },
   onAck(ack) {
-    // M144 only: server INPUT_ACK may coalesce samples; it does not prove
-    // which physical DOM edges occurred or a Combat HIT. Bounded diagnostics.
-    if (acceptanceScenario === "uimultirecoveryffa") {
+    // M144/M156 only: original server INPUT_ACK is a coalesced highwater;
+    // not per-click admission, physical input provenance or a Combat HIT.
+    if (acceptanceScenario === "uimultirecoveryffa" ||
+        acceptanceScenario === "uirollknockdownffahit") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.inputAckReceipts ??= [];
@@ -370,6 +406,8 @@ networkClient = await connectAuthoritativeClient({
           epochMs: Date.now(),
           processedClientTick: networkClient?.processedClientTick ?? null,
           serverTick: networkClient?.latestServerTick ?? null,
+          ...(acceptanceScenario === "uirollknockdownffahit"
+            ? {actorNetId:networkClient?.playerNetId ?? null} : {}),
         });
         if (debug.inputAckReceipts.length > 32) debug.inputAckReceipts.shift();
       }
@@ -770,7 +808,8 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa" ||
+        acceptanceScenario === "uirollknockdownffahit") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
@@ -787,6 +826,28 @@ function simulatePrediction(stepMs) {
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
           });
+        } else if (acceptanceScenario === "uirollknockdownffahit") {
+          debug.inputSubmissions ??= [];
+          appendM144InputSample(debug.inputSubmissions, {
+            clientTick:outgoingTick, epochMs:debug.lastSubmittedAtEpochMs,
+            attack:Boolean(currentInput.attack),
+            jump:Boolean(currentInput.jump),
+            heavyAttack:Boolean(currentInput.heavyAttack),
+          });
+          // Record actual live v1 sampled input around the genuine pointer
+          // transition, including latch state BEFORE original reset below.
+          if (actionSample || Date.now() - m156LastPointerEpochMs <= 160) {
+            observeM156OriginalInput("sampled-send", {
+              clientTick:outgoingTick,
+              attack:Boolean(currentInput.attack),
+              jump:Boolean(currentInput.jump),
+              heavyAttack:Boolean(currentInput.heavyAttack),
+              attackLatchedBeforeReset:Boolean(attackRequested),
+              chargePressed:leftButtonCharge.isPressed(),
+              canvasFocused:document.activeElement === canvas,
+              matchOver:Boolean(matchOver), initialized:Boolean(local.initialized),
+            });
+          }
         } else if (actionSample) {
           // M145 existing action-only original trace remains unchanged.
           debug.inputSubmissions ??= [];
