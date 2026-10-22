@@ -1,4 +1,11 @@
+import { isChatC1Eligible } from "../src/browser/chat-c1-activation.mjs";
+import { installLocalChat } from "../src/browser/local-chat.mjs";
 const params = new URLSearchParams(window.location.search);
+// No chat UI or streams on public origins unless the operator-configured lobby
+// adds chatC1=1. Existing loopback preview remains explicitly nonproduction.
+if (isChatC1Eligible(window.location)) {
+  installLocalChat(document, { online: params.has("server") });
+}
 
 if (params.has("server")) {
   try {

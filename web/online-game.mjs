@@ -333,6 +333,8 @@ canvas.addEventListener("keydown", (event) => {
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
+// Chat composer focus must release held game inputs, not trap a charge.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
 setStatus("Connecting to authoritative server…");
@@ -386,6 +388,17 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+// Chat C1 uses the current authenticated WebTransport connection and separate
+// bounded reliable streams. Public requests require the operator-served
+// chatC1=1 config; localhost chatC1Preview=1 remains nonproduction-only.
+// Never let a missing/failed chat stream block damage, input or rendering.
+void import("../src/browser/chat-c1-activation.mjs")
+  .then(({ isChatC1Eligible, activateChatC1Preview }) =>
+    isChatC1Eligible(window.location)
+      ? activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient })
+      : null)
+  .catch(() => { /* Chat is optional, authoritative Combat continues. */ });
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
