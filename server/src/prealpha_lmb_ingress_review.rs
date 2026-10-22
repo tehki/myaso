@@ -119,16 +119,28 @@ impl ReviewLmbIngress {
         if self.closed {
             return IngressResult::Rejected(None);
         }
-        let event = match decode_event(packet) {
+        // Decode for a diagnostic STALE receipt only after the caller has
+        // associated this packet with a trusted lease. Malformed bytes from a
+        // retired/foreign lease must not poison the active actor's ingress.
+        // This fixture does not itself authenticate the caller's lease.
+        let decoded = decode_event(packet);
+        if current_trusted_lease != self.lease {
+            return match decoded {
+                Ok(event) => {
+                    IngressResult::Stale(Self::ack(event, AckStatus::Stale, server_tick))
+                }
+                Err(_) => IngressResult::Rejected(None),
+            };
+        }
+        let event = match decoded {
             Ok(event) => event,
             Err(_) => {
+                // Malformed bytes on the CURRENT authenticated review lease
+                // still retire that lease, preserving the original fail-close.
                 self.close();
                 return IngressResult::Rejected(None);
             }
         };
-        if current_trusted_lease != self.lease {
-            return IngressResult::Stale(Self::ack(event, AckStatus::Stale, server_tick));
-        }
 
         let seq = u64::from(event.sequence);
         if seq < self.expected_seq {
