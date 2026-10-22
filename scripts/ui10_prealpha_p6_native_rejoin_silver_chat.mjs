@@ -111,23 +111,33 @@ try {
   "if(!window.__CORE8C_VISIBLE_IDS__){",
   "const ctx=CanvasRenderingContext2D.prototype,oldText=ctx.fillText,oldImage=ctx.drawImage,oldEllipse=ctx.ellipse;",
   "const raf=window.requestAnimationFrame;",
-  "const q={active:false,labels:[],frames:[],frameCount:0,silverDraws:0,silverFourFrames:0,fallbackBodies:0};",
+  "const q={active:false,labels:[],labelPoints:[],spritePoints:[],fallbackPoints:[],frames:[],frameCount:0,silverDraws:0,silverFourFrames:0,fallbackBodies:0};",
   "window.requestAnimationFrame=function(cb){return raf.call(window,function(t){",
-  "q.active=true;q.labels=[];q.silverDraws=0;q.fallbackBodies=0;",
+  "q.active=true;q.labels=[];q.labelPoints=[];q.spritePoints=[];q.fallbackPoints=[];q.silverDraws=0;q.fallbackBodies=0;",
   "try{return cb(t);}finally{",
   "q.active=false;q.frameCount++;if(q.silverDraws===4)q.silverFourFrames++;",
-  "q.frames.push({t,ids:[...new Set(q.labels)].sort(),silvers:q.silverDraws,fallbackBodies:q.fallbackBodies});",
+  "q.frames.push({t,ids:[...new Set(q.labels)].sort(),silvers:q.silverDraws,fallbackBodies:q.fallbackBodies,",
+  "labels:q.labelPoints,sprites:q.spritePoints,fallback:q.fallbackPoints});",
   "if(q.frames.length>80)q.frames.shift();",
   "}});};",
   "ctx.fillText=function(text,...args){",
-  "if(q.active&&this.canvas?.id==='arena'&&/^#[0-9]+$/.test(String(text)))q.labels.push(String(text));",
+  "if(q.active&&this.canvas?.id==='arena'&&/^#[0-9]+$/.test(String(text))){",
+  "q.labels.push(String(text));const p=this.getTransform();",
+  "q.labelPoints.push({id:String(text),x:p.e+Number(args[0]||0),y:p.f+Number(args[1]||0)});",
+  "}",
   "return oldText.call(this,text,...args);};",
   "ctx.drawImage=function(...args){",
   "const image=args[0],uri=image?.currentSrc||image?.src||'';",
-  "if(q.active&&this.canvas?.id==='arena'&&uri.includes('/assets/knights/silver_')&&uri.endsWith('.webp'))q.silverDraws++;",
+  "if(q.active&&this.canvas?.id==='arena'&&uri.includes('/assets/knights/silver_')&&uri.endsWith('.webp')){",
+  "q.silverDraws++;const p=this.getTransform();",
+  "q.spritePoints.push({clip:uri.split('/').at(-1),x:Math.round(p.e),y:Math.round(p.f)});",
+  "}",
   "return oldImage.apply(this,args);};",
   "ctx.ellipse=function(x,y,rx,ry,rot,start,end,...rest){",
-  "if(q.active&&this.canvas?.id==='arena'&&x===-2&&y===8&&rx===20&&ry===13)q.fallbackBodies++;",
+  "if(q.active&&this.canvas?.id==='arena'&&x===-2&&y===8&&rx===20&&ry===13){",
+  "q.fallbackBodies++;const p=this.getTransform();",
+  "q.fallbackPoints.push({x:Math.round(p.e),y:Math.round(p.f)});",
+  "}",
   "return oldEllipse.call(this,x,y,rx,ry,rot,start,end,...rest);};",
   "window.__CORE8C_VISIBLE_IDS__=()=>({frameCount:q.frameCount,",
   "frames:q.frames.slice(-25),silverFourFrames:q.silverFourFrames,",
@@ -373,6 +383,12 @@ try {
  }));
  const backReconciled=[];
  for(const sid of surviving){
+  // Record the original Canvas draw provenance even if the strict full-four
+  // Silver source-art gate fails. Do not spoof any actor, alter the source
+  // framebuffer, relax distances or quietly retry a failing release gate.
+  const beforeBack=await visible(sid);
+  console.log("UI10_BACK_SOURCE_SILVER_BEFORE",JSON.stringify({
+   status:beforeBack?.status,frames:beforeBack?.frames?.slice(-2)}));
   const q=await poll("real browser Back must remove #2/#5/#6/#7 and draw #8",
    async()=>{
     const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
@@ -382,6 +398,8 @@ try {
         &&[2,5,6,7].every(id=>!frame.ids.includes("#"+id))&&frame.silvers===4
         &&frame.ids.length>=3).length>=8};
    },12000);
+  console.log("UI10_BACK_FOUR_SOURCE_SILVER_PASS",JSON.stringify({
+   roster:q.roster,frames:q.frames.slice(-3)}));
   backReconciled.push({roster:q.roster,frames:q.frames.slice(-8).map(frame=>frame.ids)});
   const ack=await realWasdAndAck(sid,"post-history-back","s");
   console.log("CORE8C_HISTORY_BACK_SURVIVOR_ACK",JSON.stringify(ack));
