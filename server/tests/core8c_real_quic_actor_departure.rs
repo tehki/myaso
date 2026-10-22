@@ -297,7 +297,10 @@ async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcome
         })
         .await
         .expect("authoritative repeated delta without client ACK");
-        assert!(!snapshot.full, "initial baseline must still be acknowledged");
+        assert!(
+            !snapshot.full,
+            "initial baseline must still be acknowledged"
+        );
         assert_eq!(
             snapshot.baseline_sequence, initial.sequence,
             "without a new ACK each delta must compare to original baseline"
@@ -339,7 +342,10 @@ async fn surviving_quic_player_receives_real_removed_actor_tombstone_and_newcome
     })
     .await
     .expect("actual server advanced the acknowledged snapshot baseline");
-    assert!(!confirmed.full, "acknowledged snapshot must remain incremental");
+    assert!(
+        !confirmed.full,
+        "acknowledged snapshot must remain incremental"
+    );
     assert!(
         confirmed.records.iter().all(|r| r.net_id != 2),
         "after acknowledged removal old actor cannot reappear in live deltas"
