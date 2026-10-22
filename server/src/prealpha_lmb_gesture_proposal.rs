@@ -207,3 +207,69 @@ mod tests {
         assert_eq!(decode_event(&encoded), Err(DecodeError::ZeroGestureId));
     }
 }
+
+/// Explicit opt-in REVIEW codec for the draft source discriminator from #723.
+/// Original decode_event keeps refusing byte3 != 0 until all owners approve
+/// future authenticated QUIC stream negotiation. This module has no live call.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum GestureSource {
+    Lmb = 0,
+    KeyE = 1,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TypedGestureEvent {
+    pub source: GestureSource,
+    pub event: GestureEvent,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TypedDecodeError {
+    Original(DecodeError),
+    UnknownSource(u8),
+    InvalidSourceAction,
+}
+
+impl From<DecodeError> for TypedDecodeError {
+    fn from(error: DecodeError) -> Self {
+        Self::Original(error)
+    }
+}
+
+fn check_source_action(
+    source: GestureSource,
+    action: GestureAction,
+) -> Result<(), TypedDecodeError> {
+    if source == GestureSource::KeyE && action == GestureAction::Upgrade {
+        return Err(TypedDecodeError::InvalidSourceAction);
+    }
+    Ok(())
+}
+
+pub fn encode_typed_event(event: TypedGestureEvent) -> Result<[u8; BYTES], TypedDecodeError> {
+    check_source_action(event.source, event.event.action)?;
+    let mut bytes = encode_event(event.event)?;
+    bytes[3] = event.source as u8;
+    Ok(bytes)
+}
+
+pub fn decode_typed_event(bytes: &[u8]) -> Result<TypedGestureEvent, TypedDecodeError> {
+    if bytes.len() != BYTES {
+        return Err(DecodeError::Length.into());
+    }
+    let source = match bytes[3] {
+        0 => GestureSource::Lmb,
+        1 => GestureSource::KeyE,
+        other => return Err(TypedDecodeError::UnknownSource(other)),
+    };
+    // Delegate canonical v2 length/type/version/identity checks to existing
+    // Combat4 byte parser. Normalizing byte3 in a COPY never changes the
+    // received packet and does NOT authenticate the sender or actor.
+    let mut normalized = [0_u8; BYTES];
+    normalized.copy_from_slice(bytes);
+    normalized[3] = 0;
+    let event = decode_event(&normalized)?;
+    check_source_action(source, event.action)?;
+    Ok(TypedGestureEvent { source, event })
+}
