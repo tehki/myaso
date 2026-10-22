@@ -55,7 +55,6 @@ fn p6_c02_four_fighters_at_arena_wall_separate_within_bounds() {
     assert_separated(&world, &[1, 2, 3, 4]);
 }
 
-
 #[test]
 fn p6_c03_kick_knockback_does_not_leave_four_fighters_penetrating_after_tick() {
     // Kick target #2 at 254 toward the stationary #3 at 306. The kick's
@@ -86,7 +85,10 @@ fn p6_c03_kick_knockback_does_not_leave_four_fighters_penetrating_after_tick() {
             break;
         }
     }
-    assert!(kick_hit_tick.is_some(), "actual kick never knocked target down");
+    assert!(
+        kick_hit_tick.is_some(),
+        "actual kick never knocked target down"
+    );
     assert_eq!(world.fighter(2).unwrap().hp, 100.0, "kick is non-damaging");
     assert_eq!(world.fighter(3).unwrap().hp, 100.0);
     assert_eq!(world.fighter(4).unwrap().hp, 100.0);
