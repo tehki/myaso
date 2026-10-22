@@ -1,0 +1,16 @@
+{
+  "actualBlenderEditableLight": true,
+  "supportLegLightName": "Original Left Support Leg Soft Bounce",
+  "lightEnergy": 4.800000190734863,
+  "lightSize": 0.41999998688697815,
+  "lightAnimationFrameRange": [
+    1.0,
+    23.799999237060547
+  ],
+  "lightActionName": "Original Left Support Leg Soft BounceAction",
+  "sourceRigBones": 22,
+  "originalKickActionPreserved": true,
+  "matchesEightTrueSourceFrameSamples": true,
+  "replacedOriginalGeometry": false,
+  "humanApproval": false
+}

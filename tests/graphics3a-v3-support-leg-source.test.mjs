@@ -1,0 +1,81 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync,readdirSync} from "node:fs";
+import {createHash} from "node:crypto";
+const root=new URL("../",import.meta.url);
+const dir="docs/art/silver-spartan-v3-support-leg-fill/";
+const bytes=p=>readFileSync(new URL(p,root));
+const sha=b=>createHash("sha256").update(b).digest("hex");
+const m=JSON.parse(bytes(dir+"support_leg_fill_manifest.json"));
+test("real Cycles 22-bone leg-focused light preserves original source and authoritative 380ms",()=>{
+ assert.equal(m.sourceRigBones,22);
+ assert.equal(m.sourceGLBSha256,"d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f");
+ assert.deepEqual(m.authoritativePhasesMs,[90,70,220]);
+ assert.equal(m.totalKickMs,380);
+ assert.equal(m.blenderActualSupportLegLights.enabled,true);
+ assert.deepEqual(m.blenderActualSupportLegLights.sourceRigBoneNames,
+   ["mixamorig:LeftUpLeg","mixamorig:LeftLeg"]);
+ assert.equal(m.blenderActualSupportLegLights.skinnedOriginalSource,true);
+ assert.equal(m.blenderActualSupportLegLights.noTextureOrMeshRepaint,true);
+ assert.equal(m.blenderActualSupportLegLights.noPoseTimingChange,true);
+ assert.equal(m.originalSourceAssetNotBundled,true);
+ assert.equal(m.noCameraOrRigChange,true);
+ assert.equal(m.noGameplayOrPhysicsOrCombatChange,true);
+ assert.equal(m.noDefaultRendererChanges,true);
+ assert.equal(m.noNativeGameAcceptance,true);
+ assert.equal(m.ownerArtApproved,false);
+ assert.equal(m.preAlphaIncluded,false);
+});
+test("original V3 light atlas preserved; all 64 genuine Blender rendered alpha silhouettes preserved",()=>{
+ const original=bytes("docs/art/silver-spartan-v3-readability-study/silver_spartan_v3_readable_light_study_8x8.webp");
+ assert.equal(sha(original),m.baseAtlasSha256);
+ assert.equal(m.baseAtlasSha256,"3522f093a095a616dedf6f859c954553dd4832f8c1cbf655b644207faf239a79");
+ const corrected=bytes(dir+"silver_spartan_v3_support_leg_fill_8way.webp");
+ assert.equal(sha(corrected),m.newAtlasSha256);
+ assert.equal(corrected.subarray(8,12).toString("ascii"),"WEBP");
+ assert.notEqual(m.newAtlasSha256,m.baseAtlasSha256);
+ assert.equal(m.directions,8);
+ assert.equal(m.framesPerDirection,8);
+ assert.deepEqual(m.pixelResolution,[160,160]);
+ assert.equal(m.all64SourceAlphaIdentical,true);
+ assert.equal(m.samples.length,64);
+ assert.equal(m.blenderActualSupportLegLights.positions.length,64);
+ assert.ok(m.minimumVisiblePixelLuminanceGainPct>3);
+ assert.ok(m.samples.every(x=>x.alphaIdentical&&x.lumaGainPct>3&&x.visiblePixels>300));
+ assert.equal(sha(bytes(dir+"Graphics3A_Silver_Spartan_V3_SupportLegFill_source.blend")),m.editableBlenderSourceSha256);
+ const gif=bytes(dir+"silver_spartan_v3_support_leg_before_after_380ms.gif");
+ assert.equal(gif.subarray(0,4).toString(),"GIF8");
+ assert.equal(sha(gif),m.originalGifSha256);
+});
+test("Blender variant is explicitly opt-in, not a game or model repaint",()=>{
+ const script=bytes("tools/art/author_silver_kick_dash_p0.py").toString();
+ assert.match(script,/--spartan-v3-support-leg-fill/);
+ assert.match(script,/args\.spartan_v3_support_leg_fill or \(args\.spartan_v3_readable_light/);
+ assert.match(script,/rigKey\+"LeftUpLeg"/);
+ assert.match(script,/rigKey\+"LeftLeg"/);
+ assert.match(script,/supportLegLight\.rotation_euler/);
+ assert.match(script,/bpy\.ops\.render\.render\(write_still=True\)/);
+ const files=readdirSync(new URL(dir,root));
+ assert.ok(!files.some(x=>x.endsWith(".glb")));
+ assert.ok(!files.some(x=>x.endsWith(".png")));
+});
+test("reopened original 22-bone Blender action and support toe are byte-identical through all key phases",()=>{
+ const a=JSON.parse(bytes(dir+"original_vs_support_leg_pose_audit.json"));
+ assert.deepEqual(a.priorSamples,a.proposedSamples);
+ assert.deepEqual(a.authoritativeKickPhaseMs,[90,70,220]);
+ assert.ok(a.candidateSupportToeMaxSourceDrift<=.002);
+});
+
+test("saved editable Blender file contains real animated AREA bounce light over exact V3 action range",()=>{
+ const a=JSON.parse(bytes(dir+"actual_blender_support_leg_light_audit.json"));
+ assert.equal(a.actualBlenderEditableLight,true);
+ assert.equal(a.supportLegLightName,"Original Left Support Leg Soft Bounce");
+ assert.ok(Math.abs(a.lightEnergy-4.8)<.001);
+ assert.ok(Math.abs(a.lightSize-.42)<.001);
+ assert.ok(Math.abs(a.lightAnimationFrameRange[0]-1)<.001);
+ assert.ok(Math.abs(a.lightAnimationFrameRange[1]-23.8)<.001);
+ assert.equal(a.sourceRigBones,22);
+ assert.equal(a.originalKickActionPreserved,true);
+ assert.equal(a.replacedOriginalGeometry,false);
+ assert.equal(a.humanApproval,false);
+});

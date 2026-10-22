@@ -18,10 +18,12 @@ p.add_argument("--spartan-kick",action="store_true",help="Opt-in cinematic high-
 p.add_argument("--spartan-high-forward",action="store_true",help="Owner-approved silhouette: higher knee-to-chest chamber and farther boot thrust using natural 22-bone hip drive; preview only")
 p.add_argument("--spartan-contact-recoil-v3",action="store_true",help="Further refine authentic Silver armored high-knee contact and knee-return between exact Combat action phase boundaries; source art only")
 p.add_argument("--spartan-v3-readable-light",action="store_true",help="Isolated authentic V3 source lighting/contrast comparison; not default game art or approval")
+p.add_argument("--spartan-v3-support-leg-fill",action="store_true",help="Isolated Cycles-only camera-facing bounce light at genuine LeftUpLeg/LeftLeg skinned source, not post-processing")
 p.add_argument("--samples",type=int,default=1)
 p.add_argument("--engine",choices=["CYCLES","BLENDER_EEVEE_NEXT"],default="CYCLES")
 args=p.parse_args(argv)
 assert not args.spartan_v3_readable_light or args.spartan_contact_recoil_v3, "Readability study needs unchanged Spartan V3 source"
+assert not args.spartan_v3_support_leg_fill or (args.spartan_v3_readable_light and args.spartan_contact_recoil_v3 and args.engine=="CYCLES"), "Support-leg art variant requires original Blender V3 Cycles lighting study"
 source=Path(args.source).resolve();out=Path(args.output).resolve()
 assert source.is_file()
 out.mkdir(parents=True,exist_ok=True)
@@ -311,6 +313,19 @@ for name,loc,power,color in [
  ob.location=loc
  ob.rotation_euler=(Vector((0,0,-.08))-ob.location).to_track_quat("-Z","Y").to_euler()
  light.energy=power;light.color=color;light.shape="DISK";light.size=3.6
+# Real Blender light, following the evaluated ORIGINAL 22-bone LeftLeg,
+# not a screenshot paint/mask or unearned new geometry.
+supportLegLight=None
+supportLegPositions=[]
+if args.spartan_v3_support_leg_fill:
+ supportLegData=bpy.data.lights.new("Original Left Support Leg Soft Bounce","AREA")
+ supportLegLight=bpy.data.objects.new("Original Left Support Leg Soft Bounce",supportLegData)
+ sc.collection.objects.link(supportLegLight)
+ supportLegData.energy=4.8
+ supportLegData.color=(.82,.88,1.0)
+ supportLegData.shape="DISK"
+ supportLegData.size=.42
+ assert rigKey+"LeftUpLeg" in arm.pose.bones and rigKey+"LeftLeg" in arm.pose.bones
 cameraData=bpy.data.cameras.new("Original 8-way 1.66-ortho")
 cam=bpy.data.objects.new("Original 8-way 1.66-ortho",cameraData)
 sc.collection.objects.link(cam);sc.camera=cam
@@ -336,6 +351,31 @@ for clip,frames in samples.items():
    if args.smoke_fast and col not in (0,4):continue
    if args.smoke and not args.smoke_fast and col not in (0,2,4,6):continue
    sc.frame_set(int(fr),subframe=fr-int(fr))
+   if supportLegLight is not None and clip=="silver_kick_p0":
+    # Evaluated original upper/knee and shin/ankle support leg, after real
+    # source action and Hips toe-plant correction are evaluated at the frame.
+    bpy.context.view_layer.update()
+    upper=arm.pose.bones[rigKey+"LeftUpLeg"]
+    lower=arm.pose.bones[rigKey+"LeftLeg"]
+    knee=arm.matrix_world @ lower.head
+    ankle=arm.matrix_world @ lower.tail
+    hip=arm.matrix_world @ upper.head
+    # Aim along BOTH original support thigh and shin, favour the shaded knee.
+    targetLeg=knee*.48+ankle*.28+hip*.24
+    toCamera=Vector(cam.location)-targetLeg
+    toCamera.z=0
+    assert toCamera.length>.1,"Camera/leg ray invalid"
+    toCamera.normalize()
+    supportLegLight.location=targetLeg+toCamera*.46+Vector((0,0,.18))
+    supportLegLight.rotation_euler=(targetLeg-supportLegLight.location).to_track_quat("-Z","Y").to_euler()
+    # Persist one real eight-key editable light animation for the saved source
+    # scene (facing 7); all eight camera directions are baked above.
+    if d==7 and not (args.smoke or args.smoke_fast):
+     supportLegLight.keyframe_insert(data_path="location",frame=fr)
+     supportLegLight.keyframe_insert(data_path="rotation_euler",frame=fr)
+    supportLegPositions.append({"direction":d,"phase":col,
+      "leftSupportLegSourcePoint":[round(float(x),6) for x in targetLeg],
+      "cameraFacingLightPoint":[round(float(x),6) for x in supportLegLight.location]})
    target=out/f"{clip}_dir{d}_frame{col}.png"
    sc.render.filepath=str(target)
    bpy.ops.render.render(write_still=True)
@@ -368,6 +408,14 @@ if not (args.smoke or args.smoke_fast):
  "spartanContactRecoilV3OptIn":args.spartan_contact_recoil_v3,
  "sourceActionKeys":[{"blenderFrame":fr,"sourceMs":round((fr-1.0)/60*1000,3)} for fr,_,_ in kickKeys],
  "sourceLightingStudy": {"enabled":args.spartan_v3_readable_light,"worldStrength":.88 if args.spartan_v3_readable_light else .65,"keyEnergy":295 if args.spartan_v3_readable_light else 210,"fillEnergy":280 if args.spartan_v3_readable_light else 180,"noGameplayOrPhysicsModification":True,"humanArtApproval":False},
+ "supportLegBlenderLight": {"enabled":args.spartan_v3_support_leg_fill,
+  "sourceRigBoneNames":["mixamorig:LeftUpLeg","mixamorig:LeftLeg"],
+  "lamp":"AREA","lightEnergy":4.8 if args.spartan_v3_support_leg_fill else 0,
+  "lightSize":.42 if args.spartan_v3_support_leg_fill else 0,
+  "cameraFacing":True,"target":"original evaluated left supporting hip, knee, shin, ankle",
+  "skinnedOriginalSource":True,"noTextureOrMeshRepaint":True,
+  "noPoseTimingChange":True,"positions":supportLegPositions,
+  "humanArtApproval":False},
  "worldGroundValidated":False,
  "originalArtReplaced":False,"realGreyhaven":False,"humanVisualApproved":False,
  "trueServerEvent":False,"sourceEditableBlend":not args.smoke,

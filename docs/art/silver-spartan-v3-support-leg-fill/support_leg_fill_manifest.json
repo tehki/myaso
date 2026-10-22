@@ -1,0 +1,1524 @@
+{
+  "status": "ORIGINAL BLENDER 22-BONE SOURCE TESTED; NOT NATIVE / NOT VISUALLY APPROVED",
+  "sourceRigBones": 22,
+  "sourceGLBSha256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+  "baseAtlasSha256": "3522f093a095a616dedf6f859c954553dd4832f8c1cbf655b644207faf239a79",
+  "newAtlasSha256": "c99c392a067494fff7416c6040422d2ff2bbf196ddfc3086d6fda3acd8790158",
+  "editableBlenderSourceSha256": "3287c1357680ffbe99fa3699f34e2a1e648e446d8d444435156dc9693f7352c5",
+  "originalGifSha256": "8259857c678eb5c036bd17479767a4445912675b6f59ea1e14c6ebd4fd860d8b",
+  "authoritativePhasesMs": [
+    90,
+    70,
+    220
+  ],
+  "totalKickMs": 380,
+  "directions": 8,
+  "framesPerDirection": 8,
+  "pixelResolution": [
+    160,
+    160
+  ],
+  "all64SourceAlphaIdentical": true,
+  "minimumVisiblePixelLuminanceGainPct": 9.26,
+  "averageVisiblePixelLuminanceGainPct": 27.39,
+  "maxVisiblePixelLuminanceGainPct": 49.58,
+  "samples": [
+    {
+      "direction": 0,
+      "frame": 0,
+      "visiblePixels": 2235,
+      "sourceLuma": 60.223,
+      "supportLegFillLuma": 79.743,
+      "lumaGainPct": 32.41,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 1,
+      "visiblePixels": 2453,
+      "sourceLuma": 61.329,
+      "supportLegFillLuma": 81.098,
+      "lumaGainPct": 32.23,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 2,
+      "visiblePixels": 2466,
+      "sourceLuma": 59.128,
+      "supportLegFillLuma": 77.509,
+      "lumaGainPct": 31.09,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 3,
+      "visiblePixels": 2539,
+      "sourceLuma": 56.483,
+      "supportLegFillLuma": 73.84,
+      "lumaGainPct": 30.73,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 4,
+      "visiblePixels": 2389,
+      "sourceLuma": 55.136,
+      "supportLegFillLuma": 72.474,
+      "lumaGainPct": 31.45,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 5,
+      "visiblePixels": 2367,
+      "sourceLuma": 60.988,
+      "supportLegFillLuma": 80.084,
+      "lumaGainPct": 31.31,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 6,
+      "visiblePixels": 2369,
+      "sourceLuma": 58.865,
+      "supportLegFillLuma": 77.636,
+      "lumaGainPct": 31.89,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 0,
+      "frame": 7,
+      "visiblePixels": 2235,
+      "sourceLuma": 60.223,
+      "supportLegFillLuma": 79.743,
+      "lumaGainPct": 32.41,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 0,
+      "visiblePixels": 1649,
+      "sourceLuma": 62.474,
+      "supportLegFillLuma": 78.93,
+      "lumaGainPct": 26.34,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 1,
+      "visiblePixels": 1784,
+      "sourceLuma": 65.87,
+      "supportLegFillLuma": 83.464,
+      "lumaGainPct": 26.71,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 2,
+      "visiblePixels": 2025,
+      "sourceLuma": 63.768,
+      "supportLegFillLuma": 79.225,
+      "lumaGainPct": 24.24,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 3,
+      "visiblePixels": 2127,
+      "sourceLuma": 62.18,
+      "supportLegFillLuma": 77.815,
+      "lumaGainPct": 25.14,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 4,
+      "visiblePixels": 2037,
+      "sourceLuma": 58.748,
+      "supportLegFillLuma": 76.259,
+      "lumaGainPct": 29.81,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 5,
+      "visiblePixels": 1801,
+      "sourceLuma": 64.458,
+      "supportLegFillLuma": 81.024,
+      "lumaGainPct": 25.7,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 6,
+      "visiblePixels": 1687,
+      "sourceLuma": 64.371,
+      "supportLegFillLuma": 82.252,
+      "lumaGainPct": 27.78,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 1,
+      "frame": 7,
+      "visiblePixels": 1649,
+      "sourceLuma": 62.474,
+      "supportLegFillLuma": 78.93,
+      "lumaGainPct": 26.34,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 0,
+      "visiblePixels": 1929,
+      "sourceLuma": 34.288,
+      "supportLegFillLuma": 43.39,
+      "lumaGainPct": 26.55,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 1,
+      "visiblePixels": 1741,
+      "sourceLuma": 39.158,
+      "supportLegFillLuma": 48.248,
+      "lumaGainPct": 23.21,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 2,
+      "visiblePixels": 1825,
+      "sourceLuma": 46.274,
+      "supportLegFillLuma": 58.336,
+      "lumaGainPct": 26.07,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 3,
+      "visiblePixels": 1992,
+      "sourceLuma": 46.985,
+      "supportLegFillLuma": 56.587,
+      "lumaGainPct": 20.44,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 4,
+      "visiblePixels": 2020,
+      "sourceLuma": 45.432,
+      "supportLegFillLuma": 54.736,
+      "lumaGainPct": 20.48,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 5,
+      "visiblePixels": 1810,
+      "sourceLuma": 39.746,
+      "supportLegFillLuma": 49.002,
+      "lumaGainPct": 23.29,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 6,
+      "visiblePixels": 2021,
+      "sourceLuma": 35.727,
+      "supportLegFillLuma": 45.105,
+      "lumaGainPct": 26.25,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 2,
+      "frame": 7,
+      "visiblePixels": 1929,
+      "sourceLuma": 34.288,
+      "supportLegFillLuma": 43.39,
+      "lumaGainPct": 26.55,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 0,
+      "visiblePixels": 2750,
+      "sourceLuma": 23.073,
+      "supportLegFillLuma": 28.164,
+      "lumaGainPct": 22.07,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 1,
+      "visiblePixels": 2442,
+      "sourceLuma": 25.67,
+      "supportLegFillLuma": 30.915,
+      "lumaGainPct": 20.43,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 2,
+      "visiblePixels": 2113,
+      "sourceLuma": 29.574,
+      "supportLegFillLuma": 35.107,
+      "lumaGainPct": 18.71,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 3,
+      "visiblePixels": 2188,
+      "sourceLuma": 30.339,
+      "supportLegFillLuma": 35.056,
+      "lumaGainPct": 15.55,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 4,
+      "visiblePixels": 2242,
+      "sourceLuma": 30.03,
+      "supportLegFillLuma": 35.233,
+      "lumaGainPct": 17.33,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 5,
+      "visiblePixels": 2441,
+      "sourceLuma": 27.305,
+      "supportLegFillLuma": 32.378,
+      "lumaGainPct": 18.58,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 6,
+      "visiblePixels": 2813,
+      "sourceLuma": 24.201,
+      "supportLegFillLuma": 28.579,
+      "lumaGainPct": 18.09,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 3,
+      "frame": 7,
+      "visiblePixels": 2750,
+      "sourceLuma": 23.073,
+      "supportLegFillLuma": 28.164,
+      "lumaGainPct": 22.07,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 0,
+      "visiblePixels": 2729,
+      "sourceLuma": 21.793,
+      "supportLegFillLuma": 26.573,
+      "lumaGainPct": 21.94,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 1,
+      "visiblePixels": 2643,
+      "sourceLuma": 25.521,
+      "supportLegFillLuma": 30.311,
+      "lumaGainPct": 18.77,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 2,
+      "visiblePixels": 2234,
+      "sourceLuma": 28.192,
+      "supportLegFillLuma": 32.83,
+      "lumaGainPct": 16.45,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 3,
+      "visiblePixels": 2343,
+      "sourceLuma": 27.079,
+      "supportLegFillLuma": 31.643,
+      "lumaGainPct": 16.85,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 4,
+      "visiblePixels": 2398,
+      "sourceLuma": 27.524,
+      "supportLegFillLuma": 31.992,
+      "lumaGainPct": 16.23,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 5,
+      "visiblePixels": 2575,
+      "sourceLuma": 25.272,
+      "supportLegFillLuma": 29.886,
+      "lumaGainPct": 18.26,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 6,
+      "visiblePixels": 2766,
+      "sourceLuma": 22.987,
+      "supportLegFillLuma": 27.756,
+      "lumaGainPct": 20.75,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 4,
+      "frame": 7,
+      "visiblePixels": 2729,
+      "sourceLuma": 21.793,
+      "supportLegFillLuma": 26.573,
+      "lumaGainPct": 21.94,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 0,
+      "visiblePixels": 2024,
+      "sourceLuma": 33.699,
+      "supportLegFillLuma": 43.303,
+      "lumaGainPct": 28.5,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 1,
+      "visiblePixels": 2092,
+      "sourceLuma": 35.149,
+      "supportLegFillLuma": 39.82,
+      "lumaGainPct": 13.29,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 2,
+      "visiblePixels": 1832,
+      "sourceLuma": 38.513,
+      "supportLegFillLuma": 43.094,
+      "lumaGainPct": 11.89,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 3,
+      "visiblePixels": 2036,
+      "sourceLuma": 37.653,
+      "supportLegFillLuma": 43.216,
+      "lumaGainPct": 14.78,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 4,
+      "visiblePixels": 2134,
+      "sourceLuma": 36.189,
+      "supportLegFillLuma": 39.541,
+      "lumaGainPct": 9.26,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 5,
+      "visiblePixels": 2086,
+      "sourceLuma": 33.459,
+      "supportLegFillLuma": 40.024,
+      "lumaGainPct": 19.62,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 6,
+      "visiblePixels": 2095,
+      "sourceLuma": 33.733,
+      "supportLegFillLuma": 39.728,
+      "lumaGainPct": 17.77,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 5,
+      "frame": 7,
+      "visiblePixels": 2024,
+      "sourceLuma": 33.699,
+      "supportLegFillLuma": 43.303,
+      "lumaGainPct": 28.5,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 0,
+      "visiblePixels": 1638,
+      "sourceLuma": 55.954,
+      "supportLegFillLuma": 83.694,
+      "lumaGainPct": 49.58,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 1,
+      "visiblePixels": 1670,
+      "sourceLuma": 62.11,
+      "supportLegFillLuma": 87.48,
+      "lumaGainPct": 40.85,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 2,
+      "visiblePixels": 1546,
+      "sourceLuma": 58.967,
+      "supportLegFillLuma": 80.203,
+      "lumaGainPct": 36.01,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 3,
+      "visiblePixels": 1573,
+      "sourceLuma": 56.325,
+      "supportLegFillLuma": 78.082,
+      "lumaGainPct": 38.63,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 4,
+      "visiblePixels": 1562,
+      "sourceLuma": 54.628,
+      "supportLegFillLuma": 75.619,
+      "lumaGainPct": 38.42,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 5,
+      "visiblePixels": 1593,
+      "sourceLuma": 59.925,
+      "supportLegFillLuma": 81.361,
+      "lumaGainPct": 35.77,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 6,
+      "visiblePixels": 1735,
+      "sourceLuma": 56.736,
+      "supportLegFillLuma": 81.988,
+      "lumaGainPct": 44.51,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 6,
+      "frame": 7,
+      "visiblePixels": 1638,
+      "sourceLuma": 55.954,
+      "supportLegFillLuma": 83.694,
+      "lumaGainPct": 49.58,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 0,
+      "visiblePixels": 2222,
+      "sourceLuma": 59.201,
+      "supportLegFillLuma": 83.045,
+      "lumaGainPct": 40.28,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 1,
+      "visiblePixels": 2343,
+      "sourceLuma": 61.397,
+      "supportLegFillLuma": 83.645,
+      "lumaGainPct": 36.24,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 2,
+      "visiblePixels": 2188,
+      "sourceLuma": 59.502,
+      "supportLegFillLuma": 82.093,
+      "lumaGainPct": 37.97,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 3,
+      "visiblePixels": 2208,
+      "sourceLuma": 57.576,
+      "supportLegFillLuma": 79.48,
+      "lumaGainPct": 38.04,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 4,
+      "visiblePixels": 2085,
+      "sourceLuma": 54.23,
+      "supportLegFillLuma": 79.539,
+      "lumaGainPct": 46.67,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 5,
+      "visiblePixels": 2216,
+      "sourceLuma": 60.821,
+      "supportLegFillLuma": 83.907,
+      "lumaGainPct": 37.96,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 6,
+      "visiblePixels": 2323,
+      "sourceLuma": 59.635,
+      "supportLegFillLuma": 81.071,
+      "lumaGainPct": 35.95,
+      "alphaIdentical": true
+    },
+    {
+      "direction": 7,
+      "frame": 7,
+      "visiblePixels": 2222,
+      "sourceLuma": 59.201,
+      "supportLegFillLuma": 83.045,
+      "lumaGainPct": 40.28,
+      "alphaIdentical": true
+    }
+  ],
+  "blenderActualSupportLegLights": {
+    "enabled": true,
+    "sourceRigBoneNames": [
+      "mixamorig:LeftUpLeg",
+      "mixamorig:LeftLeg"
+    ],
+    "lamp": "AREA",
+    "lightEnergy": 4.8,
+    "lightSize": 0.42,
+    "cameraFacing": true,
+    "target": "original evaluated left supporting hip, knee, shin, ankle",
+    "skinnedOriginalSource": true,
+    "noTextureOrMeshRepaint": true,
+    "noPoseTimingChange": true,
+    "positions": [
+      {
+        "direction": 0,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.110163,
+          -0.509621,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          0.124721,
+          -0.509541,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          0.114178,
+          -0.506454,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          0.101994,
+          -0.54865,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          0.091819,
+          -0.585365,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          0.11042,
+          -0.515255,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          0.110164,
+          -0.50962,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 0,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.110163,
+          -0.509621,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.448068,
+          -0.381,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          0.463761,
+          -0.382275,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          0.452146,
+          -0.378425,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          0.44236,
+          -0.41649,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          0.434267,
+          -0.449564,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          0.448795,
+          -0.386261,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          0.448069,
+          -0.380999,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 1,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.448068,
+          -0.381,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.588581,
+          -0.042626,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          0.605574,
+          -0.042606,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          0.593254,
+          -0.039938,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          0.579164,
+          -0.075909,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          0.567293,
+          -0.107261,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          0.588905,
+          -0.047432,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          0.588582,
+          -0.042625,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 2,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.588581,
+          -0.042626,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.440804,
+          0.287875,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          0.45647,
+          0.289072,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          0.445332,
+          0.291142,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          0.429455,
+          0.25078,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          0.416089,
+          0.215641,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          0.440711,
+          0.282634,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          0.440804,
+          0.287875,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 3,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.440804,
+          0.287875,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.110722,
+          0.409659,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          0.125354,
+          0.409536,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          0.114721,
+          0.412773,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          0.102918,
+          0.370729,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          0.092997,
+          0.334129,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          0.111043,
+          0.40402,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          0.110723,
+          0.409659,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 4,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          0.110722,
+          0.409659,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.201942,
+          0.269876,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          -0.186059,
+          0.268699,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          -0.197797,
+          0.272478,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          -0.207969,
+          0.234229,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          -0.216396,
+          0.20084,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          -0.201243,
+          0.264611,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          -0.201941,
+          0.269876,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 5,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.201942,
+          0.269876,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.331309,
+          -0.043186,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          -0.314316,
+          -0.043242,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          -0.32665,
+          -0.040482,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          -0.34049,
+          -0.076834,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          -0.352018,
+          -0.108437,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          -0.33096,
+          -0.048058,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          -0.331309,
+          -0.043186,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 6,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.331309,
+          -0.043186,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 0,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.208812,
+          -0.362604,
+          -0.099706
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 1,
+        "leftSupportLegSourcePoint": [
+          0.145634,
+          -0.050017,
+          -0.281764
+        ],
+        "cameraFacingLightPoint": [
+          -0.192905,
+          -0.361451,
+          -0.101764
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 2,
+        "leftSupportLegSourcePoint": [
+          0.133306,
+          -0.046852,
+          -0.285026
+        ],
+        "cameraFacingLightPoint": [
+          -0.204228,
+          -0.359376,
+          -0.105026
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 3,
+        "leftSupportLegSourcePoint": [
+          0.11935,
+          -0.088977,
+          -0.26306
+        ],
+        "cameraFacingLightPoint": [
+          -0.220221,
+          -0.399286,
+          -0.08306
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 4,
+        "leftSupportLegSourcePoint": [
+          0.10766,
+          -0.125638,
+          -0.251454
+        ],
+        "cameraFacingLightPoint": [
+          -0.233741,
+          -0.433932,
+          -0.071454
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 5,
+        "leftSupportLegSourcePoint": [
+          0.128978,
+          -0.05563,
+          -0.278606
+        ],
+        "cameraFacingLightPoint": [
+          -0.208887,
+          -0.367796,
+          -0.098606
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 6,
+        "leftSupportLegSourcePoint": [
+          0.128641,
+          -0.049992,
+          -0.279702
+        ],
+        "cameraFacingLightPoint": [
+          -0.208811,
+          -0.362604,
+          -0.099702
+        ]
+      },
+      {
+        "direction": 7,
+        "phase": 7,
+        "leftSupportLegSourcePoint": [
+          0.12864,
+          -0.049992,
+          -0.279706
+        ],
+        "cameraFacingLightPoint": [
+          -0.208812,
+          -0.362604,
+          -0.099706
+        ]
+      }
+    ],
+    "humanArtApproval": false
+  },
+  "originalSourceAssetNotBundled": true,
+  "noCameraOrRigChange": true,
+  "noGameplayOrPhysicsOrCombatChange": true,
+  "noDefaultRendererChanges": true,
+  "noNativeGameAcceptance": true,
+  "preAlphaIncluded": false,
+  "ownerArtApproved": false
+}
