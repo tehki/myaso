@@ -1111,3 +1111,58 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/verify_main_push_provenance.py
+
+
+  # Source-only authentic Blender Silver review. Independent of full mandatory
+  # Combat quality; this job NEVER authorizes gameplay use, merge or deploy.
+  graphics3a-original-spartan-v3-source:
+    name: graphics3a-authentic-silver-spartan-v3-source
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-contact-recoil-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact original Blender-authored Silver artifact
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify first-party Blender V2 and V3 pose, asset SHA and immutable combat budgets
+        run: |
+          node --check web/silver-spartan-contact-recoil-v3-review.mjs
+          node --check tools/art/verify_silver_spartan_contact_recoil_v3_browser.mjs
+          node --test tests/silver-spartan-contact-recoil-v3-source.test.mjs tests/silver-spartan-contact-recoil-v3-browser-evidence.test.mjs tests/silver-spartan-high-forward-source-art.test.mjs
+
+
+  # Native Chrome and Firefox against one actual local Rust authoritative
+  # arena. Dedicated V3 source-only triple opt-in; mandatory quality separate.
+  graphics3a-native-spartan-v3-connected:
+    name: graphics3a-native-connected-spartan-v3
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-connected-preview-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact V3 real-server accepted source head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject V2 source substitution and invented kick phase
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/graphics3a-spartan-v3-source-receipt.mjs
+          node --test tests/graphics3a-spartan-v3-connected.test.mjs tests/graphics3a-connected-spartan-kick-receipt.test.mjs tests/knight-kick-confirmed-preview.test.mjs tests/silver-spartan-contact-recoil-v3-source.test.mjs tests/silver-spartan-contact-recoil-v3-browser-evidence.test.mjs
+      - name: Ensure genuine native Chrome Firefox and Rust WebDriver setup
+        run: |
+          cargo --version
+          rustc --version
+          node --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Build exact local Rust server before timed native acceptance
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Verify actual authenticated V3 kick frames in Chrome and Firefox
+        env:
+          MYASO_PVP_SCENARIO: "uikickbuffer"
+          MYASO_GRAPHICS3A_SPARTAN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs

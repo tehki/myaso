@@ -106,10 +106,17 @@ export function spriteAtlasRect(facing, frame, frames) {
 export function createKnightSpriteRenderer({ ImageCtor = Image,
   assetBase = new URL("./assets/knights/", import.meta.url),
   presentationScale = KNIGHT_PRESENTATION_SCALE,
-  sourceKickPreview = false } = {}) {
+  sourceKickPreview = false,
+  sourceKickVariant = "v2" } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
+  // This changes ONLY the explicit source-art preview texture. Never grant
+  // a kick action, override a server phase, or activate V3 in Pre-Alpha.
+  if (!["v2","v3"].includes(sourceKickVariant)
+    || (sourceKickVariant === "v3" && sourceKickPreview !== true)) {
+    throw new RangeError("Spartan V3 requires opt-in source kick rendering");
+  }
   const atlases = new Map();
   const states = new Map();
   const clipList = sourceKickPreview
@@ -124,7 +131,8 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     };
     image.onerror = () => { atlas.ready = false; };
     image.decoding = "async";
-    image.src = new URL(name + ".webp", assetBase).href;
+    image.src = new URL(name === "silver_kick" && sourceKickVariant === "v3"
+      ? "silver_kick_v3.webp" : name + ".webp", assetBase).href;
     atlases.set(name, atlas);
   }
   return {
