@@ -135,7 +135,6 @@ async fn assert_original_v1_input_ack(connection: &Connection, net_id: u32, tick
     );
 }
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn four_real_quic_sessions_disconnect_frees_capacity_without_reusing_actor_identity() {
     let (_server, url, digest) = start_server();
