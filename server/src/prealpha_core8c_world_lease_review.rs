@@ -147,7 +147,8 @@ impl ReviewWorldLease {
                     return ReviewEdgeStatus::Retired;
                 }
                 let count = edges.len();
-                self.pending.extend(edges.into_iter().map(|accepted| accepted.event));
+                self.pending
+                    .extend(edges.into_iter().map(|accepted| accepted.event));
                 ReviewEdgeStatus::Accepted(count)
             }
             IngressResult::Deferred => ReviewEdgeStatus::Deferred,
