@@ -1,0 +1,11 @@
+# UI10 — original Combat Controls keyboard focus acceptance, real Pre-Alpha
+
+**DRAFT / TEST ONLY.** Exact parent [#729](https://github.com/tehki/myaso/pull/729) source `a7735668a2365e285be8401c489d1f934016d5d3`, which independently passed BOTH native graphics/chat and full protected quality. This child only changes the original dedicated W3C four-browser acceptance script; does not modify live `web/`, CSS, Combat, Silver Knight art, Core, Rust, Chat C1, Sound, or server flags.
+
+## New fail-closed browser acceptance
+
+In each of the original **FOUR true Chrome/Firefox/Chrome/Chrome authenticated Rust Combat + optional proximity Chat C1 clients**, after genuine W3C mouse clicks open and reclose the 14 original Combat instructions and canvas fits the short inner browser viewport, the native `<summary>Controls · movement and combat</summary>` must retain keyboard focus. Real W3C keyboard **Space** must reopen the native disclosure; **Enter** must close it again. Capture listeners on the original document and arena prove actual **trusted native** key events target the summary (not game Canvas), never trigger a Canvas Combat keydown, never scroll the original page, and never accidentally open the Chat C1 composer.
+
+The same real session must then restore Canvas focus and show genuine **Enter** opens the actual Chat C1 text input; native **Escape** restores original Canvas focus without emitting a message. Existing source acceptance is entirely preserved: real server-issued four peers, 4 genuine original Silver Knights painted in one RAF on every viewport, authoritative Chat C1 nearby/out-of-range delivery, ChatResult ACK, UTF-8 and HTML safety, 14 help controls, genuine native WASD and continuing Rust input-ACK/ticks. Optional Chat C1 only enabled on disposable localhost test server, production remains OFF.
+
+This is an accessibility and input-focus boundary, **not** a server-authoritative Combat HIT, live instant pointerDOWN/320ms READY heavy, public deploy, real 4-human independent-host test, or proof of a playable Pre-Alpha package. Protected quality on this new exact head plus dedicated real Chrome/Firefox native acceptance are mandatory. No main merge, stage activation, system restart, deployment, relaxation of M151 or owner/Main GO. Keep all known Combat protections intact.
