@@ -354,6 +354,10 @@ async fn main() -> Result<()> {
     if flight_action_proof && !bind.ip().is_loopback() {
         bail!("authoritative flight action proof is permitted only on loopback binds");
     }
+    #[cfg(feature = "p6-native-audit")]
+    if env::var("MYASO_P6_NATIVE_AUDIT").as_deref() == Ok("1") && !bind.ip().is_loopback() {
+        bail!("P6 authoritative collision audit is permitted only on loopback binds");
+    }
     tokio::spawn(run_authoritative_clock(
         Arc::clone(&game),
         flight_action_proof,
@@ -561,6 +565,8 @@ fn m201_flight_proof_lines(
 }
 
 async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: bool) {
+    #[cfg(feature = "p6-native-audit")]
+    let p6_audit = env::var("MYASO_P6_NATIVE_AUDIT").as_deref() == Ok("1");
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut events = Vec::new();
@@ -570,6 +576,28 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
         state.world.step_into(&mut events);
+        // Only the opt-in localhost QA binary can observe unquantized
+        // authoritative fighter positions AFTER this exact World step.
+        // No test actor, input override, network field or release log exists.
+        #[cfg(feature = "p6-native-audit")]
+        if p6_audit && state.world.tick % 3 == 0 {
+            let fighters = state.world.fighters();
+            if fighters.len() == 4 {
+                let mut nearest = f32::INFINITY;
+                let mut furthest = 0.0_f32;
+                for (index, first) in fighters.iter().enumerate() {
+                    for second in fighters.iter().skip(index + 1) {
+                        let distance = (first.x - second.x).hypot(first.y - second.y);
+                        nearest = nearest.min(distance);
+                        furthest = furthest.max(distance);
+                    }
+                }
+                println!(
+                    "P6_AUTH_WORLD tick={} fighters=4 min={nearest:.6} max={furthest:.6}",
+                    state.world.tick
+                );
+            }
+        }
         if flight_action_proof {
             for line in m201_flight_proof_lines(&state.world, &events, &mut previous_actions) {
                 println!("{line}");

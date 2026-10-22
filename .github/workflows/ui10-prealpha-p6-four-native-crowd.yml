@@ -1,0 +1,37 @@
+name: UI10 Pre-Alpha P6 four real Silver crowd and Chat C1 (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ui10_prealpha_p6_four_native_crowd.mjs"
+      - ".github/workflows/ui10-prealpha-p6-four-native-crowd.yml"
+      - "server/src/simulation.rs"
+      - "server/tests/p6_prealpha_four_fighter_collision.rs"
+      - "server/src/main.rs"
+      - "server/Cargo.toml"
+      - "tests/p6-snapshot-quantization.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  true-four-browser-crowd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original Silver and optional Chat source regressions
+        run: |
+          node --check scripts/ui10_prealpha_p6_four_native_crowd.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-chat-release-gating.test.mjs tests/p6-snapshot-quantization.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build real Physics6-integrated authoritative Rust Combat server
+        run: cargo build --locked --features p6-native-audit --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four independently connected native Chrome Firefox players physically crowd
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 195s node scripts/ui10_prealpha_p6_four_native_crowd.mjs
