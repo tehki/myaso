@@ -1,6 +1,42 @@
 # 🌕⚡️🚀 Core 8A — ONE v2 gesture wire candidate for Main #723
 
 
+## Shared typed-source ID allocator — review-only child of #809
+
+`src/network/prealpha-shared-source-allocator-proposal.mjs` now
+defines **one** `ProposedSharedSourceGestureAllocator` for BOTH
+`source=0` LMB and `source=1` standalone KeyE. It calls the opt-in
+typed codec already reviewed in #809 without changing original
+LMB-only outbox internals or any original live browser importer.
+One test-owned lease begins with one global `sequence=1` and
+`gestureId=1`; pressing either source consumes a new global gesture
+ID and each event consumes a globally increasing sequence.
+Both independent sources may be active simultaneously, and a
+matching RELEASE/CANCEL uses only its own source gesture ID.
+KEY_E UPGRADE is unavailable; LMB UPGRADE is allowed once.
+
+Counters fail closed before overflow and reserve enough **identifier
+headroom** for outstanding terminal events (plus optional LMB
+upgrade). Retirement closes all active gestures, so stale caller
+commands fail. Two different hypothetical leases may legitimately
+restart from the same numeric IDs: authenticated actor isolation
+**cannot** be established from wire sequence alone. The Node
+contract test requires four independent fixture allocators to emit
+identical KEY_E PRESS bytes and stay mutually independent.
+
+**Critical limits:** The allocator does not send packets, record
+retransmission attempts, reserve network outbox slots, accept ACKs,
+authenticate `trustedLease`, bind actor/World zone epoch, or commit
+Combat hits. An object token is merely a local test handle.
+Original LMB-only `ProposedLmbGestureOutbox` is UNCHANGED and still
+owns its independent counters: do **not** instantiate it alongside
+this allocator on one eventual live v2 lease. Main's eventual
+integrated writer must join the allocator, bounded 16-gap replay
+outbox and same-lock Core8C/Combat World authority into **one**
+reviewed implementation before enabling any traffic. This draft
+is non-imported and default OFF. Existing W3C M41/M143/M156
+protected gates and real independent host acceptance are unchanged.
+
 ## Isolated typed source API, NOT active v2 — Core8A review
 
 The existing **same** dormant proposal codec modules now expose
@@ -16,8 +52,7 @@ The original v1 gameplay remains unchanged.
 The new JS/Rust tests read the SAME canonical 15-row golden fixture;
 they assert source0 bit compatibility, source1 PRESS/RELEASE/CANCEL,
 KeyE UPGRADE rejection, unknown source denial and 0x52 denial.
-A transport ACK is never a hit. This **does not** supply the mandated
-single global per-lease LMB+KeyE sequence/gesture ID allocator,
+A transport ACK is never a hit. The codec by itself **does not** supply a sequence allocator,
 authenticated QUIC capability handshake, bounded stream or ACK router,
 World-incarnation/owner epoch check, terminal/replay arbitration,
 browser provenance, or Combat heavy-on-KeyE-PRESS handling.
