@@ -21,11 +21,17 @@ export class ProposedSharedSourceGestureAllocator {
   #active = new Map();
   #closed = false;
 
-  constructor({reviewVersion, trustedLease} = {}) {
+  constructor({reviewVersion, trustedLease, testOnlyInitialSequence = 1} = {}) {
     if (reviewVersion !== PROPOSED_GESTURE_VERSION)
       throw new Error("review version 2 explicitly required; NOT live negotiation");
     if (trustedLease === null || typeof trustedLease !== "object")
       throw new TypeError("opaque current review lease object required");
+    if (!Number.isInteger(testOnlyInitialSequence)
+        || testOnlyInitialSequence < 1 || testOnlyInitialSequence > MAX_U32)
+      throw new RangeError("test-only initial sequence must be a nonzero u32");
+    // Test seam ONLY: simulate nearing u32 exhaustion without billions of
+    // events. This dormant review class is not imported by live game code.
+    this.#sequence = testOnlyInitialSequence;
     this.#trustedLease = trustedLease;
   }
 
@@ -39,11 +45,22 @@ export class ProposedSharedSourceGestureAllocator {
   #checkTick(clientTick) {
     if (!validTick(clientTick)) throw new RangeError("diagnostic clientTick must be u32");
   }
-  #requireAvailable(count) {
+  #requireAvailable(count, preserveActive = false) {
     if (this.#sequence > MAX_U32 || MAX_U32 - this.#sequence + 1 < count) {
-      this.retire();
+      // Refusing a prospective second source must NOT retire an existing
+      // well-reserved source and strand its valid UPGRADE/RELEASE/CANCEL.
+      if (!preserveActive) this.retire();
       throw new Error("review sequence capacity exhausted; obtain fresh connection lease");
     }
+  }
+  #remainingActiveEdges() {
+    let required = 0;
+    for (const [source, state] of this.#active) {
+      required += 1; // one eventual RELEASE or CANCEL for each active source
+      if (source === SOURCE.LMB && !state.upgraded)
+        required += 1; // optional future UPGRADE, before its terminal
+    }
+    return required;
   }
   #event(source, action, gestureId, clientTick) {
     // Validations are performed before any counters change. Every event gets
@@ -70,10 +87,14 @@ export class ProposedSharedSourceGestureAllocator {
       this.retire();
       throw new Error("review gesture IDs exhausted; fresh lease required");
     }
-    // Reserve at least one terminal for every current source. LMB additionally
-    // reserves optional UPGRADE + terminal; KeyE reserves its terminal only.
-    // This is COUNTER headroom, not queue/outbox packet capacity.
-    this.#requireAvailable(1 + this.#active.size + (source === SOURCE.LMB ? 2 : 1));
+    // Reserve every outstanding edge in BOTH active sources. In particular,
+    // starting KeyE must ALSO reserve the pre-existing unupgraded LMB's
+    // optional UPGRADE, not just its terminal (Core8C #723 review finding).
+    // This is COUNTER headroom, not pending/outbox packet capacity.
+    this.#requireAvailable(
+      this.#remainingActiveEdges() + 1 + (source === SOURCE.LMB ? 2 : 1),
+      this.#active.size > 0, // only retire if no valid older source exists
+    );
     const gestureId = this.#gestureId;
     const event = this.#event(source, ACTION.PRESS, gestureId, clientTick);
     this.#gestureId++;
@@ -105,7 +126,9 @@ export class ProposedSharedSourceGestureAllocator {
     this.#checkTick(clientTick);
     const active = this.#active.get(source);
     if (!active) throw new Error("no active gesture of this source");
-    this.#requireAvailable(this.#active.size);
+    // Until this terminal commits, preserve the OTHER source's optional
+    // LMB upgrade and all still-active terminals at the u32 boundary.
+    this.#requireAvailable(this.#remainingActiveEdges());
     const event = this.#event(source, action, active.gestureId, clientTick);
     this.#active.delete(source);
     return event;

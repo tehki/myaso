@@ -1,6 +1,37 @@
 # 🌕⚡️🚀 Core 8A — ONE v2 gesture wire candidate for Main #723
 
 
+## Near-u32 shared counter reservation — Core8C review fix
+
+The Core8C review of #815 caught a real **review-state invariant**:
+if a source0 LMB PRESS is still **unupgraded** and source1 KeyE begins
+near the end of its shared per-lease 32-bit sequence space, the
+previous `1 + activeSources + ownSourceFuture` arithmetic failed
+to reserve the LMB's *optional* UPGRADE. Example: only three slots
+remain after a legitimate LMB PRESS, but a concurrent KeyE PRESS,
+KeyE terminal, LMB UPGRADE and LMB terminal require **four**.
+The KeyE start must be refused **without retiring the already-valid
+LMB**, while its queued upgrade and terminal still fit.
+
+The dormant allocator now counts **one terminal for each active
+source plus one optional UPGRADE for a not-yet-upgraded LMB**. It
+reserves these obligations before admitting any additional PRESS.
+It also preserves outstanding obligations before retiring one source,
+so releasing KeyE first cannot starve an outstanding LMB upgrade.
+If there is **no** active source and no sequence headroom to start
+a complete gesture, the exhausted review lease retires. No u32 wrap.
+
+A test-only `testOnlyInitialSequence` fixture constructor parameter
+allows actual original allocator calls to reproduce the invariant at
+`0xffffffff - 3` and to exercise a fully legal exactly five-edge
+sequence finishing on `0xffffffff`, without billions of dummy
+events. No real network can set this local test parameter; the entire
+module remains dormant and non-imported by live gameplay. This
+does not establish QUIC source authentication, server actor binding,
+World-clock admission, ACK or HIT, nor prove client IDs will actually
+reach 2^32 in a real session. The original browser v1 and strict
+Combat acceptance tests remain unchanged.
+
 ## One bounded typed edge outbox — isolated Core8A review child
 
 The original dormant `src/network/prealpha-lmb-gesture-outbox-proposal.mjs`

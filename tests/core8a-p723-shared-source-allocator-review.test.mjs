@@ -115,3 +115,70 @@ test("creation is explicitly review-only and never asserts QUIC authentication",
     reviewVersion:1,trustedLease:lease(),
   }),/review version/i);
 });
+
+test("near-u32 KEY_E admission denies under-reserved LMB UPGRADE but preserves old gesture",()=>{
+  const max=0xffff_ffff;
+  const q=new ProposedSharedSourceGestureAllocator({
+    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:max-3,
+  });
+  const lmb=q.begin(S.LMB,1);
+  assert.equal(lmb.sequence,max-3);
+  const before=q.snapshot;
+  // Only three valid sequence numbers remain. A new KeyE PRESS/terminal
+  // PLUS this existing unupgraded LMB UPGRADE/terminal requires FOUR.
+  // Previous source calculation counted only three and let KeyE strand
+  // the already legitimate LMB heavy charge at the boundary.
+  assert.throws(()=>q.begin(S.KEY_E,2),/sequence capacity exhausted/);
+  assert.deepEqual(q.snapshot,before,
+    "denied second-source PRESS cannot burn sequence/gesture IDs or retire LMB");
+  const upgraded=q.upgrade(3);
+  const release=q.release(S.LMB,4);
+  assert.deepEqual([upgraded.sequence,release.sequence],[max-2,max-1]);
+  assert.equal(upgraded.gestureId,lmb.gestureId);
+  assert.equal(release.gestureId,lmb.gestureId);
+  assert.deepEqual(q.snapshot.activeSources,[]);
+  assert.equal(q.snapshot.closed,false);
+});
+
+test("near-u32 exact four remaining edges admit KeyE while LMB can still upgrade and terminate",()=>{
+  const max=0xffff_ffff;
+  const q=new ProposedSharedSourceGestureAllocator({
+    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:max-4,
+  });
+  const lmb=q.begin(S.LMB,100);
+  const key=q.begin(S.KEY_E,101);
+  // The order stresses reserving the other source's optional upgrade
+  // even when KeyE closes BEFORE LMB upgrades.
+  const keyUp=q.release(S.KEY_E,102);
+  const upgraded=q.upgrade(103);
+  const lmbUp=q.release(S.LMB,104);
+  assert.deepEqual([lmb,key,keyUp,upgraded,lmbUp].map(x=>x.sequence),
+    [max-4,max-3,max-2,max-1,max]);
+  assert.deepEqual([lmb,key,keyUp,upgraded,lmbUp].map(x=>x.gestureId),
+    [1,2,2,1,1]);
+  assert.deepEqual([lmb,key,keyUp,upgraded,lmbUp].map(parsed).map(x=>x.sequence),
+    [max-4,max-3,max-2,max-1,max]);
+  assert.equal(q.snapshot.nextSequence,max+1,
+    "nonwrapping exhausted u32 counter is allowed as an internal sentinel only");
+  assert.deepEqual(q.snapshot.activeSources,[]);
+  assert.throws(()=>q.begin(S.LMB,105),/sequence capacity exhausted/);
+  assert.equal(q.snapshot.closed,true);
+});
+
+test("test-only counter seam refuses invalid values and never grants authorization",()=>{
+  for(const value of [0,-1,2**32,1.5,"123",NaN]){
+    assert.throws(()=>new ProposedSharedSourceGestureAllocator({
+      reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:value,
+    }),/test-only initial sequence/);
+  }
+  const q=new ProposedSharedSourceGestureAllocator({
+    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:0xffff_ffff,
+  });
+  assert.throws(()=>q.begin(S.KEY_E,1),/sequence capacity exhausted/,
+    "starting KeyE requires PRESS and terminal, not just one last sequence");
+  assert.equal(q.snapshot.nextSequence,0xffff_ffff);
+  assert.equal(q.snapshot.nextGestureId,1);
+  assert.equal(q.snapshot.closed,true,
+    "no active source remains: an exhausted lease retires rather than wraps");
+  assert.equal(q.receiveAck,undefined);
+});
