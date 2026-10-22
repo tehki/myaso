@@ -199,15 +199,63 @@ fn selected_family_shared_fixture_matches_original_combat4_rust_codec_and_review
 #[test]
 fn selected_main_draft_opt_in_rust_codec_matches_shared_js_vectors_without_live_enable() {
     let cases = [
-        ("LMB_PRESS", GestureSource::Lmb, GestureAction::Press, 1, 1, 42),
-        ("LMB_RELEASE", GestureSource::Lmb, GestureAction::Release, 2, 1, 42),
-        ("KEY_E_PRESS", GestureSource::KeyE, GestureAction::Press, 3, 2, 43),
-        ("KEY_E_RELEASE", GestureSource::KeyE, GestureAction::Release, 4, 2, 44),
-        ("KEY_E_CANCEL", GestureSource::KeyE, GestureAction::Cancel, 5, 2, 45),
-        ("LMB_UPGRADE", GestureSource::Lmb, GestureAction::Upgrade, 6, 3, 42),
-        ("LMB_CANCEL", GestureSource::Lmb, GestureAction::Cancel, 7, 3, 42),
-    ];
-    for (name, source, action, sequence, gesture_id, client_tick) in cases {
+        (
+            "LMB_PRESS",
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1,
+            42,
+        ),
+        (
+            "LMB_RELEASE",
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1,
+            42,
+        ),
+        (
+            "KEY_E_PRESS",
+            GestureSource::KeyE,
+            GestureAction::Press,
+            3,
+            2,
+            43,
+        ),
+        (
+            "KEY_E_RELEASE",
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2,
+            44,
+        ),
+        (
+            "KEY_E_CANCEL",
+            GestureSource::KeyE,
+            GestureAction::Cancel,
+            5,
+            2,
+            45,
+        ),
+        (
+            "LMB_UPGRADE",
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            6,
+            3,
+            42,
+        ),
+        (
+            "LMB_CANCEL",
+            GestureSource::Lmb,
+            GestureAction::Cancel,
+            7,
+            3,
+            42,
+        ),
+    ];    for (name, source, action, sequence, gesture_id, client_tick) in cases {
         let received = shared_selected_family_bytes(name);
         let typed = TypedGestureEvent {
             source,
@@ -232,7 +280,11 @@ fn selected_main_draft_opt_in_rust_codec_matches_shared_js_vectors_without_live_
             assert_eq!(decode_event(&received), Err(DecodeError::Reserved));
         }
     }
-    for name in ["BAD_UNKNOWN_SOURCE", "BAD_KEY_E_UPGRADE", "BAD_UNSELECTED_52"] {
+    for name in [
+        "BAD_UNKNOWN_SOURCE",
+        "BAD_KEY_E_UPGRADE",
+        "BAD_UNSELECTED_52",
+    ] {
         let received = shared_selected_family_bytes(name);
         assert!(decode_typed_event(&received).is_err(), "{name} denied");
     }
