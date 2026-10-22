@@ -1166,3 +1166,44 @@ jobs:
           MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT: "1"
           MYASO_PVP_FLIGHT_DURATION_MS: "11000"
         run: node scripts/pvp_browser_flight_runner.mjs
+
+  # Authentic browser Canvas snapshot from a real server-confirmed V3 active
+  # frame; never a mock, source-art preview or substitute for protected quality.
+  graphics3a-spartan-v3-contact-png:
+    name: graphics3a-real-connected-v3-contact-png
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/spartan-v3-contact-png-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact authenticated V3 contact screenshot source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse unverified source and fake contact image evidence
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/graphics3a-spartan-v3-original-contact-images.test.mjs tests/graphics3a-spartan-v3-contact-png.test.mjs tests/graphics3a-spartan-v3-connected.test.mjs tests/graphics3a-connected-spartan-kick-receipt.test.mjs
+      - name: Verify native browsers and Rust toolchain
+        run: |
+          cargo --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Prebuild exact local authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Capture V3 original kick active Canvas pixels after real server receipt
+        env:
+          MYASO_PVP_SCENARIO: "uikickbuffer"
+          MYASO_GRAPHICS3A_SPARTAN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT: "1"
+          MYASO_GRAPHICS3A_V3_CONTACT_PNG: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
+      - name: Publish authentic Chrome and Firefox contact frame PNGs
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3a-v3-real-contact-png
+          path: .graphics3a-v3-native-contact-png/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1

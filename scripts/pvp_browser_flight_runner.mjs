@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -42,6 +43,10 @@ const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 // Combat flights remain EXACTLY unchanged when this environment variable is off.
 const spartanFlight = process.env.MYASO_GRAPHICS3A_SPARTAN_FLIGHT === "1";
 const spartanV3Flight = process.env.MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT === "1";
+const spartanV3ContactPng = process.env.MYASO_GRAPHICS3A_V3_CONTACT_PNG === "1";
+if (spartanV3ContactPng && !spartanV3Flight) {
+  throw new Error("Graphics3A real V3 contact PNG requires genuine triple-opt-in native source flight");
+}
 if (spartanV3Flight && !spartanFlight) {
   throw new Error("Graphics3A V3 requires the strict connected Spartan source-flight opt-in");
 }
@@ -6830,7 +6835,7 @@ async function installSpartanKickDrawProbe(session) {
   return await execute(session.base, session.sessionId, `
     if (!window.__graphics3aSpartanDrawProbe) {
       const original=CanvasRenderingContext2D.prototype.drawImage;
-      const data={draws:[],installed:true};
+      const data={draws:[],installed:true,contactPng:null,contactError:null,contactPending:false};
       CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
         const src=typeof image?.src==="string" ? image.src : "";
         if((src.endsWith("/silver_kick_v3.webp") || src.endsWith("/silver_kick.webp")) && args.length===8) {
@@ -6839,7 +6844,27 @@ async function installSpartanKickDrawProbe(session) {
             frame,direction,epochMs:Date.now(),
             sourceFile:src.split("/").at(-1)});
         }
-        return original.call(this,image,...args);
+        const result=original.call(this,image,...args);
+        // Only QA native V3 contact visual frame. Actual game Canvas pixels,
+        // no regenerated art, no hit or remote action forged.
+        if(${spartanV3ContactPng} && src.endsWith("/silver_kick_v3.webp")
+          && args.length===8 && (args[0]===480 || args[0]===640)
+          && !data.contactPng && !data.contactPending) {
+          data.contactPending=true;
+          const gameCanvas=this.canvas;
+          // The current game-render JS callback finishes before this
+          // microtask, so capture other fighters and existing HUD overlays
+          // rather than freezing in the middle of a single drawImage call.
+          queueMicrotask(()=>{
+            try {
+              const raw=gameCanvas.toDataURL("image/png");
+              if(raw.startsWith("data:image/png;base64,")) data.contactPng=raw;
+            } catch(e) {
+              data.contactError=String(e);
+            }
+          });
+        }
+        return result;
       };
       window.__graphics3aSpartanDrawProbe=data;
     }
@@ -6863,6 +6888,39 @@ async function readSpartanKickDrawProbe(session) {
     };
   `);
   return {...observed,engine:session.name};
+}
+
+async function captureSpartanV3RealContactPngs(entries,receipt) {
+  if (!receipt?.verifiedRealConnectedServer
+    || receipt.authenticOriginalSilverV3AtlasBothBrowsers!==true
+    || entries.length!==2) throw Error("real V3 kick contact source not accepted");
+  const dir=path.join(root,".graphics3a-v3-native-contact-png");
+  await mkdir(dir,{recursive:true});
+  const items=[];
+  for(const entry of entries){
+    const capture=await execute(entry.base,entry.sessionId,`
+      const probe=window.__graphics3aSpartanDrawProbe;
+      return {png:probe?.contactPng??null,error:probe?.contactError??null};
+    `);
+    const value=capture?.png;
+    if(typeof value!=="string"||!value.startsWith("data:image/png;base64,"))
+      throw Error("native V3 real Canvas contact image missing in "+entry.name+": "+capture?.error);
+    const bytes=Buffer.from(value.slice("data:image/png;base64,".length),"base64");
+    if(bytes.length<15000||bytes.subarray(0,8).toString("hex")!=="89504e470d0a1a0a"
+      ||bytes.readUInt32BE(16)<400||bytes.readUInt32BE(20)<300)
+      throw Error("native V3 actual contact PNG invalid in "+entry.name);
+    const filename="actual_connected_silver_spartan_v3_contact_"+entry.name+".png";
+    await writeFile(path.join(dir,filename),bytes);
+    const report=receipt.nativeBrowserSourceDraws.find(x=>x.engine===entry.name);
+    items.push({browser:entry.name,serverPlayerId:report?.netId,
+      filename,bytes:bytes.length,
+      sha256:createHash("sha256").update(bytes).digest("hex")});
+  }
+  await writeFile(path.join(dir,"native_v3_contact_manifest.json"),
+    JSON.stringify({realConnectedSourceAccepted:true,sourceVersion:"contact-recoil-v3",
+      actualServerHitReceiptValidated:false,fullFrameAfterRenderLoopValidated:false,
+      fourHumanOperators:false,images:items},null,2));
+  return items;
 }
 
 async function runOnlineUiKickBufferFlight(entries) {
@@ -7057,6 +7115,12 @@ async function runOnlineUiKickBufferFlight(entries) {
       });
       console.log("GRAPHICS3A_SPARTAN_V3_CONNECTED_KICK_FLIGHT "
         + JSON.stringify(spartanReceipt));
+      if (spartanV3ContactPng) {
+        const saved=await captureSpartanV3RealContactPngs(
+          [attacker, defender],spartanReceipt);
+        console.log("GRAPHICS3A_SPARTAN_V3_NATIVE_CONTACT_PNG "
+          + JSON.stringify(saved));
+      }
     } else {
       console.log("GRAPHICS3A_SPARTAN_CONNECTED_KICK_FLIGHT "
         + JSON.stringify(spartanReceipt));
