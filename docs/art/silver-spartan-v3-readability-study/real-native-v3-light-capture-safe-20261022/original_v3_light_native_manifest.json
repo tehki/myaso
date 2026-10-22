@@ -1,0 +1,56 @@
+{
+  "actualThreeNativeBrowsers": true,
+  "realAuthoritativeM153": true,
+  "independentSourceSHA256": "3522f093a095a616dedf6f859c954553dd4832f8c1cbf655b644207faf239a79",
+  "previewOnly": true,
+  "screenshotProvenance": "real original game Canvas observed source-phase frame, unmodified pixels",
+  "actualActiveFrameProvenForKicker": true,
+  "activeFrameRequiredFromSpectators": false,
+  "allClientsCapturedActive": true,
+  "actualGreyhavenGroundValidated": false,
+  "humanArtApproval": false,
+  "originalV3SourceAtlasUnchanged": true,
+  "originalV2VictimSourceUnchanged": true,
+  "preAlphaIncluded": false,
+  "images": [
+    {
+      "browser": "chrome",
+      "authenticatedServerId": 1,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_chrome.png",
+      "capturedSourcePhase": "active",
+      "capturedSourceFrame": 3,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792686581297,
+      "activeFrameActuallyObserved": true,
+      "bytes": 30984,
+      "sha256": "0786d55207836d8a3207b69c181ac6ba09dd349310fc2a7b4d68c17d9238eebe"
+    },
+    {
+      "browser": "firefox",
+      "authenticatedServerId": 2,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_firefox.png",
+      "capturedSourcePhase": "active",
+      "capturedSourceFrame": 3,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792686581396,
+      "activeFrameActuallyObserved": true,
+      "bytes": 28157,
+      "sha256": "0d79e83162dd6887a0c53ac47c086483e711aac95886cb8105a0a9a120030e5b"
+    },
+    {
+      "browser": "chrome2",
+      "authenticatedServerId": 3,
+      "sourceFile": "silver_kick_v3_lit.webp",
+      "filename": "original_silver_spartan_v3_lit_chrome2.png",
+      "capturedSourcePhase": "active",
+      "capturedSourceFrame": 3,
+      "capturedSourceDirection": 6,
+      "capturedDrawEpochMs": 1792686581345,
+      "activeFrameActuallyObserved": true,
+      "bytes": 30873,
+      "sha256": "d89f9ae4b7f4fc8287cce9927c7632be6efdad488b55211a60a689a1a1e66756"
+    }
+  ]
+}
