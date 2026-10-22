@@ -1,0 +1,80 @@
+{
+  "type": "P49 actual client+Rust local authoritative smoke and RAF gap telemetry",
+  "sourceHead": "893144ef56a64c2395038b4c7ebd3648cfb5f192",
+  "serverBinary": "myaso-server",
+  "host": "127.0.0.1",
+  "browsersIndependentHosts": false,
+  "serverAuthoritative": true,
+  "worldFlag": true,
+  "clientsRequested": 1,
+  "measureMs": 5000,
+  "results": [
+    {
+      "index": 1,
+      "errors": [],
+      "client": {
+        "status": "Online - player #1 - server tick 48",
+        "canvasOpaque": true,
+        "title": "myaso.io — Browser Combat Prototype"
+      },
+      "measurement": {
+        "status": "Online - player #1 - server tick 72",
+        "scoreboard": [
+          "#10"
+        ],
+        "diagnostics": "Input→ACK p50 24ms · p95 24ms | Jitter p95 3ms | Snapshots p50 50ms · p95 52ms | Camera correction p95 0.8u | Stale-own ACKs 114 | Deferred reconciles 226 | Render catch-ups 6 | Extra render lag p50 0ms · p95 0ms | >33ms 0% (57 samples) | Samples 96",
+        "opaqueCanvas": true,
+        "tileCanvasDrawCalls": 2400,
+        "rAFGapP50Ms": 16.7,
+        "rAFGapP95Ms": 16.8,
+        "rAFGapMaxMs": 16.800000000000182,
+        "rAFSamples": 299,
+        "actualGameFrameP50Ms": 0.6,
+        "actualGameFrameP95Ms": 0.8,
+        "actualGameFrameMaxMs": 1.1,
+        "actualGameFrameSamples": 300,
+        "worldTileBlitMs": 29.4,
+        "worldTileBlitCalls": 2400,
+        "measuredCallbackNames": [
+          "collect",
+          "frame"
+        ],
+        "actualGameFrameGapOver33": 0,
+        "actualGameFrameGapOver50": 0,
+        "actualGameFrameGapOver100": 0,
+        "callbackOver16Ms": 0,
+        "severeFrameGapsWithTaskOverlap": 0,
+        "severeFrameGapsWithoutTaskOverlap": 0,
+        "severeFrameGapsWithShortNextCallback": 0,
+        "observedLongTaskCount": 0,
+        "observedLongTaskMaxMs": 0,
+        "longTaskObserverStatus": "observing",
+        "snapshotReaderHooks": 1,
+        "actualSnapshotPacketCount": 101,
+        "otherRealtimePacketCount": 101,
+        "ingressSource": "WebTransport.datagrams.readable.getReader() unmodified read results",
+        "ingressIntervals": 100,
+        "ingressGapP50Ms": 50,
+        "ingressGapP95Ms": 51.8,
+        "ingressGapMaxMs": 53.5,
+        "ingressTickJumpP95": 3,
+        "ingressTickJumpMax": 3,
+        "ingressIntervalsOver100Ms": 0,
+        "ingressIntervalsOver250Ms": 0,
+        "ingressIntervalsOver400Ms": 0,
+        "eventBursts": [],
+        "topFrameGaps": [],
+        "documentHidden": false,
+        "note": "Game frame synchronous JS callback measured by requestAnimationFrame wrapper; NOT GPU presented frame time or true FPS"
+      }
+    }
+  ],
+  "errors": [],
+  "serverSummary": {
+    "endpointLoopback": true,
+    "admittedPlayerIds": [
+      1
+    ],
+    "clientCount": 1
+  }
+}
