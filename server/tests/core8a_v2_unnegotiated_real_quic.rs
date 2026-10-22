@@ -267,3 +267,31 @@ async fn one_unnegotiated_v2_sender_cannot_starve_another_legacy_v1_player() {
     // The noisy peer's authentic gameplay connection must also remain usable.
     assert_original_v1_input_ack(&noisy, 1, 902).await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn four_connections_with_identical_v1_sequence_and_tick_keep_distinct_actor_acks() {
+    // Every original browser starts its own lease-scoped v1 sequence at 1.
+    // Different players may submit the SAME client tick concurrently.
+    // An accidental global deduplication or unscoped ACK by client tick
+    // would deny at least one real actor or return the wrong player net ID.
+    // This proves original QUIC actor isolation, NOT active v2 negotiation.
+    let (_server, url, digest) = start_server();
+    let (_ep1, one, _send1, _recv1) = connect(&url, &digest).await;
+    let (_ep2, two, _send2, _recv2) = connect(&url, &digest).await;
+    let (_ep3, three, _send3, _recv3) = connect(&url, &digest).await;
+    let (_ep4, four, _send4, _recv4) = connect(&url, &digest).await;
+
+    // Helper sends original v1 sequence=1 for each independently admitted
+    // connection. All four use exact clientTick=1444, intentionally unlike
+    // the previous peer-isolation test's distinct 901/902 tick values.
+    timeout(Duration::from_secs(8), async {
+        tokio::join!(
+            assert_original_v1_input_ack(&one, 1, 1444),
+            assert_original_v1_input_ack(&two, 2, 1444),
+            assert_original_v1_input_ack(&three, 3, 1444),
+            assert_original_v1_input_ack(&four, 4, 1444),
+        );
+    })
+    .await
+    .expect("same client tick on four leases must never suppress a peer ACK");
+}
