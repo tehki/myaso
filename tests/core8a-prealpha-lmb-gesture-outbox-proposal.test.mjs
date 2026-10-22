@@ -67,6 +67,7 @@ test("cancel terminates current edge without synthesizing a RELEASE or a Combat 
 test("ACKs only settle exact event+gesture on correct bound connection and cannot prove a hit",()=>{
   const lease=token(),q=open(lease);
   const p=q.begin(),r=q.release();
+  assert.deepEqual(q.nextSendBatch().map(x=>x.sequence),[p.sequence,r.sequence]);
   assert.throws(()=>q.receiveAck(ack(p),token()),/cross-lease/);
   assert.throws(()=>q.receiveAck(ack({...p,gestureId:p.gestureId+1}),lease),/does not match/);
   assert.throws(()=>q.receiveAck(ack({...p,sequence:777}),lease),/unexpected/);
@@ -84,6 +85,7 @@ test("ACKs only settle exact event+gesture on correct bound connection and canno
 
 test("late and invalid server ACKs fail closed, do not invent accepted action",()=>{
   const lease=token(),q=open(lease),p=q.begin();
+  assert.deepEqual(q.nextSendBatch().map(x=>x.sequence),[p.sequence]);
   const bad=ack(p);bad[3]=1;
   assert.throws(()=>q.receiveAck(bad,lease),/reserved/);
   const outcome=q.receiveAck(ack({...p,status:GESTURE_ACK_STATUS.STALE}),lease);
@@ -92,6 +94,7 @@ test("late and invalid server ACKs fail closed, do not invent accepted action",(
   assert.equal(q.snapshot.closed,true);
   assert.throws(()=>q.begin(),/closed/);
   const rejectLease=token(),reject=open(rejectLease);const x=reject.begin();
+  assert.deepEqual(reject.nextSendBatch().map(x=>x.sequence),[x.sequence]);
   assert.equal(reject.receiveAck(ack({...x,status:GESTURE_ACK_STATUS.REJECTED}),rejectLease).transportSettled,false);
   assert.equal(reject.snapshot.closed,true);
 });
@@ -123,6 +126,7 @@ test("old connection ACKs cannot clear new lease's coincident sequence after rec
   old.closeLease();
   assert.equal(old.snapshot.pending,0);
   const newLease=token(),fresh=open(newLease),newPress=fresh.begin();
+  assert.deepEqual(fresh.nextSendBatch().map(x=>x.sequence),[newPress.sequence]);
   assert.equal(newPress.sequence,p.sequence); // numeric IDs alone cannot fence sessions
   assert.throws(()=>fresh.receiveAck(ack(p),formerLease),/cross-lease/);
   assert.equal(fresh.snapshot.pending,1);
