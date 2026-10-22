@@ -90,7 +90,7 @@ try {
    originalSilverCanvas:true,chatConnected:true,all14Controls:true}));
   return measured;
  }
- const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&netstats=1";
+ const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&chatC1Preview=1&netstats=1&knights=1";
  for(let i=0;i<browserMatrix.length;i++){
   const browser=browserMatrix[i];
   const capabilities=browser==="chrome"
