@@ -65,6 +65,6 @@ test("source browser evidence never mutates the live game or claims production a
  assert.match(viewer,/gameRendererIntegrated:false/);
  assert.match(runner,/liveGameIntegration:false/);
  assert.match(runner,/realFourPlayerMultiplayer:false/);
- assert.match(runner,/productionChange:true/);
+ assert.match(runner,/noItemAuthorityOrProductionChange:true/);
  assert.match(read("web/armory-p0-a232-original-ironwork-review.html"),/Real|source-authentic|Source|original/i);
 });
