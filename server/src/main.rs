@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
+    match_observer::MatchWinObserver,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -202,6 +203,7 @@ impl GameState {
 
 struct SharedGame {
     state: Mutex<GameState>,
+    match_observer: MatchWinObserver,
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
@@ -215,6 +217,8 @@ impl SharedGame {
                 flight.near_pressure_players,
             )),
             next_player_id: AtomicU32::new(1),
+            // No wallet, publisher, writer, or receiver is configured.
+            match_observer: MatchWinObserver::disabled(),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
         })
@@ -512,6 +516,8 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
             }
         }
         state.record_combat_events(&events);
+        // Actual Rust MatchWon boundary; disabled by default. No I/O/ACK.
+        game.match_observer.observe(state.world.tick, &events);
         if state.world.tick % SNAPSHOT_EVERY_SERVER_TICKS == 0 {
             state.refresh_replication_frame();
         }
