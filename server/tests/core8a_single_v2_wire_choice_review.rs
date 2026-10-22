@@ -255,7 +255,8 @@ fn selected_main_draft_opt_in_rust_codec_matches_shared_js_vectors_without_live_
             3,
             42,
         ),
-    ];    for (name, source, action, sequence, gesture_id, client_tick) in cases {
+    ];
+    for (name, source, action, sequence, gesture_id, client_tick) in cases {
         let received = shared_selected_family_bytes(name);
         let typed = TypedGestureEvent {
             source,
