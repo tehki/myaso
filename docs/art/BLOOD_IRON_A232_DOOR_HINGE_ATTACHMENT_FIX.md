@@ -11,7 +11,7 @@ The two hinge straps of the Red Lion door look detached. Inspection of the origi
 - Both **original hinge straps** now have Y = −2.045 m, embedding 12.5 mm into the door face.
 - Both **original iron hinge barrels** now have Y = −2.050 m, intersecting the physical wood and corresponding hinge straps.
 - All six original **peen/rivet heads** now have Y = −2.075 m, intersecting their straps.
-- Original X coordinates, upper/lower Z, dimensions, source iron material, 20 editable iron objects, door mesh, windows, shutters, roof and portal are otherwise unchanged.
+- **Follow-up lower-hinge support correction:** move ONLY the lower hinge's strap, barrel and all three rivets **24 cm upward**, from **Z=0.72 m to Z=0.96 m** in the actual saved editable Blender scene. The complete upper assembly remains at **Z=1.88 m**. This spaces the hinges more naturally above the threshold while preserving original X, hinge Y contact depths, iron materials, 20 separate meshes, door, upper hinge, windows, shutters, roof and portal.
 
 The rebuilt **red_lion_a232_wrought_ironwork.blend** is the actual editable artifact, not a Photoshop/image-generation retouch. Actual Blender 5.2.2 readback verified all ten hinge metal meshes contact the original wood/iron and emitted red_lion_a232_hinge_attachment_blender_report.json with world-space bounds, contacts and source hash.
 
@@ -19,16 +19,17 @@ The rebuilt **red_lion_a232_wrought_ironwork.blend** is the actual editable arti
 
 The original sprite export deliberately flattens world geometry. Moving real Blender hinge meshes to the physical door correctly introduced a visual height shift in this custom projection. The deterministic **build_red_lion_a232_ironwork.py** now corrects only the hinge parts in the export-only deformation AFTER the editable .blend has been saved, preserving the source physical placements. It also projects the hinges **8 cm inboard** on the rendered game door. No source world/roof/collision changes are involved.
 
-The original Cycles PNGs, lossless day/dusk game WebPs, manifest hashes and proof render were regenerated from genuine Blender. Verified updated **6,582 RGB changed pixels, zero alpha changes**, original 228×297 sprite crop and exact roof byte identity.
+The original Cycles PNGs, lossless day/dusk game WebPs, manifest hashes and proof render were regenerated from genuine Blender. Verified latest follow-up **6,792 RGB changed pixels, zero alpha changes**, original 228×297 sprite crop and exact roof byte identity. The lower hinge assembly is 24 cm higher, while the upper hinge remains fixed.
 
 **Inspect:**
 - Editable 3D scene: assets/environment/greyhaven/a232-review/red_lion_a232_wrought_ironwork.blend
-- Actual old ironwork vs corrected hinge visual: assets/environment/greyhaven/a232-review/red_lion_a232_original_vs_attached_projection.png
+- **Actual Blender before vs 24cm-raised lower hinge**: assets/environment/greyhaven/a232-review/red_lion_a232_lower_hinge_raised_blender_comparison.png
+- Original A2.32 old detached ironwork vs correctly mounted hinge visual: assets/environment/greyhaven/a232-review/red_lion_a232_original_vs_attached_projection.png
 - Actual Blender contact report: assets/environment/greyhaven/a232-review/red_lion_a232_hinge_attachment_blender_report.json
 - Deterministic generator: tools/art/build_red_lion_a232_ironwork.py
 - Geometry validator: tools/art/verify_red_lion_a232_door_hinge_attachment.py
 - Node regression: tests/art-direction-a232-hinge-attachment.test.mjs
 
-**Local acceptance**: original Blender 5.2.2 saved source and reread; 10/10 genuine hardware contact placements; source export and WebP decode; 9/9 focused Node regression tests passed.
+**Follow-up local acceptance:** reopen the revised editable Blender 5.2 scene; assert the actual lower strap, barrel and rivets now all center at Z=0.96 m, upper ones remain at Z=1.88 m; independently assert hardware-to-door / rivet-to-strap overlaps. Rebuild original Cycles renders and lossless day/dusk source WebPs, then rerun all art and geometry regression tests. No automated release or merge.
 
 **Limits:** DRAFT art only, not yet approved by owner as final gameplay scale; live online-game.mjs is unchanged; no server/Combat/Physics/Items or Red Lion World integration; no main merge or release. Strict protected CI and Art Director visual signoff remain required. Pre-Alpha 0.1 remains the minimal Combat arena.

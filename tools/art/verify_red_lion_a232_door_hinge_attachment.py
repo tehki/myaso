@@ -18,7 +18,10 @@ iron=[o.name for o in objects if o.name.startswith(prefix)]
 assert len(iron)==20,iron
 original={}
 corrected={}
-for label,z in (("lower",.72),("upper",1.88)):
+LOWER_Z=.96
+UPPER_Z=1.88
+assert LOWER_Z>.72 and LOWER_Z<UPPER_Z
+for label,z in (("lower",LOWER_Z),("upper",UPPER_Z)):
  strap=b(prefix+"door hinge strap "+label)
  barrel=b(prefix+"hinge barrel "+label)
  assert overlaps(strap,door,1,.005),("strap FLOATS",label,strap,door)

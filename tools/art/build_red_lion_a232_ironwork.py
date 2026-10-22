@@ -43,8 +43,10 @@ DOOR_FACE_Y=-2.030
 HINGE_STRAP_Y=DOOR_FACE_Y-.015
 HINGE_BARREL_Y=DOOR_FACE_Y-.020
 HINGE_PEEN_Y=DOOR_FACE_Y-.045
-for label,z in (("lower",.72),("upper",1.88)):
- # Keep original left-edge X, upper/lower Z, width, thickness, and silhouette.
+# Raise the lower door hinge 24 cm for proper door support; upper stays fixed.
+# Straps, barrels and peens all share the same new z for their assembly.
+for label,z in (("lower",.96),("upper",1.88)):
+ # Preserve original X, widths and thickness; raise ONLY lower assembly Z.
  bar("door hinge strap "+label,(-.36,HINGE_STRAP_Y,z),(.61,.055,.072),.012)
  bar("hinge barrel "+label,(-.70,HINGE_BARREL_Y,z),(.075,.084,.16),.016)
  for i,x in enumerate((-.51,-.32,-.13)):

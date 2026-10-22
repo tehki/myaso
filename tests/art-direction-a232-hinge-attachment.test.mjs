@@ -20,14 +20,20 @@ test("actual Blender source revised: both real forged straps cross original Red 
  assert.equal(report.door.name,"Red Lion / door_front");
  assert.ok(Math.abs(report.door.frontY+2.03)<0.002);
  assert.ok(report.previousClosestFaceGapMeters>0.6);
+ const expectedHeights={lower:0.96,upper:1.88};
+ assert.ok(Math.abs((expectedHeights.lower-0.72)-0.24)<1e-10);
  for(const z of ["lower","upper"]){
    const {strap,barrel,peens}=report.corrected[z];
+   const mid=b=>(b[2][0]+b[2][1])/2;
+   assert.ok(Math.abs(mid(strap)-expectedHeights[z])<0.001,z+" Blender Z");
+   assert.ok(Math.abs(mid(barrel)-expectedHeights[z])<0.001,z+" barrel Z");
    assert.ok(overlap(strap,report.door.worldBounds,1)>.005,z+" strap must intersect actual wood");
    assert.ok(overlap(barrel,report.door.worldBounds,1)>.005,z+" barrel must meet wood");
    assert.ok(overlap(strap,barrel,1)>.005,z+" barrel must meet strap in depth");
    assert.ok(overlap(strap,barrel,0)>.002,z+" barrel must meet strap at left edge");
    assert.equal(peens.length,3);
    for(const rivet of peens){
+     assert.ok(Math.abs(((rivet[2][0]+rivet[2][1])/2)-expectedHeights[z])<0.001,z+" rivet Z");
      assert.ok(overlap(rivet,strap,1)>.005,z+" rivet physically seated in iron strap");
      assert.ok(overlap(rivet,strap,0)>.005,z+" rivet has contact surface on strap");
    }
@@ -53,6 +59,9 @@ test("source-only 2.5D render projection does not move the saved physical hinge 
  const builder=readFileSync(sourceFile,"utf8");
  const validator=readFileSync(validatorFile,"utf8");
  assert.match(builder,/DOOR_FACE_Y=-2\.030/);
+ assert.match(builder,/for label,z in \(\("lower",\.96\),\("upper",1\.88\)\)/);
+ assert.match(validator,/LOWER_Z=\.96/);
+ assert.match(validator,/UPPER_Z=1\.88/);
  assert.match(builder,/HINGE_STRAP_Y=DOOR_FACE_Y-\.015/);
  assert.match(builder,/HINGE_BARREL_Y=DOOR_FACE_Y-\.020/);
  assert.match(builder,/HINGE_PEEN_Y=DOOR_FACE_Y-\.045/);
