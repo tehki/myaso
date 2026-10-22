@@ -16,6 +16,7 @@ import { summarizeM217SuccessfulKickLatency } from "./m217-successful-kick-laten
 import { summarizeSpartanConnectedKickFlight } from "./graphics3a-spartan-connected-receipt.mjs";
 import { summarizeSpartanV3ConnectedKickFlight } from "./graphics3a-spartan-v3-source-receipt.mjs";
 import { summarizeSpartanV3RealKnockdown } from "./graphics3a-v3-real-knockdown-receipt.mjs";
+import { qualifyOriginalSilverVictimKnockdown } from "./graphics3a-original-silver-knockdown-receipt.mjs";
 import { correlateM230HeavyReplayEvidence } from "./m230-heavy-replay-correlation.mjs";
 import { withM231M108FailureEvidence } from "./m231-m108-failure-path.mjs";
 import { summarizeM232SpatialHandoffFailure } from "./m232-spatial-handoff-failure.mjs";
@@ -46,6 +47,9 @@ const spartanFlight = process.env.MYASO_GRAPHICS3A_SPARTAN_FLIGHT === "1";
 const spartanV3Flight = process.env.MYASO_GRAPHICS3A_SPARTAN_V3_FLIGHT === "1";
 const spartanV3ContactPng = process.env.MYASO_GRAPHICS3A_V3_CONTACT_PNG === "1";
 const spartanV3KnockdownFlight = process.env.MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT === "1";
+const originalSilverVictimKnockdownFlight = process.env.MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT === "1";
+if(originalSilverVictimKnockdownFlight && !spartanV3KnockdownFlight)
+  throw new Error("Original Silver victim QA requires strict real M153 three-player V3 kick receipt");
 if (spartanV3KnockdownFlight && (spartanFlight || spartanV3Flight
   || spartanV3ContactPng || scenario !== "uikickknockdownffa")) {
   throw new Error("Graphics3A V3 knockdown requires isolated M153 original authoritative FFA flight");
@@ -422,6 +426,13 @@ try {
       const clients=await Promise.all(sessions.map(readSpartanKickDrawProbe));
       const receipt=summarizeSpartanV3RealKnockdown({results,clients});
       console.log("GRAPHICS3A_SPARTAN_V3_REAL_KNOCKDOWN " + JSON.stringify(receipt));
+      if(originalSilverVictimKnockdownFlight){
+        const observations=await Promise.all(sessions.map(readOriginalSilverKnockdownProbe));
+        const victimReceipt=qualifyOriginalSilverVictimKnockdown({results,sourceReceipt:receipt,
+          nativeClients:observations});
+        console.log("GRAPHICS3A_ORIGINAL_SILVER_VICTIM_REAL_KNOCKDOWN "
+          +JSON.stringify(victimReceipt));
+      }
     }
   } else if (scenario === "uikickknockdownffahit") {
     const results = await runOnlineUiKickKnockdownFfaHitFlight(sessions);
@@ -625,6 +636,8 @@ async function navigate(session, gameUrl, certificateHash) {
     url.searchParams.set("knightKickSource", "1");
     if (spartanV3Flight || spartanV3KnockdownFlight)
       url.searchParams.set("knightKickV3", "1");
+    if (originalSilverVictimKnockdownFlight)
+      url.searchParams.set("knightKnockdownSource", "1");
   }
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
@@ -6700,6 +6713,9 @@ async function runOnlineUiKickKnockdownFfaFocusFlight(entries) {
     for (const entry of entries) {
       if (await installSpartanKickDrawProbe(entry) !== true)
         throw Error("Graphics3A V3 FFA source observer failed in "+entry.name);
+      if (originalSilverVictimKnockdownFlight
+        &&await installOriginalSilverKnockdownProbe(entry)!==true)
+        throw Error("Original Silver source victim observer failed in "+entry.name);
     }
   }
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
@@ -6889,6 +6905,37 @@ async function installSpartanKickDrawProbe(session) {
     }
     return window.__graphics3aSpartanDrawProbe.installed;
   `);
+}
+
+// Read-only W3C-sourced original victim atlas observer. It never grants
+// knockdown or substitutes server snapshots with a local animation timer.
+async function installOriginalSilverKnockdownProbe(session) {
+  return await execute(session.base,session.sessionId,`
+    if (!window.__originalSilverVictimProbe) {
+      const original=CanvasRenderingContext2D.prototype.drawImage;
+      const data={draws:[],installed:true};
+      CanvasRenderingContext2D.prototype.drawImage=function(image,...args){
+        const src=typeof image?.src==="string"?image.src:"";
+        if(src.endsWith("/silver_knockdown.webp")&&args.length===8){
+          if(data.draws.length<2048)
+            data.draws.push({sourceFile:src.split("/").at(-1),
+              frame:args[0]/160,direction:args[1]/160,epochMs:Date.now()});
+        }
+        return original.call(this,image,...args);
+      };
+      window.__originalSilverVictimProbe=data;
+    }
+    return window.__originalSilverVictimProbe.installed;
+  `);
+}
+async function readOriginalSilverKnockdownProbe(session) {
+  const receipt=await readSpartanKickDrawProbe(session);
+  const data=await execute(session.base,session.sessionId,`
+    const found=window.__originalSilverVictimProbe;
+    return {probeInstalled:found?.installed===true,draws:found?.draws??[]};
+  `);
+  return {...data,engine:session.name,netId:receipt.netId,
+    serverConnected:receipt.serverConnected};
 }
 
 async function readSpartanKickDrawProbe(session) {

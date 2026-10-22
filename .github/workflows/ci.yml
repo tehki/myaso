@@ -1258,3 +1258,36 @@ jobs:
           node --check scripts/graphics3a-v3-real-knockdown-receipt.mjs
           python3 -m py_compile tools/art/author_original_silver_knockdown_p0.py tools/art/pack_original_silver_knockdown.py tools/art/audit_original_silver_knockdown.py
           node --test tests/graphics3a-original-silver-knockdown-source.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+
+  # Genuine server-action-gated original victim Silver source art in three
+  # native browsers. Pure QA opt-in and separate from protected full quality.
+  graphics3a-native-original-silver-victim:
+    name: graphics3a-native-original-silver-victim-knockdown
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'graphics3a/original-silver-knockdown-connected-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout original approved Silver QA branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse synthetic original Silver victim or fabricated server knockdown
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/graphics3a-original-silver-knockdown-receipt.mjs
+          node --test tests/graphics3a-original-silver-victim-connected.test.mjs tests/graphics3a-original-silver-knockdown-source.test.mjs tests/graphics3a-v3-real-knockdown-receipt.test.mjs
+      - name: Validate Chrome Firefox and authoritative Rust tooling
+        run: |
+          cargo --version
+          command -v chromedriver
+          command -v geckodriver
+          command -v firefox
+      - name: Build exact authoritative Rust arena before native flight
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Prove real three-player original Silver victim animation following server knockdown
+        env:
+          MYASO_PVP_SCENARIO: "uikickknockdownffa"
+          MYASO_GRAPHICS3A_V3_KNOCKDOWN_FLIGHT: "1"
+          MYASO_GRAPHICS3A_ORIGINAL_VICTIM_FLIGHT: "1"
+          MYASO_PVP_FLIGHT_DURATION_MS: "11000"
+        run: node scripts/pvp_browser_flight_runner.mjs
