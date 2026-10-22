@@ -144,3 +144,68 @@ test("two distinct quick taps drain first presses and releases before retrying o
   assert.throws(()=>queue.nextSendBatch(1),/retransmission exhausted/);
   assert.equal(queue.snapshot.pending,4);
 });
+
+
+test("large first-send batch stays within Rust 16-edge forward-gap, not configured 32-pending capacity",()=>{
+  const rust=readFileSync(new URL("../server/src/prealpha_lmb_ingress_review.rs",import.meta.url),"utf8");
+  assert.match(rust,/const MAX_GAP: u32 = 16;/);
+  assert.match(rust,/const MAX_BUFFERED: usize = 16;/);
+  const lease=newLease(),queue=new ProposedLmbGestureOutbox({
+    negotiatedVersion:PROPOSED_GESTURE_VERSION,trustedLease:lease,maxPending:32,maxAttempts:3,
+  });
+  const queued=[];
+  for(let i=0;i<11;i++){
+    queued.push(queue.begin(i));
+    queued.push(queue.release(i));
+  }
+  assert.equal(queue.snapshot.pending,22);
+  // Original Rust ReviewLmbIngress MAX_GAP = 16: when seq1 is missing,
+  // later event seq18 is too far ahead and fail-closes the server model.
+  const first=queue.nextSendBatch(32);
+  assert.deepEqual(first.map(x=>x.sequence),queued.slice(0,17).map(x=>x.sequence));
+  assert.ok(first.every(x=>x.attempt===1));
+  assert.throws(()=>queue.receiveAck(acknowledged(queued[17]),lease),/unscheduled/);
+  assert.equal(queue.snapshot.pending,22);
+  assert.equal(queue.snapshot.closed,false);
+});
+
+test("server-window slides only with oldest outstanding exact ACK, not out-of-order newer ACK",()=>{
+  const lease=newLease(),queue=new ProposedLmbGestureOutbox({
+    negotiatedVersion:PROPOSED_GESTURE_VERSION,trustedLease:lease,maxPending:32,maxAttempts:3,
+  });
+  const edges=[];
+  for(let i=0;i<11;i++){edges.push(queue.begin(i),queue.release(i));}
+  queue.nextSendBatch(32);
+  assert.equal(queue.receiveAck(acknowledged(edges[16]),lease).transportSettled,true);
+  // seq17 ACK alone cannot allow seq18: seq1 remains outstanding.
+  const before=queue.nextSendBatch(1);
+  assert.deepEqual(before.map(x=>[x.sequence,x.attempt]),[[1,2]]);
+  assert.throws(()=>queue.receiveAck(acknowledged(edges[17]),lease),/unscheduled/);
+  assert.equal(queue.receiveAck(acknowledged(edges[0]),lease).transportSettled,true);
+  const now=queue.nextSendBatch(1);
+  assert.deepEqual(now.map(x=>[x.sequence,x.attempt]),[[18,1]]);
+  assert.equal(queue.receiveAck(acknowledged(edges[17]),lease).transportSettled,true);
+  assert.equal(queue.snapshot.closed,false);
+});
+
+test("the 16-edge gate advances on each contiguous oldest ACK and never changes original event bytes",()=>{
+  const lease=newLease(),queue=new ProposedLmbGestureOutbox({
+    negotiatedVersion:PROPOSED_GESTURE_VERSION,trustedLease:lease,maxPending:32,maxAttempts:3,
+  });
+  const edges=[];
+  for(let i=0;i<11;i++){edges.push(queue.begin(10+i),queue.release(10+i));}
+  const prefix=queue.nextSendBatch(32);
+  assert.equal(prefix.length,17);
+  assert.equal(prefix[16].sequence,17);
+  assert.equal(queue.receiveAck(acknowledged(edges[0]),lease).combatCommitted,false);
+  const next=queue.nextSendBatch(1);
+  assert.equal(next[0].sequence,18);
+  assert.equal(next[0].bytes[0],2);
+  assert.equal(next[0].bytes[1],0x11);
+  assert.equal(new DataView(next[0].bytes.buffer).getUint32(4,true),18);
+  assert.equal(next[0].attempt,1);
+  assert.equal(queue.receiveAck(acknowledged(edges[1]),lease).transportSettled,true);
+  assert.deepEqual(queue.nextSendBatch(1).map(x=>x.sequence),[19]);
+  assert.equal(queue.receiveAck(acknowledged(edges[2]),lease).transportSettled,true);
+  assert.deepEqual(queue.nextSendBatch(1).map(x=>x.sequence),[20]);
+});

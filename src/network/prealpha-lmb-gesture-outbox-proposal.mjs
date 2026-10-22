@@ -8,6 +8,10 @@ import {
 } from "./prealpha-lmb-gesture-proposal.mjs";
 
 const U32_MAX = 0xffff_ffff;
+// Must match the original dormant Rust ReviewLmbIngress MAX_GAP = 16.
+// If an earlier event is unACKed, allowing sequence + 17 into a later
+// independently reordered transport offer would fail-close the Rust gate.
+const MAX_INGRESS_FORWARD_GAP = 16;
 const validTick = tick => Number.isInteger(tick) && tick >= 0 && tick <= U32_MAX;
 function requireTick(tick) {
   if (!validTick(tick)) throw new RangeError("clientTick must be a diagnostic u32");
@@ -110,8 +114,15 @@ export class ProposedLmbGestureOutbox {
     // Sort the final batch by original sequence for its wire presentation;
     // the future authoritative Rust ingress separately buffers genuine gaps.
     const pending = [...this.#pending.values()];
-    const firstAttempts = pending.filter(e=>e.attempts===0);
-    const retransmits = pending.filter(e=>e.attempts>0);
+    // Also respect the dormant Rust ingress server's bounded forward gap.
+    // Even when maxPending is 256, do not send farther than 16 sequence
+    // numbers ahead of the lowest unACKed edge. Unlike a client tick, this
+    // is only a bounded transport scheduling rule, never Combat authority.
+    const oldestUnacked = pending[0]?.sequence;
+    const eligible = pending.filter(e=>
+      e.sequence <= oldestUnacked + MAX_INGRESS_FORWARD_GAP);
+    const firstAttempts = eligible.filter(e=>e.attempts===0);
+    const retransmits = eligible.filter(e=>e.attempts>0);
     const selected = [...firstAttempts,...retransmits]
       .slice(0,limit)
       .sort((a,b)=>a.sequence-b.sequence);
