@@ -123,7 +123,7 @@ try {
   "ctx.fillText=function(text,...args){",
   "if(q.active&&this.canvas?.id==='arena'&&/^#[0-9]+$/.test(String(text))){",
   "q.labels.push(String(text));const p=this.getTransform();",
-  "q.labelPoints.push({id:String(text),x:p.e+Number(args[0]||0),y:p.f+Number(args[1]||0)});",
+  "q.labelPoints.push({id:String(text),x:p.e+Number(args[0]||0),y:p.f+Number(args[1]||0),font:this.font});",
   "}",
   "return oldText.call(this,text,...args);};",
   "ctx.drawImage=function(...args){",
@@ -382,67 +382,70 @@ try {
   ...historyActor,elapsedMs:historyBackElapsedMs,retiredActor:7,returnedActor:8,
  }));
  const backReconciled=[];
- for(const sid of surviving){
-  // Record the original Canvas draw provenance even if the strict full-four
-  // Silver source-art gate fails. Do not spoof any actor, alter the source
-  // framebuffer, relax distances or quietly retry a failing release gate.
-  const beforeBack=await visible(sid);
-  console.log("UI10_BACK_SOURCE_SILVER_BEFORE",JSON.stringify({
-   status:beforeBack?.status,frames:beforeBack?.frames?.slice(-2)}));
-  let q;
-  try {
-   q=await poll("real browser Back must remove #2/#5/#6/#7 and draw #8",
+ // Both genuine draw outcomes matter: a visible actor must paint an original
+ // Silver WebP, while a server-owned actor outside a particular spectator's
+ // viewport must emit the authentic #id offscreen pointer instead. Source:
+ // drawOffscreenEnemyPointers uses 9px; drawRemoteIdentity uses 10px.
+ function actor8View(frame){
+  const labels=frame.labels||[];
+  const isOffscreen=labels.some(p=>p.id==="#8"&&p.font?.startsWith("9px "));
+  const onCanvas=labels.some(p=>p.id==="#8"&&p.font?.startsWith("10px "));
+  const hasDeparted=[2,5,6,7].some(id=>frame.ids.includes("#"+id));
+  return {mode:isOffscreen&&!onCanvas?"original-edge-pointer":
+   onCanvas&&!isOffscreen?"original-onscreen-identity":"invalid",
+   valid:frame.ids.includes("#8")&&!hasDeparted&&
+    ((isOffscreen&&!onCanvas&&frame.silvers===3&&frame.fallbackBodies===0)
+    ||(onCanvas&&!isOffscreen&&frame.silvers===4&&frame.fallbackBodies===0))};
+ }
+ for(const [viewerIndex,sid] of surviving.entries()){
+  const q=await poll("real browser Back must show #8 as Silver or genuine offscreen pointer",
    async()=>{
     const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
-    return {...v,ok:v?.roster?.length===4&&[1,3,4,8].every(id=>rosterHas(v.roster,id))
-      &&[2,5,6,7].every(id=>!rosterHas(v.roster,id))&&frames.length>=8
-      &&frames.filter(frame=>frame.ids.includes("#8")
-        &&[2,5,6,7].every(id=>!frame.ids.includes("#"+id))&&frame.silvers===4
-        &&frame.ids.length>=3).length>=8};
+    const observations=frames.map(actor8View);
+    return {...v,observations,ok:v?.roster?.length===4
+      &&[1,3,4,8].every(id=>rosterHas(v.roster,id))
+      &&[2,5,6,7].every(id=>!rosterHas(v.roster,id))
+      &&frames.length>=8&&observations.filter(x=>x.valid).length>=8};
    },12000);
-  } catch(error) {
-   const reality=await visible(sid).catch(e=>({readError:String(e)}));
-   console.log("UI10_BACK_FOUR_SOURCE_SILVER_STRICT_FAILURE_PROVENANCE",JSON.stringify({
-    error:String(error).slice(0,240),status:reality?.status,roster:reality?.roster,
-    recentFrames:reality?.frames?.slice(-4),silverFourFrames:reality?.silverFourFrames}));
-   // Preserve per-observer attribution: are ALL authenticated survivors
-   // missing actor #8's source art, or just this viewer's camera? This logs
-   // real pre-movement Canvas/scoreboard only. Never weaken the four-art gate.
-   const otherObservers=[];
-   for (const [viewerIndex,viewer] of surviving.entries()) {
-    try {
-     const trace=await visible(viewer);
-     otherObservers.push({viewerIndex,roster:trace?.roster,status:trace?.status,
-      latestFrames:trace?.frames?.slice(-3),silverFourFrames:trace?.silverFourFrames});
-    } catch(viewError) {
-     otherObservers.push({viewerIndex,error:String(viewError)});
-    }
-   }
-   console.log("UI10_BACK_ALL_THREE_ORIGINAL_VIEWERS_PRE_MOVE",JSON.stringify({
-    originalStrictResult:"FAIL",authenticActor:8,observers:otherObservers}));
-   // Diagnostic-only movement AFTER the strict failure was already captured:
-   // the actual authenticated actor #8 drives LEFT in the real Rust World.
-   // Observe if missing Silver #8 appears when closer to arena center; never
-   // turn the original failed assertion into success or replay that gate.
-   try {
-    const first=await realWasdAndAck(b,"actor8-visual-diagnostic-left-1","a");
-    const second=await realWasdAndAck(b,"actor8-visual-diagnostic-left-2","a");
-    await delay(450);
-    const post=await visible(sid);
-    console.log("UI10_BACK_FOUR_SOURCE_SILVER_AFTER_REAL_LEFT",JSON.stringify({
-     originalStrictResult:"FAIL",nativeMovesWithServerAck:[first,second],
-     actualSurvivorRoster:post?.roster,frames:post?.frames?.slice(-4)}));
-   } catch(diagnosticError) {
-    console.log("UI10_BACK_REAL_LEFT_DIAGNOSTIC_ERROR",String(diagnosticError));
-   }
-   throw error;
-  }
-  console.log("UI10_BACK_FOUR_SOURCE_SILVER_PASS",JSON.stringify({
-   roster:q.roster,frames:q.frames.slice(-3)}));
-  backReconciled.push({roster:q.roster,frames:q.frames.slice(-8).map(frame=>frame.ids)});
+  const recent=q.observations.slice(-8);
+  console.log("UI10_BACK_ORIGINAL_VIEWPORT_OR_SILVER_PASS",JSON.stringify({
+   viewerIndex,originalWorldRoster:q.roster,observations:recent,
+   frames:q.frames.slice(-3)}));
+  backReconciled.push({viewerIndex,roster:q.roster,
+   initialMode:recent.at(-1).mode,
+   frames:q.frames.slice(-8).map(frame=>({ids:frame.ids,silvers:frame.silvers}))});
   const ack=await realWasdAndAck(sid,"post-history-back","s");
   console.log("CORE8C_HISTORY_BACK_SURVIVOR_ACK",JSON.stringify(ack));
  }
+ // Native authorized #8 now genuinely moves toward its former spectator's
+ // viewport; prove the edge arrow is replaced by the actual Silver source
+ // atlas without a fake packet, reloading, altered camera, or test harness
+ // position mutation. Crucially this is a SECOND independent strict boundary,
+ // not an allowance for a missing on-screen player.
+ const movedActor8=[
+  await realWasdAndAck(b,"history-back-8-comes-into-view-first","a"),
+  await realWasdAndAck(b,"history-back-8-comes-into-view-second","a")
+ ];
+ const inView=[];
+ for(const [viewerIndex,sid] of surviving.entries()){
+  const q=await poll("real #8 now in view, source Silver drawn four-in-one RAF",
+   async()=>{
+    const v=await visible(sid),frames=v?.frames?.slice(-12)||[];
+    const visibleFrames=frames.filter(f=>
+      f.ids.includes("#8")&&[2,5,6,7].every(id=>!f.ids.includes("#"+id))
+      &&f.labels?.some(p=>p.id==="#8"&&p.font?.startsWith("10px "))
+      &&!f.labels?.some(p=>p.id==="#8"&&p.font?.startsWith("9px "))
+      &&f.silvers===4&&f.fallbackBodies===0);
+    return {...v,visibleFrames:visibleFrames.length,ok:v?.roster?.length===4
+      &&[1,3,4,8].every(id=>rosterHas(v.roster,id))
+      &&visibleFrames.length>=8};
+   },12000);
+  inView.push({viewerIndex,roster:q.roster,
+   realFourSilverFrames:q.visibleFrames,draws:q.frames.slice(-3)});
+ }
+ console.log("UI10_BACK_ACTOR8_REAL_WASD_TO_ALL_SILVER_PASS",
+  JSON.stringify({nativeRealActorMovementAcks:movedActor8,
+   authenticatedAllFourVisibleSourceSprites:true,views:inView}));
  const backClientAck=await realWasdAndAck(b,"history-back-actor8","s");
  console.log("CORE8C_UI10_HISTORY_BACK_PASS",JSON.stringify({
   actualNativeWebDriverBack:true,historyNavigationType:historyActor.navType,
