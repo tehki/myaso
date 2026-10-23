@@ -183,7 +183,9 @@ impl SessionGestureWorldPath {
                             {
                                 self.held_source_id[source_index] = None;
                             }
-                            GestureAction::Upgrade | GestureAction::Release | GestureAction::Cancel => {}
+                            GestureAction::Upgrade
+                            | GestureAction::Release
+                            | GestureAction::Cancel => {}
                         }
                         AckStatus::Accepted
                     } else {
