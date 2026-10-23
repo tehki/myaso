@@ -80,6 +80,10 @@ pub struct GestureAuthority {
     // executing the other. Admit and tombstone its edges without World damage.
     // This is NOT another active combat action or an actor authorization.
     busy_source: Option<(GestureSource, u32)>,
+    // Original 60Hz World may recover and hand combat to the other source
+    // before a physically held earlier source's authentic terminal arrives.
+    // Preserve that one displaced UP/CANCEL as transport-only, never combat.
+    displaced_held_source: Option<(GestureSource, u32)>,
     highest_gesture_id: u32,
     highest_sequence: u32,
     press_ms: u64,
@@ -96,6 +100,7 @@ impl GestureAuthority {
             active_id: None,
             active_source: None,
             busy_source: None,
+            displaced_held_source: None,
             highest_gesture_id: 0,
             highest_sequence: 0,
             press_ms: 0,
@@ -196,6 +201,15 @@ impl GestureAuthority {
                 if self.busy_source == Some((source, event.gesture_id)) =>
             {
                 self.busy_source = None;
+                Command::None
+            }
+            GestureAction::Release | GestureAction::Cancel
+                if self.displaced_held_source == Some((source, event.gesture_id)) =>
+            {
+                // Earlier source has already completed original World combat,
+                // but its physical UP was never admitted before newer source
+                // acquired World. It cannot release or hit with that newer owner.
+                self.displaced_held_source = None;
                 Command::None
             }
             GestureAction::Press
@@ -342,6 +356,11 @@ impl GestureAuthority {
     pub fn retire(&mut self, lease: u64, gesture_id: u32) -> bool {
         if lease == 0 || lease != self.lease_epoch || self.active_id != Some(gesture_id) {
             return false;
+        }
+        if !self.released {
+            // Preserve a still physically held owner for exactly its delayed
+            // matching terminal. Original World returning Idle is NOT keyup.
+            self.displaced_held_source = self.active_source.zip(self.active_id);
         }
         self.active_id = None;
         self.active_source = None;
