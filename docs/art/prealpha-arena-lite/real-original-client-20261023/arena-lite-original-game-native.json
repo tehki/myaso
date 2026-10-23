@@ -1,0 +1,109 @@
+{
+  "sourceCommit": "9f26cff108acd500d1e3aebb1d5aeb289f851a44",
+  "actualRustWebTransport": true,
+  "actualOriginalClient": true,
+  "realSeparateNativeBrowserProcesses": 4,
+  "independentPhysicalHumanHosts": false,
+  "authenticSilverKnightIntegrationVerified": false,
+  "modeIsOptional": true,
+  "defaultArenaPreserved": true,
+  "genuineFullCombatApproval": false,
+  "trials": [
+    {
+      "browser": "chrome",
+      "actorId": 1,
+      "mode": "lite",
+      "data": {
+        "canvasHeight": 540,
+        "canvasWidth": 960,
+        "floor": {
+          "centerLuminance": 63.927549485289035,
+          "frame": 1,
+          "height": 540,
+          "width": 960
+        },
+        "frameIntervalP50Ms": 16.700000047683716,
+        "frameIntervalP95Ms": 22.40000009536743,
+        "frames": 349,
+        "innerHeight": 577,
+        "innerWidth": 1280,
+        "over33ms": 4,
+        "status": "Online - player #1 - server tick 60"
+      },
+      "screenshot": "chrome-0-lite.png",
+      "pngSha256": "50695584a1f968c86fc3fa8a696bb70fcbf22d2b1ad38bbe6fbe0d2d101f6015"
+    },
+    {
+      "browser": "chrome",
+      "actorId": 2,
+      "mode": "grid",
+      "data": {
+        "canvasHeight": 540,
+        "canvasWidth": 960,
+        "floor": {
+          "centerLuminance": 26.084968137253217,
+          "frame": 1,
+          "height": 540,
+          "width": 960
+        },
+        "frameIntervalP50Ms": 16.700000047683716,
+        "frameIntervalP95Ms": 21.59999990463257,
+        "frames": 285,
+        "innerHeight": 577,
+        "innerWidth": 1280,
+        "over33ms": 5,
+        "status": "Online - player #2 - server tick 126"
+      },
+      "screenshot": "chrome-1-grid.png",
+      "pngSha256": "0a84713225116418d5a9a5117a6a4edacc90c9c0750d4904bfd928e76dcc7e7d"
+    },
+    {
+      "browser": "chrome",
+      "actorId": 3,
+      "mode": "lite",
+      "data": {
+        "canvasHeight": 540,
+        "canvasWidth": 960,
+        "floor": {
+          "centerLuminance": 63.927549485289035,
+          "frame": 1,
+          "height": 540,
+          "width": 960
+        },
+        "frameIntervalP50Ms": 16.700000047683716,
+        "frameIntervalP95Ms": 20.799999952316284,
+        "frames": 219,
+        "innerHeight": 577,
+        "innerWidth": 1280,
+        "over33ms": 3,
+        "status": "Online - player #3 - server tick 207"
+      },
+      "screenshot": "chrome-2-lite.png",
+      "pngSha256": "9200cdc8b41499da6dbb97ca1ee38d262dba2ad39221a867a834fa6ca113da7a"
+    },
+    {
+      "browser": "chrome",
+      "actorId": 4,
+      "mode": "grid",
+      "data": {
+        "canvasHeight": 540,
+        "canvasWidth": 960,
+        "floor": {
+          "centerLuminance": 26.084968137253217,
+          "frame": 1,
+          "height": 540,
+          "width": 960
+        },
+        "frameIntervalP50Ms": 16.700000047683716,
+        "frameIntervalP95Ms": 20,
+        "frames": 157,
+        "innerHeight": 577,
+        "innerWidth": 1280,
+        "over33ms": 0,
+        "status": "Online - player #4 - server tick 297"
+      },
+      "screenshot": "chrome-3-grid.png",
+      "pngSha256": "999653173497400413c55e6b8c8c87e9f827330a262c08cb0b09a1a41dd2083b"
+    }
+  ]
+}
