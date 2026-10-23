@@ -989,7 +989,10 @@ fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
             survivor.advance_under_world_lock(&mut world, LEASE, BOOT);
             continue;
         }
-        assert!(gesture < 18, "five genuine Combat kills must finish promptly");
+        assert!(
+            gesture < 18,
+            "five genuine Combat kills must finish promptly"
+        );
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
         // Original 18px knockback per landed light can move the target out
         // of range. Approach via the normal movement input until close.
@@ -1002,11 +1005,7 @@ fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
                 1,
                 InputIntent {
                     move_x: dx.signum(),
-                    facing_radians: if dx >= 0.0 {
-                        0.0
-                    } else {
-                        std::f32::consts::PI
-                    },
+                    facing_radians: if dx >= 0.0 { 0.0 } else { std::f32::consts::PI },
                     ..InputIntent::default()
                 }
             ));
@@ -1018,11 +1017,7 @@ fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
         assert!(world.set_input(
             1,
             InputIntent {
-                facing_radians: if dx >= 0.0 {
-                    0.0
-                } else {
-                    std::f32::consts::PI
-                },
+                facing_radians: if dx >= 0.0 { 0.0 } else { std::f32::consts::PI },
                 ..InputIntent::default()
             }
         ));
@@ -1085,7 +1080,10 @@ fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
     assert_eq!(match_wins, 1);
     assert_eq!(respawns, 4);
     assert_eq!(gesture, 15);
-    assert!(survivor.retired(), "match winner no longer owns future gestures");
+    assert!(
+        survivor.retired(),
+        "match winner no longer owns future gestures"
+    );
     assert_eq!(world.world_instance(), old_world_instance);
     let mut saw_reset = false;
     for _ in 0..170 {
