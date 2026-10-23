@@ -131,10 +131,17 @@ impl SessionGestureWorldPath {
                     // receipt lets Core8A's bounded sender retry both edges
                     // in sequence. A REJECTED ACK would permanently retire
                     // the sender lease and turn a 6ms click into no attack.
-                    if self.last_gesture_id.is_none()
-                        && event.action
-                            != crate::prealpha_lmb_gesture_proposal::GestureAction::Press
+                    if event.action
+                        != crate::prealpha_lmb_gesture_proposal::GestureAction::Press
+                        && self
+                            .last_gesture_id
+                            .is_none_or(|last| event.gesture_id > last)
                     {
+                        // The first PRESS *or any later greater-ID PRESS* may
+                        // be missing. A rejected ACK here would incorrectly
+                        // retire the bounded outbox before PRESS can retry.
+                        // Never infer actor/Combat success from the missing
+                        // receipt; original replay/World checks still apply.
                         return None;
                     }
                     AckStatus::Rejected
