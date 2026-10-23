@@ -275,6 +275,7 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  leftButtonPressMovement = null;
   if (m111InputProbe && committed) {
     m111InputProbe.physicalTerminals.push({
       epochMs: Date.now(), trusted: event.isTrusted,
@@ -282,7 +283,6 @@ function onLeftPointerUp(event) {
     });
     if (m111InputProbe.physicalTerminals.length > 32) m111InputProbe.physicalTerminals.shift();
   }
-  leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
     audio.unlock();
