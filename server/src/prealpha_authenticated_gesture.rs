@@ -5,9 +5,11 @@
 //! holding the live GameState/World mutex, with no await between checks & hit.
 use crate::prealpha_lmb_gesture_authority::{Command, Disposition, GestureAuthority};
 use crate::prealpha_lmb_gesture_proposal::{
-    decode_typed_event, AckStatus, GestureAck, GestureSource, BYTES, EVENT_TYPE, VERSION,
+    decode_typed_event, AckStatus, GestureAck, GestureAction, GestureEvent, GestureSource, BYTES,
+    EVENT_TYPE, VERSION,
 };
 use crate::simulation::{Action, World};
+use std::collections::VecDeque;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ServerActorBinding {
@@ -24,6 +26,12 @@ pub struct SessionGestureWorldPath {
     authority: GestureAuthority,
     retired: bool,
     last_gesture_id: Option<u32>,
+    // Shared per-lease sequence and gesture namespace for source0 + source1.
+    highest_sequence: u32,
+    highest_gesture_id: u32,
+    keye_active_id: Option<u32>,
+    keye_terminal: bool,
+    keye_accepted: VecDeque<GestureEvent>,
 }
 
 impl SessionGestureWorldPath {
@@ -52,6 +60,11 @@ impl SessionGestureWorldPath {
             authority: GestureAuthority::new(lease_epoch),
             retired: false,
             last_gesture_id: None,
+            highest_sequence: 0,
+            highest_gesture_id: 0,
+            keye_active_id: None,
+            keye_terminal: false,
+            keye_accepted: VecDeque::with_capacity(64),
         })
     }
 
@@ -79,10 +92,50 @@ impl SessionGestureWorldPath {
             })
     }
 
+    fn accept_keye(&mut self, world: &mut World, event: GestureEvent) -> Option<AckStatus> {
+        if self.keye_accepted.iter().any(|seen| *seen == event) {
+            return Some(AckStatus::Duplicate);
+        }
+        if event.sequence <= self.highest_sequence {
+            return Some(AckStatus::Stale);
+        }
+        match event.action {
+            GestureAction::Press if event.gesture_id > self.highest_gesture_id => {
+                if !world.apply_review_only_keye_press(self.binding.player_id) {
+                    return Some(AckStatus::Rejected);
+                }
+                self.keye_active_id = Some(event.gesture_id);
+                self.keye_terminal = false;
+                self.highest_gesture_id = event.gesture_id;
+            }
+            GestureAction::Release | GestureAction::Cancel
+                if self.keye_active_id == Some(event.gesture_id) && !self.keye_terminal =>
+            {
+                // KeyE is standalone: heavy starts on PRESS and the original
+                // World owns its 320ms windup/hit, not this terminal receipt.
+                self.keye_terminal = true;
+            }
+            GestureAction::Release | GestureAction::Cancel
+                if event.gesture_id > self.highest_gesture_id =>
+            {
+                // A legitimate future KeyE PRESS may still be in transit.
+                // Never permanently reject its terminal ahead of that PRESS.
+                return None;
+            }
+            _ => return Some(AckStatus::Rejected),
+        }
+        self.highest_sequence = event.sequence;
+        self.keye_accepted.push_back(event);
+        if self.keye_accepted.len() > 64 {
+            self.keye_accepted.pop_front();
+        }
+        Some(AckStatus::Accepted)
+    }
+
     /// Called synchronously under original GameState/World mutex, not after
     /// unlocking or by a transport ACK handler. Returns real World tick ACK.
-    /// Only source0 LMB is presently supported as a live experimental path;
-    /// typed KeyE source1 fails closed until Combat source-arbitration joins it.
+    /// Source0 LMB and source1 KeyE share the same session lease, monotonic
+    /// sequence/gesture namespace, server authority, and World mutation lock.
     pub fn accept_under_world_lock(
         &mut self,
         world: &mut World,
@@ -96,9 +149,43 @@ impl SessionGestureWorldPath {
         let status = if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             AckStatus::Stale
-        } else if typed.source != GestureSource::Lmb {
-            AckStatus::Rejected
+        } else if event.sequence > self.highest_sequence.saturating_add(1) {
+            // One ordered lease across BOTH source families: if an earlier
+            // sequence was dropped/reordered, never admit a later KeyE PRESS
+            // (or later LMB event) first and permanently stale the earlier
+            // valid gesture. Withhold ACK so the same bounded outbox retries.
+            return None;
+        } else if typed.source == GestureSource::KeyE {
+            // Already validated typed action/source and immutable server lease.
+            // No separate source1 QUIC connection, actor or ACK family.
+            self.accept_keye(world, event)?
         } else {
+            // Previously accepted source1 events also advance this lease's
+            // global sequence; never admit a different older source0 event.
+            if event.sequence <= self.highest_sequence {
+                let prior =
+                    self.authority
+                        .clone()
+                        .process(lease_epoch, event, world.now_ms.round() as u64);
+                return Some(GestureAck {
+                    status: if prior.disposition == Disposition::Duplicate {
+                        AckStatus::Duplicate
+                    } else {
+                        AckStatus::Stale
+                    },
+                    sequence: event.sequence,
+                    gesture_id: event.gesture_id,
+                    server_tick: tick,
+                });
+            }
+            if event.action == GestureAction::Press && event.gesture_id <= self.highest_gesture_id {
+                return Some(GestureAck {
+                    status: AckStatus::Rejected,
+                    sequence: event.sequence,
+                    gesture_id: event.gesture_id,
+                    server_tick: tick,
+                });
+            }
             // An earlier one-hit World action must finish before new PRESS.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
             if event.action == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
@@ -128,6 +215,10 @@ impl SessionGestureWorldPath {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
                         self.authority = proposed;
+                        self.highest_sequence = event.sequence;
+                        if event.action == GestureAction::Press {
+                            self.highest_gesture_id = event.gesture_id;
+                        }
                         AckStatus::Accepted
                     } else {
                         // A failed World action is NOT a received Combat hit,
@@ -146,6 +237,7 @@ impl SessionGestureWorldPath {
                         && self
                             .last_gesture_id
                             .is_none_or(|last| event.gesture_id > last)
+                        && event.gesture_id > self.highest_gesture_id
                     {
                         // The first PRESS *or any later greater-ID PRESS* may
                         // be missing. A rejected ACK here would incorrectly

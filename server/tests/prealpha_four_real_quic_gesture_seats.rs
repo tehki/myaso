@@ -275,3 +275,48 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
         assert_both_server_acks(&seat.connection).await;
     }
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn genuine_source1_keye_press_enters_real_server_heavy_without_release_hit() {
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+    // Existing authenticated actor and 0x11/0x12 ACK family; only byte3
+    // chooses source1. KeyE terminal cannot trigger a second World attack.
+    let mut press = event(1, 1);
+    press[3] = 1;
+    let mut cancel = event(4, 2);
+    cancel[3] = 1;
+    seat.connection
+        .send_datagram(press)
+        .expect("real KeyE PRESS");
+    seat.connection
+        .send_datagram(cancel)
+        .expect("real KeyE CANCEL");
+    assert_both_server_acks(&seat.connection).await;
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            if lines.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=1 from=9 to=10")
+            }) {
+                println!("CORE8_NATIVE_KEYE_HEAVY_WORLD_PASS");
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("actual World HeavyWindup9 to HeavyActive10 on standalone KeyE");
+    sleep(Duration::from_millis(600)).await;
+    let lines = server.lines.lock().unwrap().clone();
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.contains("M201_AUTH_ACTION tick=")
+                && line.contains(" fighter=1 from=9 to=10"))
+            .count(),
+        1,
+        "one KeyE gesture must not create a second heavy after CANCEL"
+    );
+    drop(seat);
+}

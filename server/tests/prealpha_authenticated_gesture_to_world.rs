@@ -252,21 +252,15 @@ fn different_world_with_same_actor_ids_and_local_tick_cannot_replay() {
     assert_eq!(w2.fighter(2).unwrap().hp, 100.0);
 }
 #[test]
-fn malformed_unnegotiated_keye_and_incompatible_052_do_not_generate_hits() {
+fn malformed_keye_upgrade_and_incompatible_052_do_not_generate_hits() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            1,
-            1
-        ),
-        AckStatus::Rejected
-    );
+    // The canonical codec rejects source1 UPGRADE, even with valid identity.
+    let mut invalid_keye = edge(GestureSource::KeyE, GestureAction::Press, 1, 1);
+    invalid_keye[2] = GestureAction::Upgrade as u8;
+    assert!(p
+        .accept_under_world_lock(&mut w, LEASE, BOOT, &invalid_keye)
+        .is_none());
     let good = edge(GestureSource::Lmb, GestureAction::Press, 1, 1);
     assert!(p
         .accept_under_world_lock(&mut w, LEASE, BOOT, &good[..15])
@@ -673,4 +667,272 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
     );
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert!(advance(&mut p, &mut w, 55).is_empty());
+}
+
+#[test]
+fn source1_keye_press_is_one_real_standalone_46hp_heavy_without_release() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    // KeyE needs no RELEASE: the original 320ms World windup activates once.
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Cancel,
+            3,
+            1
+        ),
+        AckStatus::Rejected
+    );
+    assert!(advance(&mut p, &mut w, 55).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+}
+
+#[test]
+fn source1_and_source0_share_monotonic_ids_with_no_cross_source_hit() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    // A forged source0 RELEASE for the same KeyE ID cannot release LMB or
+    // grant a new light strike; one lease cannot reuse event sequence #1.
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            2,
+            1
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+    // Legitimate new LMB identity on same lease starts normal original light.
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 20)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+}
+
+#[test]
+fn keye_premature_terminal_recovers_original_press_and_foreign_boot_is_stale() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert!(p
+        .accept_under_world_lock(
+            &mut w,
+            LEASE,
+            BOOT,
+            &edge(GestureSource::KeyE, GestureAction::Release, 2, 1)
+        )
+        .is_none());
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(
+        p.accept_under_world_lock(
+            &mut w,
+            LEASE,
+            BOOT + 1,
+            &edge(GestureSource::KeyE, GestureAction::Press, 3, 2)
+        )
+        .unwrap()
+        .status,
+        AckStatus::Stale
+    );
+    assert!(p.retired());
+    assert!(advance(&mut p, &mut w, 55).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+}
+
+#[test]
+fn later_keye_press_cannot_overtake_lost_earlier_lmb_press_on_same_lease() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    // Both sender sources use the same sequence: seq1 LMB was lost, KeyE
+    // seq2/id2 arrives before it. No ACK or World mutation for the future
+    // packet, so real client can retransmit the legitimate older PRESS.
+    assert!(p
+        .accept_under_world_lock(
+            &mut w,
+            LEASE,
+            BOOT,
+            &edge(GestureSource::KeyE, GestureAction::Press, 2, 2)
+        )
+        .is_none());
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Rejected,
+        "standalone heavy cannot interrupt a real current light windup"
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
 }
