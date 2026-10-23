@@ -63,6 +63,11 @@ jobs:
           node --check tests/combat4a-m172-native-stamina-window.test.mjs
           node --test tests/combat4a-m172-native-stamina-window.test.mjs
 
+      - name: Validate Combat 4A physical multi-button middle guard
+        run: |
+          node --check tests/combat4a-mmb-multibutton-native-transition.test.mjs
+          node --test tests/combat4a-mmb-multibutton-native-transition.test.mjs
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
