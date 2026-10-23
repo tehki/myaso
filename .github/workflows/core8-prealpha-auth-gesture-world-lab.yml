@@ -13,6 +13,7 @@ on:
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
       - "scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs"
+      - "scripts/core8_native_v2_two_browsers_shared_outbox_quic_lab.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "src/network/prealpha-lmb-gesture-proposal.mjs"
       - "src/network/prealpha-shared-source-allocator-proposal.mjs"
@@ -48,5 +49,9 @@ jobs:
         run: |
           node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Two real independent Chromium W3C seats share original QUIC World and own typed outboxes
+        run: |
+          node --check scripts/core8_native_v2_two_browsers_shared_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 120s node scripts/core8_native_v2_two_browsers_shared_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
