@@ -866,7 +866,7 @@ function simulatePrediction(stepMs) {
           facing: currentInput.facing,
           attack: Boolean(currentInput.attack),
           heavyAttack: Boolean(currentInput.heavyAttack),
-          heldLightCharge: Boolean(leftChargeHeld),
+          heldLightCharge: Boolean(leftButtonCharge.isCharging()),
           committedLightMove: committedLightMove
             ? { moveX: committedLightMove.moveX, moveY: committedLightMove.moveY }
             : null,
