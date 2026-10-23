@@ -34,7 +34,10 @@ test("two LMB edges inside one 30Hz client tick survive actual typed queue and o
   }
   assert.equal(q.snapshot.pending,0);
   assert.equal(q.snapshot.reservedTerminalCapacity,0);
-  assert.throws(()=>q.receiveAck(ack(press),token),/replayed/);
+  const repeated=q.receiveAck(ack(press),token);
+  assert.equal(repeated.alreadySettled,true,
+    "an exact same-lease duplicate must be transport-only, not replay-authoritative");
+  assert.equal(repeated.combatCommitted,false);
 });
 
 test("one sequence/gesture namespace spans interleaved LMB and KeyE, ACK source inferred only from pending",()=>{
@@ -220,4 +223,29 @@ test("settled ACK replay scope rejects forged IDs, stale status, and cross-lease
   const r=q.release(S.KEY_E,10);
   q.nextSendBatch(1);
   assert.equal(q.receiveAck(ack(r),token).transportSettled,true);
+});
+
+test("bounded settled receipt history evicts stale sequences and retirement clears all",()=>{
+  const token=lease(),q=newQueue(token);
+  let oldest,latest;
+  for(let i=0;i<72;i++){
+    const p=q.begin(S.KEY_E,i*2);
+    if(i===0)oldest=p;
+    q.nextSendBatch(1);
+    assert.equal(q.receiveAck(ack(p),token).transportSettled,true);
+    const r=q.release(S.KEY_E,i*2+1);
+    q.nextSendBatch(1);
+    assert.equal(q.receiveAck(ack(r),token).transportSettled,true);
+    latest=r;
+    assert.ok(q.snapshot.settledReceipts<=64,"no unbounded replay receipt growth");
+  }
+  assert.equal(q.snapshot.settledReceipts,64);
+  assert.throws(()=>q.receiveAck(ack(oldest,ACK.DUPLICATE),token),/replayed/,
+    "once history is evicted a late ACK must still fail closed");
+  const validLatest=q.receiveAck(ack(latest,ACK.ACCEPTED),token);
+  assert.equal(validLatest.alreadySettled,true);
+  assert.equal(validLatest.combatCommitted,false);
+  q.retire();
+  assert.equal(q.snapshot.settledReceipts,0);
+  assert.throws(()=>q.receiveAck(ack(latest),token),/closed/);
 });
