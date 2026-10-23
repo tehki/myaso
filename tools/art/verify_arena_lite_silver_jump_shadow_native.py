@@ -7,7 +7,7 @@ movement. Does not claim server physics, human operators or production GO.
 import json,os,re,select,shutil,socket,subprocess,time,urllib.parse,urllib.request
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 BIN=ROOT/"server"/"target"/"debug"/"myaso-server"
 assert BIN.is_file(), f"Compile genuine Rust server before this native flight: {BIN}"
 
