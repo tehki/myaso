@@ -8983,7 +8983,21 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
-        secondHeavyIssuedAt = attemptIssuedAt;
+        // M111 is a RELEASE-to-strike KeyE heavy: the original Rust World
+        // begins the 320+100+420ms commitment after genuine KeyE UP, never
+        // when W3C KeyE DOWN starts its physical hold. A keydown-based target
+        // can therefore fire LMB while the attacker is still recovering.
+        if (returnTiming) {
+          const secondRelease = (attackerState.keyTransitions ?? [])
+            .filter((event) => event.code === "KeyE"
+              && event.type === "keyup"
+              && Number.isFinite(event.epochMs)
+              && event.epochMs >= attemptIssuedAt).at(-1);
+          if (!secondRelease) {
+            throw new Error(`M111 accepted guard break lacked genuine second KeyE release epoch: ${JSON.stringify(attackerState.keyTransitions)}`);
+          }
+          secondHeavyIssuedAt = secondRelease.epochMs;
+        }
         finalEvidence = states;
         break;
       }
@@ -9104,12 +9118,13 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
-  // Time the one genuine click from the accepted second-heavy request.
-  // Heavy windup + active + recovery is 840ms. The former 800ms click could
-  // release during authoritative heavy recovery, which DOES NOT buffer light
-  // attacks; the real 10ms W3C click was correctly ignored by the server.
-  // Schedule 60ms after the unchanged recovery boundary, still early enough
-  // for 135ms light windup to hit inside the defender's heavy guard-break stun.
+  // Time the one genuine click from the second heavy's actual trusted KeyE
+  // RELEASE epoch, not its earlier KeyE DOWN. This original release-only heavy
+  // commits 320ms windup + 100ms active + 420ms recovery after KeyE UP.
+  // A keydown-based 840+60ms target can still fall inside real recovery when
+  // the physical KeyE hold lasted >60ms, producing no buffered light at all.
+  // Allow 60ms beyond unchanged recovery. Keep exactly one real 10ms W3C LMB,
+  // the real 135ms light windup and every original stun/HP/HIT predicate.
   // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
   const firstClickTargetMs = COMBAT.heavyAttack.windupMs
