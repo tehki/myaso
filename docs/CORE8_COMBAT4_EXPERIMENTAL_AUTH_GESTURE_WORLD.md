@@ -113,3 +113,35 @@ integration/release writer. **NO MAIN MERGE / PUBLIC PROTOCOL / DEPLOY / GO.**
   cluster-zone globally fenced epoch. Production approval still requires
   cross-department 8A/8B/8C explicit sign-off, original strict M-series,
   multi-host and Main single-writer release gates.
+
+
+## Four simultaneously admitted ORIGINAL Rust QUIC sessions — 2026-10-23
+
+Dedicated strict nonrelease original-server integration test
+\`server/tests/prealpha_four_real_quic_gesture_seats.rs\` spawns a genuine
+isolated loopback Rust game server with \`MYASO_MAX_PLAYERS=4\` and v2 lab
+explicitly opted in. It opens **four separate wtransport client endpoints**
+with separate native UDP sockets and **server-pinned real TLS**, each real
+connection opening the original game bidi stream then a separate client
+uni-stream carrying precisely the canonical 8-byte version grant hello.
+Each receives its OWN accepted reliable v2 negotiation grant.
+
+All four independent current QUIC leases send original \`02 11\` source0
+PRESS(seq1,id1) and matching RELEASE(seq2,id1), proving a lease-scoped
+identity means **the same sequence/gesture ID across different actors is not
+a collision**. All eight ACKs are original Rust server \`02 12\` with
+actual nonzero World ticks; no packet can name its fighter. Server read-only
+original \`M201_AUTH_ACTION\` confirms **fighter1,2,3,4** each entered
+\`LightActive2\` from genuine original \`LightWindup1\` during their common
+World loop (not a mocked fixture). Actor life/boot epoch checks remain
+unchanged. A fifth independent real TLS client receives real server
+admission rejection, and all existing four continue delivering acknowledged
+Combat inputs afterward.
+
+This verifies **four genuine pinned QUIC sessions and server-owned World
+combat state**, **NOT** four separate physical hosts, live human accounts,
+four independent graphical browsers, or guaranteed multi-client HP damage
+in a shared visual arena. The one-browser Chromium physical pointer test
+still exists separately; KeyE source1, UI10 original-game event ownership
+and complete loss/retransmit browser integration remain pending. Full
+original protected Combat M107/M193/M194 are independent mandatory gates.\n
