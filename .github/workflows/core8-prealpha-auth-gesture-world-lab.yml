@@ -12,6 +12,10 @@ on:
       - "server/tests/prealpha_boot_nonce_authority.rs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
+      - "scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "src/network/prealpha-shared-source-allocator-proposal.mjs"
       - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
   workflow_dispatch:
 
@@ -40,5 +44,9 @@ jobs:
           google-chrome --version
           chromedriver --version
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_quic_gesture_lab.mjs
+      - name: Genuine Chromium W3C LMB and KeyE through ONE original Core8A typed outbox to Rust World
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
