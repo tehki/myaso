@@ -1618,6 +1618,22 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     throw new Error(`M121 directional light incomplete evidence: ${JSON.stringify(evidence)}`);
   }
 
+  // M121 read-only native proof: original physical strafe/LMB,
+  // 30Hz v1 sender flags and replicated authoritative World actions.
+  // Original strict LEFT SWEEP assertions below remain unmodified.
+  console.log("M121_DIRECTIONAL_INPUT_PROVENANCE " + JSON.stringify({
+    attackerNetId: attackerResult.playerNetId,
+    defenderNetId: defenderResult.playerNetId,
+    physicalKeyTransitions: attackerResult.keyTransitions,
+    physicalPointerTransitions: attackerResult.pointers,
+    originalThirtyHzSamples: attackerResult.acceptance?.inputSubmissions ?? [],
+    originalWorldOwnActions: attackerResult.acceptance?.ownActionTransitions ?? [],
+    originalWorldFocusActions: defenderResult.acceptance?.focusActionTransitions ?? [],
+    attackerEvents: attackerResult.eventTransitions,
+    defenderThreat: defenderResult.threatTransitions,
+    defenderRecovery: defenderResult.recoveryTransitions,
+    defenderHp: defenderResult.playerHp,
+  }));
   const lightDown = attackerResult.pointers.find((event) =>
     event.type === "pointerdown" && event.button === 0);
   const lightUp = attackerResult.pointers.find((event) =>
