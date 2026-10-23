@@ -35,7 +35,7 @@ async function wd(method,path,body) {
   if(!response.ok||result.value?.error) throw Error(method+" "+path+" "+JSON.stringify(result).slice(0,500));
   return result.value;
 }
-function initBrowser(endpoint,pin,moduleUrl,callback) {
+function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,callback) {
   (async()=>{
     const hash=new Uint8Array(pin.match(/../g).map(x=>parseInt(x,16)));
     const wt=new WebTransport(endpoint,{serverCertificateHashes:[{algorithm:"sha-256",value:hash}]});
@@ -66,7 +66,7 @@ function initBrowser(endpoint,pin,moduleUrl,callback) {
     const {ProposedSharedTypedGestureOutbox} = await import(moduleUrl);
     const token=Object.freeze({});
     const q=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:token});
-    const lab={acks:[],events:[],sent:[],errors:[],settlements:[],queue:null};
+    const lab={acks:[],events:[],sent:[],dropped:[],errors:[],settlements:[],queue:null};
     const writer=wt.datagrams.writable.getWriter();
     // Actual one shared Core8A typed outbox supplies ALL bytes and ids.
     // This lab is NOT the original game browser adapter or real authentication.
@@ -81,8 +81,25 @@ function initBrowser(endpoint,pin,moduleUrl,callback) {
           throw Error("new independent edge not first-scheduled in shared queue");
         lab.sent.push({source:packet.source,action:packet.action,
           sequence:packet.sequence,gestureId:packet.gestureId,attempt:packet.attempt});
-        void writer.write(packet.bytes).catch(e=>lab.errors.push(String(e)));
+        // Negative loss lab: packet seq1 is physically emitted by the real
+        // Core8A queue, but the transport intentionally discards its first
+        // datagram. It must stay pending for the queue's genuine resend.
+        if(dropFirstPress && packet.sequence===1 && packet.attempt===1) {
+          lab.dropped.push({sequence:packet.sequence,source:packet.source,
+            gestureId:packet.gestureId,attempt:packet.attempt});
+        } else {
+          void writer.write(packet.bytes).catch(e=>lab.errors.push(String(e)));
+        }
       } catch(e) {lab.errors.push(String(e));}
+    };
+    lab.resendOne=async()=>{
+      const [packet]=q.nextSendBatch(1);
+      if(!packet)throw Error("expected bounded in-order retry, queue was empty");
+      lab.sent.push({source:packet.source,action:packet.action,
+        sequence:packet.sequence,gestureId:packet.gestureId,attempt:packet.attempt});
+      await writer.write(packet.bytes);
+      return {sequence:packet.sequence,gestureId:packet.gestureId,
+        source:packet.source,attempt:packet.attempt};
     };
     const incoming=wt.datagrams.readable.getReader();
     void (async()=>{
@@ -164,7 +181,8 @@ try {
   await wd("POST",base+"/url",{url:"http://127.0.0.1:"+httpPort+"/"});
   const boot=await wd("POST",base+"/execute/async",{
     script:"("+initBrowser.toString()+").apply(null,arguments)",args:[info.url,info.pin,
-      "http://127.0.0.1:"+httpPort+"/src/network/prealpha-lmb-gesture-outbox-proposal.mjs"],
+      "http://127.0.0.1:"+httpPort+"/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
+      process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1"],
   });
   assert(boot.ok,JSON.stringify(boot));
   // One real WebDriver action schedule: physical pointerDOWN is ordered
@@ -189,9 +207,44 @@ try {
       {type:"pause",duration:0},
     ],
   }]});
+  const lossTest=process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1";
+  if(lossTest) {
+    // Actual W3C edges have all been placed on the ONE real sender queue.
+    // Only seq1 was deliberately lost; seq2-4 reached the actual Rust QUIC
+    // listener *before* seq1. The server must withhold their ACK and avoid
+    // any premature original World action until the missing PRESS returns.
+    await pause(140);
+    const before=await wd("POST",base+"/execute/sync",{
+      script:"return {acks:window.lab.acks, sent:window.lab.sent, dropped:window.lab.dropped, snapshot:window.lab.snapshot};",
+      args:[],
+    });
+    assert.deepEqual(before.dropped,[{sequence:1,source:0,gestureId:1,attempt:1}]);
+    assert.equal(before.acks.length,0,"future KeyE/LMB cannot be ACKed ahead of lost LMB PRESS");
+    assert.equal(before.snapshot.pending,4,"all four independently sourced W3C edges must remain pending");
+    assert(!output.includes("fighter=1 from=1 to=2"),
+      "no original LightActive without the authenticated missing LMB PRESS");
+    // Only the real Core8A queue decides which edge is retried. The driver
+    // never reconstructs packets or assigns sequence/source/gesture IDs.
+    for(let sequence=1;sequence<=4;sequence++) {
+      const retry=await wd("POST",base+"/execute/async",{
+        script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
+        args:[],
+      });
+      assert.equal(retry.sequence,sequence,
+        "ordered retransmission MUST come from original pending Core8A outbox");
+      assert.equal(retry.attempt,2,"each canonical edge is retried exactly once");
+      await poll("real World ACK after Core8A retry seq"+sequence,async()=>{
+        const ack=await wd("POST",base+"/execute/sync",{
+          script:"return window.lab.acks.find(x=>x.sequence===arguments[0])||null;",
+          args:[sequence],
+        });
+        return {ok:ack?.status===1,ack};
+      });
+    }
+  }
   const accepted=await poll("native shared typed outbox → genuine World light",async()=>{
     const x=await wd("POST",base+"/execute/sync",{
-      script:"return {acks:window.lab?.acks,events:window.lab?.events,sent:window.lab?.sent,errors:window.lab?.errors,settlements:window.lab?.settlements,snapshot:window.lab?.snapshot};",
+      script:"return {acks:window.lab?.acks,events:window.lab?.events,sent:window.lab?.sent,dropped:window.lab?.dropped,errors:window.lab?.errors,settlements:window.lab?.settlements,snapshot:window.lab?.snapshot};",
       args:[],
     });
     return {...x,ok:x.acks?.length===4 && x.snapshot?.pending===0
@@ -202,8 +255,10 @@ try {
     ["lmbDown","keyDown","keyUp","lmbUp"]);
   assert.equal(accepted.events[0].id,accepted.events[3].id);
   assert(accepted.events.slice(1,3).every(x=>x.trusted),"genuine W3C physical KeyE required");
-  assert.deepEqual(accepted.sent.map(x=>[x.sequence,x.gestureId,x.source,x.action]),
+  assert.deepEqual(accepted.sent.filter(x=>x.attempt===1).map(x=>[x.sequence,x.gestureId,x.source,x.action]),
     [[1,1,0,1],[2,2,1,1],[3,2,1,3],[4,1,0,3]]);
+  assert.deepEqual(accepted.sent.filter(x=>x.attempt===2).map(x=>x.sequence),
+    lossTest?[1,2,3,4]:[]);
   assert.deepEqual(accepted.acks.map(x=>[x.sequence,x.gestureId,x.source,x.status]).sort((a,b)=>a[0]-b[0]),
     [[1,1,0,1],[2,2,1,1],[3,2,1,1],[4,1,0,1]]);
   assert(accepted.settlements.every(x=>x.transportSettled&&!x.combatCommitted));
@@ -212,8 +267,10 @@ try {
   assert(!output.includes("fighter=1 from=9 to=10"),
     "BUSY KeyE must not create a phantom standalone heavy");
   assert.equal(accepted.errors.length,0);
-  console.log("CORE8_NATIVE_ONE_SHARED_OUTBOX_WORLD_PASS",JSON.stringify({
+  console.log(lossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_LOSS_REPLAY_PASS":
+    "CORE8_NATIVE_ONE_SHARED_OUTBOX_WORLD_PASS",JSON.stringify({
     actualChromeW3C:true,actualQUIC:true,actualCore8AOutbox:true,
+    lossTest,dropped:accepted.dropped,
     events:accepted.events.map(x=>x.name),sent:accepted.sent,acks:accepted.acks,
     snapshot:accepted.snapshot,
     worldAction:output.split("\n").find(x=>x.includes("M201_AUTH_ACTION")&&x.includes("fighter=1 from=1 to=2")),
