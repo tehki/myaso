@@ -189,3 +189,34 @@ Human/account player-seat authentication beyond ephemeral trusted QUIC
 session, Core8C true zone owner fencing, 2–4 separate real physical
 browser hosts, all original Combat M-series protected CI and orchestrator
 GO. No main merge, staging, public endpoint, deploy or restart.
+
+
+## Shared source0/source1 gap fence, 23 October review update
+
+**Core 8 P0 bug fixed in draft only:** a transport-reordered KeyE PRESS with
+global sequence 3 previously could arrive before valid older LMB PRESS
+sequence 1 and RELEASE sequence 2, advance the lease's accepted sequence,
+then irreversibly STALE the real physical source0 gesture. The converse
+source0-after-lost-KeyE sequence has the same failure. Under the **existing
+original authoritative World lock**, v2 admission now withholds ACK for
+a valid typed event with a sequence greater than the current globally accepted
+sequence plus one. This never mutates World, advances gesture timers or
+creates fake HIT; the one bounded Core 8A outbox must retransmit the missing
+earlier event. Existing duplicate/tamper/source1 ownership checks still
+apply. New genuine original World integration tests use both orderings and
+prove exactly one legal 34HP LMB plus one 46HP KeyE hit after retransmission.
+
+**IMPORTANT CROSS-DEPARTMENT INCOMPATIBILITY — DO NOT MERGE EITHER BEHAVIOR
+UNREVIEWED:** Core8A sibling draft PR #858 models standalone KeyE heavy as
+auto-committing when World finishes the original 320ms windup, treating
+KeyE RELEASE/CANCEL as noncommitting acknowledgements. This PR #855 models
+KeyE as deliberate **release-only heavy**, with early release/CANCEL a
+nonhitting abort. Both agree original LMB light 135ms and held LMB 320ms
+READY then RELEASE-only. The owner and Combat4 must explicitly choose
+**the standalone KeyE game rule**, with physical W3C test and canonical
+UI10 behavior, before Main combines these mutually incompatible branches.
+Original v1 KeyE remains untouched in both drafts.
+
+This source-only experimental repair does NOT show the original UI10 source0/
+source1 browser outbox is enabled, four independently operated humans,
+or that unchanged protected Combat M193/M194 gate passed.

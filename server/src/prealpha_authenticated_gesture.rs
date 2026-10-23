@@ -98,6 +98,15 @@ impl SessionGestureWorldPath {
             self.retire();
             AckStatus::Stale
         } else {
+            // Even if each event has a valid source and lease, a newer
+            // KeyE/LMB PRESS can overtake an older source's lost PRESS.
+            // Without a single shared consecutive sequence fence, the new
+            // event would permanently stale that legitimate older action.
+            // Withhold its receipt so the ONE bounded Core8A sender can
+            // retransmit the earlier edge. Never grant World authority here.
+            if event.sequence > self.authority.highest_accepted_sequence().saturating_add(1) {
+                return None;
+            }
             // An earlier one-hit World action must finish before new PRESS.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
             if event.action == crate::prealpha_lmb_gesture_proposal::GestureAction::Press

@@ -103,6 +103,12 @@ impl GestureAuthority {
         self.phase
     }
 
+    /// One global monotonic accepted sequence across both typed sources.
+    /// The ingress uses this only while it owns the original World lock.
+    pub fn highest_accepted_sequence(&self) -> u32 {
+        self.highest_sequence
+    }
+
     pub fn process(&mut self, lease: u64, event: GestureEvent, server_ms: u64) -> Decision {
         self.process_typed(lease, GestureSource::Lmb, event, server_ms)
     }
