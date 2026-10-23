@@ -1,0 +1,60 @@
+name: Graphics3C x Graphics3A original Silver Arena Lite four-native proof
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/graphics3c-arena-lite-silver-four-native.yml"
+      - "web/online-game.mjs"
+      - "src/browser/prealpha-arena-lite-floor.mjs"
+      - "src/browser/prealpha-arena-lite-selection.mjs"
+      - "tools/art/verify_prealpha_arena_lite_silver_four_native.mjs"
+      - "tests/prealpha-arena-lite-*.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-silver-and-terrain:
+    name: original Rust four W3C Chrome Firefox Silver + terrain
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact PR source, not synthesized merge tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact original Silver and terrain code and hash pins
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --check
+          node --check web/online-game.mjs
+          node --check tools/art/verify_prealpha_arena_lite_silver_four_native.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-arena-lite-floor.test.mjs tests/prealpha-arena-lite-optin.test.mjs
+      - name: Verify real browser drivers and toolchain
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          cargo --version
+      - name: Four actual Rust QUIC players, authentic Silver atlas draws, two Lite and two default grid
+        env:
+          MYASO_ARENA_LITE_CARGO_OFFLINE: "0"
+          MYASO_ARENA_LITE_NATIVE_BROWSERS: "chrome,firefox,chrome,firefox"
+          MYASO_ARENA_LITE_NATIVE_OUT: "artifacts/arena-lite-silver-four-native"
+          MYASO_ARENA_LITE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p artifacts/arena-lite-silver-four-native
+          timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_prealpha_arena_lite_silver_four_native.mjs
+      - name: Preserve original unretouched four W3C PNGs, SHA manifest and timings
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3c-3a-real-four-silver-arena-lite-native
+          path: artifacts/arena-lite-silver-four-native/*
+          if-no-files-found: ignore
+          retention-days: 7
