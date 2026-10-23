@@ -167,7 +167,9 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (!(event.buttons & 1)) leftButtonCharge.cancel(event.pointerId);
+  if (Number.isInteger(event.pointerId) && !(event.buttons & 1)) {
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
