@@ -338,7 +338,9 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (!reviewedGestureLab && event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  if (!reviewedGestureLab) {
+    if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  }
   if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;

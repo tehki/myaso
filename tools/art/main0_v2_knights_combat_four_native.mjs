@@ -150,10 +150,10 @@ try{
  const attacker=actors[0].s;
  const worldAction=(from,to)=>{
    const re=new RegExp("M201_AUTH_ACTION tick=\\d+ fighter=1 from="+from+" to="+to);
-   return readAuthoritativeWorld().split("\\n").find(line=>re.test(line));
+   return readAuthoritativeWorld().split("\n").find(line=>re.test(line));
  };
  const baseline=await waitFor(()=>{
-   const line=readAuthoritativeWorld().split("\\n").find(line=>/M201_FLIGHT_ACTOR_BASELINE tick=\d+ fighter=1 action=0/.test(line));
+   const line=readAuthoritativeWorld().split("\n").find(line=>/M201_FLIGHT_ACTOR_BASELINE tick=\d+ fighter=1 action=0/.test(line));
    return line||false;
  },12000);
  assert(baseline,"trusted first-seen original World Idle0 baseline");
@@ -171,7 +171,7 @@ try{
  });
  const heavy=await waitFor(()=>worldAction(9,10),12000);
  const heavyReturnedIdle=await waitFor(()=>{
-   const lines=readAuthoritativeWorld().split("\\n");
+   const lines=readAuthoritativeWorld().split("\n");
    const after=lines.findIndex(line=>line===heavy);
    return after>=0 && lines.slice(after+1).find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
  },14000);
@@ -190,7 +190,7 @@ try{
    actions:[{type:"pointer",id:"real-original-lmb",parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
  });
  const lightActive=await waitFor(()=>worldAction(1,2),12000);
- const honestWorldHits=readAuthoritativeWorld().split("\\n")
+ const honestWorldHits=readAuthoritativeWorld().split("\n")
   .filter(line=>/M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
  assert.ok(honestWorldHits.some(line=>/damage=46(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 46 HP heavy strike against an independent fighter");

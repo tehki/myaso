@@ -104,7 +104,7 @@ test("original player-facing online client mutually excludes legacy v1 attack wr
  assert.match(game,/if \(gestureLabRequested && !reviewedGestureLab\)/);
  assert.match(game,/currentInput\.attack = !reviewedGestureLab &&/);
  assert.match(game,/currentInput\.heavyAttack = !reviewedGestureLab &&/);
- assert.match(game,/if \(!reviewedGestureLab && event\.code === "KeyE"/);
+ assert.match(game,/if \(!reviewedGestureLab\) \{[\s\S]{0,100}if \(event\.code === "KeyE"/);
  assert.match(game,/onExperimentalGestureAck\(bytes, lease\)/);
  assert.match(game,/await activateLoopbackGestureLab\(/);
  assert.match(game,/if \(reviewedGestureLab\) return; \/\/ v2 capture owns edge/);
