@@ -76,6 +76,10 @@ pub struct GestureAuthority {
     phase: Phase,
     active_id: Option<u32>,
     active_source: Option<GestureSource>,
+    // One distinct physically held source can arrive while World is already
+    // executing the other. Admit and tombstone its edges without World damage.
+    // This is NOT another active combat action or an actor authorization.
+    busy_source: Option<(GestureSource, u32)>,
     highest_gesture_id: u32,
     highest_sequence: u32,
     press_ms: u64,
@@ -91,6 +95,7 @@ impl GestureAuthority {
             phase: Phase::Idle,
             active_id: None,
             active_source: None,
+            busy_source: None,
             highest_gesture_id: 0,
             highest_sequence: 0,
             press_ms: 0,
@@ -158,6 +163,37 @@ impl GestureAuthority {
             return Decision::rejected();
         }
         let command = match event.action {
+            // One globally sequenced, independently identified source can be
+            // physically pressed while the other source owns the combat action.
+            // Its PRESSED/terminal edges are still real transport inputs and
+            // must not fatally retire the shared Core8A outbox. Retire them as
+            // no-combat events, not as a second attack or a fabricated hit.
+            GestureAction::Press
+                if self.active_id.is_some()
+                    && self.active_source != Some(source)
+                    && self.busy_source.is_none()
+                    && event.gesture_id > self.highest_gesture_id =>
+            {
+                self.busy_source = Some((source, event.gesture_id));
+                self.highest_gesture_id = event.gesture_id;
+                Command::None
+            }
+            // A real held LMB may UPGRADE while the independent KeyE is the
+            // only World attack. ACK this ordered input without changing the
+            // KeyE-owned World or upgrading it to an accidental second heavy.
+            // UI10 shares ONE fatal-on-REJECTED outbox for both sources.
+            GestureAction::Upgrade
+                if source == GestureSource::Lmb
+                    && self.busy_source == Some((source, event.gesture_id)) =>
+            {
+                Command::None
+            }
+            GestureAction::Release | GestureAction::Cancel
+                if self.busy_source == Some((source, event.gesture_id)) =>
+            {
+                self.busy_source = None;
+                Command::None
+            }
             GestureAction::Press
                 if self.phase == Phase::Idle && event.gesture_id > self.highest_gesture_id =>
             {
