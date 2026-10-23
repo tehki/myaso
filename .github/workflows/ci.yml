@@ -20,7 +20,9 @@ jobs:
   quality:
     name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Original mandatory native browser matrix consumes most of 30 minutes;
+    # preserve M8 capacity + whitespace gates rather than terminating mid-probe.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
