@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
 import {ORIGINAL_RED_LION_ART,ORIGINAL_RED_LION_WORLD_ANCHOR,
- createOriginalRedLionLiveArt,drawScreenLayerInZoomedGame} from "../src/browser/red-lion-live-art.mjs";
+ createOriginalRedLionLiveArt,drawScreenLayerInZoomedGame,redLionActorHudVisible} from "../src/browser/red-lion-live-art.mjs";
 
 const artRoot=new URL("../assets/environment/greyhaven/a232-review/",import.meta.url);
 const src=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
@@ -79,6 +79,19 @@ test("World source owns depth and only local Red Lion footprint can be behind",a
  assert.equal(h.value.behindFacade({x:99999,y:4000}),false);
  assert.equal(h.value.behindFacade({x:4365,y:NaN}),false);
 });
+test("Red Lion facade occludes remote HUD only when the image frame is ready",async()=>{
+ const h=build();
+ const behind={netId:2,x:4365,y:4040},front={netId:3,x:4365,y:4075};
+ assert.equal(redLionActorHudVisible(null,null,behind),true);
+ assert.equal(await h.value.load(),true);
+ const frame=h.value.prepare({x:4365,y:4075},960,540,.84);
+ assert.ok(frame);
+ assert.equal(redLionActorHudVisible(h.value,frame,behind),false);
+ assert.equal(redLionActorHudVisible(h.value,frame,front),true);
+ assert.equal(redLionActorHudVisible(h.value,frame,{netId:4,x:5300,y:4040}),true);
+ assert.deepEqual([behind,front].filter(x=>redLionActorHudVisible(h.value,frame,x)).map(x=>x.netId),[3]);
+ assert.equal(redLionActorHudVisible(h.value,null,behind),true);
+});
 test("incorrect original WebP SHA causes fail-closed and NO canonical World replacement",async()=>{
  const h=build({badHash:true});
  assert.equal(await h.value.load(),false);
@@ -113,6 +126,9 @@ test("non-optin Combat runtime remains verbatim default, optin requires BOTH wor
  assert.match(qa,/const defaultWorld=createAuthoredWorldRenderer\(\);/);
  assert.doesNotMatch(qa,/createAuthoredWorldRenderer\(\{buildLimit:8\}\)/);
  assert.match(src,/redLionActorsInFront/);
+ assert.match(src,/redLionActorHudVisible\(originalRedLionArt,redLionFrame,sampled\)/);
+ assert.match(src,/if \(remoteVisibleAboveFacade\) visibleEnemyPositions\.push\(sampled\)/);
+ assert.match(src,/if \(redLionFrame && remoteVisibleAboveFacade\)/);
  assert.match(src,/originalRedLionArt.behindFacade/);
  assert.doesNotMatch(src,/sendTryPickup\(|grantSword\(|teleport.*RedLion/i);
 });

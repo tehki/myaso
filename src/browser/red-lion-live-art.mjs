@@ -33,6 +33,14 @@ export function drawScreenLayerInZoomedGame(ctx,canvas,w,h,z){
  }finally{ctx.restore()}
 }
 
+// When the original building facade actually covers a world actor, its name,
+// vitals and offscreen HUD marker must not appear THROUGH the opaque tavern.
+// The original Combat arena or a failed detailed-art frame returns the EXACT
+// unfiltered indicator behavior. This is presentation only; no actor state edit.
+export function redLionActorHudVisible(art,redLionFrame,actor){
+ return !redLionFrame || !art.behindFacade(actor);
+}
+
 // Deliberate default opt-in contract: no assets downloaded unless ?world=1&redlion=1.
 // After a missing/corrupt original source, only the unchanged World renderer remains.
 export function createOriginalRedLionLiveArt({

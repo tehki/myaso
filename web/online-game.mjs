@@ -13,7 +13,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
-import { createOriginalRedLionLiveArt, drawScreenLayerInZoomedGame } from "../src/browser/red-lion-live-art.mjs";
+import { createOriginalRedLionLiveArt, drawScreenLayerInZoomedGame, redLionActorHudVisible } from "../src/browser/red-lion-live-art.mjs";
 import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -931,12 +931,15 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    // Keep all remote sprites for the screen-space HUD pass. The offscreen
-    // pointer helper excludes dead fighters on its own.
-    visibleEnemyPositions.push(sampled);
+    // Do not reveal a genuine actor through the opaque tavern using remote
+    // nameplates/vitals or the offscreen marker AFTER its body is occluded.
+    // Without a successfully staged optional Red Lion frame, the original
+    // arena/HUD list and all Combat pixel paths are unchanged.
+    const remoteVisibleAboveFacade = redLionActorHudVisible(originalRedLionArt,redLionFrame,sampled);
+    if (remoteVisibleAboveFacade) visibleEnemyPositions.push(sampled);
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
     const recoveryTell = entity.netId === recoveryFocusNetId;
-    if (redLionFrame && !originalRedLionArt.behindFacade(sampled)) {
+    if (redLionFrame && remoteVisibleAboveFacade) {
       redLionActorsInFront.push({sampled,damageTell,recoveryTell});
     } else {
       drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);

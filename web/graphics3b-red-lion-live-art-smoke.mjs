@@ -1,4 +1,4 @@
-import {createOriginalRedLionLiveArt} from "../src/browser/red-lion-live-art.mjs";
+import {createOriginalRedLionLiveArt,redLionActorHudVisible} from "../src/browser/red-lion-live-art.mjs";
 import {createAuthoredWorldRenderer} from "../src/browser/authored-world-renderer.mjs";
 import {MAP_IDS} from "../src/world/authored-maps.mjs";
 const w=640,h=640,z=.84;
@@ -32,7 +32,17 @@ try{
   if(aa[i]!==bb[i]||aa[i+1]!==bb[i+1]||aa[i+2]!==bb[i+2])changed++;
   if(aa[i+3]!==bb[i+3])changedAlpha++;
  }
+ // World9 depth-point browser probes, NOT manufactured Rust player snapshots.
+ // They certify that the presentational HUD path cannot reveal names/vitals
+ // when an authored, opaque facade would cover a real replicated fighter.
+ const sourceDepthProbe=Object.freeze({
+  nonOptinPreservesHud:redLionActorHudVisible(art,null,{x:4365,y:4040}),
+  behindFacadeOccluded:!!frame&&!redLionActorHudVisible(art,frame,{x:4365,y:4040}),
+  frontThresholdVisible:!!frame&&redLionActorHudVisible(art,frame,{x:4365,y:4075}),
+  outsideFootprintVisible:!!frame&&redLionActorHudVisible(art,frame,{x:5300,y:4040})
+ });
  const outcome=Object.freeze({
+  sourceDepthProbe,
   ready:true,sourceArtState:art.state().phase,originalSourceHashValidated:!!frame,
   canonicalReplacement:!!frame,changedRgb:changed,changedAlpha,
   unchangedWorldFallback:!frame && changed===0,worldReplaceOnlyRedLion:true,

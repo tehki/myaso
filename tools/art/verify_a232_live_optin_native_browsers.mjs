@@ -61,6 +61,10 @@ async function sourceCases(browser,page){
   }
   assert.ok(report?.ready, browser.name+" "+choice+" first-party browser smoke failed "+JSON.stringify(report));
   const accepted=choice==="normal"||choice==="pan";
+  assert.equal(report.sourceDepthProbe.nonOptinPreservesHud,true);
+  assert.equal(report.sourceDepthProbe.behindFacadeOccluded,accepted);
+  assert.equal(report.sourceDepthProbe.frontThresholdVisible,accepted);
+  assert.equal(report.sourceDepthProbe.outsideFootprintVisible,accepted);
   assert.equal(report.actualCameraPan,choice==="pan");
   assert.equal(report.cameraX,choice==="pan"?4465:4365);
   assert.equal(report.cameraY,choice==="pan"?4115:4075);

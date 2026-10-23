@@ -16,6 +16,20 @@ The new opt-in render loop stages the original World replacement and original fa
 
 The real game still has original authoritative physics, packet validation, collision, old portal/entrance, item state and Sound/Combat model. There is no attempt to activate entry transitions or signed swords. This source is ART-SCOPED, not promoted or advertised as a finished four-machine First Playable. Even though offscreen source frames are staged, the final visible destination drawImage can still fail, and this draft does not claim device-loss transactional recovery.
 
+### Opaque facade versus remote indicators
+
+At the authentic Red Lion World9 footprint, a remote fighter painted behind the
+original facade must not have screen-space health/name labels or offscreen pointers
+repainted over the tavern roof. The optional live-render path now applies the SAME
+World9 depth classification to the original shared `visibleEnemyPositions` HUD
+and marker input, while keeping original authoritative actor data, animations,
+HUD for visible actors and all default Combat arena frames untouched. In a
+missing or invalid source-frame case the original HUD list remains unchanged.
+Unit tests exercise exactly this split. Native Chrome and Firefox examine
+source-depth coordinate probes inside the real browser original-renderer smoke;
+these probes are NOT server-admitted multiplayer actors. Actual 4-player
+Rust/WebTransport around the Red Lion still requires independent acceptance.
+
 ## Test scope & future acceptance
 
 - Source SHA256-pinned directly from original Blender #810, includes frozen byte-identical roof
