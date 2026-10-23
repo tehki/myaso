@@ -405,28 +405,63 @@ fn earlier_held_lmb_cannot_be_pressed_again_during_newer_keye_world_action() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 2, 2),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            2,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
 
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 3, 3),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            3
+        ),
         AckStatus::Rejected,
         "independent KeyE World ownership must not release earlier held LMB"
     );
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 3, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 20)]);
