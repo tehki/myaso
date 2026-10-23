@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moon Games — Arena Lite source-art review</title>
+<style>
+:root{color-scheme:dark;background:#15130f;color:#e8dcc7;font:14px ui-sans-serif,system-ui,sans-serif}
+body{margin:0;padding:24px;max-width:1150px;margin-inline:auto}
+h1{font-size:26px;margin:0 0 10px}p{line-height:1.55;max-width:970px}
+main{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+section{min-width:0;padding:10px;border:1px solid #5a4e39;border-radius:8px;background:#241f19}
+h2{font-size:15px;margin:4px 0 12px}canvas{display:block;width:100%;height:auto;aspect-ratio:16/9}
+code{font-family:ui-monospace,monospace}
+small{color:#b3a891}
+@media(max-width:750px){main{grid-template-columns:1fr}body{padding:12px}}
+</style></head><body>
+<h1>🌕⚔️ Arena Lite — Graphics 3C floor candidate</h1>
+<p><strong>PREVIEW ONLY — NOT THE CURRENT GAME.</strong> Both panels are actual native Canvas draws from checked-in source. No players, networking, buildings, world physics or gameplay claims. The left panel recreates the original arena floor exactly; the right shows a proposed deterministic, once-painted packed-earth/cobblestone replacement. The default online arena remains unchanged. A separate draft game client accepts the explicit <code>?arenaLite=1</code> visual opt-in.</p>
+<main>
+<section><h2>Original Pre-Alpha grid (unchanged live default)</h2><canvas id="original" width="960" height="540"></canvas></section>
+<section><h2>Graphics 3C Arena Lite floor (draft-game opt-in only)</h2><canvas id="candidate" width="960" height="540"></canvas></section>
+</main>
+<p><small>Technical: opaque Canvas 960×540, fixed deterministic seed, no animation or draw-loop; the live client now imports this source strictly behind <code>?arenaLite=1</code>, with the original default preserved. Art review is not release approval.</small></p>
+<output id="status" role="status">Loading local source…</output>
+<script type="module">
+import {paintArenaLiteFloor} from "../src/browser/prealpha-arena-lite-floor.mjs";
+const first=document.querySelector("#original"),layer=first.getContext("2d",{alpha:false});
+layer.fillStyle="#1c1913";layer.fillRect(0,0,first.width,first.height);
+layer.strokeStyle="rgba(214, 195, 148, .065)";layer.lineWidth=1;
+for(let x=0;x<=first.width;x+=48){layer.beginPath();layer.moveTo(x,0);layer.lineTo(x,first.height);layer.stroke();}
+for(let y=0;y<=first.height;y+=48){layer.beginPath();layer.moveTo(0,y);layer.lineTo(first.width,y);layer.stroke();}
+layer.strokeStyle="rgba(214, 195, 148, .22)";layer.lineWidth=3;
+layer.strokeRect(12,12,first.width-24,first.height-24);
+const review=document.querySelector("#candidate");
+paintArenaLiteFloor(review.getContext("2d",{alpha:false}));
+document.body.dataset.reviewReady="true";
+document.querySelector("#status").textContent="Source-art review ready (no gameplay enabled).";
+</script></body></html>
