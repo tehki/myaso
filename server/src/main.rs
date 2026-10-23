@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
-    prealpha_authenticated_gesture::{is_v2_event, SessionGestureWorldPath},
+    prealpha_authenticated_gesture::{is_v2_event, new_server_boot_nonce, SessionGestureWorldPath},
     prealpha_lmb_gesture_proposal::encode_ack,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
@@ -108,6 +108,7 @@ enum ReliablePayload {
 
 struct GameState {
     world: World,
+    boot_nonce: u128,
     gesture_sessions: BTreeMap<u64, SessionGestureWorldPath>,
     replication_frame: Arc<ReplicationFrame>,
     flight_background_ids: Vec<u32>,
@@ -140,6 +141,7 @@ impl GameState {
         ));
         Self {
             world,
+            boot_nonce: 0,
             gesture_sessions: BTreeMap::new(),
             replication_frame,
             flight_background_ids,
@@ -215,12 +217,11 @@ struct SharedGame {
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig) -> Arc<Self> {
+    fn new(flight: LoopbackFlightConfig, boot_nonce: u128) -> Arc<Self> {
+        let mut state = GameState::new(flight.background_players, flight.near_pressure_players);
+        state.boot_nonce = boot_nonce;
         Arc::new(Self {
-            state: Mutex::new(GameState::new(
-                flight.background_players,
-                flight.near_pressure_players,
-            )),
+            state: Mutex::new(state),
             next_player_id: AtomicU32::new(1),
             next_lease_epoch: AtomicU64::new(1),
             reliable_write_delay: flight.reliable_write_delay,
@@ -291,7 +292,6 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
-    let game = SharedGame::new(flight);
     // No account authentication service exists for this temporary arena.
     // The experiment is session-assigned, loopback-only, and default OFF.
     let v2_lab = match env::var("MYASO_EXPERIMENTAL_GESTURE_V2").as_deref() {
@@ -302,6 +302,10 @@ async fn main() -> Result<()> {
     if v2_lab && !bind.ip().is_loopback() {
         bail!("experimental v2 gesture ingress is loopback-only");
     }
+    // Legacy v1 boot remains unchanged; only the explicit v2 lab requires OS
+    // CSPRNG. No entropy failure may accidentally block a disabled v1 game.
+    let boot_nonce = if v2_lab { new_server_boot_nonce()? } else { 0 };
+    let game = SharedGame::new(flight, boot_nonce);
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -548,10 +552,11 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         let GameState {
             world,
             gesture_sessions,
+            boot_nonce,
             ..
         } = &mut *state;
         for (epoch, gesture) in gesture_sessions.iter_mut() {
-            gesture.advance_under_world_lock(world, *epoch);
+            gesture.advance_under_world_lock(world, *epoch, *boot_nonce);
         }
         if flight_action_proof {
             for line in m201_flight_proof_lines(&state.world, &events, &mut previous_actions) {
@@ -662,13 +667,23 @@ async fn handle_connection(
             negotiation = connection.accept_uni(), if v2_lab && !v2_enabled => {
                 if let Ok(mut stream) = negotiation {
                     let mut hello = [0u8; 8];
-                    if let Ok(Ok(_)) = tokio::time::timeout(
+                    if let Ok(Ok(())) = tokio::time::timeout(
                         Duration::from_secs(1), stream.read_exact(&mut hello)
                     ).await {
-                        if hello == V2_LAB_HELLO && !legacy_combat_seen {
+                        // Complete the client-written FIN before releasing
+                        // RecvStream. Dropping immediately after read_exact
+                        // can send QUIC STOP_SENDING while Chrome's writer
+                        // awaits close, aborting an otherwise valid handshake.
+                        // Reject trailing data: exactly ONE 8-byte hello.
+                        let mut trailing = [0_u8; 1];
+                        let complete = matches!(
+                            tokio::time::timeout(Duration::from_secs(1), stream.read(&mut trailing)).await,
+                            Ok(Ok(None))
+                        );
+                        if complete && hello == V2_LAB_HELLO && !legacy_combat_seen {
                             let mut state = game.state.lock().await;
                             if let Some(path) = SessionGestureWorldPath::from_admitted_world(
-                                &state.world, player_id, lease_epoch
+                                &state.world, player_id, lease_epoch, state.boot_nonce
                             ) {
                                 state.gesture_sessions.insert(lease_epoch, path);
                                 v2_enabled = true;
@@ -687,9 +702,10 @@ async fn handle_connection(
                     // No await inside real World admission/Combat application.
                     let ack = {
                         let mut state = game.state.lock().await;
+                        let boot_nonce = state.boot_nonce;
                         state.gesture_sessions.remove(&lease_epoch).and_then(|mut path| {
                             let ack = path.accept_under_world_lock(
-                                &mut state.world, lease_epoch, datagram.as_ref()
+                                &mut state.world, lease_epoch, boot_nonce, datagram.as_ref()
                             );
                             state.gesture_sessions.insert(lease_epoch, path);
                             ack

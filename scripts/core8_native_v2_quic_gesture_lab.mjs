@@ -156,6 +156,11 @@ try {
     ack:accepted.acks,
     worldAction:output.split("\n").find(x=>x.includes("M201_AUTH_ACTION")&&x.includes("to=1")),
   }));
+} catch (error) {
+  console.error("CORE8_NATIVE_V2_FAILURE",JSON.stringify({
+    error:String(error),serverLog:output.slice(-3200),
+  }));
+  throw error;
 } finally {
   if(session)try{await wd("DELETE","/session/"+session);}catch{}
   for(const p of children)try{p.kill();}catch{}
