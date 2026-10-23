@@ -162,11 +162,14 @@ window.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) leftButtonCharge.cancel(event.pointerId);
+  // Match the active pointerId even when pointercancel reports button=-1.
+  leftButtonCharge.cancel(event.pointerId);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (!(event.buttons & 1)) leftButtonCharge.cancel(event.pointerId);
+  if (Number.isInteger(event.pointerId) && !(event.buttons & 1)) {
+    leftButtonCharge.cancel(event.pointerId);
+  }
 });
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();

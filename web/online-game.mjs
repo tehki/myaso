@@ -219,6 +219,9 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
+    // Only a new, identified LMB pointer may update this gesture's movement.
+    // Duplicate/foreign DOWN must not overwrite the active press direction.
+    if (!Number.isInteger(event.pointerId) || leftButtonCharge.isPressed()) return;
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
@@ -233,6 +236,8 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
+  // A foreign pointerUP must not reset another pointer's live LMB chord.
+  if (!leftButtonCharge.isActivePointer(event.pointerId)) return;
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
@@ -274,7 +279,9 @@ window.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) {
+  // Pointer cancellation may report button=-1. Guard the real pointer
+  // identity before clearing captured movement or ending its live charge.
+  if (leftButtonCharge.isActivePointer(event.pointerId)) {
     leftButtonDown = false;
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
@@ -282,9 +289,12 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.pointerId !== undefined && !(event.buttons & 1)) {
+  // Capture loss may report button=-1; only the matching, no-longer-down
+  // LMB pointer can clear its movement and Space+LMB reservation.
+  if (Number.isInteger(event.pointerId) && !(event.buttons & 1)
+    && leftButtonCharge.cancel(event.pointerId)) {
+    leftButtonDown = false;
     leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
   }
 });
 canvas.addEventListener("wheel", (event) => {

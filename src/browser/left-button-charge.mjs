@@ -62,6 +62,7 @@ export function createLeftButtonCharge({
   return Object.freeze({
     press, release, commitLight, cancel, progress,
     isPressed: () => pointer !== null,
+    isActivePointer: (pointerId) => pointer !== null && pointer === pointerId,
     isCharging: () => pointer !== null && !committed,
   });
 }
