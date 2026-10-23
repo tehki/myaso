@@ -1,0 +1,27 @@
+name: Main 0 original-QUIC gesture transport owner (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/network-transport.mjs"
+      - "tests/main0-v2-transport-owner.test.mjs"
+      - ".github/workflows/main0-v2-transport-owner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transport-owner-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check the real game transport source and exact-head regression
+        run: |
+          node --check web/network-transport.mjs
+          node --check tests/main0-v2-transport-owner.test.mjs
+          node --test tests/main0-v2-transport-owner.test.mjs
