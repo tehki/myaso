@@ -13,6 +13,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { createAuthoredWorldRenderer } from "../src/browser/authored-world-renderer.mjs";
+import { createOriginalRedLionLiveArt, drawScreenLayerInZoomedGame, redLionActorHudVisible } from "../src/browser/red-lion-live-art.mjs";
 import { MAP_IDS } from "../src/world/authored-maps.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -119,6 +120,11 @@ const diagnosticsVisible = params.get("netstats") === "1";
 // become functional only after server-approved zone transitions are implemented.
 const fixedWorldEnabled = params.get("world") === "1" && !params.has("scenario");
 const authoredWorld = fixedWorldEnabled ? createAuthoredWorldRenderer() : null;
+// Review-only Greyhaven opt-in, never Pre-Alpha default. Source WebPs must pass
+// byte SHA and decode before World 9 may suppress the one Red Lion placeholder.
+const originalRedLionArt = fixedWorldEnabled && params.get("redlion") === "1"
+  ? createOriginalRedLionLiveArt() : null;
+if (originalRedLionArt) void originalRedLionArt.load();
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
 if (diagnosticsPanel) diagnosticsPanel.hidden = !diagnosticsVisible;
@@ -903,10 +909,19 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-  if (authoredWorld && local.initialized) {
+  // Stage BOTH the canonical World replacement and the complete original
+  // facade offscreen. A missing/decode-failed asset leaves the original world
+  // presentation and all players completely unchanged on this render frame.
+  const redLionFrame = local.initialized ? originalRedLionArt?.prepare(
+    visualCameraPosition,canvas.width,canvas.height,ARENA_VIEW_ZOOM) : null;
+  if (redLionFrame) {
+    drawScreenLayerInZoomedGame(ctx,redLionFrame.world,
+      canvas.width,canvas.height,ARENA_VIEW_ZOOM);
+  } else if (authoredWorld && local.initialized) {
     authoredWorld.draw(ctx, MAP_IDS.overworld, visualCameraPosition,
       canvas.width, canvas.height, ARENA_VIEW_ZOOM);
   }
+  const redLionActorsInFront = redLionFrame ? [] : null;
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -916,14 +931,33 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    // Keep all remote sprites for the screen-space HUD pass. The offscreen
-    // pointer helper excludes dead fighters on its own.
-    visibleEnemyPositions.push(sampled);
+    // Do not reveal a genuine actor through the opaque tavern using remote
+    // nameplates/vitals or the offscreen marker AFTER its body is occluded.
+    // Without a successfully staged optional Red Lion frame, the original
+    // arena/HUD list and all Combat pixel paths are unchanged.
+    const remoteVisibleAboveFacade = redLionActorHudVisible(originalRedLionArt,redLionFrame,sampled);
+    if (remoteVisibleAboveFacade) visibleEnemyPositions.push(sampled);
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
     const recoveryTell = entity.netId === recoveryFocusNetId;
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
+    if (redLionFrame && remoteVisibleAboveFacade) {
+      redLionActorsInFront.push({sampled,damageTell,recoveryTell});
+    } else {
+      drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
+    }
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  const ownBehindRedLion = !!(redLionFrame && originalRedLionArt.behindFacade(local));
+  if (ownId && local.initialized && (!redLionFrame || ownBehindRedLion))
+    drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  if (redLionFrame) {
+    // World9 authorizes actor depth at the tavern. The source-art facade and
+    // roof cover only fighters BEHIND it; all other fighters stay in front.
+    drawScreenLayerInZoomedGame(ctx,redLionFrame.facade,
+      canvas.width,canvas.height,ARENA_VIEW_ZOOM);
+    for (const item of redLionActorsInFront)
+      drawFighterWorld(item.sampled, "#b96350", "#47251f", item.damageTell, item.recoveryTell);
+    if (ownId && local.initialized && !ownBehindRedLion)
+      drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  }
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
