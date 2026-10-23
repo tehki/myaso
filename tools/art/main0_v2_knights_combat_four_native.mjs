@@ -245,6 +245,37 @@ try{
  }
  const honestWorldHits=readAuthoritativeWorld().split("\n")
   .filter(line=>/M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
+ // 4D QA-only failure snapshot. The real first-party test must still FAIL
+ // unless the unchanged original Rust World proves both physical 46HP and
+ // 34HP target contact. Never infer HP from accepted ACK or animations.
+ if(!honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line))) {
+   const worldLines=readAuthoritativeWorld().split("\n");
+   const originalWorldCombat=worldLines.filter(line=>
+     /M201_AUTH_(ACTION|HIT|BLOCK|PARRY|BREAK)/.test(line)).slice(-90);
+   const browsers=await Promise.all(actors.map(async ({s,actor})=>({
+     assignedActor:actor.id,engine:s.engine,
+     evidence:await evaluate(s,
+       "return {event:document.querySelector('#event-text')?.textContent||'',"+
+       "roster:[...document.querySelectorAll('#scoreboard-list li')].map(x=>x.textContent?.trim()||''),"+
+       "gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
+     ).catch(e=>({driverError:String(e)})),
+   })));
+   const evidence={
+     source:"Combat4D original native W3C first-party missing 34HP World hit",
+     existingHeavyWorldPress:pressed,
+     existingHeavyWorldRelease:heavy,
+     existingLightWorldPress:lightPress,
+     existingLightWorldActive:lightActive,
+     authenticWorldHits:honestWorldHits,
+     originalWorldCombat,
+     browsers,
+     firstPartyAssertionStillRequired:"real 34 HP World hit from player1 onto an independent actor",
+   };
+   await writeFile(join(output,"combat4-missing-light-hit-original-world.json"),
+     JSON.stringify(evidence,null,2)+"\n");
+   console.error("MAIN0_ORIGINAL_GAME_MISSING_34HP_DIAGNOSTIC",
+     JSON.stringify(evidence).slice(0,18000));
+ }
  assert.ok(honestWorldHits.some(line=>/damage=46(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 46 HP heavy strike against an independent fighter");
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
