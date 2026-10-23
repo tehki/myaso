@@ -1,0 +1,469 @@
+{
+  "schemaVersion": 1,
+  "project": "myaso.io",
+  "department": "Combat 4D",
+  "release": "Pre-Alpha 0.1",
+  "recordedAt": "2026-10-23",
+  "baseline": {
+    "branch": "main",
+    "sha": "6fa59b649112c272bcbc018b4a32bf963f9a5bba",
+    "verifiedBy": "GitHub compare main...SHA identical"
+  },
+  "rules": [
+    "PASS requires independent evidence for exact candidate; compile-only and ACK-only do not prove combat.",
+    "No synthetic input may satisfy native requirements.",
+    "No public GO from Combat 4D; Main 0 retains deploy authority."
+  ],
+  "rows": [
+    {
+      "id": "P0-LMB-DOWN",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Native LMB pointerDOWN creates authoritative 135ms light windup before UP",
+      "evidence_kind": "native",
+      "reference": "M156 #531; #695; #696",
+      "baseline": "FAIL",
+      "reason": "main src/browser/left-button-charge.mjs still release-to-strike"
+    },
+    {
+      "id": "P0-LMB-SHORT",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "6–12ms real native click survives 30Hz sender and remains a light",
+      "evidence_kind": "native",
+      "reference": "M156 #531; #857",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-LMB-UPGRADE",
+      "group": "input",
+      "owner": "4A/4C",
+      "scenario": "Valid unlanded light upgrades on held LMB before first active hit",
+      "evidence_kind": "world",
+      "reference": "#695; #696; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-HEAVY-READY",
+      "group": "input",
+      "owner": "4B/4C",
+      "scenario": "Server charge reaches READY at 320ms and remains held without impact",
+      "evidence_kind": "world",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-HEAVY-RELEASE",
+      "group": "input",
+      "owner": "4A/4C",
+      "scenario": "Valid RELEASE after READY creates exactly one 46HP heavy hit",
+      "evidence_kind": "native",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-EARLY-RELEASE",
+      "group": "input",
+      "owner": "4A/4C",
+      "scenario": "Release before 320ms yields at most one legal light, never a heavy",
+      "evidence_kind": "world",
+      "reference": "#696; #840",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-LMB-KEYE",
+      "group": "input",
+      "owner": "4A/4C",
+      "scenario": "Independent KeyE source cannot hijack or strand LMB gesture",
+      "evidence_kind": "network",
+      "reference": "#723; #862",
+      "baseline": "BLOCKED",
+      "reason": "4C #862 documents fail-first busy-source rejected-ACK retirement"
+    },
+    {
+      "id": "P0-RMB-KICK",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Physical RMB tap creates Spartan Kick",
+      "evidence_kind": "native",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-ROLL-MOUSE",
+      "group": "input",
+      "owner": "4A/6",
+      "scenario": "Physical wheel forward rolls toward mouse with correct recovery",
+      "evidence_kind": "native",
+      "reference": "#695; #531",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-DASH",
+      "group": "input",
+      "owner": "4A/4B",
+      "scenario": "Dash activates correctly and preserves cooldown and collision",
+      "evidence_kind": "native",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-PARRY-INPUT",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Trusted wheel-back parry admission precedes server decision",
+      "evidence_kind": "native",
+      "reference": "M41 #402",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-BLOCK-INPUT",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Valid wheel-back short block admitted independently of parry",
+      "evidence_kind": "native",
+      "reference": "M194 #298",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-SPRINT",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Hold-to-run and RMB/LMB chord preserve exact input semantics",
+      "evidence_kind": "native",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-JUMP",
+      "group": "input",
+      "owner": "4A",
+      "scenario": "Space jumps using genuine browser input",
+      "evidence_kind": "native",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-JUMP-LMB",
+      "group": "input",
+      "owner": "4A/4B",
+      "scenario": "Space+LMB immediately commits authoritative jumping attack",
+      "evidence_kind": "native",
+      "reference": "M144 #392",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-CANCEL",
+      "group": "input",
+      "owner": "4A/4C",
+      "scenario": "Blur, capture loss, cancel, death and disconnect cause no phantom hit",
+      "evidence_kind": "network",
+      "reference": "#696; #861",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-LIGHT-34",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Real landed light commits 34HP once at active phase after 135ms windup",
+      "evidence_kind": "world",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-HEAVY-46",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Heavy damage 46HP; invalid hit/miss cannot alter HP",
+      "evidence_kind": "world",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-EXACTLY-ONCE",
+      "group": "mechanic",
+      "owner": "4B/4C",
+      "scenario": "No one gesture produces both a 34HP light and a 46HP heavy",
+      "evidence_kind": "network",
+      "reference": "#696; #840",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-PARRY-125",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "125ms parry success/failure and authoritative punish outcome",
+      "evidence_kind": "native",
+      "reference": "M41 #402",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-GUARD-M194",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Block-only M194 preserves expected -38 guard and HP=100",
+      "evidence_kind": "native",
+      "reference": "M194 #298",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-KICK-360",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Kick causes genuine contact, knockdown, 360ms recovery",
+      "evidence_kind": "world",
+      "reference": "M155 #591",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-KICK-PUNISH",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Third-party light active and hits before knockdown recovery tick",
+      "evidence_kind": "native",
+      "reference": "M155 #591; M206",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-ROLL-M156",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Rolling collision permits genuine third-party 34HP light punish",
+      "evidence_kind": "native",
+      "reference": "M156 #531",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-DODGE-IFRAME",
+      "group": "mechanic",
+      "owner": "4B/6",
+      "scenario": "Valid iframe prevents damage; late dodge cannot claim success",
+      "evidence_kind": "native",
+      "reference": "M107; #854",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-STAMINA",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Attack/run/roll/dash costs and regeneration use server truth",
+      "evidence_kind": "world",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-FEINT-M171",
+      "group": "mechanic",
+      "owner": "4B",
+      "scenario": "Feint cancellation precedes first committed 34HP strike",
+      "evidence_kind": "native",
+      "reference": "M171 #245",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-DEATH-RESPAWN",
+      "group": "mechanic",
+      "owner": "4B/8C",
+      "scenario": "Death, respawn and recovery retire old combat authority",
+      "evidence_kind": "multiplayer",
+      "reference": "#860",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-ACTOR-LEASE",
+      "group": "network",
+      "owner": "8B/8C",
+      "scenario": "Authenticated session controls its actor only, rejects stale lease",
+      "evidence_kind": "network",
+      "reference": "#848; #860",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-QUIC-INGRESS",
+      "group": "network",
+      "owner": "4C/8A/8C",
+      "scenario": "Negotiated real QUIC source event admitted into original Rust World",
+      "evidence_kind": "network",
+      "reference": "#841; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-V2-WIRE",
+      "group": "network",
+      "owner": "4C/8A",
+      "scenario": "Single negotiated typed v2 codec/ACK, no unsupported version activation",
+      "evidence_kind": "network",
+      "reference": "#723; #841",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-LOST-PRESS",
+      "group": "network",
+      "owner": "4C/8A",
+      "scenario": "Lost PRESS has bounded retry or safe rejection; no phantom hit",
+      "evidence_kind": "network",
+      "reference": "#846; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-LOST-RELEASE",
+      "group": "network",
+      "owner": "4C/8A",
+      "scenario": "Lost RELEASE cannot strand charge indefinitely or trigger phantom heavy",
+      "evidence_kind": "network",
+      "reference": "#846; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-REORDER",
+      "group": "network",
+      "owner": "4C/8A",
+      "scenario": "Reordered PRESS/UPGRADE/RELEASE preserve monotonic identity and phase",
+      "evidence_kind": "network",
+      "reference": "#846; #840",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-REPLAY",
+      "group": "network",
+      "owner": "4C/8B",
+      "scenario": "Duplicate events and damaging replay never commit duplicate HP loss",
+      "evidence_kind": "network",
+      "reference": "#848; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-RECONNECT",
+      "group": "network",
+      "owner": "8A/8B/8C",
+      "scenario": "Reconnect during charge retires old session and actor control",
+      "evidence_kind": "multiplayer",
+      "reference": "#848; #856",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-BOOT-ABA",
+      "group": "network",
+      "owner": "8B/8C",
+      "scenario": "Old server boot nonce and same-tick actor reuse rejected",
+      "evidence_kind": "network",
+      "reference": "#848; #860",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-WIRE-NEGATIVE",
+      "group": "network",
+      "owner": "4C/8A",
+      "scenario": "Malformed and unsupported wire versions fail closed; queues bounded",
+      "evidence_kind": "network",
+      "reference": "#723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-HP-REPLICATION",
+      "group": "network",
+      "owner": "4C/8C",
+      "scenario": "Same committed server hit/HP/stamina visible to every participant",
+      "evidence_kind": "multiplayer",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-TWO-BROWSERS",
+      "group": "multiplayer",
+      "owner": "4D",
+      "scenario": "Genuine Chrome and Firefox same arena, complete combat lifecycle",
+      "evidence_kind": "multiplayer",
+      "reference": "#695; #696",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-THREE-BROWSERS",
+      "group": "multiplayer",
+      "owner": "4D",
+      "scenario": "Chrome Firefox Chrome2 cross-targeting, kick punish and interference",
+      "evidence_kind": "multiplayer",
+      "reference": "M155 #591; M156 #531",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-FOUR-BROWSERS",
+      "group": "multiplayer",
+      "owner": "4D",
+      "scenario": "Four genuine independent sessions, same World, hits, restart and reconnect",
+      "evidence_kind": "multiplayer",
+      "reference": "#852; #695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-HUMAN-HUMAN",
+      "group": "release",
+      "owner": "4D",
+      "scenario": "Separately operated human versus human acceptance, not automation",
+      "evidence_kind": "human",
+      "reference": "#695",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-REMOTE-HOST",
+      "group": "release",
+      "owner": "4D",
+      "scenario": "Independent-host browser reachability, not loopback-only",
+      "evidence_kind": "human",
+      "reference": "#695; #723",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    },
+    {
+      "id": "P0-EXACT-HEAD-CI",
+      "group": "release",
+      "owner": "4D/0",
+      "scenario": "Full protected exact-head CI plus independent post-merge CI",
+      "evidence_kind": "ci",
+      "reference": "#695; #360",
+      "baseline": "NOT TESTED",
+      "reason": ""
+    }
+  ]
+}
