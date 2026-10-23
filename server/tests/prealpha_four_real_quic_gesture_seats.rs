@@ -330,3 +330,89 @@ async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() 
     .await
     .expect("original World action for active #1,#3,#4,#5, never retired #2");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn admitted_windup_session_retirement_cannot_attack_from_departed_quic_actor() {
+    let (server, url, digest) = real_server();
+    let mut seats = Vec::new();
+    for _ in 0..4 {
+        seats.push(admitted_seat(&url, &digest).await);
+    }
+
+    // Actor #2 begins a REAL server-owned light windup and receives a
+    // processed-World receipt, not just a generic input highwater ACK.
+    seats[1]
+        .connection
+        .send_datagram(event(1, 1))
+        .expect("real actor #2 PRESS");
+    timeout(WAIT, async {
+        loop {
+            let ack = seats[1]
+                .connection
+                .receive_datagram()
+                .await
+                .expect("QUIC actor #2 still connected");
+            if ack.len() == 16 && ack[0] == 2 && ack[1] == 0x12 {
+                assert_eq!(ack[2], 1, "original World admitted actor #2 PRESS");
+                assert_eq!(u32::from_le_bytes(ack[4..8].try_into().unwrap()), 1);
+                assert_eq!(u32::from_le_bytes(ack[8..12].try_into().unwrap()), 1);
+                assert!(u32::from_le_bytes(ack[12..16].try_into().unwrap()) > 0);
+                break;
+            }
+        }
+    })
+    .await
+    .expect("actual actor #2 PRESS accepted by live World");
+
+    // Close only this admitted transport while the attack may still be
+    // winding up. Retirement forbids NEW actions; it is not permission to
+    // backdate or undo any hit that legitimately completed before cleanup.
+    seats[1]
+        .connection
+        .close(VarInt::from_u32(0), b"core8c-inflight-windup-retirement");
+    sleep(Duration::from_millis(900)).await;
+    let replacement = admitted_seat(&url, &digest).await;
+    // New actor #5 is admitted only after old lease #2's World cleanup.
+    // Mark the post-replacement log boundary: pre-retirement contact is
+    // intentionally not classified as ghost damage.
+    let after_replacement = server.lines.lock().unwrap().len();
+    let current = [&seats[0], &seats[2], &seats[3], &replacement];
+    for seat in current {
+        seat.connection
+            .send_datagram(event(1, 1))
+            .expect("current actor PRESS");
+        seat.connection
+            .send_datagram(event(3, 2))
+            .expect("current actor RELEASE");
+    }
+    for seat in current {
+        assert_both_server_acks(&seat.connection).await;
+    }
+
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            let recent = &lines[after_replacement..];
+            let fresh_actor_is_admitted =
+                lines.iter().any(|line| line.contains("assigned player 5 "));
+            let all_current_actors_attack = [1_u32, 3, 4, 5].iter().all(|id| {
+                recent.iter().any(|line| {
+                    line.contains("M201_AUTH_ACTION tick=")
+                        && line.contains(&format!(" fighter={id} from=1 to=2"))
+                })
+            });
+            let retired_actor_has_no_new_active_action = !recent.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=1 to=2")
+            });
+            if fresh_actor_is_admitted
+                && all_current_actors_attack
+                && retired_actor_has_no_new_active_action
+            {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("no post-retirement actor #2 action; active #1,#3,#4,#5 work");
+}

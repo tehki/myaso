@@ -962,3 +962,177 @@ fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
     assert_eq!(fresh_hits, vec![(34, 66)]);
     assert!(old_target.retired());
 }
+
+#[test]
+fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
+    let mut world = arena();
+    let mut survivor =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let old_actor_life = survivor.binding().incarnation;
+    let old_world_instance = survivor.binding().world_instance;
+    let mut hits = 0_u32;
+    let mut deaths = 0_u32;
+    let mut respawns = 0_u32;
+    let mut match_wins = 0_u32;
+    let mut gesture = 0_u32;
+
+    // Win the original five-kill FFA through genuine 135ms World contacts.
+    // Use World inputs to adjust spacing after knockback; never modify HP,
+    // kills, action timers or authoritative fighter position directly.
+    while !world.match_over() {
+        if world.fighter(2).unwrap().action == Action::Dead {
+            for event in world.step() {
+                if let CombatEvent::Respawn { fighter: 2 } = event {
+                    respawns += 1;
+                }
+            }
+            survivor.advance_under_world_lock(&mut world, LEASE, BOOT);
+            continue;
+        }
+        assert!(
+            gesture < 18,
+            "five genuine Combat kills must finish promptly"
+        );
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        // Original 18px knockback per landed light can move the target out
+        // of range. Approach via the normal movement input until close.
+        for _ in 0..80 {
+            let dx = world.fighter(2).unwrap().x - world.fighter(1).unwrap().x;
+            if dx.abs() <= 60.0 {
+                break;
+            }
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_x: dx.signum(),
+                    facing_radians: if dx >= 0.0 { 0.0 } else { std::f32::consts::PI },
+                    ..InputIntent::default()
+                }
+            ));
+            world.step();
+            survivor.advance_under_world_lock(&mut world, LEASE, BOOT);
+        }
+        let dx = world.fighter(2).unwrap().x - world.fighter(1).unwrap().x;
+        assert!(dx.abs() <= 70.0, "actual input must approach Combat reach");
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                facing_radians: if dx >= 0.0 { 0.0 } else { std::f32::consts::PI },
+                ..InputIntent::default()
+            }
+        ));
+
+        gesture += 1;
+        assert_eq!(
+            admit(
+                &mut survivor,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                2 * gesture - 1,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut survivor,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2 * gesture,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        let before = hits;
+        for _ in 0..55 {
+            for event in world.step() {
+                match event {
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 34,
+                        ..
+                    } => hits += 1,
+                    CombatEvent::Death { fighter: 2, .. } => deaths += 1,
+                    CombatEvent::Respawn { fighter: 2 } => respawns += 1,
+                    CombatEvent::MatchWon { winner: 1, .. } => match_wins += 1,
+                    _ => {}
+                }
+            }
+            survivor.advance_under_world_lock(&mut world, LEASE, BOOT);
+            if world.match_over() {
+                break;
+            }
+        }
+        assert_eq!(
+            hits,
+            before + 1,
+            "every admitted light must contact once in original World"
+        );
+    }
+
+    assert_eq!(deaths, 5);
+    assert_eq!(hits, 15);
+    assert_eq!(match_wins, 1);
+    assert_eq!(respawns, 4);
+    assert_eq!(gesture, 15);
+    assert!(
+        survivor.retired(),
+        "match winner no longer owns future gestures"
+    );
+    assert_eq!(world.world_instance(), old_world_instance);
+    let mut saw_reset = false;
+    for _ in 0..170 {
+        if world
+            .step()
+            .iter()
+            .any(|event| matches!(event, CombatEvent::MatchReset))
+        {
+            saw_reset = true;
+            break;
+        }
+        survivor.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert!(saw_reset, "real FFA match-reset timer must elapse");
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_ne!(
+        world.fighter(1).unwrap().world_incarnation(),
+        old_actor_life,
+        "surviving winner must acquire fresh authority after match reset"
+    );
+    assert_eq!(
+        admit(
+            &mut survivor,
+            &mut world,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2 * gesture + 1,
+            gesture
+        ),
+        AckStatus::Stale,
+        "old terminal cannot cross the reset while keeping same numerical ID"
+    );
+    let fresh_lease = LEASE + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, fresh_lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted,
+        "legitimate new authority must remain able to attack"
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+}
