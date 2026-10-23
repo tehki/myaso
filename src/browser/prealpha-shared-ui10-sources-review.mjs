@@ -65,12 +65,19 @@ export function attachDormantSharedUi10Sources(gates, {
     gates.closeLease();
     throw error;
   }
+  // Page navigation ends the entire physical LMB+KeyE connection lease.
+  // The KeyE origin's own pagehide listener only retires source1 locally;
+  // without this whole-lease fence, old LMB bytes could remain queued and
+  // be retried after navigating away. No phantom RELEASE is transmitted.
+  const retireOnPagehide = () => gates.closeLease();
+  windowObj.addEventListener("pagehide", retireOnPagehide, true);
   // Only a QA fixture may attach this listener pair. A future live
   // session must atomically replace existing v1 LMB/KeyE interception.
   let detached = false;
   return () => {
     if (detached) return;
     detached = true;
+    windowObj.removeEventListener("pagehide", retireOnPagehide, true);
     detachKeyE();
     detachLmb();
     gates.closeLease();
