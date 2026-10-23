@@ -427,6 +427,16 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
+    // M144 FFA only: preserve authenticated server processed-client-tick
+    // evidence for a genuine Space+LMB which can otherwise remain World Idle.
+    // Observation only; no input admission, packet or prediction mutation.
+    if (acceptanceScenario === "uimultirecoveryffa") {
+      const witness = window.__MYASO_ACCEPTANCE_STATE__;
+      if (witness) {
+        witness.lastProcessedClientTick = networkClient.processedClientTick;
+        witness.lastProcessedServerTick = networkClient.latestServerTick;
+      }
+    }
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
@@ -823,7 +833,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
