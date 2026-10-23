@@ -19,8 +19,7 @@ const html=String.raw`<!doctype html><meta charset="utf-8">
 style="display:block;margin:40px;width:500px;height:320px;touch-action:none;border:1px solid black"></canvas>
 <script type="module">
 import {ProposedSharedTypedGestureOutbox} from "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
-import {decodeProposedTypedGestureEvent} from "/src/network/prealpha-lmb-gesture-proposal.mjs",
-"/src/network/prealpha-shared-source-allocator-proposal.mjs";
+import {decodeProposedTypedGestureEvent} from "/src/network/prealpha-lmb-gesture-proposal.mjs";
 import {createDormantSharedUi10Sources,attachDormantSharedUi10Sources}
  from "/src/browser/prealpha-shared-ui10-sources-review.mjs";
 
@@ -62,7 +61,8 @@ const allowed=new Set([
 "/src/browser/prealpha-keye-source-review.mjs",
 "/src/browser/prealpha-shared-ui10-sources-review.mjs",
 "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
-"/src/network/prealpha-lmb-gesture-proposal.mjs"
+"/src/network/prealpha-lmb-gesture-proposal.mjs",
+"/src/network/prealpha-shared-source-allocator-proposal.mjs"
 ]);
 const server=http(async(req,res)=>{
  try{
