@@ -276,7 +276,6 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
     }
 }
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() {
     let (server, url, digest) = real_server();
@@ -295,7 +294,7 @@ async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() 
     let newcomer = admitted_seat(&url, &digest).await;
     // The same numeric per-lease sequence / gesture IDs are legal for
     // surviving players 1,3,4 and fresh actor 5; never inherit actor 2.
-    for seat in [ &seats[0], &seats[2], &seats[3], &newcomer ] {
+    for seat in [&seats[0], &seats[2], &seats[3], &newcomer] {
         seat.connection
             .send_datagram(event(1, 1))
             .expect("real current-lease PRESS");
@@ -303,7 +302,7 @@ async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() 
             .send_datagram(event(3, 2))
             .expect("real current-lease RELEASE");
     }
-    for seat in [ &seats[0], &seats[2], &seats[3], &newcomer ] {
+    for seat in [&seats[0], &seats[2], &seats[3], &newcomer] {
         let acks = assert_both_server_acks(&seat.connection).await;
         assert_eq!(acks.len(), 2, "two admitted events per current lease");
     }
@@ -312,9 +311,7 @@ async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() 
     timeout(Duration::from_secs(4), async {
         loop {
             let lines = server.lines.lock().unwrap().clone();
-            let admitted_five = lines.iter().any(|line| {
-                line.contains("assigned player 5 ")
-            });
+            let admitted_five = lines.iter().any(|line| line.contains("assigned player 5 "));
             let exact_four_active = [1, 3, 4, 5].iter().all(|id| {
                 lines.iter().any(|line| {
                     line.contains("M201_AUTH_ACTION tick=")
@@ -322,8 +319,7 @@ async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() 
                 })
             });
             let retired_actor_was_not_attacked = !lines.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=")
-                    && line.contains(" fighter=2 from=1 to=2")
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=1 to=2")
             });
             if admitted_five && exact_four_active && retired_actor_was_not_attacked {
                 break;
