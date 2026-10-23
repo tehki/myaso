@@ -215,3 +215,50 @@ test("Combat 4A: practice lost-capture without pointer identity cannot cancel cu
   lost({ pointerId: 7, button: -1, buttons: 0 });
   assert.equal(leftButtonCharge.isPressed(), false);
 });
+
+test("Combat 4A: duplicate/foreign pointerDOWN cannot overwrite real LMB movement", () => {
+  let nowMs = 100;
+  const events = [];
+  const leftButtonCharge = createLeftButtonCharge({
+    now: () => nowMs,
+    onLight: () => events.push("LIGHT"),
+    onHeavy: () => events.push("HEAVY"),
+  });
+  const keys = new Set(["KeyA"]);
+  const context = {
+    keys,
+    leftButtonDown: false,
+    leftButtonPressMovement: null,
+    leftButtonCharge,
+    jumpRequested: false,
+    local: { action: "idle" },
+    COMBAT_ACTION: { jump: "jump" },
+    updateMouse: () => {},
+    captureLightAttackMovement: keySet => ({
+      moveX: (keySet.has("KeyD") ? 1 : 0) - (keySet.has("KeyA") ? 1 : 0),
+      moveY: (keySet.has("KeyS") ? 1 : 0) - (keySet.has("KeyW") ? 1 : 0),
+    }),
+  };
+  const down = loadRealInputHandler("../web/online-game.mjs", "pointerdown", context);
+  context.canvas.focus = () => {};
+  down({ pointerId: 7, button: 0 });
+  assert.equal(context.leftButtonDown, true);
+  assert.equal(leftButtonCharge.isActivePointer(7), true);
+  assert.equal(context.leftButtonPressMovement.moveX, -1);
+  const firstMovement = context.leftButtonPressMovement;
+  keys.clear();
+  keys.add("KeyD");
+  nowMs = 110;
+  down({ pointerId: 7, button: 0 });
+  down({ pointerId: 19, button: 0 });
+  assert.equal(leftButtonCharge.isActivePointer(7), true);
+  assert.equal(context.leftButtonPressMovement, firstMovement,
+    "ignored additional DOWN must not overwrite accepted gesture movement");
+  assert.equal(context.leftButtonPressMovement.moveX, -1);
+  nowMs = 112;
+  const up = loadRealInputHandler("../web/online-game.mjs", "onLeftPointerUp", context);
+  context.audio = { isUnlocked: () => true };
+  up({ pointerId: 7, button: 0 });
+  assert.deepEqual(events, ["LIGHT"]);
+  assert.equal(context.leftButtonPressMovement, null);
+});
