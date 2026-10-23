@@ -6,6 +6,7 @@ on:
       - "web/online-game.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
+      - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
       - "web/prealpha-gesture-live-lab.mjs"
       - "web/network-transport.mjs"
