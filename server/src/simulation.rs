@@ -2146,10 +2146,28 @@ mod r2_combat_control_tests {
         assert!((own.x - 210.75).abs() < 0.001);
     }
 
-    // 4B M155: an active third-party light inside a real kick knockdown
-    // is one genuine 34 HP hit. The server owns both action clocks.
-    #[test]
-    fn m155_third_party_light_before_kick_recovery_hits_once() {
+    // 4B M155: every combat action here originates from a World input edge.
+    // No test-only injection of KickActive or AttackWindup is permitted.
+    fn m155_input_kick_knocks_down(world: &mut World) -> u32 {
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                kick: true,
+                ..InputIntent::default()
+            }
+        ));
+        let mut knockdown_tick = None;
+        for _ in 0..12 {
+            world.step();
+            if world.fighter(2).unwrap().action == Action::Knockdown {
+                knockdown_tick = Some(world.tick);
+                break;
+            }
+        }
+        knockdown_tick.expect("actual admitted kick must knock target down")
+    }
+
+    fn m155_three_real_input_fighters() -> World {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
         assert!(world.add_player_at(2, 240.0, 250.0, std::f32::consts::PI));
@@ -2161,12 +2179,21 @@ mod r2_combat_control_tests {
                 ..InputIntent::default()
             }
         ));
-        world.fighters[0].set_action(Action::KickActive, KICK_ACTIVE_MS);
-        world.step();
-        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
-        let knockdown_tick = world.tick;
+        world
+    }
 
-        world.fighters[2].set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+    #[test]
+    fn m155_third_party_light_before_kick_recovery_hits_once() {
+        let mut world = m155_three_real_input_fighters();
+        let knockdown_tick = m155_input_kick_knocks_down(&mut world);
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                attack: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
         let mut hits = 0;
         for _ in 0..14 {
             let events = world.step();
@@ -2186,42 +2213,46 @@ mod r2_combat_control_tests {
                 }
             }
         }
-        assert_eq!(hits, 1, "one light action must never damage twice");
+        assert_eq!(hits, 1, "one admitted light must never damage twice");
         assert_eq!(world.fighter(2).unwrap().hp, 66.0);
     }
 
-    // 4B M155/M206: a strike may still damage the recovered player, but
-    // an active/HIT edge on the recovery tick is NOT an in-knockdown punish.
-    // Guard against making the window longer to satisfy native browser CI.
+    // 4B M155/M206: World recovers knockdown before resolving attacks on
+    // this tick. A true light HIT on recovery is normal damage, NOT a valid
+    // inside-knockdown punish, even when the press began during knockdown.
     #[test]
     fn m155_same_recovery_tick_light_is_not_a_knockdown_punish() {
-        let mut world = World::new(800.0, 600.0);
-        assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
-        assert!(world.add_player_at(2, 240.0, 250.0, std::f32::consts::PI));
-        assert!(world.add_player_at(3, 330.0, 250.0, std::f32::consts::PI));
-        assert!(world.set_input(
-            3,
-            InputIntent {
-                facing_radians: std::f32::consts::PI,
-                ..InputIntent::default()
-            }
-        ));
-        world.fighters[0].set_action(Action::KickActive, KICK_ACTIVE_MS);
-        world.step();
-        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
-        let knockdown_tick = world.tick;
-
+        let mut world = m155_three_real_input_fighters();
+        let knockdown_tick = m155_input_kick_knocks_down(&mut world);
         for _ in 0..13 {
             world.step();
         }
         assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
-        world.fighters[2].set_action(Action::AttackWindup, ATTACK_WINDUP_MS);
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                attack: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
         for _ in 0..8 {
-            world.step();
+            let events = world.step();
+            assert!(
+                !events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 3,
+                        target: 2,
+                        ..
+                    }
+                )),
+                "a light cannot hit before its real 135ms windup"
+            );
         }
         assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
         assert_eq!(world.fighter(3).unwrap().action, Action::AttackWindup);
-
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
         let events = world.step();
         assert_eq!(world.tick, knockdown_tick + 22);
         assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
@@ -2234,52 +2265,71 @@ mod r2_combat_control_tests {
                 hp: 66
             }
         )));
-        // The hit itself is genuine; its recovered-target state disqualifies
-        // it from M155/M206 punish acceptance, not from normal damage.
     }
 
-    // 4B M194: server parry or block is selected by the real action elapsed
-    // at impact, not Firefox wheel or Chrome pointer receipt wall time.
+    // 4B M194: genuine input edges enter the server at different ticks;
+    // server elapsed state, not Firefox or Chrome wall time, chooses the
+    // unchanged 125ms parry vs -38 guard block.
     #[test]
     fn m194_125ms_parry_vs_later_block_keeps_exact_guard_pressure() {
-        for (elapsed_ms, expect_parry) in [(100.0, true), (150.0, false)] {
+        for (block_start_tick, expect_parry) in [(4, true), (1, false)] {
             let mut world = World::new(800.0, 600.0);
             assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
             assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
-            world.fighters[0].set_action(Action::AttackActive, ATTACK_ACTIVE_MS);
-            world.fighters[1].set_action(Action::Block, f32::INFINITY);
-            world.fighters[1].action_elapsed_ms = elapsed_ms;
             assert!(world.set_input(
-                2,
+                1,
                 InputIntent {
-                    block: true,
-                    facing_radians: std::f32::consts::PI,
+                    attack: true,
                     ..InputIntent::default()
                 }
             ));
-
-            let events = world.step();
+            let mut parries = 0;
+            let mut blocks = 0;
+            for tick in 1..=14 {
+                if tick == block_start_tick {
+                    assert!(world.set_input(
+                        2,
+                        InputIntent {
+                            block: true,
+                            facing_radians: std::f32::consts::PI,
+                            ..InputIntent::default()
+                        }
+                    ));
+                }
+                let events = world.step();
+                parries += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Parry {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+                blocks += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Block {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+            }
             assert_eq!(world.fighter(2).unwrap().hp, 100.0);
             if expect_parry {
-                assert!(events.iter().any(|event| matches!(
-                    event,
-                    CombatEvent::Parry {
-                        attacker: 1,
-                        target: 2
-                    }
-                )));
+                assert_eq!((parries, blocks), (1, 0));
                 assert_eq!(world.fighter(2).unwrap().guard, 100.0);
                 assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
             } else {
-                assert!(events.iter().any(|event| matches!(
-                    event,
-                    CombatEvent::Block {
-                        attacker: 1,
-                        target: 2
-                    }
-                )));
+                assert_eq!((parries, blocks), (0, 1));
                 assert_eq!(world.fighter(2).unwrap().guard, 62.0);
-                assert_eq!(world.fighter(1).unwrap().action, Action::AttackActive);
             }
         }
     }
