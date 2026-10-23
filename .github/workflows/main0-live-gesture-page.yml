@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "web/prealpha-gesture-live-lab.mjs"
       - "tests/main0-live-gesture-page.test.mjs"
       - ".github/workflows/main0-live-gesture-page.yml"
