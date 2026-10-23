@@ -68,9 +68,12 @@ export function knightClip(action, actorKind, speed = 0, moving = false) {
 // camera traversal. This is a SOURCE-CLIP orientation fix, not actor facing,
 // input direction, Combat or camera rotation. Roll and future art stay native.
 const MIRRORED_HORIZONTAL_CLIPS = new Set(["silver_idle", "silver_walk", "silver_sprint", "silver_jump"]);
-export function spriteAtlasRect(facing, frame, frames, clip = null) {
+export function spriteAtlasRect(facing, frame, frames, clip = null, sourceArtVariant = "original") {
+  if (!["original", "relit"].includes(sourceArtVariant)) throw new RangeError("Invalid original Silver source art variant");
   const sourceDirection = knightDirectionIndex(facing);
-  const direction = MIRRORED_HORIZONTAL_CLIPS.has(clip)
+  // The owner-authorized Blender relight uses Roll-native camera directions.
+  // Mirror ONLY the immutable dark legacy atlases, never the authentic rebake.
+  const direction = sourceArtVariant === "original" && MIRRORED_HORIZONTAL_CLIPS.has(clip)
     ? (8 - sourceDirection) % 8 : sourceDirection;
   const index = ((Math.floor(frame) % frames) + frames) % frames;
   return { x: index * KNIGHT_FRAME_PX, y: direction * KNIGHT_FRAME_PX,
@@ -79,10 +82,13 @@ export function spriteAtlasRect(facing, frame, frames, clip = null) {
 
 export function createKnightSpriteRenderer({ ImageCtor = Image,
   assetBase = new URL("./assets/knights/", import.meta.url),
-  presentationScale = KNIGHT_PRESENTATION_SCALE } = {}) {
+  presentationScale = KNIGHT_PRESENTATION_SCALE,
+  sourceArtVariant = "original" } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
+  if (!["original", "relit"].includes(sourceArtVariant))
+    throw new RangeError("Invalid original Silver source art variant");
   const atlases = new Map();
   const states = new Map();
   for (const [name] of Object.entries(KNIGHT_CLIPS)) {
@@ -94,7 +100,12 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     };
     image.onerror = () => { atlas.ready = false; };
     image.decoding = "async";
-    image.src = new URL(name + ".webp", assetBase).href;
+    // Only a deliberate review URL can display the four source-authored,
+    // size-matched Blender relights. Default five frozen Pre-Alpha atlases and
+    // original 350ms Roll are unchanged; no new attack sprites are available.
+    const file = sourceArtVariant === "relit" && MIRRORED_HORIZONTAL_CLIPS.has(name)
+      ? "review/" + name + "_relit.webp" : name + ".webp";
+    image.src = new URL(file, assetBase).href;
     atlases.set(name, atlas);
   }
   return {
@@ -147,7 +158,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
           : clip === "silver_jump" ? 430 : 470;
         frame = Math.min(frames - 1, Math.floor((nowMs - state.clipStartedMs) / duration * frames));
       }
-      const src = spriteAtlasRect(fighter.facing ?? 0, frame, frames, clip);
+      const src = spriteAtlasRect(fighter.facing ?? 0, frame, frames, clip, sourceArtVariant);
       // The combat context is rotated for attack telegraphs; the sprite already
       // contains an eight-direction facing. Undo only that presentation rotation.
       ctx.save();

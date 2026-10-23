@@ -35,5 +35,5 @@ test("Roll, Kick and Knockdown keep every native source direction unchanged", ()
 });
 test("live Silver renderer passes selected clip into source-only orientation remap", () => {
   const source = readFileSync(new URL("../web/knight-sprites.mjs", import.meta.url), "utf8");
-  assert.match(source, /spriteAtlasRect\(fighter\.facing \?\? 0,\s*frame,\s*frames,\s*clip\)/);
+  assert.match(source, /spriteAtlasRect\(fighter\.facing \?\? 0,\s*frame,\s*frames,\s*clip,\s*sourceArtVariant\)/);
 });
