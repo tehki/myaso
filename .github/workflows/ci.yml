@@ -48,6 +48,14 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      # Opt-in Graphics 3C floor never becomes a Pre-Alpha gameplay dependency.
+      - name: Validate optional original Arena Lite live selector
+        run: |
+          node --check src/browser/prealpha-arena-lite-floor.mjs
+          node --check src/browser/prealpha-arena-lite-selection.mjs
+          node --check web/online-game.mjs
+          node --test tests/prealpha-arena-lite-floor.test.mjs tests/prealpha-arena-lite-optin.test.mjs
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
