@@ -200,3 +200,110 @@ fn independent_keye_busy_press_must_not_strand_legitimate_lmb_release() {
     assert_eq!(next_hits, vec![(34, 32)]);
     assert_eq!(world.fighter(2).unwrap().hp, 32.0);
 }
+
+#[test]
+fn busy_lmb_upgrade_while_keye_owns_world_must_not_retire_shared_outbox() {
+    let mut world = arena();
+    let mut path = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+
+    // Source1 is the sole real World attack. This #855 branch deliberately
+    // uses release-only standalone KeyE until Combat4/Main choose the rule.
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::KeyE, GestureAction::Press, 1, 1),
+        )
+        .unwrap()
+        .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::Lmb, GestureAction::Press, 2, 2),
+        )
+        .unwrap()
+        .status,
+        AckStatus::Accepted
+    );
+    // UI10's real held source0 can still issue its single UPGRADE while
+    // source1 owns HeavyWindup. It is transport-admitted but NO COMBAT;
+    // REJECTED would retire the one shared Core8A outbox and strand KeyE.
+    let upgrade = event(GestureSource::Lmb, GestureAction::Upgrade, 3, 2);
+    assert_eq!(
+        path.accept_under_world_lock(&mut world, LEASE, BOOT, &upgrade)
+            .unwrap()
+            .status,
+        AckStatus::Accepted,
+        "busy LMB UPGRADE must be a typed no-combat receipt, not lease-fatal"
+    );
+    assert_eq!(
+        path.accept_under_world_lock(&mut world, LEASE, BOOT, &upgrade)
+            .unwrap()
+            .status,
+        AckStatus::Duplicate
+    );
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::Lmb, GestureAction::Release, 4, 2),
+        )
+        .unwrap()
+        .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+
+    let mut before_release = vec![];
+    for _ in 0..37 {
+        for outcome in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = outcome
+            {
+                before_release.push((damage, hp));
+            }
+        }
+        path.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert!(before_release.is_empty(), "busy LMB cannot cause phantom 34/46HP");
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::KeyE, GestureAction::Release, 5, 1),
+        )
+        .unwrap()
+        .status,
+        AckStatus::Accepted
+    );
+    let mut hits = vec![];
+    for _ in 0..55 {
+        for outcome in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = outcome
+            {
+                hits.push((damage, hp));
+            }
+        }
+        path.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert_eq!(hits, vec![(46, 54)], "only source1's actual heavy may land");
+    assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+}
