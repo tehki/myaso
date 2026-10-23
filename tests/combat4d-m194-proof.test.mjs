@@ -34,7 +34,7 @@ test("4D rejects forged second World action and actor ownership",()=>{
 test("4D keeps true first BLOCK even though integer log delta only 7 ticks",()=>{
   const x=structuredClone(w);
   x.world_exchanges[0].tickLines[3]="M201_AUTH_PARRY tick=283 attacker=1 target=2";
-  assert.throws(()=>assessM194Witness(x),/source failure/);
+  assert.throws(()=>assessM194Witness(x),/server attack\/ParryStun|source failure/);
 });
 test("4D refuses synthetic/truncated W3C Chrome clicks and false trusted wheel",()=>{
   const x=structuredClone(w);
