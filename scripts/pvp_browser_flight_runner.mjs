@@ -526,6 +526,9 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        // Independent read-only World chronology for failing strict M111/M121.
+        // Rust denies this diagnostic on any non-loopback bind.
+        || scenario === "uiheavyguardbreakpunish" || scenario === "uidirectionallight"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
