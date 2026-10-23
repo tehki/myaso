@@ -31,6 +31,10 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
+      - name: Install pinned original Rust toolchain and prebuild real World before both native runs
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: M121 first genuine independent W3C strafe LMB World directional hit
         run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
       - name: M121 second genuine independent W3C strafe LMB World directional hit
