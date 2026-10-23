@@ -219,6 +219,22 @@ try{
  assert(heavyReturnedIdle,"new physically pressed light starts only after original World returns to Idle");
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
+ // Physical player positioning is a real part of combat acceptance, NOT a
+ // simulated server coordinate edit. Original Rust spawns actors 96 units
+ // apart; a 46HP heavy applies 28 units of target knockback and the next
+ // 34HP light has shorter reach (76 + target radius 18). After heavy, the
+ // original actor can be outside the light arc even though both attacks
+ // correctly enter their World Active phases. Use genuine W3C KeyD and the
+ // original unchanged 30Hz locomotion input to close range before LMB.
+ // 185ms at original 215 units/s is only ~40 units; there is no World warp,
+ // hitbox expansion, fake HP or post-hoc native assertion relaxation.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+   actions:[{type:"key",id:"real-original-approach",actions:[
+     {type:"keyDown",value:"d"},
+     {type:"pause",duration:185},
+     {type:"keyUp",value:"d"},
+   ]}]
+ });
  // One physical W3C pointer action tick sequence. Do NOT wait for a
  // server Windup log while the mouse remains held: the original 85ms local
  // UPGRADE-intent hook can correctly request server-held heavy after that.
