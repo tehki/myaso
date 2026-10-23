@@ -8,7 +8,9 @@
 
 use std::collections::VecDeque;
 
-use crate::prealpha_lmb_gesture_proposal::{GestureAction, GestureEvent};
+use crate::prealpha_lmb_gesture_proposal::{
+    GestureAction, GestureEvent, GestureSource, TypedGestureEvent,
+};
 
 const LIGHT_WINDUP_MS: u64 = 135;
 const HEAVY_READY_MS: u64 = 320;
@@ -37,12 +39,14 @@ pub enum Disposition {
 pub enum Command {
     None,
     BeginLightWindup,
+    BeginKeyEHeavy,
     ActivateLight,
     UpgradeHeldHeavy { server_elapsed_ms: u64 },
     HeavyReady,
     ResumeLight { server_elapsed_ms: u64 },
     ReleaseHeavy,
     CancelUnlandedLight,
+    CancelKeyEHeavy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,11 +75,12 @@ pub struct GestureAuthority {
     last_server_ms: u64,
     phase: Phase,
     active_id: Option<u32>,
+    active_source: Option<GestureSource>,
     highest_gesture_id: u32,
     highest_sequence: u32,
     press_ms: u64,
     released: bool,
-    accepted: VecDeque<GestureEvent>,
+    accepted: VecDeque<TypedGestureEvent>,
 }
 
 impl GestureAuthority {
@@ -85,6 +90,7 @@ impl GestureAuthority {
             last_server_ms: 0,
             phase: Phase::Idle,
             active_id: None,
+            active_source: None,
             highest_gesture_id: 0,
             highest_sequence: 0,
             press_ms: 0,
@@ -98,6 +104,22 @@ impl GestureAuthority {
     }
 
     pub fn process(&mut self, lease: u64, event: GestureEvent, server_ms: u64) -> Decision {
+        self.process_typed(lease, GestureSource::Lmb, event, server_ms)
+    }
+
+    /// One monotonic accepted sequence/replay journal for both typed sources.
+    /// Source ownership is attached to the active gesture; KeyE cannot
+    /// release/upgrade/cancel an LMB gesture with identical numbers.
+    pub fn process_typed(
+        &mut self,
+        lease: u64,
+        source: GestureSource,
+        event: GestureEvent,
+        server_ms: u64,
+    ) -> Decision {
+        if source == GestureSource::KeyE && event.action == GestureAction::Upgrade {
+            return Decision::rejected();
+        }
         if lease != self.lease_epoch
             || lease == 0
             || server_ms < self.last_server_ms
@@ -110,9 +132,9 @@ impl GestureAuthority {
         if let Some(previous) = self
             .accepted
             .iter()
-            .find(|previous| previous.sequence == event.sequence)
+            .find(|previous| previous.event.sequence == event.sequence)
         {
-            return if *previous == event {
+            return if *previous == (TypedGestureEvent { source, event }) {
                 Decision::new(Disposition::Duplicate, Command::None)
             } else {
                 Decision::rejected()
@@ -123,20 +145,36 @@ impl GestureAuthority {
         }
 
         let elapsed = server_ms.saturating_sub(self.press_ms);
+        if event.action != GestureAction::Press
+            && self.active_id == Some(event.gesture_id)
+            && self.active_source != Some(source)
+        {
+            return Decision::rejected();
+        }
         let command = match event.action {
             GestureAction::Press
                 if self.phase == Phase::Idle && event.gesture_id > self.highest_gesture_id =>
             {
                 self.active_id = Some(event.gesture_id);
+                self.active_source = Some(source);
                 self.highest_gesture_id = event.gesture_id;
                 self.press_ms = server_ms;
-                self.phase = Phase::LightWindup;
+                self.phase = if source == GestureSource::KeyE {
+                    Phase::HeavyCharging
+                } else {
+                    Phase::LightWindup
+                };
                 self.released = false;
-                Command::BeginLightWindup
+                if source == GestureSource::KeyE {
+                    Command::BeginKeyEHeavy
+                } else {
+                    Command::BeginLightWindup
+                }
             }
             GestureAction::Upgrade
                 if self.active_id == Some(event.gesture_id)
                     && self.phase == Phase::LightWindup
+                    && source == GestureSource::Lmb
                     && !self.released
                     && elapsed < LIGHT_WINDUP_MS =>
             {
@@ -158,6 +196,13 @@ impl GestureAuthority {
                         self.phase = Phase::HeavyActive;
                         self.released = true;
                         Command::ReleaseHeavy
+                    }
+                    Phase::HeavyCharging if source == GestureSource::KeyE => {
+                        // Standalone KeyE never turns into a free LMB light.
+                        // Undercharged release cancels with no 34/46HP hit.
+                        self.phase = Phase::Cancelled;
+                        self.released = true;
+                        Command::CancelKeyEHeavy
                     }
                     Phase::HeavyCharging => {
                         self.phase = if elapsed >= LIGHT_WINDUP_MS {
@@ -193,7 +238,11 @@ impl GestureAuthority {
                 match self.phase {
                     Phase::HeavyCharging | Phase::HeavyReady => {
                         self.phase = Phase::Cancelled;
-                        Command::CancelUnlandedLight
+                        if source == GestureSource::KeyE {
+                            Command::CancelKeyEHeavy
+                        } else {
+                            Command::CancelUnlandedLight
+                        }
                     }
                     Phase::LightWindup if elapsed < LIGHT_WINDUP_MS => {
                         self.phase = Phase::Cancelled;
@@ -215,7 +264,7 @@ impl GestureAuthority {
 
         self.last_server_ms = server_ms;
         self.highest_sequence = event.sequence;
-        self.accepted.push_back(event);
+        self.accepted.push_back(TypedGestureEvent { source, event });
         if self.accepted.len() > MAX_REPLAY_JOURNAL {
             self.accepted.pop_front();
         }
@@ -249,6 +298,7 @@ impl GestureAuthority {
             return false;
         }
         self.active_id = None;
+        self.active_source = None;
         self.phase = Phase::Idle;
         self.released = false;
         true

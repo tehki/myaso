@@ -738,6 +738,22 @@ impl World {
                 fighter.gesture_review_owns_light = true;
                 true
             }
+            Command::BeginKeyEHeavy
+                if fighter.action == Action::Idle
+                    && !fighter.latest_input.block
+                    && !fighter.latest_input.dodge
+                    && !fighter.latest_input.kick
+                    && !fighter.latest_input.jump
+                    && !fighter.latest_input.dash =>
+            {
+                // Separate KeyE cannot upgrade or inherit an LMB gesture.
+                // READY never auto-hits; matching KeyE RELEASE owns 46HP.
+                fighter.attack_hit_targets.clear();
+                fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+                fighter.charging_heavy = true;
+                fighter.gesture_review_owns_held_charge = true;
+                true
+            }
             Command::UpgradeHeldHeavy { server_elapsed_ms }
                 if matches!(
                     fighter.action,
@@ -777,12 +793,23 @@ impl World {
             }
             Command::ReleaseHeavy
                 if fighter.action == Action::HeavyAttackWindup
-                    && fighter.gesture_review_owns_light
+                    && fighter.gesture_review_owns_held_charge
                     && fighter.charging_heavy
                     && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS =>
             {
                 fighter.attack_hit_targets.clear();
                 fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS);
+                true
+            }
+            Command::CancelKeyEHeavy
+                if fighter.action == Action::HeavyAttackWindup
+                    && !fighter.gesture_review_owns_light
+                    && fighter.gesture_review_owns_held_charge
+                    && fighter.charging_heavy
+                    && fighter.attack_hit_targets.is_empty() =>
+            {
+                fighter.set_action(Action::Idle, 0.0);
+                fighter.clear_pending_actions();
                 true
             }
             Command::CancelUnlandedLight
@@ -809,7 +836,7 @@ impl World {
             ),
             Command::HeavyReady => {
                 fighter.action == Action::HeavyAttackWindup
-                    && fighter.gesture_review_owns_light
+                    && fighter.gesture_review_owns_held_charge
                     && fighter.charging_heavy
                     && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS
             }
