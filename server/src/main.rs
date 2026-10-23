@@ -667,10 +667,20 @@ async fn handle_connection(
             negotiation = connection.accept_uni(), if v2_lab && !v2_enabled => {
                 if let Ok(mut stream) = negotiation {
                     let mut hello = [0u8; 8];
-                    if let Ok(Ok(_)) = tokio::time::timeout(
+                    if let Ok(Ok(())) = tokio::time::timeout(
                         Duration::from_secs(1), stream.read_exact(&mut hello)
                     ).await {
-                        if hello == V2_LAB_HELLO && !legacy_combat_seen {
+                        // Complete the client-written FIN before releasing
+                        // RecvStream. Dropping immediately after read_exact
+                        // can send QUIC STOP_SENDING while Chrome's writer
+                        // awaits close, aborting an otherwise valid handshake.
+                        // Reject trailing data: exactly ONE 8-byte hello.
+                        let mut trailing = [0_u8; 1];
+                        let complete = matches!(
+                            tokio::time::timeout(Duration::from_secs(1), stream.read(&mut trailing)).await,
+                            Ok(Ok(None))
+                        );
+                        if complete && hello == V2_LAB_HELLO && !legacy_combat_seen {
                             let mut state = game.state.lock().await;
                             if let Some(path) = SessionGestureWorldPath::from_admitted_world(
                                 &state.world, player_id, lease_epoch, state.boot_nonce
