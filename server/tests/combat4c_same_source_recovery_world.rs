@@ -66,11 +66,25 @@ fn genuine_second_lmb_click_during_light_recovery_must_not_kill_shared_outbox() 
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(hits(&mut p, &mut w, 10), vec![(34, 66)]);
@@ -79,24 +93,59 @@ fn genuine_second_lmb_click_during_light_recovery_must_not_kill_shared_outbox() 
     // Human rapid clicking can produce another real DOWN/UP even though World
     // is still executing the first committed strike. This second gesture is
     // physically valid but must be NO-COMBAT, not a fatal shared-lease reject.
-    let second = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 3, 2);
+    let second = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Press,
+        3,
+        2,
+    );
     assert_eq!(
         second,
         AckStatus::Accepted,
         "benign same-source busy PRESS must not retire shared source0/source1 outbox"
     );
-    let terminal = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 4, 2);
+    let terminal = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Release,
+        4,
+        2,
+    );
     assert_eq!(terminal, AckStatus::Accepted);
-    let duplicate = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 4, 2);
+    let duplicate = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Release,
+        4,
+        2,
+    );
     assert_eq!(duplicate, AckStatus::Duplicate);
     assert!(hits(&mut p, &mut w, 55).is_empty());
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
 
     // The no-op receipt must not poison the next real World 34HP light.
-    let next = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 5, 3);
+    let next = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Press,
+        5,
+        3,
+    );
     assert_eq!(next, AckStatus::Accepted);
-    let release = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 6, 3);
+    let release = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Release,
+        6,
+        3,
+    );
     assert_eq!(release, AckStatus::Accepted);
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 32)]);
 }
@@ -106,23 +155,58 @@ fn genuine_second_keye_click_during_autoheavy_must_not_kill_shared_outbox() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
 
     // Second distinct, monotonic, genuinely released KeyE keypress, while
     // first World autoheavy is still charging: transport only, no new 46HP.
-    let second = admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 3, 2);
+    let second = admit(
+        &mut p,
+        &mut w,
+        GestureSource::KeyE,
+        GestureAction::Press,
+        3,
+        2,
+    );
     assert_eq!(second, AckStatus::Accepted);
-    let release = admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2);
+    let release = admit(
+        &mut p,
+        &mut w,
+        GestureSource::KeyE,
+        GestureAction::Release,
+        4,
+        2,
+    );
     assert_eq!(release, AckStatus::Accepted);
     assert_eq!(
-        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Duplicate
     );
     assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 54)]);
@@ -130,9 +214,23 @@ fn genuine_second_keye_click_during_autoheavy_must_not_kill_shared_outbox() {
 
     // A later physically valid source0 light must not be lost when the
     // autoheavy ends. This is NOT a request to change standalone KeyE policy.
-    let next = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 5, 3);
+    let next = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Press,
+        5,
+        3,
+    );
     assert_eq!(next, AckStatus::Accepted);
-    let terminal = admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 6, 3);
+    let terminal = admit(
+        &mut p,
+        &mut w,
+        GestureSource::Lmb,
+        GestureAction::Release,
+        6,
+        3,
+    );
     assert_eq!(terminal, AckStatus::Accepted);
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 20)]);
 }
