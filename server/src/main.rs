@@ -2,6 +2,8 @@ use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
+    prealpha_authenticated_gesture::{is_v2_event, SessionGestureWorldPath},
+    prealpha_lmb_gesture_proposal::encode_ack,
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -13,7 +15,7 @@ use std::{
     env,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
@@ -22,6 +24,8 @@ use tokio::sync::{mpsc, Mutex};
 use wtransport::{Connection, Endpoint, Identity, SendStream, ServerConfig, VarInt};
 
 const GAME_PATH: &str = "/game";
+const V2_LAB_HELLO: [u8; 8] = [2, 0x10, b'M', b'Y', b'A', b'S', b'O', b'1'];
+const V2_LAB_GRANTED: [u8; 4] = [2, 0x13, 0, 0];
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
@@ -104,6 +108,7 @@ enum ReliablePayload {
 
 struct GameState {
     world: World,
+    gesture_sessions: BTreeMap<u64, SessionGestureWorldPath>,
     replication_frame: Arc<ReplicationFrame>,
     flight_background_ids: Vec<u32>,
     kill_events: VecDeque<KillEventPacket>,
@@ -135,6 +140,7 @@ impl GameState {
         ));
         Self {
             world,
+            gesture_sessions: BTreeMap::new(),
             replication_frame,
             flight_background_ids,
             kill_events: VecDeque::with_capacity(MAX_KILL_EVENT_HISTORY),
@@ -203,6 +209,7 @@ impl GameState {
 struct SharedGame {
     state: Mutex<GameState>,
     next_player_id: AtomicU32,
+    next_lease_epoch: AtomicU64,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
 }
@@ -215,19 +222,24 @@ impl SharedGame {
                 flight.near_pressure_players,
             )),
             next_player_id: AtomicU32::new(1),
+            next_lease_epoch: AtomicU64::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
         })
     }
 
-    fn allocate_player_id(&self) -> u32 {
-        loop {
-            let candidate = self.next_player_id.fetch_add(1, Ordering::Relaxed);
-            if candidate != 0 {
-                return candidate;
-            }
-        }
+    fn allocate_player_id(&self) -> Option<u32> {
+        self.next_player_id
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .ok()
     }
+
+    fn allocate_lease_epoch(&self) -> Option<u64> {
+        self.next_lease_epoch
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .ok()
+    }
+
 }
 
 fn should_enqueue_reliable_catchup(
@@ -281,6 +293,16 @@ async fn main() -> Result<()> {
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
     let game = SharedGame::new(flight);
+    // No account authentication service exists for this temporary arena.
+    // The experiment is session-assigned, loopback-only, and default OFF.
+    let v2_lab = match env::var("MYASO_EXPERIMENTAL_GESTURE_V2").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_EXPERIMENTAL_GESTURE_V2 must be 0 or 1"),
+    };
+    if v2_lab && !bind.ip().is_loopback() {
+        bail!("experimental v2 gesture ingress is loopback-only");
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -335,7 +357,14 @@ async fn main() -> Result<()> {
                 return;
             }
 
-            let player_id = game.allocate_player_id();
+            let Some(player_id) = game.allocate_player_id() else {
+                connection.close(VarInt::from_u32(0x15), b"player id exhausted");
+                return;
+            };
+            let Some(lease_epoch) = game.allocate_lease_epoch() else {
+                connection.close(VarInt::from_u32(0x16), b"session epoch exhausted");
+                return;
+            };
             {
                 let mut state = game.state.lock().await;
                 if !state.world.add_player(player_id) {
@@ -345,9 +374,10 @@ async fn main() -> Result<()> {
                 state.refresh_replication_frame();
             }
 
-            let result = handle_connection(connection, player_id, Arc::clone(&game)).await;
+            let result = handle_connection(connection, player_id, lease_epoch, v2_lab, Arc::clone(&game)).await;
             {
                 let mut state = game.state.lock().await;
+                if let Some(mut gesture) = state.gesture_sessions.remove(&lease_epoch) { gesture.retire(); }
                 state.world.remove_player(player_id);
                 state.refresh_replication_frame();
             }
@@ -506,6 +536,11 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
         state.world.step_into(&mut events);
+        // Single authoritative 60Hz World lock covers every current session.
+        let GameState { world, gesture_sessions, .. } = &mut *state;
+        for (epoch, gesture) in gesture_sessions.iter_mut() {
+            gesture.advance_under_world_lock(world, *epoch);
+        }
         if flight_action_proof {
             for line in m201_flight_proof_lines(&state.world, &events, &mut previous_actions) {
                 println!("{line}");
@@ -521,12 +556,16 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
 async fn handle_connection(
     connection: Connection,
     player_id: u32,
+    lease_epoch: u64,
+    v2_lab: bool,
     game: Arc<SharedGame>,
 ) -> Result<()> {
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
     println!("session {stable_id} assigned player {player_id} from {remote}");
 
+    let mut v2_enabled = false;
+    let mut legacy_combat_seen = false;
     let mut ingress = InputIngressWindow::default();
     let mut snapshots = SnapshotSession::default();
     let mut reliable_snapshots = SnapshotSession::default();
@@ -606,8 +645,50 @@ async fn handle_connection(
                     Err(error) => bail!("reliable writer task failed: {error}"),
                 }
             }
+            // Separate negotiated client uni stream, on the admitted QUIC
+            // connection. No datagram or query parameter can enable v2.
+            negotiation = connection.accept_uni(), if v2_lab && !v2_enabled => {
+                if let Ok(mut stream) = negotiation {
+                    let mut hello = [0u8; 8];
+                    if let Ok(Ok(_)) = tokio::time::timeout(
+                        Duration::from_secs(1), stream.read_exact(&mut hello)
+                    ).await {
+                        if hello == V2_LAB_HELLO && !legacy_combat_seen {
+                            let mut state = game.state.lock().await;
+                            if let Some(path) = SessionGestureWorldPath::from_admitted_world(
+                                &state.world, player_id, lease_epoch
+                            ) {
+                                state.gesture_sessions.insert(lease_epoch, path);
+                                v2_enabled = true;
+                                drop(state);
+                                reliable_tx.send(ReliablePayload::Bytes(V2_LAB_GRANTED.to_vec()))
+                                    .await.context("send reliable experimental v2 grant")?;
+                            }
+                        }
+                    }
+                }
+            }
             datagram = connection.receive_datagram() => {
                 let datagram = datagram?;
+                if is_v2_event(datagram.as_ref()) {
+                    if !v2_enabled { continue; }
+                    // No await inside real World admission/Combat application.
+                    let ack = {
+                        let mut state = game.state.lock().await;
+                        state.gesture_sessions.remove(&lease_epoch).and_then(|mut path| {
+                            let ack = path.accept_under_world_lock(
+                                &mut state.world, lease_epoch, datagram.as_ref()
+                            );
+                            state.gesture_sessions.insert(lease_epoch, path);
+                            ack
+                        })
+                    };
+                    if let Some(ack) = ack {
+                        connection.send_datagram(encode_ack(ack)?.to_vec())
+                            .context("send v2 event processed ACK")?;
+                    }
+                    continue;
+                }
                 let packet = match decode_input_packet(datagram.as_ref()) {
                     Ok(packet) => packet,
                     Err(error) => {
@@ -640,8 +721,18 @@ async fn handle_connection(
 
                 let accepted = ingress.ingest(&packet);
                 let coalesced: Option<(u32, InputIntent)> =
-                    coalesce_accepted_input_batch(accepted.as_slice())
-                        .map(|sample| (sample.tick, sample.into()));
+                    coalesce_accepted_input_batch(accepted.as_slice()).map(|sample| {
+                        let mut intent: InputIntent = sample.into();
+                        if v2_enabled {
+                            // Still permit v1 locomotion, but block an
+                            // independent sampled Combat attack producer.
+                            intent.attack = false;
+                            intent.heavy_attack = false;
+                        } else if intent.attack || intent.heavy_attack {
+                            legacy_combat_seen = true;
+                        }
+                        (sample.tick, intent)
+                    });
                 // M229: loopback-only read-only evidence after real ingress/dedup.
                 // Never claim that sending an action proved it was accepted.
                 if game.drop_new_action_datagrams {

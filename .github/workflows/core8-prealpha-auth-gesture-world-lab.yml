@@ -1,0 +1,31 @@
+name: Core8 authenticated gesture to World loopback lab (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "server/src/prealpha_authenticated_gesture.rs"
+      - "server/src/prealpha_lmb_gesture_authority.rs"
+      - "server/src/lib.rs"
+      - "server/tests/prealpha_authenticated_gesture_to_world.rs"
+      - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-world-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust formatting exact HEAD
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
+      - name: Server binary real QUIC transport integration compiles
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict Rust Clippy across original game and experimental integration
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
