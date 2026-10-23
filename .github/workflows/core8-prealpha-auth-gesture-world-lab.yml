@@ -92,5 +92,12 @@ jobs:
         env:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
         run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: Real Chromium KeyE PRESS accepted plus delayed duplicate ACK must preserve physical RELEASE
+        env:
+          CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
+          CORE8A_LAB_DUPLICATE_KEYE_PRESS: "1"
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings

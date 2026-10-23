@@ -35,7 +35,7 @@ async function wd(method,path,body) {
   if(!response.ok||result.value?.error) throw Error(method+" "+path+" "+JSON.stringify(result).slice(0,500));
   return result.value;
 }
-function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback) {
+function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,duplicatePressedAck,callback) {
   (async()=>{
     const hash=new Uint8Array(pin.match(/../g).map(x=>parseInt(x,16)));
     const wt=new WebTransport(endpoint,{serverCertificateHashes:[{algorithm:"sha-256",value:hash}]});
@@ -89,6 +89,18 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
             gestureId:packet.gestureId,attempt:packet.attempt});
         } else {
           void writer.write(packet.bytes).catch(e=>lab.errors.push(String(e)));
+          // Repeat original byte-exact source1 PRESS before its first ACK.
+          if(duplicatePressedAck && source===1 && name==="down" && packet.sequence===1) {
+            const [retry]=q.nextSendBatch(1);
+            if(!retry||retry.sequence!==1||retry.attempt!==2
+               ||retry.gestureId!==packet.gestureId||retry.source!==packet.source)
+              throw Error("duplicate KeyE must originate from authentic pending outbox");
+            if(!retry.bytes.every((b,i)=>b===packet.bytes[i]))
+              throw Error("bounded retry must preserve exact original 16 bytes");
+            lab.sent.push({source:retry.source,action:retry.action,
+              sequence:retry.sequence,gestureId:retry.gestureId,attempt:retry.attempt});
+            void writer.write(retry.bytes).catch(e=>lab.errors.push(String(e)));
+          }
         }
       } catch(e) {lab.errors.push(String(e));}
     };
@@ -117,8 +129,10 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
           }
           const receipt=q.receiveAck(b,token);
           lab.acks.push({status:receipt.status,sequence:receipt.sequence,
-            gestureId:receipt.gestureId,source:receipt.source,tick:receipt.serverTick});
+            gestureId:receipt.gestureId,source:receipt.source,tick:receipt.serverTick,
+            alreadySettled:receipt.alreadySettled===true});
           lab.settlements.push({transportSettled:receipt.transportSettled,
+            alreadySettled:receipt.alreadySettled===true,
             combatCommitted:receipt.combatCommitted});
         }
       }
@@ -191,7 +205,8 @@ try {
     script:"("+initBrowser.toString()+").apply(null,arguments)",args:[info.url,info.pin,
       "http://127.0.0.1:"+httpPort+"/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
       process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1",
-      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1"],
+      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1",
+      process.env.CORE8A_LAB_DUPLICATE_KEYE_PRESS === "1"],
   });
   assert(boot.ok,JSON.stringify(boot));
   // Synchronize the READ-ONLY original Rust 60Hz World flight observer.
@@ -207,6 +222,8 @@ try {
   });
   assert(originalIdle.witness,"actual server 60Hz Idle baseline is required");
   const heldKeyE = process.env.CORE8A_LAB_STANDALONE_KEYE_HELD === "1";
+  const duplicateKeyE = process.env.CORE8A_LAB_DUPLICATE_KEYE_PRESS === "1";
+  assert(!duplicateKeyE||heldKeyE,"duplicate ACK case requires actual held physical KeyE");
   if(heldKeyE) {
     assert(!process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS ||
       process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS !== "1",
@@ -223,10 +240,19 @@ try {
       });
       const windup=output.split("\n").find(l=>
         /M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(l));
-      return {...x,windup,ok:!!windup&&x.acks?.length===1&&x.acks[0].status===1};
+      return {...x,windup,ok:!!windup&&x.acks?.length===(duplicateKeyE?2:1)
+        &&x.acks.some(a=>a.sequence===1&&a.status===1)
+        &&(!duplicateKeyE||x.acks.some(a=>a.sequence===1&&a.status===2))};
     });
     assert.deepEqual(press.sent.map(e=>[e.source,e.action,e.sequence,e.gestureId,e.attempt]),
-      [[1,1,1,1,1]]);
+      duplicateKeyE?[[1,1,1,1,1],[1,1,1,1,2]]:[[1,1,1,1,1]]);
+    if(duplicateKeyE) {
+      assert.equal(press.acks.filter(a=>a.alreadySettled).length,1,
+        "genuine second Rust World ACK must idempotently settle one existing KeyE PRESS");
+      assert.equal(press.errors.length,0,"one valid duplicate ACK may not retire physical KeyE");
+      assert.equal(press.snapshot.closed,false);
+      assert.equal(press.snapshot.settledReceipts,1);
+    }
     assert.equal(press.snapshot.pending,0);
     await pause(490); // physical KeyE remains DOWN for 320ms server READY
     assert(!output.includes("fighter=1 from=9 to=10"),
@@ -241,17 +267,20 @@ try {
       });
       const active=output.split("\n").find(l=>
         /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(l));
-      return {...x,active,ok:!!active&&x.acks?.length===2
-        &&x.acks[1].sequence===2&&x.acks[1].status===1};
+      return {...x,active,ok:!!active&&x.acks?.length===(duplicateKeyE?3:2)
+        &&x.acks.some(a=>a.sequence===2&&a.status===1)};
     });
     assert.deepEqual(accepted.events.map(e=>e.name),["keyDown","keyUp"]);
     assert(accepted.events.every(e=>e.trusted),"both actual KeyE edges must be trusted native W3C events");
     assert(accepted.events[1].ms-accepted.events[0].ms>=320,
       "physical key held until the 320ms original server READY threshold");
     assert.deepEqual(accepted.sent.map(e=>[e.source,e.action,e.sequence,e.gestureId,e.attempt]),
-      [[1,1,1,1,1],[1,3,2,1,1]]);
-    assert.deepEqual(accepted.acks.map(e=>[e.sequence,e.gestureId,e.source,e.status]),
-      [[1,1,1,1],[2,1,1,1]]);
+      duplicateKeyE?[[1,1,1,1,1],[1,1,1,1,2],[1,3,2,1,1]]
+        :[[1,1,1,1,1],[1,3,2,1,1]]);
+    assert.deepEqual(accepted.acks.map(e=>[e.sequence,e.gestureId,e.source,e.status])
+      .sort((a,b)=>a[0]-b[0]||a[3]-b[3]),
+      duplicateKeyE?[[1,1,1,1],[1,1,1,2],[2,1,1,1]]
+        :[[1,1,1,1],[2,1,1,1]]);
     assert(accepted.acks.every(e=>e.tick>0),"genuine original World tick in every server ACK");
     assert(accepted.settlements.every(e=>e.transportSettled&&!e.combatCommitted),
       "ACKs are never a server-authorized HIT");
@@ -262,8 +291,10 @@ try {
       /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(l)).length,1,
       "one matching physical KeyE RELEASE must commit exactly one real heavy");
     assert.equal(accepted.errors.length,0);
-    console.log("CORE8_NATIVE_SHARED_OUTBOX_KEYE_RELEASE_ONLY_PASS",JSON.stringify({
+    console.log(duplicateKeyE?"CORE8_NATIVE_SERVER_KEYE_DUPLICATE_ACK_RELEASE_PASS":
+      "CORE8_NATIVE_SHARED_OUTBOX_KEYE_RELEASE_ONLY_PASS",JSON.stringify({
       originalWorld:true,pinnedQUIC:true,oneCore8AOutbox:true,
+      duplicateKeyE,alreadySettled:accepted.acks.filter(e=>e.alreadySettled).length,
       physicalHeldMs:accepted.events[1].ms-accepted.events[0].ms,
       press:press.windup,release:accepted.active,
       receipts:accepted.acks,queue:accepted.snapshot,
