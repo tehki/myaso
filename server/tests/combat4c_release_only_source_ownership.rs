@@ -290,3 +290,46 @@ fn original_held_lmb_is_not_released_by_newer_release_only_keye_world_owner() {
         "new KeyE World owner is not proof previous physical LMB was released"
     );
 }
+
+#[test]
+fn late_old_held_lmb_release_after_new_keye_world_owner_must_not_retire_shared_lease() {
+    // Real physical LMB is STILL held even after its original 34HP action
+    // recovers; KeyE later starts its own, different, RELEASE-TO-STRIKE heavy.
+    // The LMB's matching eventual UP is a valid old physical terminal:
+    // 0x12 ACCEPTED no-combat, not fatal REJECTED and never KeyE release.
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+
+    assert_eq!(
+        ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+    assert_eq!(
+        ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 2, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(
+        ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 3, 1),
+        AckStatus::Accepted,
+        "genuine prior LMB UP must be tombstoned without closing same KeyE lease"
+    );
+    assert_eq!(
+        ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 3, 1),
+        AckStatus::Duplicate
+    );
+    // The previous source0 terminal CANNOT auto-commit newer KeyE.
+    assert!(hits(&mut p, &mut w, 37).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+
+    assert_eq!(
+        ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 20)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+}
