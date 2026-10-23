@@ -4,7 +4,7 @@ use myaso_server::prealpha_authenticated_gesture::SessionGestureWorldPath;
 use myaso_server::prealpha_lmb_gesture_proposal::{
     encode_typed_event, AckStatus, GestureAction, GestureEvent, GestureSource, TypedGestureEvent,
 };
-use myaso_server::simulation::{Action, CombatEvent, World};
+use myaso_server::simulation::{Action, CombatEvent, InputIntent, World};
 
 const LEASE: u64 = 0x4455;
 const BOOT: u128 = 0x1122_3344_7788_99aa;
@@ -721,6 +721,14 @@ fn same_tick_actor_reuse_refuses_retired_release_and_allows_fresh_lease_hit() {
     let fresh_lease = LEASE + 1;
     let mut fresh =
         SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    // Fighter facing is refreshed from server-held latest input each World tick.
+    assert!(world.set_input(
+        2,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        }
+    ));
     assert_eq!(
         admit(
             &mut fresh,
@@ -807,6 +815,24 @@ fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
     let mut damage = Vec::new();
     let mut saw_death = false;
     for gesture in 1..=3_u32 {
+        if gesture == 3 {
+            // Two real contact knockbacks can move a target outside light
+            // reach. Close the distance through the ordinary World movement
+            // input instead of changing Combat hit range or fabricating HP.
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_x: 1.0,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..8 {
+                world.step();
+                attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+                old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+            }
+            assert!(world.set_input(1, InputIntent::default()));
+        }
         assert_eq!(
             admit(
                 &mut attacker,
@@ -885,6 +911,14 @@ fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
     let fresh_lease = stale_lease + 1;
     let mut fresh =
         SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    // Fighter facing is refreshed from server-held latest input each World tick.
+    assert!(world.set_input(
+        2,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        }
+    ));
     assert_eq!(
         admit(
             &mut fresh,
