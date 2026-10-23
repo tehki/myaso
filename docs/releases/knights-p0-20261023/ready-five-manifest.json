@@ -1,0 +1,124 @@
+{
+  "packet": "Moon Games Graphics 3A Pre-Alpha Knights Ready-Five",
+  "date": "2026-10-23",
+  "status": "READY_FOR_MAIN_RELEASE_DECISION_NOT_DEPLOYED",
+  "sourceBaseHead": "2bf5d48e2c87b70dbb30e5e91ca96dc7e41b0938",
+  "promotionGate": {
+    "configField": "silverKnightRelitEnabled",
+    "enabledValue": true,
+    "disabledByDefault": true,
+    "rollbackValue": false,
+    "trustedPinnedConfigOnly": true,
+    "urlQueryAdded": "knightArt=relit"
+  },
+  "readyMotions": [
+    {
+      "motion": "Idle",
+      "relativePath": "web/assets/knights/review/silver_idle_relit.webp",
+      "sha256": "3ce8809d131e8e06703019f8714c88fcc3d59a051fcdd301180e603ef274c0e3",
+      "bytes": 196992,
+      "framesPerDirection": 4,
+      "directions": 8,
+      "pixelFrame": [
+        160,
+        160
+      ],
+      "source": "source-authentic Blender 1.29 camera"
+    },
+    {
+      "motion": "Walk",
+      "relativePath": "web/assets/knights/review/silver_walk_relit.webp",
+      "sha256": "4ec5037277f5e50d6aa5ae5a82790f8534f2ff39560c3cd5fa140e0d36b53b6f",
+      "bytes": 379582,
+      "framesPerDirection": 8,
+      "directions": 8,
+      "pixelFrame": [
+        160,
+        160
+      ],
+      "source": "source-authentic Blender 1.29 camera"
+    },
+    {
+      "motion": "Sprint",
+      "relativePath": "web/assets/knights/review/silver_sprint_relit.webp",
+      "sha256": "0866a95df012fd09b87bd1a2a7d0529d140ab0a00667cf7cd2e74561058426a0",
+      "bytes": 379742,
+      "framesPerDirection": 8,
+      "directions": 8,
+      "pixelFrame": [
+        160,
+        160
+      ],
+      "source": "source-authentic Blender 1.29 camera"
+    },
+    {
+      "motion": "Jump",
+      "relativePath": "web/assets/knights/review/silver_jump_relit.webp",
+      "sha256": "0735cb6c36c1683ea11d49e348f26c62139bc7c73884c4836eea91e94421e074",
+      "bytes": 292526,
+      "framesPerDirection": 6,
+      "directions": 8,
+      "pixelFrame": [
+        160,
+        160
+      ],
+      "source": "source-authentic Blender 1.29 camera"
+    },
+    {
+      "motion": "Roll",
+      "relativePath": "web/assets/knights/silver_roll.webp",
+      "sha256": "31c774ac930a5cf1060640f1fc2914b02d6d5ddccd7d56591123efd098909426",
+      "bytes": 67306,
+      "framesPerDirection": 8,
+      "directions": 8,
+      "pixelFrame": [
+        160,
+        160
+      ],
+      "source": "immutable original Roll camera, 350 ms"
+    }
+  ],
+  "excludedFromGameplayRelease": [
+    {
+      "motion": "Spartan Kick V3 normal lighting",
+      "reason": "Original Blender art review available; no protected approved authoritative action-to-source mapping."
+    },
+    {
+      "motion": "Grounded Knockdown V2",
+      "reason": "Original Blender source and review approved; actual production snapshot/grounded fall-to-stand requires dedicated integration acceptance."
+    },
+    {
+      "motion": "Dash traction 140ms",
+      "reason": "Eight-way original Blender art candidate #863; authenticated native Dash-source playback still not qualified."
+    },
+    {
+      "motion": "all weapon attack/parry/stun/death assets",
+      "reason": "No grounded source-authentic committed gameplay clips; use Combat tells."
+    }
+  ],
+  "qualityEvidence": [
+    {
+      "name": "Parent full protected quality",
+      "run": 39949256026,
+      "result": "success",
+      "commit": "2bf5d48e2c87b70dbb30e5e91ca96dc7e41b0938"
+    },
+    {
+      "name": "Parent genuine 4-user native with shadow and authoritative jump landing",
+      "run": 39949255632,
+      "result": "success_after_same_sha_rerun",
+      "commit": "2bf5d48e2c87b70dbb30e5e91ca96dc7e41b0938"
+    }
+  ],
+  "releaseAuthority": "Main Development & Deployment Orchestrator",
+  "expectedHumanQA": "2-4 humans, 8 facings, moving still ground contact, 140ms Dash remains Combat fallback, Kick/Knockdown Combat fallback, Roll, Jump->Idle landing",
+  "noChangesTo": [
+    "server",
+    "src/combat",
+    "physics",
+    "hitboxes",
+    "network protocol",
+    "roll WebP",
+    "baseline five root WebPs"
+  ]
+}
