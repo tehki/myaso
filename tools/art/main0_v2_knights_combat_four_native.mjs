@@ -217,6 +217,17 @@ try{
    return after>=0 && lines.slice(after+1).find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
  },14000);
  assert(heavyReturnedIdle,"new physically pressed light starts only after original World returns to Idle");
+ // Genuine W3C re-approach after original 46HP heavy knockback. A heavy
+ // displaces the victim 28 World units; a subsequent LIGHT has shorter reach.
+ // No actor coordinates, World collision, HP or Combat timers are modified.
+ const physicalReapproach={source:"trusted W3C KeyD",heldMs:260,phase:"after genuine 46HP hit and heavy recovery"};
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"key",id:"real-original-reapproach",actions:[
+   {type:"keyDown",value:"d"},
+   {type:"pause",duration:physicalReapproach.heldMs},
+   {type:"keyUp",value:"d"},
+  ]}]
+ });
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
  // One physical W3C pointer action tick sequence. Do NOT wait for a
@@ -247,6 +258,15 @@ try{
   .filter(line=>/M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
  assert.ok(honestWorldHits.some(line=>/damage=46(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 46 HP heavy strike against an independent fighter");
+ if(!honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line))){
+  const originalWorldTail=readAuthoritativeWorld().split("\n").filter(line=>/M201_AUTH_(ACTION|HIT|PARRY|BLOCK|EVADE)/.test(line)).slice(-45);
+  const liveBrowser=await evaluate(attacker,
+   "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
+  ).catch(e=>({driverError:String(e)}));
+  const evidence={physicalReapproach,serverActor:1,lightPress,lightActive,worldHits:honestWorldHits,originalWorldTail,liveBrowser};
+  await writeFile(join(output,"core8c-original-heavy-to-light-34hp-diagnostic.json"),JSON.stringify(evidence,null,2));
+  console.error("CORE8C_ORIGINAL_HEAVY_TO_LIGHT_CONTACT_DIAGNOSTIC",JSON.stringify(evidence));
+ }
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 34 HP light strike against an independent fighter");
  console.log("MAIN0_ORIGINAL_GAME_PHYSICAL_V2_QUIC_WORLD_ACTIONS",JSON.stringify({
