@@ -529,8 +529,8 @@ async function startGameServer() {
       // World.set_input provenance. Rust itself refuses this on non-loopback.
       MYASO_FLIGHT_INPUT_ADMISSION_TRACE:
         scenario === "uirollknockdownffahit" ? "1" : "0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uirollknockdownffahit"
-        || scenario === "uiguardbreakpunishffahit"
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uirollknockdownffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
