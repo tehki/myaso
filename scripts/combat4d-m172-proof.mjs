@@ -43,7 +43,7 @@ export function assessM172Witness(e) {
     || !trace.some(x => x.serverTick === 594 && x.stamina === 12)
     || !Array.isArray(jumps) || !jumps.some(x => x.action === 15 && x.serverTick === 570)
     || !jumps.some(x => x.action === 0 && x.serverTick === 594)) {
-    throw Error("Original real ordinary Jump and regenerating authoritative stamina missing");
+    throw Error("Original real World ordinary Jump and regenerating authoritative stamina missing");
   }
   const ptr = w.pointer_transitions;
   const down = ptr?.find(x=>x.type === "pointerdown" && x.button === 0 && x.epochMs === d[0].epochMs);
