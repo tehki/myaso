@@ -344,7 +344,7 @@ pub enum ReviewLightWorldDispatch {
 
 impl ReviewOwnedWorld {
     /// REVIEW ONLY: consume exactly one already-ordered source=0 light PRESS,
-    /// optionally paired with its matching terminal in the same 60Hz tick.
+    /// optionally paired with its matching RELEASE in the same 60Hz tick.
     ///
     /// The exclusive &mut self borrow spans current owner/life verification,
     /// event drainage and the ACTUAL World::set_input mutation. Thus the World
@@ -352,6 +352,8 @@ impl ReviewOwnedWorld {
     /// between these steps. The original server's tokio Mutex<SharedGame> is
     /// NOT wired here; the QUIC actor lease is a fixture, not authenticated.
     ///
+    /// CANCEL also remains unsupported: original Combat4 must decide if and
+    /// when an unlanded attack may be aborted under the World lock.
     /// This small bridge intentionally does NOT implement LMB UPGRADE/HEAVY
     /// or KeyE. Unsupported multi-press batches retire instead of silently
     /// merging independent attacks into one World 60Hz edge.
@@ -385,14 +387,14 @@ impl ReviewOwnedWorld {
                 (Some(*edge), None)
             }
             [edge]
-                if matches!(edge.action, GestureAction::Release | GestureAction::Cancel)
+                if edge.action == GestureAction::Release
                     && gate.review_active_light_gesture == Some(edge.gesture_id) =>
             {
                 (None, Some(*edge))
             }
             [first, last]
                 if first.action == GestureAction::Press
-                    && matches!(last.action, GestureAction::Release | GestureAction::Cancel)
+                    && last.action == GestureAction::Release
                     && first.gesture_id == last.gesture_id
                     && first.sequence.checked_add(1) == Some(last.sequence)
                     && gate.review_active_light_gesture.is_none() =>
@@ -401,7 +403,7 @@ impl ReviewOwnedWorld {
             }
             _ => return reject(gate),
         };
-        // A subsequent matching RELEASE/CANCEL is bookkeeping, never another
+        // A subsequent matching RELEASE is bookkeeping, never another
         // attack and never client-authorized damage.
         if press.is_none() {
             gate.review_active_light_gesture = None;
