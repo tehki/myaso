@@ -239,7 +239,6 @@ impl SharedGame {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .ok()
     }
-
 }
 
 fn should_enqueue_reliable_catchup(
@@ -374,10 +373,19 @@ async fn main() -> Result<()> {
                 state.refresh_replication_frame();
             }
 
-            let result = handle_connection(connection, player_id, lease_epoch, v2_lab, Arc::clone(&game)).await;
+            let result = handle_connection(
+                connection,
+                player_id,
+                lease_epoch,
+                v2_lab,
+                Arc::clone(&game),
+            )
+            .await;
             {
                 let mut state = game.state.lock().await;
-                if let Some(mut gesture) = state.gesture_sessions.remove(&lease_epoch) { gesture.retire(); }
+                if let Some(mut gesture) = state.gesture_sessions.remove(&lease_epoch) {
+                    gesture.retire();
+                }
                 state.world.remove_player(player_id);
                 state.refresh_replication_frame();
             }
@@ -537,7 +545,11 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         state.apply_flight_background_motion();
         state.world.step_into(&mut events);
         // Single authoritative 60Hz World lock covers every current session.
-        let GameState { world, gesture_sessions, .. } = &mut *state;
+        let GameState {
+            world,
+            gesture_sessions,
+            ..
+        } = &mut *state;
         for (epoch, gesture) in gesture_sessions.iter_mut() {
             gesture.advance_under_world_lock(world, *epoch);
         }
@@ -684,7 +696,7 @@ async fn handle_connection(
                         })
                     };
                     if let Some(ack) = ack {
-                        connection.send_datagram(encode_ack(ack)?.to_vec())
+                        connection.send_datagram(encode_ack(ack).map_err(|e| anyhow::anyhow!("v2 ACK encoding: {e:?}"))?)
                             .context("send v2 event processed ACK")?;
                     }
                     continue;

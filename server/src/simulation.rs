@@ -285,7 +285,9 @@ pub struct Fighter {
 }
 
 impl Fighter {
-    pub fn world_incarnation(&self) -> u64 { self.world_incarnation }
+    pub fn world_incarnation(&self) -> u64 {
+        self.world_incarnation
+    }
 
     fn new(net_id: u32, x: f32, y: f32, facing: f32, world_incarnation: u64) -> Self {
         Self {
@@ -556,7 +558,7 @@ pub enum CombatEvent {
     MatchReset,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct World {
     pub width: f32,
     pub height: f32,
@@ -569,6 +571,24 @@ pub struct World {
     world_instance: u64,
 }
 
+// Cloning an entire World creates a NEW owner; never alias the source
+// instance epoch across independent authoritative World objects.
+impl Clone for World {
+    fn clone(&self) -> Self {
+        Self {
+            width: self.width,
+            height: self.height,
+            now_ms: self.now_ms,
+            tick: self.tick,
+            winner: self.winner,
+            reset_at_ms: self.reset_at_ms,
+            fighters: self.fighters.clone(),
+            next_world_incarnation: self.next_world_incarnation,
+            world_instance: reserve_world_instance(),
+        }
+    }
+}
+
 impl Default for World {
     fn default() -> Self {
         Self::new(DEFAULT_WORLD_WIDTH, DEFAULT_WORLD_HEIGHT)
@@ -576,7 +596,9 @@ impl Default for World {
 }
 
 impl World {
-    pub fn world_instance(&self) -> u64 { self.world_instance }
+    pub fn world_instance(&self) -> u64 {
+        self.world_instance
+    }
 
     fn new_incarnation(&mut self) -> u64 {
         let n = self.next_world_incarnation;
@@ -825,7 +847,8 @@ impl World {
         for fighter in &mut self.fighters {
             if fighter.action == Action::Dead {
                 if self.now_ms >= fighter.respawn_at_ms {
-                    fighter.world_incarnation = reserve_actor_life(&mut self.next_world_incarnation);
+                    fighter.world_incarnation =
+                        reserve_actor_life(&mut self.next_world_incarnation);
                     respawn_fighter(fighter);
                     events.push(CombatEvent::Respawn {
                         fighter: fighter.net_id,
@@ -1827,6 +1850,24 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
 }
 
+// Ephemeral nonreusable World and fighter-life identifiers; process scoped.
+static NEXT_GESTURE_WORLD_INSTANCE: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+fn reserve_world_instance() -> u64 {
+    NEXT_GESTURE_WORLD_INSTANCE
+        .fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |n| n.checked_add(1),
+        )
+        .expect("World owner instance epoch exhausted")
+}
+fn reserve_actor_life(next: &mut u64) -> u64 {
+    let n = *next;
+    *next = n.checked_add(1).expect("World actor life epoch exhausted");
+    n
+}
+
 #[cfg(test)]
 mod r2_combat_control_tests {
     use super::*;
@@ -2320,20 +2361,4 @@ mod r2_combat_control_tests {
         assert_eq!(own.action, Action::Block);
         assert!((own.x - 210.75).abs() < 0.001);
     }
-}
-
-
-static NEXT_GESTURE_WORLD_INSTANCE: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(1);
-fn reserve_world_instance() -> u64 {
-    NEXT_GESTURE_WORLD_INSTANCE
-        .fetch_update(std::sync::atomic::Ordering::Relaxed,
-                      std::sync::atomic::Ordering::Relaxed,
-                      |n| n.checked_add(1))
-        .expect("World owner instance epoch exhausted")
-}
-fn reserve_actor_life(next: &mut u64) -> u64 {
-    let n = *next;
-    *next = n.checked_add(1).expect("World actor life epoch exhausted");
-    n
 }
