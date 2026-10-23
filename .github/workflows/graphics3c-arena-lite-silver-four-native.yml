@@ -58,3 +58,25 @@ jobs:
           path: artifacts/arena-lite-silver-four-native/*
           if-no-files-found: ignore
           retention-days: 7
+  real-silver-walk-jump-grounded-on-arena-lite:
+    name: four authoritative Silver walkers and one real grounded-shadow Jump on Lite
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact review source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact original Silver/terrain source and native runner
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python3 -m py_compile tools/art/verify_arena_lite_silver_jump_shadow_native.py
+          node --test tests/graphics3a-ground-shadow-airborne.test.mjs tests/prealpha-silver-knight.test.mjs tests/prealpha-arena-lite-optin.test.mjs
+          google-chrome --version
+          chromedriver --version
+      - name: Compile real first-party Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real W3C Silver source players, real W key, real authoritative Space Jump and grounded shadow over Lite
+        run: timeout --signal=TERM --kill-after=5s 165s python3 tools/art/verify_arena_lite_silver_jump_shadow_native.py
