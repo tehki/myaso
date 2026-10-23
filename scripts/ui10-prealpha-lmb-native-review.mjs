@@ -49,7 +49,8 @@ window.ui10={
 const allowed=new Set([
 "/src/browser/prealpha-lmb-dom-gesture-review.mjs",
 "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
-"/src/network/prealpha-lmb-gesture-proposal.mjs"
+"/src/network/prealpha-lmb-gesture-proposal.mjs",
+"/src/network/prealpha-shared-source-allocator-proposal.mjs"
 ]);
 const server=http(async(req,res)=>{
  try{
