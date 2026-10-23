@@ -9542,9 +9542,10 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
   }));
 }
 
-// Trusted WebDriver mouse: with RMB held, middle DOWN/UP are intermediate
-// mousedown/up edges without separate W3C pointerdown/up. The original
-// online page must hold and retire a real World Block, with no fake events.
+// MMB true W3C chord acceptance: ONE physical driver action transaction
+// maintains a single pointer source across RMB2 down, MMB1 down/up, RMB2 up.
+// Split POSTs can reset ChromeDriver's button mask between commands (observed
+// buttons=2 then buttons=4, never 6) and strand block without trusted release.
 async function runCombat4aNativeMiddleMouseChordFlight(entries) {
   const label = "Combat4A authentic middle mouse chord";
   if (entries.length !== 2) throw new Error(label + ": requires Chrome and Firefox");
@@ -9560,94 +9561,85 @@ async function runCombat4aNativeMiddleMouseChordFlight(entries) {
       "document.querySelector('#arena').focus(); return document.activeElement?.id;");
     const arena = await resolveArenaElement(session, label);
     const origin = { "element-6066-11e4-a52e-4f735466cecf": arena };
-    // Read-only isTrusted provenance. Never dispatch a synthetic input event.
+    // Capture only genuine isTrusted DOM events, with the actual button mask.
+    // No synthetic JS events and no modifications to game's held block.
     await execute(session.base, session.sessionId,
       "const a=document.querySelector('#arena');"
       + "const h=[];window.__COMBAT4A_NATIVE_CHORD_PROOF__=h;"
-      + "for(const type of ['pointerdown','pointerup','mousedown','mouseup','pointercancel'])"
+      + "for(const type of ['pointerdown','pointerup','mousedown','mouseup','pointermove','pointercancel'])"
       + "a.addEventListener(type,e=>{if(e.isTrusted)h.push({type,button:e.button,"
-      + "buttons:e.buttons,trusted:e.isTrusted})},{capture:true});return true;");
-    let heldRight = false, heldMiddle = false;
-    const send = async actions => webdriver(session.base, "POST",
-      "/session/" + session.sessionId + "/actions", {
-        actions: [{ type: "pointer", id: "mouse-" + session.name,
-          parameters: { pointerType: "mouse" }, actions }],
-      });
-    try {
-      await send([
+      + "buttons:e.buttons, trusted:e.isTrusted,epochMs:Date.now()})},{capture:true});return true;");
+    const gesture = {
+      type: "pointer", id: "mouse-" + session.name,
+      parameters: { pointerType: "mouse" },
+      actions: [
         { type: "pointerMove", duration: 0, origin, x: 0, y: 0 },
         { type: "pointerDown", button: 2 },
-      ]);
-      heldRight = true;
-      await sleep(65);
-      await send([{ type: "pointerDown", button: 1 }]);
-      heldMiddle = true;
-      let seenBlock = false;
-      const blockDeadline = Date.now() + 900;
-      while (Date.now() < blockDeadline) {
-        const state = await readUiEvidence(session);
-        if ((state.acceptance?.ownActionTransitions ?? []).some(
-          e => e.action === COMBAT_ACTION.block)) {
-          seenBlock = true;
-          break;
-        }
-        await sleep(20);
-      }
-      if (!seenBlock) throw new Error(label + ": original server did not enter block on "
-        + session.name + " " + JSON.stringify(await readUiEvidence(session)));
-      // MMB physically released, RMB still physically down.
-      await send([{ type: "pointerUp", button: 1 }]);
-      heldMiddle = false;
-      let seenIdleAfterBlock = false;
-      const idleDeadline = Date.now() + 900;
-      while (Date.now() < idleDeadline) {
-        const state = await readUiEvidence(session);
-        const actions = state.acceptance?.ownActionTransitions ?? [];
-        const blockAt = actions.findIndex(e => e.action === COMBAT_ACTION.block);
-        if (blockAt >= 0 && actions.slice(blockAt + 1).some(
-          e => e.action === COMBAT_ACTION.idle)) {
-          seenIdleAfterBlock = true;
-          break;
-        }
-        await sleep(20);
-      }
-      if (!seenIdleAfterBlock) {
-        const nativeEvents = await execute(session.base, session.sessionId,
-          "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
-        throw new Error(label + ": released middle stayed blocked on "
-          + session.name + " " + JSON.stringify({
-            nativeEvents, actualWorld: await readUiEvidence(session),
-          }));
-      }
-      const events = await execute(session.base, session.sessionId,
-        "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
-      const count = (type, button) => events.filter(e =>
-        e.trusted && e.type === type && e.button === button).length;
-      const verdict = { browser: session.name, events,
-        rightPointerDown: count("pointerdown", 2),
-        intermediateMiddleMouseDown: count("mousedown", 1),
-        intermediateMiddlePointerDown: count("pointerdown", 1),
-        intermediateMiddleMouseUp: count("mouseup", 1),
-        intermediateMiddlePointerUp: count("pointerup", 1),
-        realWorldBlockAndRelease: true };
-      // ChromeDriver/Firefox are allowed to emit a trusted pointer edge for
-      // an additional button: native mouse DOWN/UP + original World Block/Idle
-      // are mandatory, and extra pointer edges must never duplicate a gesture.
-      // The first genuine Chrome trace had pointerdown(button=1) despite
-      // RMB already down; "must be zero" was an incorrect browser assumption.
-      if (verdict.rightPointerDown !== 1
-        || verdict.intermediateMiddleMouseDown !== 1
-        || verdict.intermediateMiddlePointerDown > 1
-        || verdict.intermediateMiddleMouseUp !== 1
-        || verdict.intermediateMiddlePointerUp > 1) {
-        throw new Error(label + ": genuine multi-button W3C event proof failed "
-          + JSON.stringify(verdict));
-      }
-      results.push(verdict);
+        { type: "pause", duration: 250 },
+        { type: "pointerDown", button: 1 },
+        { type: "pause", duration: 300 },
+        { type: "pointerUp", button: 1 },
+        { type: "pause", duration: 350 },
+        { type: "pointerUp", button: 2 },
+      ],
+    };
+    try {
+      // This single W3C request is a real browser gesture, not JS injection;
+      // after completion World action proof must preserve both phases.
+      await webdriver(session.base, "POST",
+        "/session/" + session.sessionId + "/actions", { actions: [gesture] });
     } finally {
-      if (heldMiddle) await send([{ type: "pointerUp", button: 1 }]);
-      if (heldRight) await send([{ type: "pointerUp", button: 2 }]);
+      // Release driver-held inputs on any error; never fake a page pointerup.
+      await webdriver(session.base, "DELETE",
+        "/session/" + session.sessionId + "/actions").catch(() => {});
     }
+
+    const deadline = Date.now() + 950;
+    let world;
+    while (Date.now() < deadline) {
+      world = await readUiEvidence(session);
+      const actions = world.acceptance?.ownActionTransitions ?? [];
+      const block = actions.findIndex(e => e.action === COMBAT_ACTION.block);
+      if (block >= 0 && actions.slice(block + 1).some(
+        e => e.action === COMBAT_ACTION.idle)) break;
+      await sleep(25);
+    }
+    const events = await execute(session.base, session.sessionId,
+      "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
+    const count = (type, button) => events.filter(e =>
+      e.trusted && e.type === type && e.button === button).length;
+    const transitions = world?.acceptance?.ownActionTransitions ?? [];
+    const blockIndex = transitions.findIndex(e => e.action === COMBAT_ACTION.block);
+    const recovered = blockIndex >= 0 && transitions.slice(blockIndex + 1)
+      .some(e => e.action === COMBAT_ACTION.idle);
+    const middleDown = events.find(e => e.type === "mousedown" && e.button === 1);
+    const middleUp = events.find(e => e.type === "mouseup" && e.button === 1);
+    const result = {
+      browser: session.name,
+      rightPointerDown: count("pointerdown", 2),
+      middleMouseDown: count("mousedown", 1),
+      middleMouseUp: count("mouseup", 1),
+      middlePointerDown: count("pointerdown", 1),
+      middlePointerUp: count("pointerup", 1),
+      simultaneousButtonMask: middleDown?.buttons ?? null,
+      releasedButtonMask: middleUp?.buttons ?? null,
+      originalWorldBlockThenIdle: recovered,
+      events, actions: transitions,
+      mmbInput: world?.acceptance?.mmbBlockSamples ?? [],
+    };
+    // Require true hardware-like button provenance, not merely event names.
+    // If ChromeDriver cannot hold RMB+MMB inside one W3C transaction, this
+    // fails closed and identifies a driver limitation; no false release GO.
+    if (result.rightPointerDown !== 1
+      || result.middleMouseDown !== 1
+      || result.middleMouseUp !== 1
+      || !middleDown || (middleDown.buttons & 6) !== 6
+      || !middleUp || (middleUp.buttons & 4) !== 0
+      || !recovered) {
+      throw new Error(label + ": no complete physical RMB+MMB authoritative World proof "
+        + JSON.stringify(result));
+    }
+    results.push(result);
   }
   const final = await Promise.all(entries.map(readUiEvidence));
   if (final.some(e => e.playerHp !== 100 || e.playerGuard !== 100
