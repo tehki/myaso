@@ -787,6 +787,23 @@ function sampleInput() {
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
+  // P0 acceptance-only: observe the exact original 30Hz outgoing physical
+  // middle state to disambiguate a missing mouseUP from a stale World action.
+  if (acceptanceScenario === "ui4amiddlemousechord") {
+    const witness = window.__MYASO_ACCEPTANCE_STATE__;
+    if (witness) {
+      const samples = witness.mmbBlockSamples ??= [];
+      const item = {
+        epochMs: Date.now(), middleBlockHeld, middleBlockPointerId,
+        inputBlock: currentInput.block, run: currentInput.run,
+      };
+      if (!samples.length || ["middleBlockHeld", "middleBlockPointerId", "inputBlock", "run"]
+        .some((key) => samples.at(-1)[key] !== item[key])) {
+        samples.push(item);
+        if (samples.length > 32) samples.shift();
+      }
+    }
+  }
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
