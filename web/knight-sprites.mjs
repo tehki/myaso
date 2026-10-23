@@ -94,7 +94,9 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
   return {
     draw(ctx, fighter, { remote = false, actorKind = null, rotation = 0, nowMs = performance.now() } = {}) {
       if (actorKind !== "player") return false;
-      const key = remote ? actorKind + ":remote:" + fighter.netId : actorKind + ":local";
+      // A fresh authenticated local player is a distinct animation timeline.
+      // Never reuse the previous server actor's movement speed or late roll frame.
+      const key = actorKind + (remote ? ":remote:" : ":local:") + fighter.netId;
       let state = states.get(key);
       if (!state) {
         state = { x: fighter.x, y: fighter.y, atMs: nowMs, lastMoveMs: -Infinity,
