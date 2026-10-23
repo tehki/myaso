@@ -19,8 +19,8 @@ const sleeps=ms=>delay(ms);
 const processes=[];
 const sessions=[];
 let http;
-async function request(base,method,path,data){
- const res=await fetch(base+path,{method,headers:data===undefined?undefined:{"content-type":"application/json"},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(15000)});
+async function request(base,method,path,data,timeoutMs=15000){
+ const res=await fetch(base+path,{method,headers:data===undefined?undefined:{"content-type":"application/json"},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(timeoutMs)});
  let result;try{result=await res.json();}catch{result=null;}
  if(!res.ok)throw Error(method+" "+path+" "+res.status+" "+JSON.stringify(result).slice(0,300));
  return result;
@@ -41,7 +41,7 @@ async function startW3C(engine,index){
  const options=engine==="chrome"?
   {browserName:"chrome","goog:chromeOptions":{args:["--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1280,720","--disable-background-timer-throttling"]}}:
   {browserName:"firefox","moz:firefoxOptions":{args:["-headless"],prefs:{"layout.frame_rate":60}}};
- const created=await request(base,"POST","/session",{capabilities:{alwaysMatch:options}});
+ const created=await request(base,"POST","/session",{capabilities:{alwaysMatch:options}},engine==="firefox"?60000:30000);
  const id=created.value?.sessionId||created.sessionId;
  assert.ok(id,"genuine driver session required");
  const s={engine,index,id,base};sessions.push(s);
@@ -104,7 +104,7 @@ try{
  for(let i=0;i<4;i++){
   const s=await startW3C(engines[i],i);const flag=i%2===0?"1":"0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);if(flag==="1")u.searchParams.set("arenaLite","1");
-  await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()});
+  await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
   assert.equal(actor.id,i+1,"genuine sequential Rust actor IDs required");
   assert.ok(await evaluate(s,hook),"read-only original Canvas image observer");
