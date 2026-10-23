@@ -34,7 +34,7 @@ test("4D refuses forged actor or original real World recovery tick", () => {
   const a=structuredClone(evidence); a.reported_original_client.player_net_id=2;
   assert.throws(()=>assessM172Witness(a),/World witness/);
   const b=structuredClone(evidence); b.reported_original_client.stamina_trace=b.reported_original_client.stamina_trace.filter(x=>x.serverTick!==594);
-  assert.throws(()=>assessM172Witness(b),/World/);
+  assert.throws(()=>assessM172Witness(b),/ordinary Jump and regenerating authoritative stamina missing/);
 });
 test("4D rejects invented W3C LMB epoch/space provenance", () => {
   const a=structuredClone(evidence); a.reported_original_client.pointer_transitions=a.reported_original_client.pointer_transitions.filter(x=>x.epochMs!==1792753704940);
