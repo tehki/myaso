@@ -131,8 +131,7 @@ impl SessionGestureWorldPath {
                     // receipt lets Core8A's bounded sender retry both edges
                     // in sequence. A REJECTED ACK would permanently retire
                     // the sender lease and turn a 6ms click into no attack.
-                    if event.action
-                        != crate::prealpha_lmb_gesture_proposal::GestureAction::Press
+                    if event.action != crate::prealpha_lmb_gesture_proposal::GestureAction::Press
                         && self
                             .last_gesture_id
                             .is_none_or(|last| event.gesture_id > last)
