@@ -233,11 +233,13 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
+  // A foreign pointerUP must not reset another pointer's live LMB chord.
+  const committed = leftButtonCharge.release(event.pointerId);
+  if (committed === null) return;
   leftButtonDown = false;
   updateMouse(event);
-  const committed = leftButtonCharge.release(event.pointerId);
   leftButtonPressMovement = null;
-  if (committed && !audio.isUnlocked()) {
+  if (!audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
     audio.unlock();
     audio.play(committed === "heavy" ? "heavy" : "light");
@@ -283,9 +285,12 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.pointerId !== undefined && !(event.buttons & 1)) {
+  // Capture loss may report button=-1; only the matching, no-longer-down
+  // LMB pointer can clear its movement and Space+LMB reservation.
+  if (Number.isInteger(event.pointerId) && !(event.buttons & 1)
+    && leftButtonCharge.cancel(event.pointerId)) {
+    leftButtonDown = false;
     leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
   }
 });
 canvas.addEventListener("wheel", (event) => {
