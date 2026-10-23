@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "web/prealpha-gesture-live-lab.mjs"
       - "web/network-transport.mjs"
       - "tools/art/main0_v2_knights_combat_four_native.mjs"
