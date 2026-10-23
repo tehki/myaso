@@ -100,6 +100,18 @@ This records a real *test setup / confirmation window timing sensitivity*, **not
 
 Recorded original client trace: [qa/evidence/m172-run-39942285919.json](../qa/evidence/m172-run-39942285919.json). `node scripts/combat4d-m172-proof.mjs qa/evidence/m172-run-39942285919.json` checks the original 10→12 and 346→361 acknowledgement timeline and intentionally prints **HOLD**. Its seven negative tests refuse a fabricated low-stamina outcome, wrong actor, W3C gestures, original server ticks, and a fake successful protected job. Offline fixture integrity PASS is never true game certification and does not authenticate GitHub by itself; independently verify the exact source run and immutable logs.
 
+## Original native M40 → M193 guard-break FIRST exchange parry — 2026-10-23
+
+Independent QA-only #865 exact `311b6cb0ed6f0641f516c13ab3608a92b3dacae8`, full protected [quality #39944996021](https://github.com/tehki/myaso/actions/runs/39944996021), job `120385358197`, **FAILED step `Validate M40 spatial FFA guard-break tell`** after 127 completed successful validation steps, including the new 4D evidence-integrity step. The failed prerequisite is the original native `M193 guard-break exchange 1 resolved as parry instead of -38 guard` at `scripts/pvp_browser_flight_runner.mjs:9841`.
+
+The original real Rust 60Hz World logged fighter1 HeavyWindup9 tick210→LightWindup1 tick211, Firefox defender2 Block6 at tick213, and original `M201_AUTH_PARRY tick219 attacker=1 target=2`, attacking fighter1 enters ParryStun7. Six real ticks = **100ms** into an unchanged 125ms parry window. Firefox defender remained 100HP/100guard and displayed truthful `Parry! Opponent stunned - punish now.`; Chrome attacker received `Parried`. The intended M40 -38 guard BLOCK did not occur: **this original genuine parry is correct gameplay, wrong test staging**.
+
+Original runner `M212_GUARD_BREAK_INGRESS` contains trusted Firefox wheel before real Chrome pointerUP, `wheelHeadStartMs:0`, same Firefox wheel→block-cue 83ms and wheel→contact/parry 166ms. Chrome original W3C pointerDOWN `1792755079099` → pointerUP `1792755079109` (a genuine 10ms click). Do not derive packet latency by subtracting two independently clocked Chrome/Firefox wall-clock values. This source establishes server-tick legality and native output, not a unique transport/root cause.
+
+The immutable transcript is in [qa/evidence/m40-run-39944996021.json](../qa/evidence/m40-run-39944996021.json). Run `node scripts/combat4d-m40-proof.mjs qa/evidence/m40-run-39944996021.json` to validate the original action/clock/W3C correspondence and obtain **HOLD**. Six adversarial unit tests refuse forged -38 guard, relabeled Parry as Block, shifted authoritative ticks, untrusted wheel/pointer, fabricated successful workflow, or false game PASS. The offline fixture cannot authenticate its own GitHub run; review original logs separately. A green integrity checker never means Combat succeeds.
+
+**Routing:** 4A/8A observe true W3C defender block-headstart → submitted input, 4B original parry-age World branch, UI10 native HUD, 4D timing reproducibility and honest evidence. Preserve original parry, block, HP, 125ms and unwaived M40/M193 assertions. No old-run rewrite, main merge, gameplay change or deployment.
+
 ## Known runnable entry points
 
 ~~~bash
