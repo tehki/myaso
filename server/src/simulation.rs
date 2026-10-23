@@ -2371,6 +2371,99 @@ mod r2_combat_control_tests {
             .any(|event| matches!(event, CombatEvent::Hit { .. })));
     }
 
+    // M144: three authentic World actors cannot exhibit two overlapping
+    // punishable recovery phases when the first actor's jump chord never
+    // reaches authoritative input. A real admitted Space+LMB must create
+    // the second server action (no client/HUD inferred recovery).
+    #[test]
+    fn m144_real_jump_chord_creates_second_recovery_and_missing_chord_does_not() {
+        for jump_chord_admitted in [true, false] {
+            let mut world = World::new(900.0, 700.0);
+            assert!(world.add_player_at(1, 160.0, 160.0, 0.0));
+            assert!(world.add_player_at(2, 650.0, 550.0, std::f32::consts::PI));
+            assert!(world.add_player_at(3, 380.0, 160.0, std::f32::consts::PI));
+            // Third fighter starts an ordinary light attack first. Positions
+            // are separated beyond both authentic attack profiles' reach.
+            assert!(world.set_input(
+                3,
+                InputIntent {
+                    attack: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..9 {
+                let events = world.step();
+                assert!(!events.iter().any(|e| matches!(e, CombatEvent::Hit { .. })));
+            }
+            if jump_chord_admitted {
+                assert!(world.set_input(
+                    1,
+                    InputIntent {
+                        jump: true,
+                        attack: true,
+                        ..InputIntent::default()
+                    }
+                ));
+            }
+            let mut light_recovery_tick = None;
+            let mut jump_recovery_tick = None;
+            let mut light_idle_tick = None;
+            let mut overlapping_recovery = false;
+            let mut remaining_jump_recovery = false;
+            for _ in 0..55 {
+                let events = world.step();
+                assert!(!events.iter().any(|e| matches!(e, CombatEvent::Hit { .. })));
+                let jump = world.fighter(1).unwrap().action;
+                let light = world.fighter(3).unwrap().action;
+                if light == Action::AttackRecovery && light_recovery_tick.is_none() {
+                    light_recovery_tick = Some(world.tick);
+                }
+                if jump == Action::JumpAttackRecovery && jump_recovery_tick.is_none() {
+                    jump_recovery_tick = Some(world.tick);
+                }
+                if light == Action::AttackRecovery && jump == Action::JumpAttackRecovery {
+                    overlapping_recovery = true;
+                }
+                if light_recovery_tick.is_some() && light == Action::Idle {
+                    light_idle_tick.get_or_insert(world.tick);
+                    if jump == Action::JumpAttackRecovery {
+                        remaining_jump_recovery = true;
+                    }
+                }
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+                assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+                assert_eq!(world.fighter(3).unwrap().hp, 100.0);
+                if !jump_chord_admitted {
+                    assert_eq!(
+                        jump,
+                        Action::Idle,
+                        "missing original Space+LMB admission cannot create HUD recovery"
+                    );
+                }
+            }
+            let light_recovery_tick =
+                light_recovery_tick.expect("genuine third-player light entered recovery");
+            let light_idle_tick = light_idle_tick.expect("light eventually recovered");
+            if jump_chord_admitted {
+                let jump_recovery_tick =
+                    jump_recovery_tick.expect("genuine admitted Space+LMB entered jump recovery");
+                assert!(jump_recovery_tick > light_recovery_tick);
+                assert!(jump_recovery_tick < light_idle_tick);
+                assert!(overlapping_recovery, "two recovery intervals must overlap");
+                assert!(
+                    remaining_jump_recovery,
+                    "second punishable recovery must remain when first ends"
+                );
+                assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            } else {
+                assert!(jump_recovery_tick.is_none());
+                assert!(!overlapping_recovery);
+                assert!(!remaining_jump_recovery);
+            }
+        }
+    }
+
     #[test]
     fn block_hold_movement_is_exactly_half_speed() {
         let mut world = World::new(800.0, 600.0);
