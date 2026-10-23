@@ -219,6 +219,9 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
+    // Only a new, identified LMB pointer may update this gesture's movement.
+    // Duplicate/foreign DOWN must not overwrite the active press direction.
+    if (!Number.isInteger(event.pointerId) || leftButtonCharge.isPressed()) return;
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
