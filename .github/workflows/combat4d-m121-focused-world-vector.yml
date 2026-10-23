@@ -1,0 +1,38 @@
+name: Combat 4D M121 true physical directional light original World (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/light-attack-movement.mjs"
+      - "server/src/simulation.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/combat4d-m121-focused-world-vector.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m121-world-variant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify native original Chrome Firefox and unchanged sources
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: M121 first genuine independent W3C strafe LMB World directional hit
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: M121 second genuine independent W3C strafe LMB World directional hit
+        if: always()
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

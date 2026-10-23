@@ -527,6 +527,7 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
+        || scenario === "uidirectionallight"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
@@ -1642,7 +1643,18 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     entry.visible && entry.state === "directional-attack-recovery"
       && entry.label === "PUNISH" && entry.detail === "Sweep recovery");
   if (!leftThreat || !sweepRecovery) {
-    throw new Error(`M121 left-sweep readability was incomplete: ${JSON.stringify(defenderResult)}`);
+    // STRICT original left-sweep assertion unchanged; add source evidence.
+    const forensic = {
+      w3cKeys: attackerResult.keyTransitions,
+      w3cPointers: attackerResult.pointers,
+      actualMoveAtPress: attackerResult.m121InputPlane?.physicalPresses ?? [],
+      actualMoveOnLightRelease: attackerResult.m121InputPlane?.lightReleases ?? [],
+      submitted30HzAttackFrames: (attackerResult.m121InputPlane?.sentFrames ?? [])
+        .filter((frame) => frame.attack),
+      victimActualHp: defenderResult.playerHp,
+      observedPhases: defenderResult.threatTransitions.map((event) => event.phase),
+    };
+    throw new Error(`M121 left-sweep readability was incomplete: ${JSON.stringify({ forensic, defender: defenderResult })}`);
   }
   if (!attackerResult.events.some((text) =>
     text.startsWith("Left sweep committed")
@@ -13977,6 +13989,11 @@ async function readUiEvidence(session) {
       keyTransitions: (state.keyTransitions ?? []).slice(),
       pointers: state.pointers.slice(),
       wheels: (state.wheels ?? []).slice(),
+      m121InputPlane: window.__MYASO_M121_DIRECTIONAL_INPUT__ ? {
+        physicalPresses: (window.__MYASO_M121_DIRECTIONAL_INPUT__.physicalPresses ?? []).map((x) => ({ ...x })),
+        lightReleases: (window.__MYASO_M121_DIRECTIONAL_INPUT__.lightReleases ?? []).map((x) => ({ ...x })),
+        sentFrames: (window.__MYASO_M121_DIRECTIONAL_INPUT__.sentFrames ?? []).slice(-96).map((x) => ({ ...x })),
+      } : null,
       acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
