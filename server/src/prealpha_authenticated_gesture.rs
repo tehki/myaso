@@ -135,8 +135,17 @@ impl SessionGestureWorldPath {
                             decision.command,
                         )
                     {
+                        // A physically real but World-busy second source is
+                        // ACKed as transport-admitted no-combat. It must NOT
+                        // replace the last actual World attack ID: that ID
+                        // remains necessary to retire the reducer only after
+                        // the authoritative fighter returns to Idle.
                         if event.action
                             == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
+                            && matches!(
+                                decision.command,
+                                Command::BeginLightWindup | Command::BeginKeyEHeavy
+                            )
                         {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
