@@ -829,24 +829,37 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
-    // Space+LMB without authoritative action may mean no 30Hz input sampled
-    // during the genuine W3C hold. Record what the production sender actually
-    // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    // M336/M156: review-only evidence of ACTUALLY submitted original 30Hz
+    // input samples. A 10ms physical W3C LMB tap can be sampled as held
+    // attack+heavy before a separate light release sample. Record only the
+    // genuine native M156 and M336 original browser QA scenarios, never the
+    // public game page or original localhost v2 gesture lab.
+    // This is read-only: no extra input, retransmission, ACK or World mutation.
+    const m156NativeInputTrace = !reviewedGestureLab
+      && acceptanceScenario === "uirollknockdownffahit";
+    if (acceptanceScenario === "uimultirecoveryspatial" || m156NativeInputTrace) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        if (m156NativeInputTrace || currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
             attack: Boolean(currentInput.attack),
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
+            ...(m156NativeInputTrace ? {
+              lmbPressed: leftButtonDown,
+              lmbCharging: leftButtonCharge.isCharging(),
+              pendingLight: attackRequested,
+              pendingHeavy: heavyAttackRequested,
+            } : {}),
           });
-          if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+          const limit = m156NativeInputTrace ? 64 : 32;
+          if (debug.inputSubmissions.length > limit) {
+            debug.inputSubmissions.shift();
+          }
         }
       }
     }
