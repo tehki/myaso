@@ -145,3 +145,78 @@ in a shared visual arena. The one-browser Chromium physical pointer test
 still exists separately; KeyE source1, UI10 original-game event ownership
 and complete loss/retransmit browser integration remain pending. Full
 original protected Combat M107/M193/M194 are independent mandatory gates.\n
+
+## KeyE source1 independent original World heavy — 2026-10-23, DRAFT child
+
+The **default-OFF negotiated loopback experimental** source now accepts
+\`02 11\` with source byte3 **1 KeyE**, as a genuine *independent source*
+sharing LMB0's **one** global lease-scoped accepted sequence, gesture ID,
+replay journal and trusted actor/boot/current World mutation lock. Original
+source0 LMB early light/upgrade/undercharged light semantics and original
+legacy v1 inputs are unchanged. Client tick and source byte are **not** actor
+authentication. Source1 UPGRADE remains invalid in the canonical codec.
+
+Source1 PRESS starts actual original Rust \`HeavyAttackWindup\` with a
+server-owned **320ms** held charge. After READY, heavy stays held with
+**zero hits until matching KeyE RELEASE**; that release makes the actual
+\`HeavyAttackActive\`, capable of one original 46HP hit in range.
+An under-320ms KeyE release or any prehit KeyE CANCEL aborts **without**
+becoming a free 34HP LMB light or future heavy. This does NOT change
+standalone *legacy v1* KeyE input, normal hit damage, parry, iframe or
+stamina behavior. A wrong-source LMB RELEASE/CANCEL cannot manipulate
+KeyE charge or consume that valid source1 shared sequence. A KeyE
+RELEASE/CANCEL cannot release an LMB source0 gesture even if its ID
+matches. Duplicate and replayed source1 sequences are bound to the
+original exact source and cannot issue an extra World HIT. The source
+owner is enforced under the **same original World mutex**.
+
+New original World tests prove the real 46HP KeyE contact/HP100→54,
+early-release and CANCEL no hit, typed replay/source separation,
+and sequential LMB 34HP then KeyE 46HP (victim HP100→66→20).
+A new **actual native pinned QUIC** test proves source1 PRESS,
+held no auto-heavy, *rejected source0 RELEASE*, accepted source1 RELEASE
+and original M201 World transition 9→10. Dedicated
+\`scripts/core8_native_v2_keye_heavy_world_lab.mjs\` issues genuine W3C
+physical Chrome KeyE keydown/keyup (not \`dispatchEvent\`) across the
+original game binary's admitted WebTransport QUIC session, verifying
+original World 9→10 **after real release**, and accepted 0x12 ticks.
+
+These are **experimental harness** browser controls, NOT activation
+of KeyE in original \`web/online-game.mjs\` or delivery of an original-game
+shared 8A browser outbox. Remaining cross-project gates: original UI10
+real DOM edge source-switch, one bounded outbox for BOTH sources,
+Human/account player-seat authentication beyond ephemeral trusted QUIC
+session, Core8C true zone owner fencing, 2–4 separate real physical
+browser hosts, all original Combat M-series protected CI and orchestrator
+GO. No main merge, staging, public endpoint, deploy or restart.
+
+
+## Shared source0/source1 gap fence, 23 October review update
+
+**Core 8 P0 bug fixed in draft only:** a transport-reordered KeyE PRESS with
+global sequence 3 previously could arrive before valid older LMB PRESS
+sequence 1 and RELEASE sequence 2, advance the lease's accepted sequence,
+then irreversibly STALE the real physical source0 gesture. The converse
+source0-after-lost-KeyE sequence has the same failure. Under the **existing
+original authoritative World lock**, v2 admission now withholds ACK for
+a valid typed event with a sequence greater than the current globally accepted
+sequence plus one. This never mutates World, advances gesture timers or
+creates fake HIT; the one bounded Core 8A outbox must retransmit the missing
+earlier event. Existing duplicate/tamper/source1 ownership checks still
+apply. New genuine original World integration tests use both orderings and
+prove exactly one legal 34HP LMB plus one 46HP KeyE hit after retransmission.
+
+**IMPORTANT CROSS-DEPARTMENT INCOMPATIBILITY — DO NOT MERGE EITHER BEHAVIOR
+UNREVIEWED:** Core8A sibling draft PR #858 models standalone KeyE heavy as
+auto-committing when World finishes the original 320ms windup, treating
+KeyE RELEASE/CANCEL as noncommitting acknowledgements. This PR #855 models
+KeyE as deliberate **release-only heavy**, with early release/CANCEL a
+nonhitting abort. Both agree original LMB light 135ms and held LMB 320ms
+READY then RELEASE-only. The owner and Combat4 must explicitly choose
+**the standalone KeyE game rule**, with physical W3C test and canonical
+UI10 behavior, before Main combines these mutually incompatible branches.
+Original v1 KeyE remains untouched in both drafts.
+
+This source-only experimental repair does NOT show the original UI10 source0/
+source1 browser outbox is enabled, four independently operated humans,
+or that unchanged protected Combat M193/M194 gate passed.

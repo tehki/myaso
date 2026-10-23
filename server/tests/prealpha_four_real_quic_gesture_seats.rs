@@ -146,15 +146,19 @@ async fn admitted_seat(url: &str, digest: &Sha256Digest) -> Seat {
         _recv: recv,
     }
 }
-fn event(action: u8, seq: u32) -> [u8; 16] {
+fn typed_event(source: u8, action: u8, seq: u32, id: u32) -> [u8; 16] {
     let mut bytes = [0_u8; 16];
     bytes[0] = 2;
     bytes[1] = 0x11;
-    bytes[2] = action; // LMB source0; id1 per separate lease
+    bytes[2] = action;
+    bytes[3] = source; // LMB0 or independent KeyE1; cannot name an actor
     bytes[4..8].copy_from_slice(&seq.to_le_bytes());
-    bytes[8..12].copy_from_slice(&1_u32.to_le_bytes());
+    bytes[8..12].copy_from_slice(&id.to_le_bytes());
     bytes[12..16].copy_from_slice(&u32::MAX.to_le_bytes()); // diagnostic ONLY
     bytes
+}
+fn event(action: u8, seq: u32) -> [u8; 16] {
+    typed_event(0, action, seq, 1)
 }
 async fn assert_both_server_acks(conn: &Connection) -> Vec<(u32, u32)> {
     let mut result = Vec::new();
@@ -274,4 +278,97 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
     for seat in &seats {
         assert_both_server_acks(&seat.connection).await;
     }
+}
+
+/// Actual end-to-end typed KeyE 1 -> original Rust World HeavyActive 10.
+/// No browser, user principal or hit damage is implied by a 0x12 receipt.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn one_native_keye_standalone_heavy_requires_320ms_then_matching_source1_release() {
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+    seat.connection
+        .send_datagram(typed_event(1, 1, 1, 1))
+        .expect("actual KeyE PRESS QUIC event");
+    let ack = timeout(WAIT, async {
+        loop {
+            let p = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("QUIC press ACK");
+            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
+                break p;
+            }
+        }
+    })
+    .await
+    .expect("KeyE PRESS acknowledged by real Rust server");
+    assert_eq!(ack[2], 1, "KeyE PRESS admitted");
+    assert_eq!(u32::from_le_bytes(ack[4..8].try_into().unwrap()), 1);
+    assert_eq!(u32::from_le_bytes(ack[8..12].try_into().unwrap()), 1);
+    // Wait well beyond original 320ms. Held READY cannot auto-hit.
+    sleep(Duration::from_millis(425)).await;
+    let before = server.lines.lock().unwrap().clone();
+    assert!(
+        !before.iter().any(|line| {
+            line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+        }),
+        "held KeyE may not auto-commit heavy before matching release"
+    );
+
+    // Attack sequence2/id1 carried on WRONG source0 is not a valid terminal.
+    seat.connection
+        .send_datagram(typed_event(0, 3, 2, 1))
+        .expect("forged LMB terminal actual QUIC packet");
+    let wrong = timeout(WAIT, async {
+        loop {
+            let p = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("QUIC wrong ACK");
+            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
+                break p;
+            }
+        }
+    })
+    .await
+    .expect("wrong source rejected");
+    assert_eq!(wrong[2], 4, "wrong LMB source cannot end KeyE held heavy");
+    assert_eq!(u32::from_le_bytes(wrong[4..8].try_into().unwrap()), 2);
+
+    // The wrong source MUST NOT consume the shared sequence tombstone.
+    seat.connection
+        .send_datagram(typed_event(1, 3, 2, 1))
+        .expect("matching real KeyE RELEASE");
+    let release = timeout(WAIT, async {
+        loop {
+            let p = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("QUIC release ACK");
+            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
+                break p;
+            }
+        }
+    })
+    .await
+    .expect("KeyE matching release real ACK");
+    assert_eq!(release[2], 1, "matching source1 RELEASE accepted");
+    assert_eq!(u32::from_le_bytes(release[4..8].try_into().unwrap()), 2);
+    timeout(Duration::from_secs(3), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            if lines.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+            }) {
+                println!("CORE8_NATIVE_SOURCE1_KEYE_HEAVY_WORLD_PASS");
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("actual Rust World heavy became active only after matching KeyE RELEASE");
 }

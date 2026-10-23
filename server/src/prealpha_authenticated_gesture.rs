@@ -5,7 +5,7 @@
 //! holding the live GameState/World mutex, with no await between checks & hit.
 use crate::prealpha_lmb_gesture_authority::{Command, Disposition, GestureAuthority};
 use crate::prealpha_lmb_gesture_proposal::{
-    decode_typed_event, AckStatus, GestureAck, GestureSource, BYTES, EVENT_TYPE, VERSION,
+    decode_typed_event, AckStatus, GestureAck, BYTES, EVENT_TYPE, VERSION,
 };
 use crate::simulation::{Action, World};
 
@@ -81,8 +81,9 @@ impl SessionGestureWorldPath {
 
     /// Called synchronously under original GameState/World mutex, not after
     /// unlocking or by a transport ACK handler. Returns real World tick ACK.
-    /// Only source0 LMB is presently supported as a live experimental path;
-    /// typed KeyE source1 fails closed until Combat source-arbitration joins it.
+    /// Both LMB0 and independent KeyE1 share the SAME lease monotonic
+    /// sequence, gesture ID fence, replay journal, and World action ownership.
+    /// Only an already-negotiated, server-owned current QUIC actor can enter.
     pub fn accept_under_world_lock(
         &mut self,
         world: &mut World,
@@ -96,9 +97,16 @@ impl SessionGestureWorldPath {
         let status = if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             AckStatus::Stale
-        } else if typed.source != GestureSource::Lmb {
-            AckStatus::Rejected
         } else {
+            // Even if each event has a valid source and lease, a newer
+            // KeyE/LMB PRESS can overtake an older source's lost PRESS.
+            // Without a single shared consecutive sequence fence, the new
+            // event would permanently stale that legitimate older action.
+            // Withhold its receipt so the ONE bounded Core8A sender can
+            // retransmit the earlier edge. Never grant World authority here.
+            if event.sequence > self.authority.highest_accepted_sequence().saturating_add(1) {
+                return None;
+            }
             // An earlier one-hit World action must finish before new PRESS.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
             if event.action == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
@@ -113,7 +121,12 @@ impl SessionGestureWorldPath {
                 }
             }
             let mut proposed = self.authority.clone();
-            let decision = proposed.process(lease_epoch, event, world.now_ms.round() as u64);
+            let decision = proposed.process_typed(
+                lease_epoch,
+                typed.source,
+                event,
+                world.now_ms.round() as u64,
+            );
             match decision.disposition {
                 Disposition::Accepted => {
                     if decision.command == Command::None
