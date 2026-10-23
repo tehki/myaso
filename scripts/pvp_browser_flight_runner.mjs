@@ -12163,7 +12163,9 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
+          // Keep the genuine lateral key held AFTER release-led LMB is sampled.
+          // This 150ms is a browser-input chord, not a server combat timing change.
+          { type: "pause", duration: 150 },
           { type: "keyUp", value: strafeKey },
         ],
       },
@@ -12178,6 +12180,7 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
           { type: "pause", duration: 150 },
+          { type: "pause", duration: 0 },
         ],
       },
     ],
