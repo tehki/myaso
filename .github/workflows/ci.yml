@@ -57,12 +57,14 @@ jobs:
           node --check scripts/combat4d-m193-proof.mjs
           node --check scripts/combat4d-m121-proof.mjs
           node --check scripts/combat4d-m172-proof.mjs
-          node --test tests/combat4d-acceptance.test.mjs tests/combat4d-m107-proof.test.mjs tests/combat4d-m155-proof.test.mjs tests/combat4d-m193-proof.test.mjs tests/combat4d-m121-proof.test.mjs tests/combat4d-m172-proof.test.mjs
+          node --check scripts/combat4d-m40-proof.mjs
+          node --test tests/combat4d-acceptance.test.mjs tests/combat4d-m107-proof.test.mjs tests/combat4d-m155-proof.test.mjs tests/combat4d-m193-proof.test.mjs tests/combat4d-m121-proof.test.mjs tests/combat4d-m172-proof.test.mjs tests/combat4d-m40-proof.test.mjs
           node scripts/combat4d-m107-proof.mjs qa/evidence/m107-run-39930443888.json
           node scripts/combat4d-m155-proof.mjs qa/evidence/m155-run-39931321731.json
           node scripts/combat4d-m193-proof.mjs qa/evidence/m193-run-39935435948.json
           node scripts/combat4d-m121-proof.mjs qa/evidence/m121-run-39938139017.json
           node scripts/combat4d-m172-proof.mjs qa/evidence/m172-run-39942285919.json
+          node scripts/combat4d-m40-proof.mjs qa/evidence/m40-run-39944996021.json
 
       - name: Validate R3 low-latency combat audio
         run: |
