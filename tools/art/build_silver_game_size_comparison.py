@@ -5,6 +5,7 @@ camera and original dark sources without modifying any of their raw pixels.
 import argparse,base64,hashlib,json,re
 from pathlib import Path
 from PIL import Image
+from ground_silver_gallery_preview import anchor_ground
 
 p=argparse.ArgumentParser()
 p.add_argument("--base",required=True)
@@ -94,6 +95,6 @@ html=html.replace('Eight real Blender directions · new vs old light','Eight Ble
 html=html.replace('<title>myaso.io — Original Silver Knight Animation Gallery (offline)</title>','<title>myaso.io — Silver Knight Three-Source Art Review (offline)</title>')
 out=Path(args.output)
 out.parent.mkdir(parents=True,exist_ok=True)
-out.write_text(html,encoding="utf8")
+out.write_text(anchor_ground(html),encoding="utf8")
 print("THREE_SOURCE_GALLERY",out,out.stat().st_size)
 for c in clips:print("GALLERY_SRC",c["id"],c["sha"],c.get("rollSha",""),c.get("legacySha",""))

@@ -62,6 +62,11 @@ code{color:#e6bd7c}
 </div>
 <main class="gallery" id="gallery"></main>
 <footer class="note">
+<p><strong>Ground reference:</strong> the circles are cosmetic review markers
+aligned to each source frame's lowest visible nontransparent pixels, not
+authoritative arena ground or physical foot-contact tests. Jump intentionally
+shows an illustrative airborne gap, not the game's jump trajectory. Sprite
+placement and arena physics must be validated in a genuine multiplayer build.</p>
 <p><strong>Why Kick was missing before:</strong> the original five-file Pre-Alpha bundle has no kick atlas. That does not mean Kick art does not exist. The authentic V3 Spartan Kick, with its original normal lighting, exists on <a href="https://github.com/tehki/myaso/pull/825" target="_blank" rel="noopener">Graphics 3A draft #825</a>. It is included here as <strong>experimental art under visual review</strong>, not a claim of Pre-Alpha integration or Main approval.</p>
 <p><strong>Knockdown / Fall V2</strong> is the true original Blender pose source from draft <a href="https://github.com/tehki/myaso/pull/788" target="_blank" rel="noopener">#788</a>; the source image here is present unchanged in the parent candidate <a href="https://github.com/tehki/myaso/pull/825" target="_blank" rel="noopener">#825</a>. Unsupported Combat states (light/heavy attacks, parry, block, stun, death) still lack these authored Silver animations and use honest Combat visuals in the game.</p>
 <p><strong>Source:</strong> original dark five preserved from Pre-Alpha candidate <code>76aaf055</code>, kick in its normal-light original and knockdown from draft <code>3fc26bb</code>. All fifteen original source and two-size relit WebPs SHA-256 verified before embedding; four new source atlases are distinct, not approved Pre-Alpha replacements. Walk and sprint playback are sample loops; in the game, those cycles are distance-driven. The gallery is not a playable build, merge, or release declaration. The original dark source, 1.66 Roll-framed relight and 1.29 size-matched Blender relight are original separate WebP byte sources, selectable without CSS retouch or a merge.</p>
@@ -78,11 +83,12 @@ const items=CLIPS.map((c,i)=>{
  card.innerHTML='<div class="card-head"><div><span class="num">SOURCE '+String(i+1).padStart(2,"0")+' / '+CLIPS.length+'</span><h2>'+c.title+'</h2></div><span class="chip '+(c.group==="Experimental"?"experimental":"")+'">'+(c.group==="Experimental"?"DRAFT / REVIEW":"PRE-ALPHA SUBSET")+'</span></div><div class="stage"><canvas width="640" height="324" aria-label="'+c.title+' original animated Silver Knight in selected facing"></canvas><span class="state" role="status">Loading embedded WebP…</span></div><div class="card-foot"><span>'+c.desc+'</span><span class="counter"></span></div><div class="bar"><span></span></div><div class="meta"><span>'+c.frames+' × 8 × 160px</span><span title="Full SHA256: '+c.sha+'">SHA '+c.sha.slice(0,12)+'…</span></div>';
  gallery.append(card);
  const canvas=card.querySelector("canvas"),ctx=canvas.getContext("2d"),label=card.querySelector(".state");
- const obj={c,ctx,canvas,img:new Image(),ready:false,label,count:card.querySelector(".counter"),bar:card.querySelector(".bar span")};
+ const obj={c,ctx,canvas,img:new Image(),ready:false,label,count:card.querySelector(".counter"),bar:card.querySelector(".bar span"),footCache:new Map()};
  obj.img.onload=()=>{
    if(obj.img.naturalWidth!==c.frames*SIZE||obj.img.naturalHeight!==SIZE*8){
      label.textContent="Source atlas dimensions invalid";label.classList.add("error");return;
    }
+   obj.footCache.clear(); // source change: old, Roll-studio and game-scale have different opaque footprints.
    obj.ready=true;label.textContent="ORIGINAL SOURCE · OFFLINE";paint(obj);
  };
  obj.img.onerror=()=>{label.textContent="Embedded source failed to decode";label.classList.add("error")};
@@ -91,10 +97,52 @@ const items=CLIPS.map((c,i)=>{
 });
 let paused=matchMedia("(prefers-reduced-motion: reduce)").matches,ms=0,last=0,rate=1,dir="0";
 const pause=document.getElementById("pause");
+// Visual review ONLY. The source WebPs do not contain world ground coordinates,
+// physics height, or authority. Anchor the preview circle to visible RGBA bounds
+// instead of a hard-coded disconnected y=265 beneath a center-y=146 actor.
+const footProbe=document.createElement("canvas");
+footProbe.width=SIZE;footProbe.height=SIZE;
+const footProbeCtx=footProbe.getContext("2d",{willReadFrequently:true});
+function atlasRow(obj,face){
+ return oldSource&&["idle","walk","sprint","jump"].includes(obj.c.id) ? (8-face)%8 : face;
+}
+function visibleSourceBottom(obj,frame,face){
+ const row=atlasRow(obj,face);
+ const key=row+":"+frame;
+ if(obj.footCache.has(key))return obj.footCache.get(key);
+ footProbeCtx.clearRect(0,0,SIZE,SIZE);
+ footProbeCtx.drawImage(obj.img,frame*SIZE,row*SIZE,SIZE,SIZE,0,0,SIZE,SIZE);
+ const pixels=footProbeCtx.getImageData(0,0,SIZE,SIZE).data;
+ // Ignore near-transparent antialias fringe; source pixel bounds, not gait physics.
+ for(let y=SIZE-1;y>=0;y--){
+   for(let x=0;x<SIZE;x++){
+     if(pixels[(y*SIZE+x)*4+3]>=64){
+       obj.footCache.set(key,y+1);
+       return y+1;
+     }
+   }
+ }
+ throw new Error("Silver source frame has no visible pixels: "+obj.c.id+" row "+row+" frame "+frame);
+}
 function draw(obj,frame,face,x,y,scale){
- const s=SIZE*scale;
- const row=oldSource&&["idle","walk","sprint","jump"].includes(obj.c.id) ? (8-face)%8 : face;
+ const s=SIZE*scale, row=atlasRow(obj,face);
  obj.ctx.drawImage(obj.img,frame*SIZE,row*SIZE,SIZE,SIZE,x-s/2,y-s/2,s,s);
+}
+function groundAlignedCenterY(obj,frame,face,groundY,scale){
+ // Jump is intentionally airborne in this visual pose-only reference. The
+ // gap is illustrative, NOT a simulated jump height or engine validation.
+ const airborneGap=obj.c.id==="jump"?18*scale:0;
+ return groundY-(visibleSourceBottom(obj,frame,face)-SIZE/2)*scale-airborneGap;
+}
+function drawAtPreviewGround(obj,frame,face,x,groundY,scale){
+ const {ctx}=obj;
+ ctx.save();
+ ctx.fillStyle=obj.c.id==="jump"?"rgba(132,153,179,.19)":"rgba(132,153,179,.28)";
+ ctx.beginPath();
+ ctx.ellipse(x,groundY,36*scale,6*scale,0,0,Math.PI*2);
+ ctx.fill();
+ ctx.restore();
+ draw(obj,frame,face,x,groundAlignedCenterY(obj,frame,face,groundY,scale),scale);
 }
 function paint(obj){
  const {c,ctx,canvas}=obj;
@@ -106,13 +154,12 @@ function paint(obj){
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
  if(dir==="all"){
    for(let i=0;i<8;i++){
-     const x=80+(i%4)*160,y=73+Math.floor(i/4)*162;
-     draw(obj,frame,i,x,y,.73);
-     ctx.font="13px ui-monospace,Consolas,monospace";ctx.fillStyle="#d1dce5";ctx.textAlign="center";ctx.fillText(DIRS[i],x,y+72);
+     const x=80+(i%4)*160,groundY=Math.floor(i/4)===0?117:279;
+     drawAtPreviewGround(obj,frame,i,x,groundY,.73);
+     ctx.font="13px ui-monospace,Consolas,monospace";ctx.fillStyle="#d1dce5";ctx.textAlign="center";ctx.fillText(DIRS[i],x,groundY+27);
    }
  }else{
-   ctx.fillStyle="#a1b4c944";ctx.beginPath();ctx.ellipse(320,265,77,12,0,0,Math.PI*2);ctx.fill();
-   draw(obj,frame,Number(dir),320,146,1.52);
+   drawAtPreviewGround(obj,frame,Number(dir),320,260,1.52);
  }
 }
 function tick(now){

@@ -72,6 +72,20 @@ test("source selector uses three different original WebP sources with only legac
  for(const variant of ["game","roll","original"])assert(page.includes('value="'+variant+'"'));
  assert(page.includes('oldSource=version==="original";'));
  assert(page.includes('version==="original" ? o.c.legacyData : version==="roll" ? o.c.rollData : o.c.data'));
- assert(page.includes('const row=oldSource&&["idle","walk","sprint","jump"].includes(obj.c.id) ? (8-face)%8 : face;'));
+ assert(page.includes('return oldSource&&["idle","walk","sprint","jump"].includes(obj.c.id) ? (8-face)%8 : face;'));
+ assert(page.includes('function atlasRow(obj,face)'));
  assert(!/filter:\s*brightness\(/i.test(page));
+});
+
+test("grounded review markers follow per-frame original WebP alpha rather than detached fixed canvas positions",()=>{
+ assert(page.includes("function visibleSourceBottom(obj,frame,face)"));
+ assert(page.includes("footProbeCtx.getImageData(0,0,SIZE,SIZE).data"));
+ assert(page.includes("function groundAlignedCenterY(obj,frame,face,groundY,scale)"));
+ assert(page.includes("groundY-(visibleSourceBottom(obj,frame,face)-SIZE/2)*scale-airborneGap"));
+ assert(page.includes('drawAtPreviewGround(obj,frame,Number(dir),320,260,1.52)'));
+ assert(page.includes("drawAtPreviewGround(obj,frame,i,x,groundY,.73)"));
+ assert(page.includes("Jump intentionally"));
+ assert(page.includes("not the game's jump trajectory"));
+ assert(!page.includes("ctx.ellipse(320,265,77,12"));
+ assert(!page.includes("draw(obj,frame,Number(dir),320,146,1.52)"));
 });
