@@ -47,7 +47,7 @@ const heavyKeyPulseMs = 120;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uimiddleblockpressure", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uimiddleblockpressure", "ui4amiddlemousechord", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -439,6 +439,9 @@ try {
   } else if (scenario === "uimiddleblockpressure") {
     const results = await runOnlineUiMiddleBlockPressureFlight(sessions);
     console.log("R2_GENUINE_MIDDLE_HOLD_GUARD_PRESSURE " + JSON.stringify({ ok: true, results }));
+  } else if (scenario === "ui4amiddlemousechord") {
+    const results = await runCombat4aNativeMiddleMouseChordFlight(sessions);
+    console.log("COMBAT4A_NATIVE_MIDDLE_MOUSE_CHORD " + JSON.stringify({ ok: true, results }));
   } else if (scenario === "uiguardbreak") {
     const results = await runOnlineUiGuardBreakFlight(sessions);
     console.log(`M34_ONLINE_GUARD_BREAK_FEEDBACK ${JSON.stringify({ ok: true, results })}`);
@@ -9537,6 +9540,110 @@ async function runOnlineUiGuardBreakPunishFfaFocusFlight(entries, convert = fals
     m151GuardBrokenId: defenderId,
     m151CloserIdleId: closerId,
   }));
+}
+
+// Trusted WebDriver mouse: with RMB held, middle DOWN/UP are intermediate
+// mousedown/up edges without separate W3C pointerdown/up. The original
+// online page must hold and retire a real World Block, with no fake events.
+async function runCombat4aNativeMiddleMouseChordFlight(entries) {
+  const label = "Combat4A authentic middle mouse chord";
+  if (entries.length !== 2) throw new Error(label + ": requires Chrome and Firefox");
+  await Promise.all(entries.map(installUiObserver));
+  const initial = await waitForUiReady(entries);
+  if (initial.some(e => e.playerHp !== 100 || e.playerGuard !== 100)) {
+    throw new Error(label + ": invalid original World staging");
+  }
+  const results = [];
+  for (const session of entries) {
+    await centerArenaInViewport(session);
+    await execute(session.base, session.sessionId,
+      "document.querySelector('#arena').focus(); return document.activeElement?.id;");
+    const arena = await resolveArenaElement(session, label);
+    const origin = { "element-6066-11e4-a52e-4f735466cecf": arena };
+    // Read-only isTrusted provenance. Never dispatch a synthetic input event.
+    await execute(session.base, session.sessionId,
+      "const a=document.querySelector('#arena');"
+      + "const h=[];window.__COMBAT4A_NATIVE_CHORD_PROOF__=h;"
+      + "for(const type of ['pointerdown','pointerup','mousedown','mouseup','pointercancel'])"
+      + "a.addEventListener(type,e=>{if(e.isTrusted)h.push({type,button:e.button,"
+      + "buttons:e.buttons,trusted:e.isTrusted})},{capture:true});return true;");
+    let heldRight = false, heldMiddle = false;
+    const send = async actions => webdriver(session.base, "POST",
+      "/session/" + session.sessionId + "/actions", {
+        actions: [{ type: "pointer", id: "mouse-" + session.name,
+          parameters: { pointerType: "mouse" }, actions }],
+      });
+    try {
+      await send([
+        { type: "pointerMove", duration: 0, origin, x: 0, y: 0 },
+        { type: "pointerDown", button: 2 },
+      ]);
+      heldRight = true;
+      await sleep(65);
+      await send([{ type: "pointerDown", button: 1 }]);
+      heldMiddle = true;
+      let seenBlock = false;
+      const blockDeadline = Date.now() + 900;
+      while (Date.now() < blockDeadline) {
+        const state = await readUiEvidence(session);
+        if ((state.acceptance?.ownActionTransitions ?? []).some(
+          e => e.action === COMBAT_ACTION.block)) {
+          seenBlock = true;
+          break;
+        }
+        await sleep(20);
+      }
+      if (!seenBlock) throw new Error(label + ": original server did not enter block on "
+        + session.name + " " + JSON.stringify(await readUiEvidence(session)));
+      // MMB physically released, RMB still physically down.
+      await send([{ type: "pointerUp", button: 1 }]);
+      heldMiddle = false;
+      let seenIdleAfterBlock = false;
+      const idleDeadline = Date.now() + 900;
+      while (Date.now() < idleDeadline) {
+        const state = await readUiEvidence(session);
+        const actions = state.acceptance?.ownActionTransitions ?? [];
+        const blockAt = actions.findIndex(e => e.action === COMBAT_ACTION.block);
+        if (blockAt >= 0 && actions.slice(blockAt + 1).some(
+          e => e.action === COMBAT_ACTION.idle)) {
+          seenIdleAfterBlock = true;
+          break;
+        }
+        await sleep(20);
+      }
+      if (!seenIdleAfterBlock) throw new Error(label + ": released middle stayed blocked on "
+        + session.name + " " + JSON.stringify(await readUiEvidence(session)));
+      const events = await execute(session.base, session.sessionId,
+        "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
+      const count = (type, button) => events.filter(e =>
+        e.trusted && e.type === type && e.button === button).length;
+      const verdict = { browser: session.name, events,
+        rightPointerDown: count("pointerdown", 2),
+        intermediateMiddleMouseDown: count("mousedown", 1),
+        intermediateMiddlePointerDown: count("pointerdown", 1),
+        intermediateMiddleMouseUp: count("mouseup", 1),
+        intermediateMiddlePointerUp: count("pointerup", 1),
+        realWorldBlockAndRelease: true };
+      if (verdict.rightPointerDown !== 1
+        || verdict.intermediateMiddleMouseDown !== 1
+        || verdict.intermediateMiddlePointerDown !== 0
+        || verdict.intermediateMiddleMouseUp !== 1
+        || verdict.intermediateMiddlePointerUp !== 0) {
+        throw new Error(label + ": genuine intermediate W3C event proof failed "
+          + JSON.stringify(verdict));
+      }
+      results.push(verdict);
+    } finally {
+      if (heldMiddle) await send([{ type: "pointerUp", button: 1 }]);
+      if (heldRight) await send([{ type: "pointerUp", button: 2 }]);
+    }
+  }
+  const final = await Promise.all(entries.map(readUiEvidence));
+  if (final.some(e => e.playerHp !== 100 || e.playerGuard !== 100
+    || e.opponentHp !== 100 || e.opponentGuard !== 100)) {
+    throw new Error(label + ": HP/guard changed without combat " + JSON.stringify(final));
+  }
+  return results;
 }
 
 async function runOnlineUiMiddleBlockPressureFlight(entries) {
