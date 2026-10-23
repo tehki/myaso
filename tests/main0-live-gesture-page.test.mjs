@@ -66,8 +66,12 @@ test("LMB and KeyE share one monotonic actor connection allocator and release-on
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:10,button:0,buttons:1}));
   await pause(10);
   assert.ok(f.wire.some(e=>e.source===0&&e.action===1));
-  const initialIds=f.wire.filter(e=>e.action===1).map(e=>e.sequence);
-  assert.deepEqual(initialIds,[1,3],"one shared sequence owner across KeyE and LMB");
+  const physicalPresses=f.wire.filter(e=>e.action===1);
+  const uniquePressIds=[...new Set(physicalPresses.map(e=>e.sequence))];
+  assert.deepEqual(uniquePressIds,[1,3],
+    "one shared monotonic sequence owner, even when unacknowledged PRESS is retransmitted");
+  assert.ok(physicalPresses.filter(e=>e.sequence===1).every(e=>e.source===1),
+    "every bounded retry preserves the original KeyE source identity");
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:10,button:0,buttons:0}));
   await pause(10);
  }finally{lab.close("test");}
