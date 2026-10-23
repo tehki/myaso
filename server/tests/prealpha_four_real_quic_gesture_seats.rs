@@ -9,7 +9,7 @@ use std::{
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
-    SendStream,
+    SendStream, VarInt,
 };
 
 const WAIT: Duration = Duration::from_secs(8);
@@ -274,4 +274,63 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
     for seat in &seats {
         assert_both_server_acks(&seat.connection).await;
     }
+}
+
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn departed_v2_seat_is_replaced_by_new_actor_without_cross_lease_replay() {
+    let (server, url, digest) = real_server();
+    let mut seats = Vec::new();
+    for _ in 0..4 {
+        seats.push(admitted_seat(&url, &digest).await);
+    }
+    // Retire only the original actor #2 / its independent authenticated QUIC
+    // session. This also frees ONE live permit, not the actor's retired ID.
+    seats[1]
+        .connection
+        .close(VarInt::from_u32(0), b"core8c-v2-actor-retired");
+    sleep(Duration::from_millis(900)).await;
+
+    // The next valid pinned-TLS transport must negotiate a new v2 seat.
+    let newcomer = admitted_seat(&url, &digest).await;
+    // The same numeric per-lease sequence / gesture IDs are legal for
+    // surviving players 1,3,4 and fresh actor 5; never inherit actor 2.
+    for seat in [ &seats[0], &seats[2], &seats[3], &newcomer ] {
+        seat.connection
+            .send_datagram(event(1, 1))
+            .expect("real current-lease PRESS");
+        seat.connection
+            .send_datagram(event(3, 2))
+            .expect("real current-lease RELEASE");
+    }
+    for seat in [ &seats[0], &seats[2], &seats[3], &newcomer ] {
+        let acks = assert_both_server_acks(&seat.connection).await;
+        assert_eq!(acks.len(), 2, "two admitted events per current lease");
+    }
+    // ACK alone is transport receipt, never proof of original World damage.
+    // The *real server World* must advance all FOUR still-live distinct actors.
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            let admitted_five = lines.iter().any(|line| {
+                line.contains("assigned player 5 ")
+            });
+            let exact_four_active = [1, 3, 4, 5].iter().all(|id| {
+                lines.iter().any(|line| {
+                    line.contains("M201_AUTH_ACTION tick=")
+                        && line.contains(&format!(" fighter={id} from=1 to=2"))
+                })
+            });
+            let retired_actor_was_not_attacked = !lines.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=")
+                    && line.contains(" fighter=2 from=1 to=2")
+            });
+            if admitted_five && exact_four_active && retired_actor_was_not_attacked {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("original World action for active #1,#3,#4,#5, never retired #2");
 }
