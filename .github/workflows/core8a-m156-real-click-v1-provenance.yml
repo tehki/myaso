@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "tests/core8a-m344-server-v1-admission-provenance.test.mjs"
       - "scripts/pvp_browser_flight_runner.mjs"
       - "src/browser/m144-input-sample-observer.mjs"
       - "tests/core8a-m156-real-v1-input-ack-provenance.test.mjs"
@@ -30,10 +32,13 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
       - name: Verify genuine v1 M156 only telemetry and original M144 bounded behavior
         run: |
+          node --test tests/core8a-m344-server-v1-admission-provenance.test.mjs
           node --test tests/core8a-m156-real-v1-input-ack-provenance.test.mjs
           node --test tests/core8a-m144-original-input-ack-trace.test.mjs tests/core8a-m144-input-sample-observer.test.mjs
-      - name: Compile unchanged Rust authoritative gameplay server
-        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Validate Rust original-server formatting and unchanged gameplay build
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml --check
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Real Chrome Firefox Chrome2 strict M156 34HP original World knockdown punish
         env:
           MYASO_PVP_SCENARIO: uirollknockdownffahit
