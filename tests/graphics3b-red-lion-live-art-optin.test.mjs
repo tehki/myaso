@@ -125,6 +125,8 @@ test("non-optin Combat runtime remains verbatim default, optin requires BOTH wor
  const qa=readFileSync(new URL("../web/graphics3b-red-lion-live-art-smoke.mjs",import.meta.url),"utf8");
  assert.match(qa,/const defaultWorld=createAuthoredWorldRenderer\(\);/);
  assert.doesNotMatch(qa,/createAuthoredWorldRenderer\(\{buildLimit:8\}\)/);
+ const nativeRunner=readFileSync(new URL("../tools/art/verify_a232_live_optin_native_browsers.mjs",import.meta.url),"utf8");
+ assert.match(nativeRunner,/exactOriginalFallback:trials\.filter\(t=>t\.mode==="fail-day"\|\|t\.mode==="tamper-day"\)\.length/);
  assert.match(src,/redLionActorsInFront/);
  assert.match(src,/redLionActorHudVisible\(originalRedLionArt,redLionFrame,sampled\)/);
  assert.match(src,/if \(remoteVisibleAboveFacade\) visibleEnemyPositions\.push\(sampled\)/);

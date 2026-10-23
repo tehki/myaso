@@ -131,7 +131,7 @@ try{
   cases:trials.length,chromium:trials.filter(t=>t.browser==="chrome").length,
   firefox:trials.filter(t=>t.browser==="firefox").length,
   realWebPArtAccepted:trials.filter(t=>t.mode==="normal"||t.mode==="pan").length,
-  exactOriginalFallback:trials.filter(t=>t.mode!=="normal").length}));
+  exactOriginalFallback:trials.filter(t=>t.mode==="fail-day"||t.mode==="tamper-day").length}));
 }catch(e){failure=e;console.error("GRAPHICS3B_A232_NATIVE_LIVE_ART_OPTIN_FAIL "+String(e.stack||e))}
 finally{
  for(const p of drivers)if(p.exitCode===null)p.kill("SIGTERM");
