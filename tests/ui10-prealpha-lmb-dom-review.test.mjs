@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PROPOSED_GESTURE_VERSION, GESTURE_ACTION,
   decodeProposedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
-import { ProposedLmbGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
+import { ProposedLmbGestureOutbox, ProposedSharedTypedGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
 import {createDormantPrealphaLmbDomGate,
   attachDormantPrealphaLmbDomGate} from "../src/browser/prealpha-lmb-dom-gesture-review.mjs";
 
@@ -164,4 +164,75 @@ test("proposal remains fully dormant: no production browser, Rust ingress or cur
  assert.doesNotMatch(live,/prealpha-lmb-gesture-outbox-proposal/);
  assert.doesNotMatch(rust,/prealpha-lmb-dom-gesture-review/);
  assert.doesNotMatch(rust,/prealpha-lmb-gesture-outbox-proposal/);
+});
+
+
+test("RMB-held LMB native mouse chord preserves ordered source0 PRESS/UPGRADE/RELEASE",()=>{
+  const lease={};
+  const outbox=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
+  const gate=createDormantPrealphaLmbDomGate({
+    outbox,getClientTick:()=>42,isCanvasTarget:e=>e.target===canvas,
+  });
+  assert.equal(gate.pointerDown(event(7,{button:2,buttons:2})),false);
+  assert.equal(gate.mouseDown({target:canvas,button:0,buttons:3}),true);
+  assert.equal(gate.snapshot.pointerId,-1);
+  assert.equal(gate.pointerDown(event(7,{buttons:3})),false,"no second press");
+  assert.equal(gate.approvedHoldUpgrade(-1),true);
+  assert.equal(gate.pointerUp(event(7,{button:2,buttons:1})),false);
+  assert.equal(gate.mouseUp({button:0,buttons:2}),true);
+  assert.equal(gate.mouseUp({button:0,buttons:2}),false);
+  // Source ownership belongs to Core8A's shared-queue packet metadata;
+  // v2 event bytes intentionally carry no additional source field.
+  const packets=outbox.nextSendBatch(8);
+  const edges=packets.map(x=>decodeProposedGestureEvent(x.bytes));
+  assert.deepEqual(edges.map(x=>x.action),[
+    GESTURE_ACTION.PRESS,GESTURE_ACTION.UPGRADE,GESTURE_ACTION.RELEASE]);
+  assert.deepEqual(packets.map(x=>x.source),[0,0,0]);
+  assert.equal(new Set(edges.map(x=>x.gestureId)).size,1);
+  assert.equal(new Set(edges.map(x=>x.clientTick)).size,1);
+  assert.equal(gate.snapshot.active,false);
+});
+
+test("RMB-held LMB chord cancels on capture loss/blur and never converts to heavy release",()=>{
+ for(const reason of ["lostCapture","pointerCancel","blur"]){
+  const {gate,outbox}=fixture();
+  assert.equal(gate.mouseDown({target:canvas,button:0,buttons:3}),true);
+  assert.equal(reason==="blur"?gate.blur():gate[reason](event(7,{button:-1,buttons:0})),true);
+  assert.equal(gate.mouseUp({button:0,buttons:2}),false);
+  assert.deepEqual(actions(outbox).map(x=>x.action),[
+    GESTURE_ACTION.PRESS,GESTURE_ACTION.CANCEL],reason);
+ }
+});
+
+test("RMB-held mouse chord respects focus, does not steal normal pointer LMB",()=>{
+ const f=fixture();
+ f.chat(true);
+ assert.equal(f.gate.mouseDown({target:canvas,button:0,buttons:3}),false);
+ f.chat(false);f.jump(true);
+ assert.equal(f.gate.mouseDown({target:canvas,button:0,buttons:3}),false);
+ f.jump(false);
+ assert.equal(f.gate.mouseDown({target:{},button:0,buttons:3}),false);
+ assert.equal(f.gate.mouseDown({target:canvas,button:1,buttons:6}),false);
+ assert.equal(f.gate.pointerDown(event(7)),true);
+ assert.equal(f.gate.mouseDown({target:canvas,button:0,buttons:3}),false);
+ assert.equal(f.gate.mouseUp({button:0,buttons:2}),false);
+ assert.equal(f.gate.pointerUp(event(7,{buttons:0})),true);
+ assert.deepEqual(actions(f.outbox).map(x=>x.action),[
+   GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+});
+
+test("DOM adapter routes genuine chord-compatible mouse events and detaches them",()=>{
+ const fakeCanvas=new EventTarget(),win=new EventTarget(),doc=new EventTarget();
+ const f=fixture({isCanvasTarget:e=>e.target===fakeCanvas});
+ const detach=attachDormantPrealphaLmbDomGate(f.gate,{canvas:fakeCanvas,windowObj:win,documentObj:doc});
+ function dispatch(target,type,props){
+   const e=new Event(type,{cancelable:true});
+   for(const [key,value] of Object.entries(props))Object.defineProperty(e,key,{value});
+   target.dispatchEvent(e);return e;
+ }
+ assert.equal(dispatch(fakeCanvas,"mousedown",{button:0,buttons:3}).defaultPrevented,true);
+ assert.equal(dispatch(win,"mouseup",{button:0,buttons:2}).defaultPrevented,true);
+ assert.deepEqual(actions(f.outbox).map(x=>x.action),[
+   GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+ detach();
 });

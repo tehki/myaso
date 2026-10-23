@@ -45,15 +45,35 @@ export function createDormantPrealphaLmbDomGate({
       return false;
     }
   }
+  // W3C mouse pointerdown/up can be emitted only on the transition from zero
+  // buttons. When RMB is already held, LMB has genuine mousedown/mouseup but
+  // may have no pointerdown/up. Reserve this internal ID ONLY for that chord.
+  const CHORDED_MOUSE_POINTER_ID = -1;
+  function begin(pointerId) {
+    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
+    if (!edge) return false;
+    active = {pointerId,gestureId:edge.gestureId,upgraded:false};
+    return true;
+  }
   function pointerDown(event) {
     if (closed || active || !validMousePointer(event)
       || event.button !== 0 || (event.buttons & 1) === 0
       || isChatFocused() || isJumpAttackChord(event)
       || !isCanvasTarget(event)) return false;
-    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
-    if (!edge) return false;
-    active = {pointerId:event.pointerId,gestureId:edge.gestureId,upgraded:false};
-    return true;
+    return begin(event.pointerId);
+  }
+  function mouseDown(event) {
+    if (closed || active || event?.button !== 0 || (event.buttons & 3) !== 3
+      || isChatFocused() || isJumpAttackChord(event)
+      || !isCanvasTarget(event)) return false;
+    // A genuine additional LMB under RMB: pointerdown may not fire. If it
+    // did fire already, 'active' prevents a duplicate PRESS.
+    return begin(CHORDED_MOUSE_POINTER_ID);
+  }
+  function mouseUp(event) {
+    if (closed || active?.pointerId !== CHORDED_MOUSE_POINTER_ID
+      || event?.button !== 0 || (event.buttons & 1) !== 0) return false;
+    return terminate("release");
   }
   // This is an explicitly invoked REVIEW hook, not a browser timer.
   // Never call on an actual game frame until timing is approved by Combat4.
@@ -70,11 +90,17 @@ export function createDormantPrealphaLmbDomGate({
   }
   function terminate(kind, event) {
     if (closed || !active) return false;
+    // A physical mouse capture loss cancels the RMB-held LMB fallback too:
+    // its internal -1 identity has no native PointerEvent counterpart.
+    const chordCancel = kind === "cancel"
+      && active.pointerId === CHORDED_MOUSE_POINTER_ID && validMousePointer(event);
     if (event !== undefined && (!validMousePointer(event)
-      || event.pointerId !== active.pointerId)) return false;
+      || (event.pointerId !== active.pointerId && !chordCancel))) return false;
     // Release is only from the actual left mouse UP event, even if
     // received on window after the pointer leaves the canvas.
-    if (kind === "release" && event?.button !== 0) return false;
+    // mouseUp already verified physical LMB button=0 before calling with no
+    // PointerEvent (the RMB-held case has no corresponding pointerup).
+    if (kind === "release" && event !== undefined && event.button !== 0) return false;
     const edge = submit(tick => kind === "release"
       ? (shared ? outbox.release(0,tick) : outbox.release(tick))
       : (shared ? outbox.cancel(0,tick) : outbox.cancel(tick)));
@@ -83,7 +109,7 @@ export function createDormantPrealphaLmbDomGate({
     return true;
   }
   return Object.freeze({
-    pointerDown,
+    pointerDown, mouseDown, mouseUp,
     pointerUp:event => terminate("release",event),
     pointerCancel:event => terminate("cancel",event),
     lostCapture:event => terminate("cancel",event),
@@ -117,6 +143,8 @@ export function attachDormantPrealphaLmbDomGate(
       if (gate.pointerDown(e) && e.cancelable) e.preventDefault();
     }],
     [windowObj,"pointerup",e=>{if(gate.pointerUp(e)&&e.cancelable)e.preventDefault();}],
+    [canvas,"mousedown",e=>{if(gate.mouseDown(e)&&e.cancelable)e.preventDefault();}],
+    [windowObj,"mouseup",e=>{if(gate.mouseUp(e)&&e.cancelable)e.preventDefault();}],
     [windowObj,"pointercancel",e=>gate.pointerCancel(e)],
     [canvas,"lostpointercapture",e=>gate.lostCapture(e)],
     [windowObj,"blur",()=>gate.blur()],
