@@ -175,3 +175,48 @@ test("unnegotiated typed ACK closes original client transport, never admits a ph
   assert.equal(errors.length,1);
   assert.match(errors[0],/current reviewed grant/);
 }));
+
+test("backpressured 65th physical gesture edge fails closed without loss or unbounded writes", () => withFixture(async () => {
+  const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
+  await c.negotiateExperimentalGestureV2();
+  let unblock;
+  // The real sender is deliberately backpressured at its writer.ready gate.
+  // This models a stalled QUIC transport, not synthetic combat admission.
+  c.datagramWriter.ready = new Promise(resolve => { unblock = resolve; });
+  const pending = [];
+  for (let n = 1; n <= 64; n += 1) {
+    const event = v2(n, n);
+    pending.push(c.sendExperimentalGestureEdge(event));
+  }
+  assert.equal(c.pendingGestureEdges, 64);
+  assert.equal(c.transport.writes.length, 0, "nothing sent while the real writer cannot accept bytes");
+  assert.throws(() => c.sendExperimentalGestureEdge(v2(65, 65)), /bounded experimental gesture queue overflow/);
+  assert.equal(c.transport.closedByClient, true, "overflow retires entire same-QUIC lease");
+  unblock();
+  const settled = await Promise.allSettled(pending);
+  assert.equal(settled.length, 64);
+  assert.equal(settled.every(result => result.status === "rejected"), true,
+    "queued old-lease edges cannot escape after full-lease retirement");
+  assert.equal(c.pendingGestureEdges, 0, "all 64 queue counters must retire");
+  assert.equal(c.transport.writes.length, 0, "no phantom packet survives retired lease");
+  assert.throws(() => c.sendExperimentalGestureEdge(v2(66, 66)), /server grant/);
+}));
+
+test("noncoalescing gesture queue drains exactly and restores capacity after a real backpressure release", () => withFixture(async () => {
+  const c = await connectGameTransport({ webTransportUrl: "https://localhost:4433/game" });
+  await c.negotiateExperimentalGestureV2();
+  let unblock;
+  c.datagramWriter.ready = new Promise(resolve => { unblock = resolve; });
+  const sends = Array.from({ length: 32 }, (_, i) =>
+    c.sendExperimentalGestureEdge(v2(i + 1, i + 1)));
+  assert.equal(c.pendingGestureEdges, 32);
+  unblock();
+  await Promise.all(sends);
+  assert.equal(c.pendingGestureEdges, 0);
+  assert.deepEqual(c.transport.writes.map(packet => packet[4]),
+    Array.from({ length: 32 }, (_, i) => i + 1));
+  await c.sendExperimentalGestureEdge(v2(33, 33));
+  assert.equal(c.pendingGestureEdges, 0);
+  assert.equal(c.transport.writes.at(-1)[4], 33);
+  c.close("test");
+}));
