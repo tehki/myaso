@@ -196,8 +196,8 @@ export async function connectAuthoritativeClient({
     diagnostics,
     sendInput,
     // Experimental loopback-only functions deliberately do not activate
-    through the game's default sampled v1 combat path. A future original UI
-    adapter must first own the one authenticated negotiated QUIC lease.
+    // through the game's default sampled v1 combat path. A future original UI
+    // adapter must first own the one authenticated negotiated QUIC lease.
     negotiateExperimentalGestureV2(options) {
       if (transport.kind !== "webtransport") {
         throw new Error("original typed Combat requires native QUIC transport");
