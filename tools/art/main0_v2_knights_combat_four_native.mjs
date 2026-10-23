@@ -169,7 +169,17 @@ try{
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
    actions:[{type:"key",id:"real-original-KeyE",actions:[{type:"keyUp",value:"e"}]}]
  });
- const heavy=await waitFor(()=>worldAction(9,10),12000);
+ let heavy;
+ try {
+   heavy=await waitFor(()=>worldAction(9,10),12000);
+ } catch (error) {
+   const page=await evaluate(attacker,
+     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
+   ).catch(e=>({driverError:String(e)}));
+   console.error("MAIN0_ORIGINAL_GAME_HEAVY_RELEASE_DIAGNOSTIC",
+     JSON.stringify({error:String(error),browser:page,originalRustWorldTail:readAuthoritativeWorld().slice(-6500)}));
+   throw error;
+ }
  const heavyReturnedIdle=await waitFor(()=>{
    const lines=readAuthoritativeWorld().split("\n");
    const after=lines.findIndex(line=>line===heavy);

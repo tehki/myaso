@@ -378,6 +378,7 @@ networkClient = await connectAuthoritativeClient({
       throw new Error("typed ACK without same-connection gesture owner");
     }
     const result = experimentalGestureLab.outbox.receiveAck(bytes, lease);
+    experimentalGestureLab.noteAck(result);
     if (!result.transportSettled) {
       experimentalGestureLab.fail("World rejected or retired typed gesture edge");
     }

@@ -103,7 +103,28 @@ export async function activateLoopbackGestureLab({
       if (outbox.snapshot.closed) { fail("typed gesture lease was retired"); return; }
       if (outbox.snapshot.pending > 0) drain();
     },170);
+    // Original-page localhost-only diagnostic: read-only physical edge/ACK
+    // witness; never a user identity, hit, source of authority, or public UI.
+    const receipts = [];
+    const proof = () => Object.freeze({
+      failed,closed:detached,transportState:lease.experimentalGestureState,
+      pending:outbox.snapshot.pending,
+      activeSources:outbox.snapshot.activeSources,
+      nextSequence:outbox.snapshot.nextSequence,
+      acknowledged:receipts.map(x=>({...x})),
+    });
+    Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
+      configurable:true,value:proof,
+    });
     return Object.freeze({outbox,lease,close,fail,
+      noteAck(receipt) {
+        receipts.push(Object.freeze({
+          sequence:receipt.sequence,gestureId:receipt.gestureId,
+          source:receipt.source,action:receipt.action,status:receipt.status,
+          serverTick:receipt.serverTick,transportSettled:receipt.transportSettled,
+        }));
+        if (receipts.length > 16) receipts.shift();
+      },
       get snapshot() { return Object.freeze({failed,closed:detached,pending:outbox.snapshot.pending}); },
     });
   } catch (error) {
