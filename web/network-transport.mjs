@@ -43,6 +43,10 @@ class WebTransportGameConnection {
     this.latestRealtime = null;
     this.realtimeFlush = null;
     this.closed = false;
+    // Typed Combat edges are never fed to the latest-wins sampled input queue.
+    this.experimentalGestureState = "off";
+    this.gestureGrantWaiter = null;
+    this.gestureWriteQueue = Promise.resolve();
   }
 
   static async connect({ webTransportUrl, webTransportOptions, onRealtime, onReliable }) {
@@ -51,9 +55,101 @@ class WebTransportGameConnection {
     const datagramWriter = transport.datagrams.writable.getWriter();
     const reliable = await transport.createBidirectionalStream();
     const reliableWriter = reliable.writable.getWriter();
+    const connection = new WebTransportGameConnection(transport, datagramWriter, reliableWriter);
+    connection.webTransportUrl = webTransportUrl;
     pumpReader(transport.datagrams.readable.getReader(), onRealtime);
-    pumpLengthPrefixedReader(reliable.readable.getReader(), onReliable);
-    return new WebTransportGameConnection(transport, datagramWriter, reliableWriter);
+    pumpLengthPrefixedReader(reliable.readable.getReader(), packet => {
+      if (!connection.#handleGestureGrant(packet)) onReliable?.(packet);
+    });
+    return connection;
+  }
+
+  #handleGestureGrant(packet) {
+    const bytes = toUint8Array(packet);
+    if (bytes.length < 2 || bytes[0] !== 2 || bytes[1] !== 0x13) return false;
+    const waiter = this.gestureGrantWaiter;
+    if (this.experimentalGestureState !== "pending" || !waiter ||
+        bytes.length !== 4 || bytes[2] !== 0 || bytes[3] !== 0) {
+      waiter?.reject(new Error("unexpected or malformed experimental gesture grant"));
+      this.gestureGrantWaiter = null;
+      this.close("invalid experimental gesture grant");
+      return true;
+    }
+    this.gestureGrantWaiter = null;
+    this.experimentalGestureState = "granted";
+    waiter.resolve(true);
+    return true;
+  }
+
+  // Only a LOCAL loopback original-Rust flight may negotiate this experimental
+  // server-issued capability. In particular this cannot activate public R2.
+  // The existing WebTransport bidi stream and original server actor stay shared.
+  async negotiateExperimentalGestureV2({ timeoutMs = 3000 } = {}) {
+    if (this.closed || this.experimentalGestureState !== "off") {
+      throw new Error("experimental gesture handshake requires a fresh connection");
+    }
+    const host = new URL(this.webTransportUrl).hostname;
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) {
+      throw new Error("experimental gesture grant is loopback-only");
+    }
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000) {
+      throw new RangeError("bounded handshake timeout required");
+    }
+    this.experimentalGestureState = "pending";
+    let resolveGrant, rejectGrant;
+    const acknowledged = new Promise((resolve, reject) => {
+      resolveGrant = resolve; rejectGrant = reject;
+    });
+    // Prevent an unhandled rejected handshake if the QUIC uni write itself fails.
+    void acknowledged.catch(() => {});
+    this.gestureGrantWaiter = { resolve: resolveGrant, reject: rejectGrant };
+    const timeout = setTimeout(() => {
+      this.gestureGrantWaiter?.reject(new Error("original Rust v2 grant timed out"));
+      this.gestureGrantWaiter = null;
+    }, timeoutMs);
+    try {
+      const stream = await this.transport.createUnidirectionalStream();
+      const writer = stream.getWriter();
+      try {
+        // Original server accepts exactly this 8-byte HELLO on the admitted
+        // existing connection, then returns 02 13 00 00 on its bidi stream.
+        await writer.write(Uint8Array.from([2, 0x10, 77, 89, 65, 83, 79, 49]));
+        await writer.close();
+      } finally { try { writer.releaseLock(); } catch {} }
+      await acknowledged;
+      return true;
+    } catch (error) {
+      this.close("experimental gesture grant not confirmed");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // Each accepted gesture edge is preserved as an individual datagram, never
+  // overwritten by the movement sampler's latestRealtime slot. This is only
+  // transport delivery, NOT an authoritative Combat hit or admission ACK.
+  sendExperimentalGestureEdge(bytes) {
+    if (this.closed || this.experimentalGestureState !== "granted") {
+      throw new Error("gesture datagram requires current server grant");
+    }
+    const payload = toUint8Array(bytes);
+    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11) {
+      throw new TypeError("only original typed 16-byte v2 gesture events accepted");
+    }
+    const owned = payload.slice();
+    const send = this.gestureWriteQueue.then(async () => {
+      if (this.closed || this.experimentalGestureState !== "granted") {
+        throw new Error("old gesture edge cannot outlive its QUIC lease");
+      }
+      await this.datagramWriter.ready;
+      if (this.closed) throw new Error("gesture lease ended before send");
+      await this.datagramWriter.write(owned);
+    });
+    this.gestureWriteQueue = send.catch(() => {
+      this.close("gesture delivery failed");
+    });
+    return send;
   }
 
   sendRealtime(bytes) {
@@ -99,6 +195,9 @@ class WebTransportGameConnection {
   close(reason = "client close") {
     if (this.closed) return;
     this.closed = true;
+    this.experimentalGestureState = "closed";
+    this.gestureGrantWaiter?.reject(new Error("experimental gesture transport closed"));
+    this.gestureGrantWaiter = null;
     this.latestRealtime = null;
     const pendingFlush = this.realtimeFlush;
     const transportClosed = this.transport.closed;
