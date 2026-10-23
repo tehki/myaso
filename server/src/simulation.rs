@@ -2145,4 +2145,653 @@ mod r2_combat_control_tests {
         assert_eq!(own.action, Action::Block);
         assert!((own.x - 210.75).abs() < 0.001);
     }
+
+    // 4B M155: every combat action here originates from a World input edge.
+    // No test-only injection of KickActive or AttackWindup is permitted.
+    fn m155_input_kick_knocks_down(world: &mut World) -> u32 {
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                kick: true,
+                ..InputIntent::default()
+            }
+        ));
+        let mut knockdown_tick = None;
+        for _ in 0..12 {
+            world.step();
+            if world.fighter(2).unwrap().action == Action::Knockdown {
+                knockdown_tick = Some(world.tick);
+                break;
+            }
+        }
+        knockdown_tick.expect("actual admitted kick must knock target down")
+    }
+
+    fn m155_three_real_input_fighters() -> World {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
+        assert!(world.add_player_at(2, 240.0, 250.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 330.0, 250.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        world
+    }
+
+    #[test]
+    fn m155_third_party_light_before_kick_recovery_hits_once() {
+        let mut world = m155_three_real_input_fighters();
+        let knockdown_tick = m155_input_kick_knocks_down(&mut world);
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                attack: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        let mut hits = 0;
+        for _ in 0..14 {
+            let events = world.step();
+            for event in &events {
+                if matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 3,
+                        target: 2,
+                        damage: 34,
+                        hp: 66
+                    }
+                ) {
+                    assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
+                    assert!(world.tick < knockdown_tick + 22);
+                    hits += 1;
+                }
+            }
+        }
+        assert_eq!(hits, 1, "one admitted light must never damage twice");
+        assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+    }
+
+    // 4B M155/M206: World recovers knockdown before resolving attacks on
+    // this tick. A true light HIT on recovery is normal damage, NOT a valid
+    // inside-knockdown punish, even when the press began during knockdown.
+    #[test]
+    fn m155_same_recovery_tick_light_is_not_a_knockdown_punish() {
+        let mut world = m155_three_real_input_fighters();
+        let knockdown_tick = m155_input_kick_knocks_down(&mut world);
+        for _ in 0..13 {
+            world.step();
+        }
+        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                attack: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..8 {
+            let events = world.step();
+            assert!(
+                !events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 3,
+                        target: 2,
+                        ..
+                    }
+                )),
+                "a light cannot hit before its real 135ms windup"
+            );
+        }
+        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
+        assert_eq!(world.fighter(3).unwrap().action, Action::AttackWindup);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        let events = world.step();
+        assert_eq!(world.tick, knockdown_tick + 22);
+        assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+        assert!(events.iter().any(|event| matches!(
+            event,
+            CombatEvent::Hit {
+                attacker: 3,
+                target: 2,
+                damage: 34,
+                hp: 66
+            }
+        )));
+    }
+
+    // M193/M194: three *admitted* light/button and held-block exchanges
+    // must consume guard 100→62→24→0 without changing combat constants.
+    // Resolve only original World edges; no direct action/guard injection.
+    #[test]
+    fn m193_three_real_lights_drain_exact_guard_without_parry_or_hp_loss() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+        let mut seen = Vec::new();
+        for attempt in 0..3 {
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    block: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut outcome = None;
+            for _ in 0..16 {
+                let events = world.step();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit { .. } | CombatEvent::Parry { .. }
+                )));
+                for event in &events {
+                    if matches!(
+                        event,
+                        CombatEvent::Block {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::GuardBreak {
+                            attacker: 1,
+                            target: 2
+                        }
+                    ) {
+                        assert!(outcome.is_none(), "single light can contact once");
+                        outcome = Some(event.clone());
+                    }
+                }
+                if outcome.is_some() {
+                    break;
+                }
+            }
+            let outcome = outcome.expect("admitted light must contact defender");
+            let expected_guard = match attempt {
+                0 => 62.0,
+                1 => 24.0,
+                _ => 0.0,
+            };
+            assert_eq!(world.fighter(2).unwrap().guard, expected_guard);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            if attempt == 2 {
+                assert!(matches!(
+                    outcome,
+                    CombatEvent::GuardBreak {
+                        attacker: 1,
+                        target: 2
+                    }
+                ));
+                assert_eq!(world.fighter(2).unwrap().action, Action::Stunned);
+            } else {
+                assert!(matches!(
+                    outcome,
+                    CombatEvent::Block {
+                        attacker: 1,
+                        target: 2
+                    }
+                ));
+            }
+            seen.push(expected_guard);
+            assert!(world.set_input(1, InputIntent::default()));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..40 {
+                let events = world.step();
+                assert!(
+                    !events.iter().any(|event| matches!(
+                        event,
+                        CombatEvent::Block {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::GuardBreak {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::Parry {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::Hit {
+                            attacker: 1,
+                            target: 2,
+                            ..
+                        }
+                    )),
+                    "a single admitted light may contact its target only once"
+                );
+                if world.fighter(1).unwrap().action == Action::Idle {
+                    break;
+                }
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            if attempt < 2 {
+                assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            }
+        }
+        assert_eq!(seen, [62.0, 24.0, 0.0]);
+    }
+
+    // M193/M194 native negative: after two valid -38 guard blocks, a later
+    // Firefox block that is still within the 125ms server parry phase MUST
+    // parry the third admitted light, not count a phantom guard break.
+    #[test]
+    fn m193_third_attack_inside_parry_window_never_completes_guard_break() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+        for expected_guard in [62.0, 24.0] {
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    block: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut block_events = 0;
+            for _ in 0..16 {
+                let events = world.step();
+                block_events += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Block {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Parry { .. }
+                        | CombatEvent::GuardBreak { .. }
+                        | CombatEvent::Hit { .. }
+                )));
+                if block_events > 0 {
+                    break;
+                }
+            }
+            assert_eq!(block_events, 1);
+            assert_eq!(world.fighter(2).unwrap().guard, expected_guard);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            assert!(world.set_input(1, InputIntent::default()));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..40 {
+                let events = world.step();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Parry { .. }
+                        | CombatEvent::GuardBreak { .. }
+                        | CombatEvent::Hit { .. }
+                        | CombatEvent::Block { .. }
+                )));
+                if world.fighter(1).unwrap().action == Action::Idle {
+                    break;
+                }
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+        }
+        assert_eq!(world.fighter(2).unwrap().guard, 24.0);
+
+        // Attacker first enters its genuine 135ms light windup; defender
+        // blocks two World ticks later, leaving only ~100ms to impact.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        let mut parries = 0;
+        for _ in 0..16 {
+            let events = world.step();
+            parries += events
+                .iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        CombatEvent::Parry {
+                            attacker: 1,
+                            target: 2
+                        }
+                    )
+                })
+                .count();
+            assert!(!events.iter().any(|event| matches!(
+                event,
+                CombatEvent::GuardBreak { .. }
+                    | CombatEvent::Block { .. }
+                    | CombatEvent::Hit { .. }
+            )));
+            if parries > 0 {
+                break;
+            }
+        }
+        assert_eq!(
+            parries, 1,
+            "a valid server parry is never an M193 guarded hit"
+        );
+        assert_eq!(world.fighter(2).unwrap().guard, 24.0);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
+    }
+
+    // M107: a genuine authoritative dodge MUST already exist at contact.
+    // A real heavy HIT at tick T cannot be reversed by a later dodge at T+1;
+    // nor can the same heavy advertise a server Evade after its one HIT.
+    #[test]
+    fn m107_timely_dodge_evades_but_late_dodge_cannot_erase_heavy_hit() {
+        for timely_dodge in [true, false] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 310.0, 300.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            // Approach the actual 320ms server windup without injecting
+            // HeavyActive, then deliver an ordinary physical-input intent.
+            while world.fighter(1).unwrap().action_elapsed_ms + SERVER_DT_MS
+                < HEAVY_ATTACK_WINDUP_MS
+            {
+                world.step();
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            let pre_contact_tick = world.tick;
+            if timely_dodge {
+                assert!(world.set_input(
+                    2,
+                    InputIntent {
+                        dodge: true,
+                        ..InputIntent::default()
+                    }
+                ));
+            }
+            let events = world.step();
+            assert_eq!(world.tick, pre_contact_tick + 1);
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
+            if timely_dodge {
+                assert_eq!(world.fighter(2).unwrap().action, Action::Dodge);
+                assert!(events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Evade {
+                        attacker: 1,
+                        target: 2
+                    }
+                )));
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        ..
+                    }
+                )));
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            } else {
+                assert!(events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 46,
+                        hp: 54
+                    }
+                )));
+                assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+                assert!(world.set_input(
+                    2,
+                    InputIntent {
+                        dodge: true,
+                        ..InputIntent::default()
+                    }
+                ));
+                for _ in 0..12 {
+                    let later = world.step();
+                    assert!(
+                        !later.iter().any(|event| matches!(
+                            event,
+                            CombatEvent::Evade {
+                                attacker: 1,
+                                target: 2
+                            } | CombatEvent::Hit {
+                                attacker: 1,
+                                target: 2,
+                                ..
+                            }
+                        )),
+                        "one already-committed heavy cannot be both HIT and Evade"
+                    );
+                    assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+                }
+            }
+        }
+    }
+
+    // M156/M237: real World input admission distinguishes a legitimate
+    // very short LMB charge-release LIGHT from an all-neutral cancellation.
+    // Neither path is allowed to manufacture an attack from a lost release.
+    #[test]
+    fn m156_roll_knockdown_short_light_release_vs_cancel_is_authoritative() {
+        for release_is_light in [true, false] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
+            assert!(world.add_player_at(2, 256.0, 250.0, std::f32::consts::PI));
+            assert!(world.add_player_at(3, 357.0, 250.0, std::f32::consts::PI));
+            assert!(world.set_input(
+                3,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    dodge: true,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut knockdown_tick = None;
+            for _ in 0..16 {
+                world.step();
+                if world.fighter(2).unwrap().action == Action::Knockdown {
+                    knockdown_tick = Some(world.tick);
+                    break;
+                }
+            }
+            let knockdown_tick =
+                knockdown_tick.expect("genuine admitted roll must knock defender down");
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+            // One original server tick of the dual-bit LMB hold is a bona
+            // fide undercharged attack. The NEXT packet resolves its mode.
+            assert!(world.set_input(
+                3,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            world.step();
+            assert_eq!(world.fighter(3).unwrap().action, Action::HeavyAttackWindup);
+            let mut release = InputIntent {
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            };
+            if release_is_light {
+                release.attack = true;
+            }
+            assert!(world.set_input(3, release));
+            world.step();
+            assert_eq!(
+                world.fighter(3).unwrap().action,
+                if release_is_light {
+                    Action::AttackWindup
+                } else {
+                    Action::Idle
+                },
+                "a lost release must cancel rather than invent damage"
+            );
+            let mut hit_ticks = Vec::new();
+            for _ in 0..25 {
+                let events = world.step();
+                for event in &events {
+                    if matches!(
+                        event,
+                        CombatEvent::Hit {
+                            attacker: 3,
+                            target: 2,
+                            ..
+                        }
+                    ) {
+                        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
+                        hit_ticks.push(world.tick);
+                        assert!(matches!(
+                            event,
+                            CombatEvent::Hit {
+                                attacker: 3,
+                                target: 2,
+                                damage: 34,
+                                hp: 66
+                            }
+                        ));
+                    }
+                }
+            }
+            if release_is_light {
+                assert_eq!(
+                    hit_ticks.len(),
+                    1,
+                    "single short LMB light hits exactly once"
+                );
+                assert!(hit_ticks[0] > knockdown_tick);
+                assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+            } else {
+                assert!(hit_ticks.is_empty(), "cancel may not become phantom hit");
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
+        }
+    }
+
+    // 4B M194: genuine input edges enter the server at different ticks;
+    // server elapsed state, not Firefox or Chrome wall time, chooses the
+    // unchanged 125ms parry vs -38 guard block.
+    #[test]
+    fn m194_125ms_parry_vs_later_block_keeps_exact_guard_pressure() {
+        for (block_start_tick, expect_parry) in [(4, true), (1, false)] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut parries = 0;
+            let mut blocks = 0;
+            for tick in 1..=14 {
+                if tick == block_start_tick {
+                    assert!(world.set_input(
+                        2,
+                        InputIntent {
+                            block: true,
+                            facing_radians: std::f32::consts::PI,
+                            ..InputIntent::default()
+                        }
+                    ));
+                }
+                let events = world.step();
+                parries += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Parry {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+                blocks += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Block {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+            }
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            if expect_parry {
+                assert_eq!((parries, blocks), (1, 0));
+                assert_eq!(world.fighter(2).unwrap().guard, 100.0);
+                assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
+            } else {
+                assert_eq!((parries, blocks), (0, 1));
+                assert_eq!(world.fighter(2).unwrap().guard, 62.0);
+            }
+        }
+    }
 }
