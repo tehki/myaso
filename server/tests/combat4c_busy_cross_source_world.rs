@@ -138,4 +138,55 @@ fn independent_keye_busy_press_must_not_strand_legitimate_lmb_release() {
     }
     assert_eq!(hits, vec![(34, 66)], "only the genuine 34HP LMB may land");
     assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+
+    // The KeyE terminal belongs to a tombstoned busy gesture: its late
+    // arrival after original LMB recovery must not become a heavy strike.
+    let no_op_terminal = event(GestureSource::KeyE, GestureAction::Release, 4, 2);
+    assert_eq!(
+        path.accept_under_world_lock(&mut world, LEASE, BOOT, &no_op_terminal)
+            .unwrap()
+            .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        path.accept_under_world_lock(&mut world, LEASE, BOOT, &no_op_terminal)
+            .unwrap()
+            .status,
+        AckStatus::Duplicate
+    );
+    assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+
+    // Busy ACKs cannot replace the last active World attack ID; once the
+    // first action recovers, a new genuine LMB gesture must be possible.
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::Lmb, GestureAction::Press, 5, 3),
+        ).unwrap().status,
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        path.accept_under_world_lock(
+            &mut world,
+            LEASE,
+            BOOT,
+            &event(GestureSource::Lmb, GestureAction::Release, 6, 3),
+        ).unwrap().status,
+        AckStatus::Accepted
+    );
+    let mut next_hits = vec![];
+    for _ in 0..55 {
+        for outcome in world.step() {
+            if let CombatEvent::Hit { attacker: 1, target: 2, damage, hp } = outcome {
+                next_hits.push((damage, hp));
+            }
+        }
+        path.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert_eq!(next_hits, vec![(34, 32)]);
+    assert_eq!(world.fighter(2).unwrap().hp, 32.0);
 }
