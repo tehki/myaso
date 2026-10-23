@@ -10,6 +10,8 @@ on:
       # changes to settled ACK handling must rerun the original game, not
       # merely smaller outbox unit/QUIC fixtures.
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      # Actor-life/boot lease changes must prove real first-party multi-client gameplay too.
+      - "server/tests/prealpha_boot_nonce_authority.rs"
       - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
       - "tools/art/main0_v2_knights_combat_four_native.mjs"
       - ".github/workflows/main0-v2-knights-combat-four-native.yml"
