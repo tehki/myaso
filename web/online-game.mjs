@@ -148,6 +148,13 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
+// NONRELEASE read-only original M121 v1 input vector; never input source.
+const m121InputProbe = acceptanceScenario === "uidirectionallight"
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  ? (window.__MYASO_M121_DIRECTIONAL_INPUT__ = {
+      physicalPresses: [], lightReleases: [], sentFrames: [],
+    })
+  : null;
 const server = params.get("server");
 const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
@@ -210,6 +217,14 @@ const leftButtonCharge = createLeftButtonCharge({
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
+    if (m121InputProbe) {
+      m121InputProbe.lightReleases.push({
+        epochMs: Date.now(), actualKeys: [...keys].filter((key) => /^Key[WASD]$/.test(key)),
+        committedMove: { ...committedLightMove },
+        localPredictedAction: local.action,
+      });
+      if (m121InputProbe.lightReleases.length > 12) m121InputProbe.lightReleases.shift();
+    }
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
@@ -248,6 +263,14 @@ canvas.addEventListener("pointerdown", (event) => {
     leftButtonCharge.press(event.pointerId, {
       immediate: local.action === COMBAT_ACTION.jump || jumpRequested || keys.has("Space"),
     });
+    if (m121InputProbe) {
+      m121InputProbe.physicalPresses.push({
+        epochMs: Date.now(), trusted: event.isTrusted, pointerId: event.pointerId,
+        actualKeys: [...keys].filter((key) => /^Key[WASD]$/.test(key)),
+        pressMove: { ...leftButtonPressMovement },
+      });
+      if (m121InputProbe.physicalPresses.length > 12) m121InputProbe.physicalPresses.shift();
+    }
     return;
   }
 });
@@ -847,6 +870,18 @@ function simulatePrediction(stepMs) {
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
       }
+    }
+    if (m121InputProbe) {
+      // EXACT final original v1 30Hz frame, before unchanged true sender.
+      m121InputProbe.sentFrames.push({
+        epochMs: Date.now(), clientTick: outgoingTick,
+        moveX: currentInput.moveX, moveY: currentInput.moveY,
+        attack: Boolean(currentInput.attack),
+        heavyAttack: Boolean(currentInput.heavyAttack),
+        actualKeys: [...keys].filter((key) => /^Key[WASD]$/.test(key)),
+        localPredictedAction: local.action,
+      });
+      if (m121InputProbe.sentFrames.length > 96) m121InputProbe.sentFrames.shift();
     }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
