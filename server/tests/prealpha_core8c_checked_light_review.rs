@@ -62,3 +62,30 @@ fn stale_ownership_cannot_apply_queued_gesture_to_replacement() {
     );
     assert!(!owner.world().fighter(1).unwrap().input().attack);
 }
+
+
+#[test]
+fn canceled_same_tick_gesture_cannot_stage_an_unintended_attack() {
+    let mut world = World::default();
+    assert!(world.add_player(1));
+    assert!(world.add_player(2));
+    let mut owner = ReviewOwnedWorld::review_new(world).unwrap();
+    let actor = ReviewActorLease::review_from_server_values(1, 2, 99).unwrap();
+    let mut gate = ReviewWorldOwnerLease::review_from_current_owner(&owner, actor).unwrap();
+    assert_eq!(
+        gate.review_ingest(&owner, actor, &edge(GestureAction::Press, 1)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(
+        gate.review_ingest(&owner, actor, &edge(GestureAction::Cancel, 2)),
+        ReviewEdgeStatus::Accepted(1)
+    );
+    assert_eq!(
+        owner.review_apply_one_lmb_light(&mut gate, actor),
+        ReviewLightWorldDispatch::RejectedAndRetired
+    );
+    assert!(gate.is_retired());
+    assert!(owner.review_step_events().is_empty());
+    assert_eq!(owner.world().fighter(1).unwrap().hp, 100.0);
+    assert!(!owner.world().fighter(1).unwrap().input().attack);
+}
