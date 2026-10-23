@@ -12,6 +12,7 @@ on:
       - "server/tests/prealpha_boot_nonce_authority.rs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
+      - "scripts/core8_native_v2_keye_autocommit_world_lab.mjs"
       - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
   workflow_dispatch:
 
@@ -40,5 +41,10 @@ jobs:
           google-chrome --version
           chromedriver --version
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_quic_gesture_lab.mjs
+      - name: Genuine W3C Chromium KeyE auto-heavy World before and after release
+        run: |
+          node --check scripts/core8_native_v2_keye_autocommit_world_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_keye_autocommit_world_lab.mjs
+          MYASO_KEYE_EARLY_RELEASE=1 timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_keye_autocommit_world_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
