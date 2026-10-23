@@ -129,7 +129,11 @@ impl SessionGestureWorldPath {
                 // KeyE is standalone: heavy starts on PRESS and the original
                 // World owns its 320ms windup/hit, not this terminal receipt.
                 self.keye_terminal = true;
-                self.world_source_terminal = true;
+                // KeyE may finish AFTER a newer LMB has acquired World.
+                // The old terminal cannot release the CURRENT World owner.
+                if self.world_source == Some(GestureSource::KeyE) {
+                    self.world_source_terminal = true;
+                }
             }
             GestureAction::Release | GestureAction::Cancel
                 if event.gesture_id > self.highest_gesture_id =>
