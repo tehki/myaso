@@ -2,7 +2,7 @@
 // Not imported by web/online-game.mjs; never sends QUIC or grants a hit.
 // Only a future authenticated/version-negotiated Core 8A lease may own outbox.
 // Browser pointer events alone are never actor authorization or Combat proof.
-import { ProposedLmbGestureOutbox } from "../network/prealpha-lmb-gesture-outbox-proposal.mjs";
+import { ProposedLmbGestureOutbox, ProposedSharedTypedGestureOutbox } from "../network/prealpha-lmb-gesture-outbox-proposal.mjs";
 
 const isFn = value => typeof value === "function";
 const validMousePointer = e => e && e.pointerType === "mouse"
@@ -16,7 +16,8 @@ export function createDormantPrealphaLmbDomGate({
   isCanvasTarget, isChatFocused = () => false,
   isJumpAttackChord = () => false,
 } = {}) {
-  if (!(outbox instanceof ProposedLmbGestureOutbox)) {
+  const shared = outbox instanceof ProposedSharedTypedGestureOutbox;
+  if (!(outbox instanceof ProposedLmbGestureOutbox) && !shared) {
     throw new TypeError("a negotiated, lease-bound proposed v2 outbox is required");
   }
   for (const fn of [getClientTick,isCanvasTarget,isChatFocused,isJumpAttackChord]) {
@@ -27,7 +28,8 @@ export function createDormantPrealphaLmbDomGate({
     if (closed) return false;
     closed = true;
     active = null;
-    outbox.closeLease();
+    if (shared) outbox.retire();
+    else outbox.closeLease();
     return true;
   }
   function submit(action) {
@@ -48,7 +50,7 @@ export function createDormantPrealphaLmbDomGate({
       || event.button !== 0 || (event.buttons & 1) === 0
       || isChatFocused() || isJumpAttackChord(event)
       || !isCanvasTarget(event)) return false;
-    const edge = submit(tick => outbox.begin(tick));
+    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
     if (!edge) return false;
     active = {pointerId:event.pointerId,gestureId:edge.gestureId,upgraded:false};
     return true;
@@ -74,7 +76,8 @@ export function createDormantPrealphaLmbDomGate({
     // received on window after the pointer leaves the canvas.
     if (kind === "release" && event?.button !== 0) return false;
     const edge = submit(tick => kind === "release"
-      ? outbox.release(tick) : outbox.cancel(tick));
+      ? (shared ? outbox.release(0,tick) : outbox.release(tick))
+      : (shared ? outbox.cancel(0,tick) : outbox.cancel(tick)));
     if (!edge) return false;
     active = null;
     return true;
@@ -99,6 +102,8 @@ export function createDormantPrealphaLmbDomGate({
 }
 
 // Opt-in QA-only event wiring, not imported or enabled by live game.
+// In shared typed review mode, source0 and source1 share one Core8A queue; never
+// attach this beside the live v1 LMB handler.
 // The future runtime must *replace* legacy v1 LMB handling atomically;
 // adding this listener alongside it could double-attack.
 export function attachDormantPrealphaLmbDomGate(
