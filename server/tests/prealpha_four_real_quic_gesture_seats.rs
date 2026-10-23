@@ -424,9 +424,10 @@ async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_key
     timeout(Duration::from_secs(4), async {
         loop {
             let original = server.lines.lock().unwrap().clone();
-            if original.iter().any(|l| {
-                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=3 to=0")
-            }) {
+            if original
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=3 to=0"))
+            {
                 assert!(
                     original.iter().any(|l| {
                         l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2")
@@ -446,9 +447,13 @@ async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_key
     combat4c_ack(&seat.connection, 1, 1, 2, 2, 1).await;
     timeout(Duration::from_secs(4), async {
         loop {
-            if server.lines.lock().unwrap().iter().any(|l| {
-                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9")
-            }) {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9"))
+            {
                 break;
             }
             sleep(Duration::from_millis(20)).await;
@@ -467,9 +472,9 @@ async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_key
     sleep(Duration::from_millis(425)).await;
     let before = server.lines.lock().unwrap().clone();
     assert!(
-        !before.iter().any(|l| {
-            l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10")
-        }),
+        !before
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10") }),
         "stale-but-authentic LMB release cannot commit newer held KeyE"
     );
 
@@ -480,9 +485,7 @@ async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_key
             let actions = server.lines.lock().unwrap().clone();
             let count = actions
                 .iter()
-                .filter(|l| {
-                    l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10")
-                })
+                .filter(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
                 .count();
             if count >= 1 {
                 assert_eq!(count, 1, "one released KeyE World heavy, no double-commit");
