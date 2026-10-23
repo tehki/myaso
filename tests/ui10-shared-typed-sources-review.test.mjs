@@ -100,7 +100,11 @@ test("actual negotiated lease ACK settles transport only, not World HIT",()=>{
   assert.equal(settled.source,0);
   assert.equal(settled.transportSettled,true);
   assert.equal(settled.combatCommitted,false);
-  assert.throws(()=>f.outbox.receiveAck(ack(e[0]),f.lease),/replayed|unexpected|retired/);
+  const duplicate=f.outbox.receiveAck(ack(e[0]),f.lease);
+  assert.equal(duplicate.alreadySettled,true,
+    "same-lease delayed transport ACK must not terminate genuine physical KeyE");
+  assert.equal(duplicate.combatCommitted,false,
+    "an idempotent transport receipt never becomes a second World hit");
   const keyack=f.outbox.receiveAck(ack(e[1]),f.lease);
   assert.equal(keyack.source,1);
   assert.equal(f.outbox.snapshot.pending,0);
