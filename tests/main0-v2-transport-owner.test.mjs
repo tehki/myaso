@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { connectGameTransport } from "../web/network-transport.mjs";
+import { connectAuthoritativeClient } from "../web/authoritative-client.mjs";
+import { ProposedSharedTypedGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
 
 class OriginalQuicFixture {
   static sessions = [];
@@ -123,4 +125,53 @@ test("invalid typed packet and old closed lease cannot enter gesture QUIC queue"
   c.close("actor retired");
   assert.throws(()=>c.sendExperimentalGestureEdge(v2(2,1)),/server grant/);
   assert.equal(c.transport.writes.length,1);
+}));
+
+const originalRustAck = (sequence, gestureId, status = 1, tick = 99) => {
+  const packet = new Uint8Array(16), view = new DataView(packet.buffer);
+  view.setUint8(0,2); view.setUint8(1,0x12); view.setUint8(2,status);
+  view.setUint32(4,sequence,true); view.setUint32(8,gestureId,true); view.setUint32(12,tick,true);
+  return packet;
+};
+
+test("first-party client routes strict 0x12 ACK to original same-lease shared typed outbox only", () => withFixture(async () => {
+  let holder, acknowledged = null;
+  const c = await connectAuthoritativeClient({
+    webTransportUrl:"https://127.0.0.1:4433/game",
+    onExperimentalGestureAck(bytes, currentLease) {
+      acknowledged = holder.receiveAck(bytes, currentLease);
+    },
+  });
+  await c.negotiateExperimentalGestureV2();
+  const lease = c.transport;
+  holder = new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
+  const press = holder.begin(0,3);
+  assert.equal(press.sequence,1);
+  const send = holder.nextSendBatch(1);
+  assert.equal(send.length,1);
+  await c.sendExperimentalGestureEdge(send[0].bytes);
+  lease.transport.datagramSource.enqueue(originalRustAck(press.sequence,press.gestureId));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(acknowledged?.sequence,1);
+  assert.equal(acknowledged?.serverTick,99);
+  assert.equal(acknowledged?.combatCommitted,false,"receipt cannot authorize a combat HIT");
+  assert.equal(holder.snapshot.pending,0);
+  assert.deepEqual(lease.transport.writes.map(x=>x[4]),[1]);
+  holder.retire();
+  c.close("test");
+}));
+
+test("unnegotiated typed ACK closes original client transport, never admits a phantom receipt", () => withFixture(async () => {
+  const errors=[],seen=[];
+  const c=await connectAuthoritativeClient({
+    webTransportUrl:"https://127.0.0.1:4433/game",
+    onProtocolError:error=>errors.push(error.message),
+    onExperimentalGestureAck:bytes=>seen.push(bytes),
+  });
+  c.transport.transport.datagramSource.enqueue(originalRustAck(1,1));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(c.transport.transport.closedByClient,true);
+  assert.deepEqual(seen,[]);
+  assert.equal(errors.length,1);
+  assert.match(errors[0],/current reviewed grant/);
 }));
