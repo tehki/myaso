@@ -53,6 +53,19 @@ The exact transcribed source lines, GitHub job ID and native client observations
 
 **Routing:** 4A/Core8A own physical wheel admission/30Hz scheduling investigation; UI10/Combat4 own post-contact dodge-success suppression; 4B/Physics6 verify original World action/timing only if further evidence implicates them. Draft [#851](https://github.com/tehki/myaso/pull/851) proposes truthful contact feedback; [#854](https://github.com/tehki/myaso/pull/854) proposes immediate physical-wheel admission. Neither experimental proposal qualifies this separate exact candidate or the full Pre-Alpha.
 
+## Protected M155 native regression — 2026-10-23
+
+The previous 4D exact-head candidate `91ab5c107cb88431c652329f760a7b68bfc35715` failed original protected [quality #39931321731](https://github.com/tehki/myaso/actions/runs/39931321731) at step `Validate M155 actionable third-party knockdown punish`, native job `120340072943`.
+
+- Real kicker fighter1 KickWindup tick348 → KickActive tick353. Victim fighter2 enters Knockdown19 **tick353**.
+- Third-player fighter3 transitions HeavyCharge9 tick359 → LightWindup1 tick367; its native pointerDOWN was recorded at epoch 1792747886333.
+- **Victim recovers Knockdown19→Idle0 tick375. On the same server tick375, third-player light becomes Active2 and commits one genuine 34HP hit, victim HP100→66.**
+- Original strict M206 rejects this as `M206 missing same-strike server attack-active edge` **inside knockdown**. A normal hit at recovery tick cannot count as a knockdown punish; no server constant should be changed to hide native delivery/scheduling problems.
+- Exact source lines are in [qa/evidence/m155-run-39931321731.json](../qa/evidence/m155-run-39931321731.json). `node scripts/combat4d-m155-proof.mjs qa/evidence/m155-run-39931321731.json` verifies chronology and prints **HOLD**. Dedicated QA tests refuse fabricated hits, misidentified actors, or reordered ticks. The QA evidence check passing does NOT qualify M155 gameplay.
+- Related [Combat 4B #864](https://github.com/tehki/myaso/pull/864) adds correct World-only positive/negative recovery boundary tests. It does not demonstrate real Chrome/Firefox knockdown punish success. Input/transport and W3C action scheduling need separate owner investigation.
+
+Do not reinterpret a later rerun as erasure of this real failure. Independent exact-integrated-candidate Chrome/Firefox/Chrome2/4-human acceptance remains mandatory.
+
 ## Known runnable entry points
 
 ~~~bash
