@@ -40,7 +40,7 @@ export function assessM155Witness(witness) {
     && e.attacker === punisher && e.target === victim);
   if ([kick, knock, recover, windup, active, hits].some(a => a.length !== 1))
     throw new Error("Expected one server kick, knockdown, recovery, third-player light and hit");
-  const [k], [n], [r], [w], [a], [h] = [kick, knock, recover, windup, active, hits];
+  const k = kick[0], n = knock[0], r = recover[0], w = windup[0], a = active[0], h = hits[0];
   if (k.tick !== n.tick || !(n.tick < w.tick && w.tick < a.tick)
     || h.tick !== a.tick || h.damage !== 34 || h.hp !== 66)
     throw new Error("Expected authentic original World 34HP light and kick chronology");
