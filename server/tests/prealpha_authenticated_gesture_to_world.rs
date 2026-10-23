@@ -1041,3 +1041,159 @@ fn future_lmb_press_cannot_overtake_missing_keye_press_or_terminal() {
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 20)]);
     assert_eq!(w.fighter(2).unwrap().hp, 20.0);
 }
+
+fn assert_fresh_source1_release_only_heavy(world: &mut World, lease: u64) {
+    let mut current = SessionGestureWorldPath::from_admitted_world(world, 1, lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut current,
+            world,
+            lease,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+
+    // This is the Main-selected contract, NOT the incompatible auto-KeyE
+    // branch: the actual server World advances beyond 320ms with ZERO hits.
+    let mut hits = Vec::new();
+    for _ in 0..37 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = event
+            {
+                hits.push((damage, hp));
+            }
+        }
+        current.advance_under_world_lock(world, lease, BOOT);
+    }
+    assert!(hits.is_empty(), "held KeyE must not auto-hit after READY");
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(
+        admit(
+            &mut current,
+            world,
+            lease,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = event
+            {
+                hits.push((damage, hp));
+            }
+        }
+        current.advance_under_world_lock(world, lease, BOOT);
+    }
+    assert_eq!(hits, vec![(46, 54)], "exactly one legitimate release hit");
+    assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+}
+
+#[test]
+fn release_only_keye_same_tick_actor_reuse_fences_stale_terminal_and_fresh_hit() {
+    let mut world = arena();
+    let mut former = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let initial_incarnation = former.binding().incarnation;
+    let initial_world = world.world_instance();
+    assert_eq!(
+        admit(
+            &mut former,
+            &mut world,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+
+    // Same tick, same numeric actor, SAME World, but new actor incarnation.
+    assert!(world.remove_player(1));
+    assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+    assert_eq!(world.world_instance(), initial_world);
+    assert_ne!(world.fighter(1).unwrap().world_incarnation(), initial_incarnation);
+    assert_eq!(
+        admit(
+            &mut former,
+            &mut world,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Stale,
+        "prior held release cannot strike a replacement actor"
+    );
+    assert!(former.retired());
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+    // Only a new explicitly admitted lease may restart the exact source1
+    // gesture ID namespace and obtain the 320ms READY + RELEASE World hit.
+    assert_fresh_source1_release_only_heavy(&mut world, LEASE + 1);
+    assert!(former.retired(), "old lease cannot resurrect after new hit");
+}
+
+#[test]
+fn release_only_keye_world_replacement_rejects_matching_ids_ticks_and_old_release() {
+    let mut previous = arena();
+    let mut stale =
+        SessionGestureWorldPath::from_admitted_world(&previous, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut stale,
+            &mut previous,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+
+    // World owner changes even if all familiar local numbers happen to match.
+    let mut replacement = arena();
+    assert_ne!(previous.world_instance(), replacement.world_instance());
+    assert_eq!(previous.tick, replacement.tick);
+    assert_eq!(
+        previous.fighter(1).unwrap().world_incarnation(),
+        replacement.fighter(1).unwrap().world_incarnation()
+    );
+    assert_eq!(
+        admit(
+            &mut stale,
+            &mut replacement,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert!(stale.retired());
+    assert_eq!(replacement.fighter(2).unwrap().hp, 100.0);
+    assert_fresh_source1_release_only_heavy(&mut replacement, LEASE + 1);
+}
