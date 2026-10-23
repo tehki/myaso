@@ -159,6 +159,45 @@ test("native event listener fixture uses only one shared source stack; teardown 
   gameplayFocus=false;
   assert.equal(send(windowObj,"keydown",{code:"KeyE",repeat:false}).defaultPrevented,false);
 });
+test("pagehide retires both physical input sources and their ONE pending outbox lease",()=>{
+  const windowObj=new EventTarget(),canvas=new EventTarget(),documentObj=new EventTarget();
+  documentObj.hidden=false;
+  const lease={},outbox=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
+  const gates=createDormantSharedUi10Sources({
+    outbox,getClientTick:()=>88,isCanvasTarget:e=>e.target===canvas,
+    isChatFocused:()=>false,isJumpAttackChord:()=>false,
+    hasGameplayFocus:()=>true,isTextEditing:()=>false,
+  });
+  const detach=attachDormantSharedUi10Sources(gates,{canvas,windowObj,documentObj});
+  function dispatch(target,type,props={}) {
+    const event=new Event(type,{cancelable:true});
+    for(const [key,value] of Object.entries(props))
+      Object.defineProperty(event,key,{value});
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+  assert.equal(dispatch(canvas,"pointerdown",{
+    pointerType:"mouse",pointerId:10,button:0,buttons:1,
+  }),true);
+  assert.equal(dispatch(windowObj,"keydown",{code:"KeyE",repeat:false}),true);
+  assert.equal(outbox.snapshot.pending,2);
+  assert.deepEqual(outbox.snapshot.activeSources,[0,1]);
+  // Actual page navigation must close the whole outbox, not only KeyE.
+  dispatch(windowObj,"pagehide");
+  assert.equal(outbox.snapshot.closed,true);
+  assert.equal(outbox.snapshot.pending,0,"old-session typed edges must be discarded");
+  assert.deepEqual(outbox.snapshot.activeSources,[]);
+  assert.equal(gates.lmb.snapshot.closed,true);
+  assert.equal(gates.keye.snapshot.closed,true);
+  assert.equal(dispatch(windowObj,"keyup",{code:"KeyE"}),false);
+  assert.equal(dispatch(windowObj,"pointerup",{
+    pointerType:"mouse",pointerId:10,button:0,buttons:0,
+  }),false);
+  assert.throws(()=>outbox.nextSendBatch(4),/closed/);
+  detach();detach(); // idempotent and no further emission after teardown
+  assert.equal(dispatch(windowObj,"keydown",{code:"KeyE",repeat:false}),false);
+});
+
 test("no original gameplay/wire imports or UI network authentication fabrication",()=>{
   const live=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
   const server=readFileSync(new URL("../server/src/main.rs",import.meta.url),"utf8");
