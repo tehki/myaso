@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 
 test("M156 real Chrome2 short click starts after actual Firefox knockdown, not wheel driver ACK", () => {
   const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
@@ -25,4 +26,81 @@ test("M156 real Chrome2 short click starts after actual Firefox knockdown, not w
   assert.ok(flight.includes('defenderState.events.includes("Hit taken - 34 HP.")'));
   assert.ok(flight.includes("defenderState?.playerHp === 66 && defenderState?.playerGuard === 100"));
   assert.ok(flight.includes("punisherState?.playerHp === 100 && punisherState?.playerGuard === 100"));
+});
+
+test("M156 actual sampled HOLD, light RELEASE and neutral transmit unchanged while bounded QA observes all", () => {
+  // Execute the REAL production simulatePrediction function in an isolated
+  // deterministic harness, including its genuine sendInput boundary.
+  const source = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("function simulatePrediction(stepMs) {");
+  const stop = source.indexOf("\nfunction predictMovement(", start);
+  assert.ok(start > 0 && stop > start);
+  const fn = source.slice(start, stop);
+  const actualPackets = [];
+  const debug = { inputSubmissions: [] };
+  const input = { attack: true, heavyAttack: true, jump: false };
+  const charge = { held: true };
+  const ctx = {
+    sampleInput() {},
+    matchOver: false,
+    local: { initialized: false },
+    predictionStep: 1,
+    clientTick: 346,
+    networkClient: {
+      sendInput(packet) { actualPackets.push({ ...packet }); },
+    },
+    markStaminaDenialSubmitted() {},
+    currentInput: input,
+    acceptanceScenario: "uirollknockdownffahit",
+    window: { __MYASO_ACCEPTANCE_STATE__: debug },
+    leftButtonDown: true,
+    leftButtonCharge: { isCharging: () => charge.held },
+    attackRequested: false,
+    runningAttackRequested: false,
+    committedLightMove: null,
+    heavyAttackRequested: false,
+    rollRequested: false,
+    kickRequested: false,
+    jumpRequested: false,
+    dashRequested: false,
+    dashMove: null,
+    Date: { now: () => 1792754242365 },
+  };
+  runInNewContext(fn, ctx);
+  ctx.simulatePrediction(1000 / 60); // real 30Hz send of initial held dual-bit charge
+  assert.equal(actualPackets.length, 1);
+  assert.equal(actualPackets[0].attack, true);
+  assert.equal(actualPackets[0].heavyAttack, true);
+  assert.equal(debug.inputSubmissions[0].lmbPressed, true);
+  assert.equal(debug.inputSubmissions[0].lmbCharging, true);
+
+  // Genuine pointerUP's onLight queued an attack-only release pulse. No
+  // synthetic send or clock advance is needed; only the original sender
+  // is allowed to issue a packet on every second prediction step.
+  input.attack = true;
+  input.heavyAttack = false;
+  ctx.leftButtonDown = false;
+  charge.held = false;
+  ctx.attackRequested = true;
+  ctx.simulatePrediction(1000 / 60); // off tick: zero extra packets
+  assert.equal(actualPackets.length, 1);
+  ctx.simulatePrediction(1000 / 60); // genuine next sender tick
+  assert.equal(actualPackets.length, 2);
+  assert.equal(actualPackets[1].attack, true);
+  assert.equal(actualPackets[1].heavyAttack, false);
+  assert.equal(debug.inputSubmissions[1].pendingLight, true);
+  assert.equal(debug.inputSubmissions[1].lmbPressed, false);
+
+  // A later quiet packet is explicitly retained for this QA scenario.
+  input.attack = false;
+  input.heavyAttack = false;
+  ctx.simulatePrediction(1000 / 60);
+  ctx.simulatePrediction(1000 / 60);
+  assert.equal(actualPackets.length, 3);
+  assert.equal(actualPackets[2].attack, false);
+  assert.equal(actualPackets[2].heavyAttack, false);
+  assert.deepEqual(debug.inputSubmissions.map(x => [x.attack, x.heavyAttack]),
+    [[true, true], [true, false], [false, false]]);
+  assert.deepEqual(actualPackets.map(x => x.tick), [346, 347, 348]);
+  assert.deepEqual(debug.inputSubmissions.map(x => x.clientTick), [346, 347, 348]);
 });
