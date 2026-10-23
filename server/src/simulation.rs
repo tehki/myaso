@@ -2371,6 +2371,118 @@ mod r2_combat_control_tests {
             .any(|event| matches!(event, CombatEvent::Hit { .. })));
     }
 
+    // M201 original-page 46HP+34HP evidence: a true server heavy HIT
+    // physically knocks the defender past unchanged ordinary light reach.
+    // Only a legitimate movement input closes that distance for a later
+    // light contact. ACK, HeavyActive and LightActive are not HITs.
+    #[test]
+    fn m201_heavy_knockback_requires_real_reapproach_for_light_followup() {
+        use crate::prealpha_lmb_gesture_authority::Command;
+        for reapproach in [false, true] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+            assert!(world.add_player_at(2, 296.0, 200.0, std::f32::consts::PI));
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+            // Original release-only KeyE authority: READY remains held
+            // without any phantom 46HP heavy before a matching release.
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginKeyEHeavy));
+            for _ in 0..22 {
+                let events = world.step();
+                assert!(!events.iter().any(|e| matches!(e, CombatEvent::Hit { .. })));
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+            let mut heavy_hits = 0;
+            for _ in 0..58 {
+                let events = world.step();
+                heavy_hits += events
+                    .iter()
+                    .filter(|e| {
+                        matches!(
+                            e,
+                            CombatEvent::Hit {
+                                attacker: 1,
+                                target: 2,
+                                damage: 46,
+                                hp: 54
+                            }
+                        )
+                    })
+                    .count();
+            }
+            assert_eq!(heavy_hits, 1, "exactly one real 46HP heavy contact");
+            assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            let post_heavy_gap = world.fighter(2).unwrap().x - world.fighter(1).unwrap().x;
+            assert!(
+                post_heavy_gap > ATTACK_REACH + FIGHTER_RADIUS,
+                "true 28-unit knockback and bounded heavy lunge exceed 94-unit light contact"
+            );
+
+            if reapproach {
+                assert!(world.set_input(
+                    1,
+                    InputIntent {
+                        move_x: 1.0,
+                        ..InputIntent::default()
+                    }
+                ));
+                for _ in 0..5 {
+                    world.step();
+                }
+                assert!(world.set_input(1, InputIntent::default()));
+                let close_gap = world.fighter(2).unwrap().x - world.fighter(1).unwrap().x;
+                assert!(
+                    close_gap < ATTACK_REACH + FIGHTER_RADIUS,
+                    "only original move_x reaches legitimate light range"
+                );
+            }
+
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+            let mut light_actives = 0;
+            let mut light_hits = 0;
+            for _ in 0..18 {
+                let events = world.step();
+                if world.fighter(1).unwrap().action == Action::AttackActive {
+                    light_actives += 1;
+                }
+                light_hits += events
+                    .iter()
+                    .filter(|e| {
+                        matches!(
+                            e,
+                            CombatEvent::Hit {
+                                attacker: 1,
+                                target: 2,
+                                damage: 34,
+                                hp: 20
+                            }
+                        )
+                    })
+                    .count();
+            }
+            assert!(
+                light_actives > 0,
+                "actual 135ms windup reached light Active"
+            );
+            if reapproach {
+                assert_eq!(
+                    light_hits, 1,
+                    "real reapproach enables exactly 34HP light hit"
+                );
+                assert_eq!(world.fighter(2).unwrap().hp, 20.0);
+            } else {
+                assert_eq!(
+                    light_hits, 0,
+                    "valid LightActive outside reach is not a HIT"
+                );
+                assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+            }
+        }
+    }
+
     #[test]
     fn block_hold_movement_is_exactly_half_speed() {
         let mut world = World::new(800.0, 600.0);
