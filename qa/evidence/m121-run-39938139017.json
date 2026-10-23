@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "provenance": "original full protected GitHub Actions real Chrome + Firefox W3C directional-light acceptance",
+  "source_run_url": "https://github.com/tehki/myaso/actions/runs/39938139017",
+  "source_job_id": 120362881111,
+  "source_step": "Validate M121 real directional light",
+  "source_outcome": "failure",
+  "candidate_sha": "2eb2a677faf972d5bcd1a11725a6118a0ad1e48b",
+  "original_runner_error": "Error: M121 left-sweep readability was incomplete:",
+  "original_runner_line": "scripts/pvp_browser_flight_runner.mjs:1645",
+  "original_native_firefox_log_error": "Error: M121 left-sweep readability was incomplete: {\"browser\":\"firefox\",\"acceptance\":null,\"activeElement\":\"arena\",\"combatFeedback\":\"\",\"eventText\":\"Online - player #2 - server tick 333\",\"eventTransitions\":[{\"t\":0,\"text\":\"Connecting to authoritative server...\"},{\"t\":1431,\"text\":\"Hit taken - 34 HP.\"}],\"events\":[\"Connecting to authoritative server...\",\"Hit taken - 34 HP.\"],\"feedbackTransitions\":[\"damage-taken\"],\"focusLabel\":\"NEAREST #1\",\"focusTransitions\":[{\"label\":\"NO RIVAL\",\"t\":0},{\"label\":\"NEAREST #1\",\"t\":88},{\"label\":\"PUNISH TARGET #1\",\"t\":1567},{\"label\":\"NEAREST #1\",\"t\":1795}],\"keyTransitions\":[],\"keys\":[],\"killFeedRows\":[],\"matchPointText\":\"MATCH POINT\",\"matchPointVisible\":false,\"opponentGuard\":100,\"opponentHp\":100,\"overlayDetail\":\"Respawning…\",\"overlayTitle\":\"DEFEATED\",\"overlayTransitions\":[{\"detail\":\"Respawning…\",\"t\":0,\"title\":\"DEFEATED\",\"visible\":false}],\"overlayVisible\":false,\"parryTellMaxPixels\":0,\"playerGuard\":100,\"playerHp\":66,\"playerNetId\":2,\"playerStamina\":100,\"pointers\":[],\"recoveryDetail\":\"Attack recovery\",\"recoveryLabel\":\"PUNISH\",\"recoveryState\":\"\",\"recoveryTellMaxPixels\":0,\"recoveryTransitions\":[{\"detail\":\"Attack recovery\",\"label\":\"PUNISH\",\"state\":\"\",\"visible\":false},{\"detail\":\"Attack recovery\",\"label\":\"PUNISH\",\"state\":\"attack-recovery\",\"visible\":true},{\"detail\":\"Attack recovery\",\"label\":\"PUNISH\",\"state\":\"\",\"visible\":false}],\"recoveryVisible\":false,\"scoreboardRows\":[{\"kills\":0,\"label\":\"#1\",\"own\":false},{\"kills\":0,\"label\":\"#2\",\"own\":true}],\"scoreboardTitle\":\"FIRST TO 5\",\"threatBearing\":\"\",\"threatCount\":\"\",\"threatGuardArc\":\"\",\"threatLabel\":\"#1\",\"threatPhase\":\"STRIKE\",\"threatSecondary\":\"\",\"threatSecondaryBearing\":\"\",\"threatSecondaryGuardArc\":\"\",\"threatSecondaryPhase\":\"\",\"threatState\":\"\",\"threatTransitions\":[{\"bearing\":\"\",\"count\":\"\",\"guardArc\":\"\",\"label\":\"#0\",\"phase\":\"WINDUP\",\"secondary\":\"\",\"secondaryBearing\":\"\",\"secondaryGuardArc\":\"\",\"secondaryPhase\":\"\",\"state\":\"\",\"visible\":false},{\"bearing\":\"FROM LEFT\",\"count\":\"\",\"guardArc\":\"FRONT\",\"label\":\"#1\",\"phase\":\"HEAVY WINDUP\",\"secondary\":\"\",\"secondaryBearing\":\"\",\"secondaryGuardArc\":\"\",\"secondaryPhase\":\"\",\"state\":\"windup\",\"visible\":true},{\"bearing\":\"FROM LEFT\",\"count\":\"\",\"guardArc\":\"FRONT\",\"label\":\"#1\",\"phase\":\"WINDUP\",\"secondary\":\"\",\"secondaryBearing\":\"\",\"secondaryGuardArc\":\"\",\"secondaryPhase\":\"\",\"state\":\"windup\",\"visible\":true},{\"bearing\":\"FROM LEFT\",\"count\":\"\",\"guardArc\":\"FRONT\",\"label\":\"#1\",\"phase\":\"STRIKE\",\"secondary\":\"\",\"secondaryBearing\":\"\",\"secondaryGuardArc\":\"\",\"secondaryPhase\":\"\",\"state\":\"strike\",\"visible\":true},{\"bearing\":\"\",\"count\":\"\",\"guardArc\":\"\",\"label\":\"#1\",\"phase\":\"STRIKE\",\"secondary\":\"\",\"secondaryBearing\":\"\",\"secondaryGuardArc\":\"\",\"secondaryPhase\":\"\",\"state\":\"\",\"visible\":false}],\"threatVisible\":false,\"title\":\"myaso.io — Browser Combat Prototype\",\"wheels\":[]}",
+  "readability_contract": {
+    "required_directional_phase": [
+      "LEFT WINDUP",
+      "LEFT SWEEP"
+    ],
+    "required_recovery_state": "directional-attack-recovery",
+    "required_recovery_detail": "Sweep recovery",
+    "required_damage_hp": 34,
+    "actual_hit_success": true,
+    "gameplay_status": "HOLD"
+  },
+  "original_firefox_snapshot": {
+    "browser": "firefox",
+    "player_net_id": 2,
+    "player_hp": 66,
+    "player_guard": 100,
+    "events": [
+      "Connecting to authoritative server...",
+      "Hit taken - 34 HP."
+    ],
+    "threat_transitions": [
+      {
+        "bearing": "",
+        "count": "",
+        "guardArc": "",
+        "label": "#0",
+        "phase": "WINDUP",
+        "secondary": "",
+        "secondaryBearing": "",
+        "secondaryGuardArc": "",
+        "secondaryPhase": "",
+        "state": "",
+        "visible": false
+      },
+      {
+        "bearing": "FROM LEFT",
+        "count": "",
+        "guardArc": "FRONT",
+        "label": "#1",
+        "phase": "HEAVY WINDUP",
+        "secondary": "",
+        "secondaryBearing": "",
+        "secondaryGuardArc": "",
+        "secondaryPhase": "",
+        "state": "windup",
+        "visible": true
+      },
+      {
+        "bearing": "FROM LEFT",
+        "count": "",
+        "guardArc": "FRONT",
+        "label": "#1",
+        "phase": "WINDUP",
+        "secondary": "",
+        "secondaryBearing": "",
+        "secondaryGuardArc": "",
+        "secondaryPhase": "",
+        "state": "windup",
+        "visible": true
+      },
+      {
+        "bearing": "FROM LEFT",
+        "count": "",
+        "guardArc": "FRONT",
+        "label": "#1",
+        "phase": "STRIKE",
+        "secondary": "",
+        "secondaryBearing": "",
+        "secondaryGuardArc": "",
+        "secondaryPhase": "",
+        "state": "strike",
+        "visible": true
+      },
+      {
+        "bearing": "",
+        "count": "",
+        "guardArc": "",
+        "label": "#1",
+        "phase": "STRIKE",
+        "secondary": "",
+        "secondaryBearing": "",
+        "secondaryGuardArc": "",
+        "secondaryPhase": "",
+        "state": "",
+        "visible": false
+      }
+    ],
+    "recovery_transitions": [
+      {
+        "detail": "Attack recovery",
+        "label": "PUNISH",
+        "state": "",
+        "visible": false
+      },
+      {
+        "detail": "Attack recovery",
+        "label": "PUNISH",
+        "state": "attack-recovery",
+        "visible": true
+      },
+      {
+        "detail": "Attack recovery",
+        "label": "PUNISH",
+        "state": "",
+        "visible": false
+      }
+    ],
+    "focus_transitions": [
+      {
+        "label": "NO RIVAL",
+        "t": 0
+      },
+      {
+        "label": "NEAREST #1",
+        "t": 88
+      },
+      {
+        "label": "PUNISH TARGET #1",
+        "t": 1567
+      },
+      {
+        "label": "NEAREST #1",
+        "t": 1795
+      }
+    ]
+  },
+  "limitations": "Fixture is a transcription of public GitHub CI log; verification of GitHub run head/outcome and original browser/server provenance remains independent review. The reported real 34HP hit does not prove LEFT SWEEP. Script timeout during Firefox shutdown does not prove a server cause."
+}
