@@ -511,6 +511,18 @@ fn m201_flight_proof_lines(
                     fighter.net_id
                 ));
             }
+        } else {
+            // The very first observed actor state has no prior World tick
+            // with which to prove an action transition. Emit an explicit
+            // READ-ONLY loopback flight baseline: browser tests must wait for
+            // fighter=1 action=0 before sending physical input, otherwise a
+            // valid fast PRESS could be ACKed and start World HeavyWindup
+            // before the M201 observer ever sampled the original Idle actor.
+            // This line is not a hit, action event, or protocol packet.
+            lines.push(format!(
+                "M201_FLIGHT_ACTOR_BASELINE tick={tick} fighter={} action={action}",
+                fighter.net_id
+            ));
         }
     }
     for event in events {
