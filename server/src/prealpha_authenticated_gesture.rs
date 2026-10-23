@@ -36,6 +36,9 @@ pub struct SessionGestureWorldPath {
     // is busy, including a fresh click of the SAME source during recovery.
     // Consume that one held source as transport-only: never a second attack.
     world_source: Option<GestureSource>,
+    // Distinguish a legitimate repeat AFTER original physical key/button UP
+    // from a forged second same-source DOWN while the first is still held.
+    world_source_terminal: bool,
     busy_source: Option<(GestureSource, u32)>,
     busy_accepted: VecDeque<TypedGestureEvent>,
 }
@@ -72,6 +75,7 @@ impl SessionGestureWorldPath {
             keye_terminal: false,
             keye_accepted: VecDeque::with_capacity(64),
             world_source: None,
+            world_source_terminal: false,
             busy_source: None,
             busy_accepted: VecDeque::with_capacity(64),
         })
@@ -114,6 +118,7 @@ impl SessionGestureWorldPath {
                     return Some(AckStatus::Rejected);
                 }
                 self.world_source = Some(GestureSource::KeyE);
+                self.world_source_terminal = false;
                 self.keye_active_id = Some(event.gesture_id);
                 self.keye_terminal = false;
                 self.highest_gesture_id = event.gesture_id;
@@ -124,6 +129,7 @@ impl SessionGestureWorldPath {
                 // KeyE is standalone: heavy starts on PRESS and the original
                 // World owns its 320ms windup/hit, not this terminal receipt.
                 self.keye_terminal = true;
+                self.world_source_terminal = true;
             }
             GestureAction::Release | GestureAction::Cancel
                 if event.gesture_id > self.highest_gesture_id =>
@@ -160,6 +166,7 @@ impl SessionGestureWorldPath {
             GestureAction::Press => {
                 if busy.is_some()
                     || self.world_source.is_none()
+                    || (self.world_source == Some(typed.source) && !self.world_source_terminal)
                     || event.gesture_id <= self.highest_gesture_id
                     || !world
                         .fighter(self.binding.player_id)
@@ -234,7 +241,9 @@ impl SessionGestureWorldPath {
             && (matches!(event.action, GestureAction::Release | GestureAction::Cancel)
                 || (typed.source == GestureSource::Lmb && event.action == GestureAction::Upgrade)))
             || (event.action == GestureAction::Press
-                && self.world_source.is_some()
+                && self
+                    .world_source
+                    .is_some_and(|owner| owner != typed.source || self.world_source_terminal)
                 && event.gesture_id > self.highest_gesture_id
                 && world
                     .fighter(self.binding.player_id)
@@ -303,6 +312,11 @@ impl SessionGestureWorldPath {
                         self.authority = proposed;
                         if event.action == GestureAction::Press {
                             self.world_source = Some(GestureSource::Lmb);
+                            self.world_source_terminal = false;
+                        } else if matches!(event.action, GestureAction::Release | GestureAction::Cancel)
+                            && self.world_source == Some(GestureSource::Lmb)
+                        {
+                            self.world_source_terminal = true;
                         }
                         self.highest_sequence = event.sequence;
                         if event.action == GestureAction::Press {
