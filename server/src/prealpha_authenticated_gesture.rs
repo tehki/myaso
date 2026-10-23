@@ -39,6 +39,9 @@ pub struct SessionGestureWorldPath {
     // Distinguish a legitimate repeat AFTER original physical key/button UP
     // from a forged second same-source DOWN while the first is still held.
     world_source_terminal: bool,
+    // Physical press ownership is independent from original 60Hz World
+    // combat/recovery and survives a DIFFERENT source owning a later strike.
+    held_source_id: [Option<u32>; 2],
     busy_source: Option<(GestureSource, u32)>,
     busy_accepted: VecDeque<TypedGestureEvent>,
 }
@@ -76,6 +79,7 @@ impl SessionGestureWorldPath {
             keye_accepted: VecDeque::with_capacity(64),
             world_source: None,
             world_source_terminal: false,
+            held_source_id: [None, None],
             busy_source: None,
             busy_accepted: VecDeque::with_capacity(64),
         })
@@ -222,6 +226,10 @@ impl SessionGestureWorldPath {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
+        let source_index = match typed.source {
+            GestureSource::Lmb => 0,
+            GestureSource::KeyE => 1,
+        };
         let status = if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             AckStatus::Stale
@@ -241,6 +249,14 @@ impl SessionGestureWorldPath {
             } else {
                 AckStatus::Stale
             }
+        } else if event.action == GestureAction::Press
+            && event.gesture_id > self.highest_gesture_id
+            && self.held_source_id[source_index].is_some()
+        {
+            // World returning Idle or a newer OTHER source taking combat
+            // ownership must NEVER impersonate the original physical UP.
+            // Keep seq unconsumed so the true matching terminal may retry.
+            AckStatus::Rejected
         } else if (self.busy_source == Some((typed.source, event.gesture_id))
             && (matches!(event.action, GestureAction::Release | GestureAction::Cancel)
                 || (typed.source == GestureSource::Lmb && event.action == GestureAction::Upgrade)))
@@ -359,6 +375,20 @@ impl SessionGestureWorldPath {
                 }
             }
         };
+        // Only genuinely accepted, source-matched physical input may change
+        // held state. A World hit/Idle, rejected spoof or replay DUPLICATE
+        // cannot release a source, even after a different source takes World.
+        if status == AckStatus::Accepted {
+            match event.action {
+                GestureAction::Press => self.held_source_id[source_index] = Some(event.gesture_id),
+                GestureAction::Release | GestureAction::Cancel
+                    if self.held_source_id[source_index] == Some(event.gesture_id) =>
+                {
+                    self.held_source_id[source_index] = None;
+                }
+                GestureAction::Upgrade | GestureAction::Release | GestureAction::Cancel => {}
+            }
+        }
         Some(GestureAck {
             status,
             sequence: event.sequence,
