@@ -6,6 +6,8 @@ on:
       - "web/online-game.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
+      # Retirement and replacement QUIC tests must rerun genuine first-party W3C.
+      - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "server/src/prealpha_authenticated_gesture.rs"
       - "server/src/prealpha_lmb_gesture_authority.rs"
       - "server/tests/combat4c_release_only_source_ownership.rs"
