@@ -112,7 +112,8 @@ function localSmoke() {
   const commands = [
     ["node", ["--test", "tests/combat-model.test.mjs", "tests/networking.test.mjs",
       "tests/combat4d-acceptance.test.mjs", "tests/combat4d-m107-proof.test.mjs",
-      "tests/combat4d-m155-proof.test.mjs", "tests/combat4d-m193-proof.test.mjs"]],
+      "tests/combat4d-m155-proof.test.mjs", "tests/combat4d-m193-proof.test.mjs",
+      "tests/combat4d-m121-proof.test.mjs"]],
     ["cargo", ["test", "--manifest-path", "server/Cargo.toml"]]
   ];
   let failed = false;
