@@ -160,6 +160,36 @@ try{
  const firstCanvas=await evaluate(attacker,"const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();return {focused:document.activeElement===c,gestureLab:new URLSearchParams(location.search).get('gestureLab')};");
  assert.equal(firstCanvas.focused,true);
  assert.equal(firstCanvas.gestureLab,"1");
+ // Combat4 QA-only, original real W3C page: preserve exact error provenance
+ // at KeyE PRESS/physical UP/typed ACK. Not a gameplay hook or hit simulator.
+ // Buffer stays in this loopback-native browser and is bounded to 24 entries.
+ const keyETraceInstall=String.raw`
+ if(window.__MYASO_COMBAT4_KEYE_TRACE__)return true;
+ const records=[];
+ const append=(entry)=>{records.push(Object.freeze(entry));if(records.length>24)records.shift();};
+ for(const type of ["keydown","keyup"]){
+   window.addEventListener(type,event=>{
+     if(event.code!=="KeyE")return;
+     append({type,code:event.code,trusted:event.isTrusted,repeat:event.repeat,
+       focus:document.activeElement?.id||"",hidden:document.hidden,at:performance.now()});
+   },true);
+ }
+ window.addEventListener("blur",()=>{
+   append({type:"blur",focus:document.activeElement?.id||"",at:performance.now()});
+ },true);
+ const originalWarn=console.warn;
+ console.warn=function(...args){
+   if(args[0]==="authoritative protocol error"){
+     const error=args[1];
+     append({type:"protocol-error",name:String(error?.name||""),
+       message:String(error?.message||error||"").slice(0,1400),
+       stack:String(error?.stack||"").slice(0,2200),at:performance.now()});
+   }
+   return originalWarn.apply(this,args);
+ };
+ window.__MYASO_COMBAT4_KEYE_TRACE__=()=>records.map(entry=>({...entry}));
+ return true;`;
+ assert.equal(await evaluate(attacker,keyETraceInstall),true,"read-only KeyE release and raw protocol error provenance");
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
    actions:[{type:"key",id:"real-original-KeyE",actions:[{type:"keyDown",value:"e"}]}]
  });
@@ -174,10 +204,11 @@ try{
    heavy=await waitFor(()=>worldAction(9,10),12000);
  } catch (error) {
    const page=await evaluate(attacker,
-     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
+     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,physicalKeyEAndProtocolErrors:window.__MYASO_COMBAT4_KEYE_TRACE__?.()??[]};"
    ).catch(e=>({driverError:String(e)}));
-   console.error("MAIN0_ORIGINAL_GAME_HEAVY_RELEASE_DIAGNOSTIC",
-     JSON.stringify({error:String(error),browser:page,originalRustWorldTail:readAuthoritativeWorld().slice(-6500)}));
+   const evidence={error:String(error),browser:page,originalRustWorldTail:readAuthoritativeWorld().slice(-6500)};
+   await writeFile(join(output,"combat4-keye-release-protocol-error.json"),JSON.stringify(evidence,null,2));
+   console.error("MAIN0_ORIGINAL_GAME_HEAVY_RELEASE_DIAGNOSTIC",JSON.stringify(evidence));
    throw error;
  }
  const heavyReturnedIdle=await waitFor(()=>{
