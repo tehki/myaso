@@ -1374,3 +1374,392 @@ fn full_original_ffa_match_reset_invalidates_old_survivor_gesture_lease() {
     );
     assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
 }
+
+#[test]
+fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
+    let mut world = arena();
+    let mut attacker =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let stale_lease = LEASE + 1;
+    let mut old_target =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, stale_lease, BOOT).unwrap();
+    let original_life = old_target.binding().incarnation;
+
+    // A real admitted source0 PRESS/CANCEL proves the old target has a
+    // gesture ID to replay, but cancels before contact to avoid fake damage.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Cancel,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+
+    let mut damage = Vec::new();
+    let mut saw_death = false;
+    for gesture in 1..=3_u32 {
+        if gesture == 3 {
+            // Two real contact knockbacks can move a target outside light
+            // reach. Close the distance through the ordinary World movement
+            // input instead of changing Combat hit range or fabricating HP.
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_x: 1.0,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..8 {
+                world.step();
+                attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+                old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+            }
+            assert!(world.set_input(1, InputIntent::default()));
+        }
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                2 * gesture - 1,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2 * gesture,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        for _ in 0..55 {
+            for event in world.step() {
+                match event {
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: dealt,
+                        hp,
+                    } => damage.push((dealt, hp)),
+                    CombatEvent::Death { fighter: 2, .. } => saw_death = true,
+                    _ => {}
+                }
+            }
+            attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+            old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+        }
+    }
+    assert_eq!(damage, vec![(34, 66), (34, 32), (34, 0)]);
+    assert!(saw_death, "death must come from original World combat");
+    assert_eq!(world.fighter(2).unwrap().action, Action::Dead);
+    assert!(old_target.retired(), "death retires old gesture authority");
+
+    let mut saw_respawn = false;
+    for _ in 0..90 {
+        for event in world.step() {
+            if let CombatEvent::Respawn { fighter: 2 } = event {
+                saw_respawn = true;
+            }
+        }
+        attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert!(saw_respawn, "actual World respawn must occur");
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_ne!(world.fighter(2).unwrap().world_incarnation(), original_life);
+
+    // Never rebind an already retired lease in place: an in-flight RELEASE
+    // must not be mistaken for a current actor's release after respawn.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    let fresh_lease = stale_lease + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    // Fighter facing is refreshed from server-held latest input each World tick.
+    assert!(world.set_input(
+        2,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        }
+    ));
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut fresh_hits = Vec::new();
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 2,
+                target: 1,
+                damage: dealt,
+                hp,
+            } = event
+            {
+                fresh_hits.push((dealt, hp));
+            }
+        }
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert_eq!(fresh_hits, vec![(34, 66)]);
+    assert!(old_target.retired());
+}
+
+#[test]
+fn release_only_keye_real_death_respawn_stales_old_release_and_allows_fresh_heavy() {
+    let mut world = arena();
+    let mut attacker =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let stale_lease = LEASE + 1;
+    let mut old_target =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, stale_lease, BOOT).unwrap();
+    let original_life = old_target.binding().incarnation;
+
+    // A real admitted independent KeyE PRESS/CANCEL proves old target has a
+    // gesture ID to replay, but cancels before contact to avoid fake damage.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::KeyE,
+            GestureAction::Cancel,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+
+    let mut damage = Vec::new();
+    let mut saw_death = false;
+    for gesture in 1..=3_u32 {
+        if gesture == 3 {
+            // Two real contact knockbacks can move a target outside light
+            // reach. Close the distance through the ordinary World movement
+            // input instead of changing Combat hit range or fabricating HP.
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_x: 1.0,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..8 {
+                world.step();
+                attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+                old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+            }
+            assert!(world.set_input(1, InputIntent::default()));
+        }
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                2 * gesture - 1,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2 * gesture,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        for _ in 0..55 {
+            for event in world.step() {
+                match event {
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: dealt,
+                        hp,
+                    } => damage.push((dealt, hp)),
+                    CombatEvent::Death { fighter: 2, .. } => saw_death = true,
+                    _ => {}
+                }
+            }
+            attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+            old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+        }
+    }
+    assert_eq!(damage, vec![(34, 66), (34, 32), (34, 0)]);
+    assert!(saw_death, "death must come from original World combat");
+    assert_eq!(world.fighter(2).unwrap().action, Action::Dead);
+    assert!(old_target.retired(), "death retires old gesture authority");
+
+    let mut saw_respawn = false;
+    for _ in 0..90 {
+        for event in world.step() {
+            if let CombatEvent::Respawn { fighter: 2 } = event {
+                saw_respawn = true;
+            }
+        }
+        attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert!(saw_respawn, "actual World respawn must occur");
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_ne!(world.fighter(2).unwrap().world_incarnation(), original_life);
+
+    // Never rebind an already retired lease in place: an in-flight RELEASE
+    // must not be mistaken for a current actor's release after respawn.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    let fresh_lease = stale_lease + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    // Fighter facing is refreshed from server-held latest input each World tick.
+    assert!(world.set_input(
+        2,
+        InputIntent {
+            facing_radians: std::f32::consts::PI,
+            ..InputIntent::default()
+        }
+    ));
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    // A true 320ms held KeyE charge may reach READY, but may NOT
+    // auto-hit before this FRESH actor's matching source1 RELEASE.
+    assert_eq!(world.fighter(2).unwrap().action, Action::HeavyAttackWindup);
+    for _ in 0..37 {
+        world.step();
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    assert_eq!(world.fighter(2).unwrap().action, Action::HeavyAttackWindup);
+    assert!(old_target.retired());
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut fresh_hits = Vec::new();
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 2,
+                target: 1,
+                damage: dealt,
+                hp,
+            } = event
+            {
+                fresh_hits.push((dealt, hp));
+            }
+        }
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert_eq!(fresh_hits, vec![(46, 54)]);
+    assert!(old_target.retired());
+}
