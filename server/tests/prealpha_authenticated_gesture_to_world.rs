@@ -1773,8 +1773,7 @@ fn fail_first_same_quic_regrant_must_not_admit_prior_incarnation_0x11_event() {
     let mut observed = Vec::new();
     for source in [GestureSource::Lmb, GestureSource::KeyE] {
         let mut world = arena();
-        let mut old =
-            SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+        let mut old = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
         let original_life = old.binding().incarnation;
 
         // Packet bytes were queued by the old authenticated connection BEFORE
