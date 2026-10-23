@@ -25,7 +25,9 @@ An approved canonical v2 implementation, in coordination with 4C/8A/8C/UI10, mus
 
 ## Scope and safeguards
 
-This draft only adds deterministic tests of **existing legacy behavior** in `tests/combat4a-prealpha-v1-gesture-boundary.test.mjs`; it makes no controller, codec, World, transport or gameplay modification. These tests are **diagnostic witnesses**, NOT passing Pre-Alpha requirements or a reclassification of known native CI failures.
+This draft adds deterministic tests of **existing legacy behavior** plus a narrowly scoped W3C pointer-cancellation fix in `web/online-game.mjs` and `web/game.mjs`. Previously both handlers gated left cancellation on `event.button === 0`; PointerEvent cancellation can report `button === -1`, leaving a still-pressed gesture active. Both handlers now call `leftButtonCharge.cancel(event.pointerId)` without guessing button state; the existing controller refuses to cancel an unrelated pointer. Online only resets left-button movement state after the matching cancellation. The separate two new tests confirm canceled charges cannot later strike and reject the old button-gated live handlers.
+
+No gameplay bindings, normal click/light/heavy algorithm, sampled input bits, network protocol, server World or damage values change. The original v1 observations are **diagnostic witnesses**, NOT passing Pre-Alpha requirements or a reclassification of known native CI failures.
 
 Do **not** merge this proof as a substitute for fix or unlock Pre-Alpha based on it. Build the actual fix on a single selected #723 protocol lineage, not by changing v1 flags to guess KeyE vs LMB. Existing Core/Combat/UI experimental proposals and their ancestry need Main/4C coordination before incorporation. Server-owned 34HP/46HP and 135ms/320ms rules remain unchanged.
 
