@@ -234,3 +234,45 @@ fn genuine_second_keye_click_during_autoheavy_must_not_kill_shared_outbox() {
     assert_eq!(terminal, AckStatus::Accepted);
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 20)]);
 }
+
+#[test]
+fn same_source_new_press_cannot_be_admitted_while_previous_physical_press_is_held() {
+    // Legitimate shared outbox permits only one held gesture per source.
+    // A malicious second DOWN with new monotonic ID (but no first terminal)
+    // must not steal the original World ownership, consume seq2 or mint a hit.
+    // The *real* first RELEASE and the later fresh busy press still work.
+    for source in [GestureSource::Lmb, GestureSource::KeyE] {
+        let mut w = arena();
+        let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 1, 1),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 2, 2),
+            AckStatus::Rejected,
+            "a second same-source press is invalid until the original source terminal"
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Release, 2, 1),
+            AckStatus::Accepted,
+            "invalid second source press may not consume the legitimate first terminal sequence"
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 3, 2),
+            AckStatus::Accepted,
+            "after the original release, the second physical press can be suppressed as busy"
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Release, 4, 2),
+            AckStatus::Accepted
+        );
+        let expected = if source == GestureSource::Lmb {
+            vec![(34, 66)]
+        } else {
+            vec![(46, 54)]
+        };
+        assert_eq!(hits(&mut p, &mut w, 55), expected);
+        assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    }
+}
