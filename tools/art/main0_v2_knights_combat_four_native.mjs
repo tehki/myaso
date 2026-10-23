@@ -188,18 +188,30 @@ try{
  assert(heavyReturnedIdle,"new physically pressed light starts only after original World returns to Idle");
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
+ // One physical W3C pointer action tick sequence. Do NOT wait for a
+ // server Windup log while the mouse remains held: the original 85ms local
+ // UPGRADE-intent hook can correctly request server-held heavy after that.
+ // This click has real DOWN and actual UP 25ms later, never a synthetic hit.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
    actions:[{type:"pointer",id:"real-original-lmb",parameters:{pointerType:"mouse"},actions:[
     {type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0},
     {type:"pointerDown",button:0},
+    {type:"pause",duration:25},
+    {type:"pointerUp",button:0},
    ]}]
  });
  const lightPress=await waitFor(()=>worldAction(0,1),12000);
- await sleeps(30); // short native hold: no 85ms UPGRADE
- await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-   actions:[{type:"pointer",id:"real-original-lmb",parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
- });
- const lightActive=await waitFor(()=>worldAction(1,2),12000);
+ let lightActive;
+ try {
+   lightActive=await waitFor(()=>worldAction(1,2),12000);
+ } catch(error) {
+   const browser=await evaluate(attacker,
+    "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
+   ).catch(e=>({driverError:String(e)}));
+   console.error("MAIN0_ORIGINAL_GAME_SHORT_LMB_DIAGNOSTIC",
+    JSON.stringify({error:String(error),browser,originalRustWorldTail:readAuthoritativeWorld().slice(-6500)}));
+   throw error;
+ }
  const honestWorldHits=readAuthoritativeWorld().split("\n")
   .filter(line=>/M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
  assert.ok(honestWorldHits.some(line=>/damage=46(?:\\.0+)? hp=/.test(line)),
