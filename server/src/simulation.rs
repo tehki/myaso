@@ -2347,22 +2347,42 @@ mod r2_combat_control_tests {
                 ));
             }
             seen.push(expected_guard);
-            if attempt < 2 {
-                assert!(world.set_input(1, InputIntent::default()));
-                assert!(world.set_input(
-                    2,
-                    InputIntent {
-                        facing_radians: std::f32::consts::PI,
-                        ..InputIntent::default()
-                    }
-                ));
-                for _ in 0..40 {
-                    world.step();
-                    if world.fighter(1).unwrap().action == Action::Idle {
-                        break;
-                    }
+            assert!(world.set_input(1, InputIntent::default()));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
                 }
-                assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            ));
+            for _ in 0..40 {
+                let events = world.step();
+                assert!(
+                    !events.iter().any(|event| matches!(
+                        event,
+                        CombatEvent::Block {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::GuardBreak {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::Parry {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::Hit {
+                            attacker: 1,
+                            target: 2,
+                            ..
+                        }
+                    )),
+                    "a single admitted light may contact its target only once"
+                );
+                if world.fighter(1).unwrap().action == Action::Idle {
+                    break;
+                }
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            if attempt < 2 {
                 assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
             }
         }
