@@ -23,6 +23,7 @@ import {decodeProposedGestureEvent} from "/src/network/prealpha-lmb-gesture-prop
 import {createDormantPrealphaLmbDomGate,attachDormantPrealphaLmbDomGate}
  from "/src/browser/prealpha-lmb-dom-gesture-review.mjs";
 const canvas=document.querySelector("#arena"),lease={};
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
 const outbox=new ProposedLmbGestureOutbox({negotiatedVersion:2,trustedLease:lease});
 let chat=false,jump=false;
 const gate=createDormantPrealphaLmbDomGate({
@@ -31,6 +32,8 @@ const gate=createDormantPrealphaLmbDomGate({
 });
 const trusted=[];
 canvas.addEventListener("pointerdown",e=>trusted.push({type:"down",trusted:e.isTrusted}),true);
+canvas.addEventListener("mousedown",e=>trusted.push({type:"mouse-down",button:e.button,trusted:e.isTrusted}),true);
+window.addEventListener("mouseup",e=>trusted.push({type:"mouse-up",button:e.button,trusted:e.isTrusted}),true);
 window.addEventListener("pointerup",e=>trusted.push({type:"up",trusted:e.isTrusted}),true);
 attachDormantPrealphaLmbDomGate(gate,{canvas,windowObj:window,documentObj:document});
 window.ui10={
@@ -107,7 +110,7 @@ try{
   assert.deepEqual(tap.edges.map(e=>e.action),
    [GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
   assert.equal(tap.edges[0].gestureId,tap.edges[1].gestureId);
-  assert.equal(tap.trusted.length,2);
+  assert.equal(tap.trusted.filter(e=>e.type==="down"||e.type==="up").length,2);
   assert.ok(tap.trusted.every(e=>e.trusted));
   await nav();
   await run([move(),down]);
@@ -135,9 +138,20 @@ try{
    [GESTURE_ACTION.PRESS,GESTURE_ACTION.CANCEL]);
   assert.equal(cancel.combatCommit,false);
   assert.equal(cancel.realServer,false);
+  await nav();
+  // This physical W3C sequence does not necessarily fire LMB pointerdown:
+  // after RMB is held the browser can emit only mousedown(button=0).
+  await run([move(),{type:"pointerDown",button:2},{type:"pointerDown",button:0},
+    {type:"pointerUp",button:0},{type:"pointerUp",button:2}]);
+  const chord=await evaluate("return ui10.report()");
+  assert.deepEqual(chord.edges.map(e=>e.action),[
+    GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+  assert.equal(chord.edges[0].gestureId,chord.edges[1].gestureId);
+  assert.ok(chord.trusted.some(e=>e.type==="mouse-down"&&e.button===0&&e.trusted));
+  assert.ok(chord.trusted.some(e=>e.type==="mouse-up"&&e.button===0&&e.trusted));
   console.log("UI10_V2_NATIVE_DOM_REVIEW_PASS",JSON.stringify({
    browser:family,realPointerTrusted:true,shortTap:true,
-   longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
+   longHoldUpgradeSameId:true,rmbHeldLmbChord:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
    authenticatedServer:false,combatHits:false,enabledLive:false
   }));
