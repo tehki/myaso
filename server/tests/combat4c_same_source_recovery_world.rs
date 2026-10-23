@@ -276,3 +276,76 @@ fn same_source_new_press_cannot_be_admitted_while_previous_physical_press_is_hel
         assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     }
 }
+
+#[test]
+fn older_keye_terminal_must_not_unlock_a_newer_held_lmb_world_owner() {
+    // An old source1 key-up can arrive long after standalone heavy committed.
+    // Its receipt is valid, but must NOT mark a newer real source0 LMB
+    // world owner as physically released and admit a forged double DOWN.
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Accepted,
+        "older KeyE physical terminal remains an ordered receipt"
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            4,
+            3
+        ),
+        AckStatus::Rejected,
+        "old KeyE terminal cannot authorize a second held-LMB DOWN"
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Accepted,
+        "real newer LMB terminal still owns the next nonconsumed seq"
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 20)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+}
