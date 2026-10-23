@@ -66,6 +66,18 @@ The previous 4D exact-head candidate `91ab5c107cb88431c652329f760a7b68bfc35715` 
 
 Do not reinterpret a later rerun as erasure of this real failure. Independent exact-integrated-candidate Chrome/Firefox/Chrome2/4-human acceptance remains mandatory.
 
+## Exact native M205 → M193 guard-break regression (2026-10-23)
+
+On the **experimental nonrelease** Combat4C [#870](https://github.com/tehki/myaso/pull/870) exact `488467b87d13c51d5bfc2e657ff7714772a8a3d3`, protected [quality #39935435948](https://github.com/tehki/myaso/actions/runs/39935435948) job `120353730262` **FAILED step 91 `Validate M205 repeated M201 server-tick FFA punish proof`**. The inner real-browser M193 guard-break sequence is the precise blocker.
+
+- Genuine attacker Chrome player1 / defender Firefox player2 / third Chrome player3 are admitted by original World. First exchange: fighter2 Block6 tick324, genuine attack ACTIVE2 and server BLOCK tick332, guard 100→62 (exact -38), HP100. This is legitimate block after **8 server ticks**.
+- Second exchange: attacker LightWindup1 tick359, defender Block6 tick361, server **PARRY tick367**, attacker ParryStun7. The defender's guard remains 62/HP100. Six 60Hz ticks (~100ms) of Block6 is inside the unchanged **125ms parry** and must never be relabeled as a block-only -38 guard pressure.
+- Genuine native W3C Chrome pointerDOWN/UP epoch `1792749876749→1792749876768` and genuine Firefox wheel epoch `1792749876762` appear in the original runner log; the logged wheel lead parameter is `0ms`, and Firefox wheel→impact-or-parry local observation is `221ms`. Original server-tick chronology is dispositive; don't subtract non-synchronized browser clocks to invent packet-latency facts.
+- The original strict runner rejected `M193 guard-break exchange 2 resolved as parry instead of -38 guard`. Consequently M205 FFA punish setup was invalid; this is **not** evidence that #870's default-OFF experimental typed source path caused a v1 browser regression.
+- [qa/evidence/m193-run-39935435948.json](../qa/evidence/m193-run-39935435948.json) captures both source exchanges. `node scripts/combat4d-m193-proof.mjs qa/evidence/m193-run-39935435948.json` verifies original log chronology and returns **HOLD**. The checks intentionally pass as evidence integrity while the original gameplay test remains failed. No change to 125ms parry, -38 guard, 34HP light, browser W3C test, or original server rules.
+
+**Routing:** 4A native physical ingress/harness ordering, 4B original Block age/World, 4C/Core8 transport only when causality is demonstrated, 4D independent adversarial proof and repeatability. No retrospective green after a later successful retry.
+
 ## Known runnable entry points
 
 ~~~bash
