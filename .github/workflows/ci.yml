@@ -53,6 +53,11 @@ jobs:
           node --check tests/combat4a-prealpha-v1-gesture-boundary.test.mjs
           node --test tests/combat4a-prealpha-v1-gesture-boundary.test.mjs
 
+      - name: Validate Combat 4A middle-button pointer lifecycle
+        run: |
+          node --check tests/combat4a-middle-pointer-cancel-owner.test.mjs
+          node --test tests/combat4a-middle-pointer-cancel-owner.test.mjs
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
