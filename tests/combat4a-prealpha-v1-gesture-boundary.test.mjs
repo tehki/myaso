@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
@@ -87,4 +88,35 @@ test("Combat 4A: fast DOWN+UP can fit within one real v1 sampler interval", () =
   assert.ok(downMs > 0 && upMs < interval);
   assert.equal(upMs - downMs, 12);
   assert.ok(interval > upMs - downMs);
+});
+
+test("Combat 4A: W3C pointercancel with button=-1 retires only the matching LMB pointer", () => {
+  let nowMs = 0;
+  const events = [];
+  const lmb = createLeftButtonCharge({
+    now: () => nowMs,
+    onLight: () => events.push("LIGHT"),
+    onHeavy: () => events.push("HEAVY"),
+  });
+  assert.equal(lmb.press(41), true);
+  const cancellationEvent = { pointerId: 41, button: -1 };
+  assert.equal(lmb.cancel(999), false, "an unrelated pointer cannot cancel the LMB");
+  assert.equal(lmb.isPressed(), true);
+  assert.equal(lmb.cancel(cancellationEvent.pointerId), true);
+  nowMs = 500;
+  assert.equal(lmb.isPressed(), false);
+  assert.equal(lmb.release(cancellationEvent.pointerId), null);
+  assert.deepEqual(events, [], "a canceled long charge may not cause delayed heavy/light");
+});
+
+test("Combat 4A: live pointercancel handlers do not require a pointer-button transition", () => {
+  for (const path of ["../web/online-game.mjs", "../web/game.mjs"]) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    const match = source.match(/canvas\.addEventListener\("pointercancel", \(event\) => \{([\s\S]*?)\n\}\);/);
+    assert.ok(match, path + " must own the real pointercancel handler");
+    assert.doesNotMatch(match[1], /if \(event\.button === 0\)/,
+      path + " must not ignore a genuine W3C pointercancel(button=-1)");
+    assert.match(match[1], /leftButtonCharge\.cancel\(event\.pointerId\)/,
+      path + " must cancel by active pointer identity, not event.button");
+  }
 });
