@@ -78,6 +78,18 @@ On the **experimental nonrelease** Combat4C [#870](https://github.com/tehki/myas
 
 **Routing:** 4A native physical ingress/harness ordering, 4B original Block age/World, 4C/Core8 transport only when causality is demonstrated, 4D independent adversarial proof and repeatability. No retrospective green after a later successful retry.
 
+## Original native M121 LEFT SWEEP semantic failure — 2026-10-23
+
+Strict full [PR #869 quality #39938139017](https://github.com/tehki/myaso/actions/runs/39938139017) on the QA-only acceptance hardening head `2eb2a677faf972d5bcd1a11725a6118a0ad1e48b` **FAILED** at `Validate M121 real directional light`, job `120362881111`. Its new 45-fabricated-manifest safeguard passed; that did not substitute for native acceptance.
+
+The genuine Firefox defender #2 received `Hit taken - 34 HP.`, HP100→66, guard100. W3C original online-page observer saw `FROM LEFT` bearing, but the visible threat phases were **HEAVY WINDUP → WINDUP → STRIKE** and visible recovery `attack-recovery / Attack recovery`; there was **no LEFT WINDUP / LEFT SWEEP phase and no directional-attack-recovery / Sweep recovery**. Both unchanged source predicates in `scripts/pvp_browser_flight_runner.mjs:1640–1646` remain unsatisfied. The server dealt damage; the required directional presentation and committed lane are **not proven**. The Firefox observer also logged a shutdown-side `recordThreat` script timeout; this is not sufficient to assign root cause to Firefox, server lane coalescing, or packet loss.
+
+This is the same historical native signature documented under [#311](https://github.com/tehki/myaso/issues/311), previously associated with genuine neutral-input/coalesced directional lane context and W3C held-strafe ordering investigations. Correlation is not proof this exact run has the same code-level cause. Do not alter damage, windup, native HUD assertion, or restore an unverified lane by relabeling an ordinary attack.
+
+Recorded exact runner error / browser transitions: [qa/evidence/m121-run-39938139017.json](../qa/evidence/m121-run-39938139017.json). `node scripts/combat4d-m121-proof.mjs qa/evidence/m121-run-39938139017.json` checks the event transcription and prints **HOLD**. Tests reject fabricated LEFT SWEEP, discarded recovery states, and changed damage/identity/protected outcome. That local fixture is **not independently authenticated solely by JSON**; match its head/conclusion/original logs against GitHub before accepting its provenance. CLI integrity success is never gameplay PASS.
+
+**Routing:** 4A/8A compare true W3C held-strafe and LMB submission lifetime with original World input/attack state; UI10 validates HUD and recovery cues from original server lane; 4B checks server action and coalescing, 4D independently retains red and reenacts only as unwaived exact-head QA.
+
 ## Known runnable entry points
 
 ~~~bash
