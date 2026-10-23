@@ -249,6 +249,11 @@ try{
  // unless the unchanged original Rust World proves both physical 46HP and
  // 34HP target contact. Never infer HP from accepted ACK or animations.
  if(!honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line))) {
+   // Observe the *actual* remaining original World light-active lifetime
+   // before classifying the missing hit. This is read-only diagnostics;
+   // the original strict 34HP acceptance assertion below is NOT changed.
+   const observedLightRecovery=await waitFor(()=>worldAction(2,3),1500)
+     .catch(e=>"no original World LightActive2-to-Recovery3: "+String(e));
    const worldLines=readAuthoritativeWorld().split("\n");
    const originalWorldCombat=worldLines.filter(line=>
      /M201_AUTH_(ACTION|HIT|BLOCK|PARRY|BREAK)/.test(line)).slice(-90);
@@ -266,7 +271,10 @@ try{
      existingHeavyWorldRelease:heavy,
      existingLightWorldPress:lightPress,
      existingLightWorldActive:lightActive,
+     observedLightRecovery,
      authenticWorldHits:honestWorldHits,
+     originalWorldHitsAfterLightRecovery:worldLines.filter(line=>
+       /M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line)),
      originalWorldCombat,
      browsers,
      firstPartyAssertionStillRequired:"real 34 HP World hit from player1 onto an independent actor",
