@@ -47,11 +47,7 @@ fn ack(
     receipt.status
 }
 
-fn step_hits(
-    path: &mut SessionGestureWorldPath,
-    w: &mut World,
-    ticks: usize,
-) -> Vec<(u8, u8)> {
+fn step_hits(path: &mut SessionGestureWorldPath, w: &mut World, ticks: usize) -> Vec<(u8, u8)> {
     let mut hits = Vec::new();
     for _ in 0..ticks {
         for event in w.step() {
@@ -74,9 +70,39 @@ fn step_hits(
 fn late_busy_keye_terminal_after_original_light_recovery_never_poison_next_light() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 1, 1), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 2, 2), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 3, 1), AckStatus::Accepted);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Accepted
+    );
     assert_eq!(step_hits(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
@@ -84,16 +110,56 @@ fn late_busy_keye_terminal_after_original_light_recovery_never_poison_next_light
     // This physically delayed terminal comes AFTER original combat recovered.
     // It must acknowledge the earlier suppressed KeyE without launching an
     // auto-heavy (or retiring the shared typed sender as fatal REJECTED).
-    assert_eq!(ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2), AckStatus::Duplicate);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Duplicate
+    );
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert!(step_hits(&mut p, &mut w, 8).is_empty());
 
     // A busy receipt must not overwrite the identity of the *real* LMB
     // World action, so the next distinct same-lease light remains possible.
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 5, 3), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 6, 3), AckStatus::Accepted);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            5,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            6,
+            3
+        ),
+        AckStatus::Accepted
+    );
     assert_eq!(step_hits(&mut p, &mut w, 55), vec![(34, 32)]);
     assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
@@ -104,26 +170,116 @@ fn late_busy_lmb_terminal_after_original_keye_autoheavy_cannot_create_light() {
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     // The #858/#868 isolated lineage preserves original standalone KeyE
     // auto-commit at server 320ms. This does NOT change release-only held LMB.
-    assert_eq!(ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 1, 1), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 2, 2), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Upgrade, 3, 2), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Upgrade, 3, 2), AckStatus::Duplicate);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            3,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            3,
+            2
+        ),
+        AckStatus::Duplicate
+    );
     assert_eq!(step_hits(&mut p, &mut w, 55), vec![(46, 54)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 54.0);
 
     // Physically delayed LMB release after KeyE committed must remain an
     // ordered no-combat receipt; KeyE's own terminal is not another hit.
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 4, 2), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 4, 2), AckStatus::Duplicate);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 5, 1), AckStatus::Accepted);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            5,
+            1
+        ),
+        AckStatus::Accepted
+    );
     assert!(step_hits(&mut p, &mut w, 8).is_empty());
     assert_eq!(w.fighter(2).unwrap().hp, 54.0);
 
     // After the accepted but discarded LMB hold, a fresh LMB source0
     // PRESS/RELEASE can legitimately land its sole original 34HP contact.
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 6, 3), AckStatus::Accepted);
-    assert_eq!(ack(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 7, 3), AckStatus::Accepted);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            6,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            7,
+            3
+        ),
+        AckStatus::Accepted
+    );
     assert_eq!(step_hits(&mut p, &mut w, 55), vec![(34, 20)]);
     assert_eq!(w.fighter(2).unwrap().hp, 20.0);
 }
