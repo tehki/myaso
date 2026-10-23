@@ -9,7 +9,7 @@ use std::{
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
-    SendStream,
+    SendStream, VarInt,
 };
 
 const WAIT: Duration = Duration::from_secs(8);
@@ -452,4 +452,109 @@ async fn real_quic_busy_lmb_upgrade_does_not_retire_authentic_keye_heavy() {
     );
     println!("CORE8_NATIVE_BUSY_LMB_UPGRADE_KEYE_HEAVY_PASS");
     drop(seat);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn retired_keye_windup_cannot_ghost_attack_replacement_and_four_seats_keep_playing() {
+    let (server, url, digest) = real_server();
+    let mut seats = Vec::new();
+    for _ in 0..4 {
+        seats.push(admitted_seat(&url, &digest).await);
+    }
+
+    // Actor #2 starts the genuine standalone source1 heavy in the original
+    // server-owned World. Verify admission using a correlated original 0x12
+    // receipt, not an unrelated input highwater acknowledgement.
+    let mut keye_press = event(1, 1);
+    keye_press[3] = 1;
+    let mut keye_release = event(3, 2);
+    keye_release[3] = 1;
+    seats[1]
+        .connection
+        .send_datagram(keye_press)
+        .expect("current actor #2 KeyE PRESS");
+    timeout(WAIT, async {
+        loop {
+            let packet = seats[1]
+                .connection
+                .receive_datagram()
+                .await
+                .expect("original KeyE QUIC session live");
+            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
+                assert_eq!(packet[2], 1, "KeyE PRESS accepted by original World");
+                assert_eq!(
+                    u32::from_le_bytes(packet[4..8].try_into().unwrap()),
+                    1
+                );
+                assert_eq!(
+                    u32::from_le_bytes(packet[8..12].try_into().unwrap()),
+                    1
+                );
+                assert!(u32::from_le_bytes(packet[12..16].try_into().unwrap()) > 0);
+                break;
+            }
+        }
+    })
+    .await
+    .expect("source1 real World admission must complete");
+
+    seats[1]
+        .connection
+        .close(VarInt::from_u32(0), b"core8c-keye-actor-retired");
+    sleep(Duration::from_millis(900)).await;
+    let newcomer = admitted_seat(&url, &digest).await;
+
+    // A committed contact before retirement remains a legitimate original
+    // Combat event. The authority guarantee starts AFTER replacement.
+    let after_replacement = server.lines.lock().unwrap().len();
+    for survivor in [&seats[0], &seats[2], &seats[3]] {
+        survivor
+            .connection
+            .send_datagram(event(1, 1))
+            .expect("surviving LMB PRESS");
+        survivor
+            .connection
+            .send_datagram(event(3, 2))
+            .expect("surviving LMB RELEASE");
+    }
+    newcomer
+        .connection
+        .send_datagram(keye_press)
+        .expect("fresh actor #5 KeyE PRESS");
+    newcomer
+        .connection
+        .send_datagram(keye_release)
+        .expect("fresh actor #5 KeyE RELEASE");
+    for current in [&seats[0], &seats[2], &seats[3], &newcomer] {
+        assert_both_server_acks(&current.connection).await;
+    }
+
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            let recent = &lines[after_replacement..];
+            let replacement_admitted =
+                lines.iter().any(|line| line.contains("assigned player 5 "));
+            let current_lights = [1_u32, 3, 4].iter().all(|id| {
+                recent.iter().any(|line| {
+                    line.contains("M201_AUTH_ACTION tick=")
+                        && line.contains(&format!(" fighter={id} from=1 to=2"))
+                })
+            });
+            let current_keye_heavy = recent.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=")
+                    && line.contains(" fighter=5 from=9 to=10")
+            });
+            let no_retired_heavy = !recent.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=")
+                    && line.contains(" fighter=2 from=9 to=10")
+            });
+            if replacement_admitted && current_lights && current_keye_heavy && no_retired_heavy {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("old KeyE actor cannot attack after replacement; four fresh seats remain live");
 }
