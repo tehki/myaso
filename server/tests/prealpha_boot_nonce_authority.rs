@@ -312,7 +312,7 @@ fn four_distinct_current_leases_isolate_identical_gesture_sequence_numbers() {
         }
     }
     assert!(paths[0].retired());
-    for (_, (actor, _)) in seats.iter().enumerate() {
+    for (actor, _) in seats.iter() {
         assert_eq!(world.fighter(*actor).unwrap().hp, 100.0);
     }
 }
