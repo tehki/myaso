@@ -937,7 +937,12 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     const recoveryTell = entity.netId === recoveryFocusNetId;
     drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  // Presentation only: bind the local Silver animation cache to the same
+  // authenticated server actor identity already used for remote Knights.
+  if (ownId && local.initialized) {
+    local.netId = ownId;
+    drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  }
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
