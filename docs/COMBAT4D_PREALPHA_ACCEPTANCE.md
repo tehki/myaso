@@ -15,7 +15,7 @@ node scripts/combat4d-acceptance.mjs --smoke
 node scripts/combat4d-acceptance.mjs --gate <EXACT_40_CHARACTER_SHA> <evidence.json>
 ~~~
 
-Inventory lists requirements without claiming PASS. Smoke runs the existing Node combat/network tests, the QA integrity tests and Rust tests. Gate checks independent exact-head evidence, exits nonzero unless every scenario qualifies, and always sets deploymentAuthorized=false. Evidence JSON is supplied externally by genuine QA runs, not synthesized by this tool.
+Inventory lists requirements without claiming PASS. Smoke runs the existing Node combat/network tests, the QA integrity tests and Rust tests. Gate is a **structural preflight, not an independent evidence verifier**: it always exits nonzero unless an independently verifiable acceptance mechanism is implemented and reviewed. Valid-looking self-submitted reports are marked **REVIEW REQUIRED / HOLD**, never PASS; deploymentAuthorized is always false. Evidence JSON may be supplied externally, but its claimed GitHub runs, actor traces, humans and host independence cannot be trusted without independent verification.
 
 Example evidence file that correctly yields HOLD or NOT QUALIFIED:
 
@@ -31,7 +31,7 @@ Example evidence file that correctly yields HOLD or NOT QUALIFIED:
 }
 ~~~
 
-For a real PASS report, each record must provide: candidate_sha, outcome PASS, independent qa_reviewer, verified_at, exact-head run_url, artifact_urls containing immutable trace links, and assertions containing individually evidenced {name, passed: true, evidence} entries. World/network/native/multiplayer cases require server_ticks of {tick, actor_id, event}; native/multiplayer require genuine w3c_events with origin W3C, trusted true and actor_id. Multiplayer requires distinct browser_sessions with actor_id, session_id, browser and same world_id; required minimum is 2, 3 or 4 by case. Human gates require separately operated human_operators; remote-host gate requires independent_host_verified=true. CI requires full_protected=true and conclusion=success. A real reviewer must independently inspect links and chronological traces; JSON shape itself does not prove truth.
+For a structurally complete report awaiting independent verification, each record must provide: candidate_sha, outcome PASS, independent qa_reviewer, verified_at, exact-head run_url, artifact_urls containing immutable trace links, and assertions containing individually evidenced {name, passed: true, evidence} entries. World/network/native/multiplayer cases require server_ticks of {tick, actor_id, event}; native/multiplayer require genuine w3c_events with origin W3C, trusted true and actor_id. Multiplayer requires distinct browser_sessions with actor_id, session_id, browser and same world_id; required minimum is 2, 3 or 4 by case. Human gates require separately operated human_operators; remote-host gate requires independent_host_verified=true. CI requires full_protected=true and conclusion=success. **Security boundary:** the script cannot authenticate GitHub run SHA/result, immutable artifacts, W3C origin, original server ticks, human identities or independent hosts. The offline CLI must not grant PASS even if all 45 records claim success. Independent QA must inspect actual source records and coordinate any final acceptance with Main 0 outside this untrusted manifest checker.
 
 ## Confirmed baseline discrepancy and historical risks
 
