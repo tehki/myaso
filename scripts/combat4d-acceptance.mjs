@@ -122,7 +122,7 @@ function localSmoke() {
       "tests/combat4d-acceptance.test.mjs", "tests/combat4d-m107-proof.test.mjs",
       "tests/combat4d-m155-proof.test.mjs", "tests/combat4d-m193-proof.test.mjs",
       "tests/combat4d-m121-proof.test.mjs", "tests/combat4d-m172-proof.test.mjs",
-      "tests/combat4d-m40-proof.test.mjs"]],
+      "tests/combat4d-m40-proof.test.mjs", "tests/combat4d-m194-proof.test.mjs"]],
     ["cargo", ["test", "--manifest-path", "server/Cargo.toml"]]
   ];
   let failed = false;
