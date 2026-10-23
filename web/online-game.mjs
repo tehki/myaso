@@ -181,6 +181,7 @@ let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 let middleBlockHeld = false;
+let middleBlockPointerId = null;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -215,6 +216,9 @@ canvas.addEventListener("pointerdown", (event) => {
   updateMouse(event);
   if (event.button === 1) {
     event.preventDefault();
+    // Keep block ownership tied to the real pressed pointer.
+    if (!Number.isInteger(event.pointerId) || middleBlockPointerId !== null) return;
+    middleBlockPointerId = event.pointerId;
     middleBlockHeld = true;
     return;
   }
@@ -232,7 +236,10 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 function onLeftPointerUp(event) {
   if (event.button === 1) {
-    middleBlockHeld = false;
+    if (middleBlockPointerId === event.pointerId) {
+      middleBlockHeld = false;
+      middleBlockPointerId = null;
+    }
     return;
   }
   if (event.button !== 0) return;
@@ -278,7 +285,11 @@ window.addEventListener("mouseup", onChordedLeftMouseUp);
 
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
-  if (event.button === 1) middleBlockHeld = false;
+  // W3C pointercancel can report button=-1: identify the held middle pointer.
+  if (middleBlockPointerId === event.pointerId) {
+    middleBlockHeld = false;
+    middleBlockPointerId = null;
+  }
   // Pointer cancellation may report button=-1. Guard the real pointer
   // identity before clearing captured movement or ending its live charge.
   if (leftButtonCharge.isActivePointer(event.pointerId)) {
@@ -288,7 +299,11 @@ canvas.addEventListener("pointercancel", (event) => {
   }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
-  if (event.button === 1) middleBlockHeld = false;
+  // Do not drop a physically held MMB when only capture ownership changes.
+  if (middleBlockPointerId === event.pointerId && !(event.buttons & 4)) {
+    middleBlockHeld = false;
+    middleBlockPointerId = null;
+  }
   // Capture loss may report button=-1; only the matching, no-longer-down
   // LMB pointer can clear its movement and Space+LMB reservation.
   if (Number.isInteger(event.pointerId) && !(event.buttons & 1)
@@ -717,6 +732,7 @@ function releaseInputs() {
   jumpRequested = false;
   shortBlockUntil = 0;
   middleBlockHeld = false;
+  middleBlockPointerId = null;
   rightButtonGesture.cancel();
   pendingStaminaDenial = null;
 }

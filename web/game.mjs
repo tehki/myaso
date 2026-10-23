@@ -75,6 +75,7 @@ let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 let middleBlockHeld = false;
+let middleBlockPointerId = null;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -110,6 +111,9 @@ canvas.addEventListener("pointerdown", (event) => {
   updateMouse(event);
   if (event.button === 1) {
     event.preventDefault();
+    // Keep block ownership tied to the real pressed pointer.
+    if (!Number.isInteger(event.pointerId) || middleBlockPointerId !== null) return;
+    middleBlockPointerId = event.pointerId;
     middleBlockHeld = true;
     return;
   }
@@ -122,7 +126,10 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 function onLeftPointerUp(event) {
   if (event.button === 1) {
-    middleBlockHeld = false;
+    if (middleBlockPointerId === event.pointerId) {
+      middleBlockHeld = false;
+      middleBlockPointerId = null;
+    }
     return;
   }
   if (event.button !== 0) return;
@@ -161,12 +168,20 @@ window.addEventListener("mouseup", onChordedLeftMouseUp);
 
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
-  if (event.button === 1) middleBlockHeld = false;
+  // W3C pointercancel can report button=-1: identify the held middle pointer.
+  if (middleBlockPointerId === event.pointerId) {
+    middleBlockHeld = false;
+    middleBlockPointerId = null;
+  }
   // Match the active pointerId even when pointercancel reports button=-1.
   leftButtonCharge.cancel(event.pointerId);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
-  if (event.button === 1) middleBlockHeld = false;
+  // Do not drop a physically held MMB when only capture ownership changes.
+  if (middleBlockPointerId === event.pointerId && !(event.buttons & 4)) {
+    middleBlockHeld = false;
+    middleBlockPointerId = null;
+  }
   if (Number.isInteger(event.pointerId) && !(event.buttons & 1)) {
     leftButtonCharge.cancel(event.pointerId);
   }
@@ -222,6 +237,7 @@ function releaseInputs() {
   jumpRequested = false;
   shortBlockUntil = 0;
   middleBlockHeld = false;
+  middleBlockPointerId = null;
   rightButtonGesture.cancel();
 }
 
