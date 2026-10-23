@@ -1,6 +1,6 @@
 /**
  * Graphics 3C / Pre-Alpha Arena Lite — optional original floor art.
- * PREVIEW ONLY. This module is NOT imported by the live game.
+ * Original preview source, optionally imported only by the explicit live game arenaLite=1 visual gate.
  * World/gameplay collision, arena projection, fighter/server state and input
  * remain unchanged. Paint ONCE into an opaque 960x540 review canvas.
  */
