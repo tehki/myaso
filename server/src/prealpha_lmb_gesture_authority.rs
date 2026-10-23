@@ -170,7 +170,11 @@ impl GestureAuthority {
             // no-combat events, not as a second attack or a fabricated hit.
             GestureAction::Press
                 if self.active_id.is_some()
-                    && self.active_source != Some(source)
+                    // A new physically released SAME source may press during
+                    // original World recovery; it is only an ACKed no-combat
+                    // busy edge. Source-physical DOWN ownership is enforced
+                    // independently by the admitted World path.
+                    && (self.active_source != Some(source) || self.released)
                     && self.busy_source.is_none()
                     && event.gesture_id > self.highest_gesture_id =>
             {
