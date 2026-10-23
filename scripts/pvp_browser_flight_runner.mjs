@@ -9139,7 +9139,37 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
 
   let defenderResult = await readUiEvidence(defender);
   if (!attackerResult) {
-    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
+    const failed = await readUiEvidence(attacker);
+    const guardBreak = [...(failed.eventTransitions ?? [])].reverse()
+      .find((event) => event.text === "Opponent guard broken - punish.");
+    const pointerUp = [...(failed.pointers ?? [])].reverse()
+      .find((event) => event.button === 0 && event.type === "pointerup");
+    const originalSend = failed.m111InputPlane?.submitted ?? [];
+    const physicalUpEpoch = pointerUp?.epochMs ?? null;
+    // Original M111 34HP/66HP/real stun/punish requirements remain strict.
+    // This diagnostic never claims a HIT or changes original W3C action timing.
+    const forensic = {
+      guardBreakObservedAtEpochMs: guardBreak?.epochMs ?? null,
+      physicalPointerUpEpochMs: physicalUpEpoch,
+      guardBreakToPointerUpMs: Number.isFinite(physicalUpEpoch)
+        && Number.isFinite(guardBreak?.epochMs)
+        ? physicalUpEpoch - guardBreak.epochMs : null,
+      originalWorldGuardBreakStunMs: COMBAT.block.guardBreakStunMs,
+      originalWorldLightWindupMs: COMBAT.attack.windupMs,
+      originalClickHoldMs: 10,
+      physicalTerminals: failed.m111InputPlane?.physicalTerminals ?? [],
+      originalLightReleases: failed.m111InputPlane?.lightReleases ?? [],
+      actual30HzAttackSubmissionsNearLightRelease: originalSend.filter((item) =>
+        item.attack && Number.isFinite(physicalUpEpoch)
+        && item.epochMs >= physicalUpEpoch - 70
+        && item.epochMs <= physicalUpEpoch + 220),
+      sampledClientFramesNearPointerUp: Number.isFinite(physicalUpEpoch)
+        ? originalSend.filter((item) =>
+            Math.abs(item.epochMs - physicalUpEpoch) <= 220)
+        : originalSend.slice(-18),
+      originalObserverHasWorldHit: failed.events.includes("Opponent hit - 34 HP."),
+    };
+    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify({ forensic, ui: failed })}`);
   }
 
   // Let the defender receive the same authoritative damage snapshot before
@@ -13977,6 +14007,11 @@ async function readUiEvidence(session) {
       keyTransitions: (state.keyTransitions ?? []).slice(),
       pointers: state.pointers.slice(),
       wheels: (state.wheels ?? []).slice(),
+      m111InputPlane: window.__MYASO_M111_INPUT_PLANE__ ? {
+        physicalTerminals: (window.__MYASO_M111_INPUT_PLANE__.physicalTerminals ?? []).slice().map((x) => ({ ...x })),
+        lightReleases: (window.__MYASO_M111_INPUT_PLANE__.lightReleases ?? []).slice().map((x) => ({ ...x })),
+        submitted: (window.__MYASO_M111_INPUT_PLANE__.submitted ?? []).slice(-96).map((x) => ({ ...x })),
+      } : null,
       acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,

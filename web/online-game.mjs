@@ -148,6 +148,14 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
+// REVIEW ONLY: bounded, read-only legacy v1 M111 input-plane chronology.
+// The observer NEVER sends Combat input, changes request latches or grants HIT.
+const m111InputProbe = acceptanceScenario === "uiheavyguardbreakpunish"
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  ? (window.__MYASO_M111_INPUT_PLANE__ = {
+      physicalTerminals: [], lightReleases: [], submitted: [],
+    })
+  : null;
 const server = params.get("server");
 const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
@@ -206,6 +214,12 @@ let shortBlockUntil = 0;
 let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
+    if (m111InputProbe) {
+      m111InputProbe.lightReleases.push({
+        epochMs: Date.now(), actionAtRelease: local.action,
+      });
+      if (m111InputProbe.lightReleases.length > 32) m111InputProbe.lightReleases.shift();
+    }
     attackRequested = true;
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
@@ -261,6 +275,13 @@ function onLeftPointerUp(event) {
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  if (m111InputProbe && committed) {
+    m111InputProbe.physicalTerminals.push({
+      epochMs: Date.now(), trusted: event.isTrusted,
+      pointerId: event.pointerId, classification: committed,
+    });
+    if (m111InputProbe.physicalTerminals.length > 32) m111InputProbe.physicalTerminals.shift();
+  }
   leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
@@ -846,6 +867,20 @@ function simulatePrediction(stepMs) {
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
+      }
+    }
+    if (m111InputProbe) {
+      // Exactly the final original 30Hz frame that will be passed to the
+      // unchanged v1 sender below; no synthetic latching or packet mutation.
+      m111InputProbe.submitted.push({
+        epochMs: Date.now(), clientTick: outgoingTick,
+        attack: Boolean(currentInput.attack),
+        heavyAttack: Boolean(currentInput.heavyAttack),
+        jump: Boolean(currentInput.jump),
+        localPredictedAction: local.action,
+      });
+      if (m111InputProbe.submitted.length > 96) {
+        m111InputProbe.submitted.shift();
       }
     }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
