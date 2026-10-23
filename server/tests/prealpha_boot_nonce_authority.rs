@@ -316,3 +316,120 @@ fn four_distinct_current_leases_isolate_identical_gesture_sequence_numbers() {
         assert_eq!(world.fighter(*actor).unwrap().hp, 100.0);
     }
 }
+
+#[test]
+fn genuine_combat_death_and_respawn_revoke_prior_actor_session_authority() {
+    // Three real original-World 34 HP hits kill fighter #2; no fixture
+    // mutation of HP, Action or actor incarnation may substitute for death.
+    let boot = new_server_boot_nonce().expect("OS boot nonce");
+    let mut world = World::new(800.0, 600.0);
+    assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+    assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    let attacker_lease = LEASE;
+    let defender_lease = LEASE + 1;
+    let mut attacker =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, attacker_lease, boot).unwrap();
+    let mut defender =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, defender_lease, boot).unwrap();
+    let old_life = defender.binding().incarnation;
+    let mut real_hits = 0;
+    let mut real_deaths = 0;
+
+    for gesture_id in 1..=3_u32 {
+        for (action, sequence) in [
+            (GestureAction::Press, gesture_id * 2 - 1),
+            (GestureAction::Release, gesture_id * 2),
+        ] {
+            let packet = encode_event(GestureEvent {
+                action,
+                sequence,
+                gesture_id,
+                client_tick: u32::MAX,
+            })
+            .unwrap();
+            assert_eq!(
+                attacker
+                    .accept_under_world_lock(&mut world, attacker_lease, boot, &packet)
+                    .unwrap()
+                    .status,
+                AckStatus::Accepted
+            );
+        }
+        for _ in 0..55 {
+            for event in world.step() {
+                match event {
+                    myaso_server::simulation::CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 34,
+                        ..
+                    } => real_hits += 1,
+                    myaso_server::simulation::CombatEvent::Death {
+                        fighter: 2,
+                        killer: 1,
+                    } => real_deaths += 1,
+                    _ => {}
+                }
+            }
+            attacker.advance_under_world_lock(&mut world, attacker_lease, boot);
+        }
+    }
+    assert_eq!(real_hits, 3, "only original Combat World hits qualify");
+    assert_eq!(real_deaths, 1, "original Combat World must kill victim");
+    assert_eq!(world.fighter(2).unwrap().action, Action::Dead);
+
+    let old_press = encode_event(GestureEvent {
+        action: GestureAction::Press,
+        sequence: 1,
+        gesture_id: 1,
+        client_tick: u32::MAX,
+    })
+    .unwrap();
+    assert_eq!(
+        defender
+            .accept_under_world_lock(&mut world, defender_lease, boot, &old_press)
+            .unwrap()
+            .status,
+        AckStatus::Stale
+    );
+    assert!(defender.retired());
+
+    let mut respawned = false;
+    for _ in 0..100 {
+        for event in world.step() {
+            if let myaso_server::simulation::CombatEvent::Respawn { fighter: 2 } = event {
+                respawned = true;
+            }
+        }
+        attacker.advance_under_world_lock(&mut world, attacker_lease, boot);
+        if respawned {
+            break;
+        }
+    }
+    assert!(respawned, "original World must complete timed respawn");
+    assert_ne!(world.fighter(2).unwrap().world_incarnation(), old_life);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+    assert_eq!(
+        defender
+            .accept_under_world_lock(&mut world, defender_lease, boot, &old_press)
+            .unwrap()
+            .status,
+        AckStatus::Stale,
+        "old session must not resurrect when actor numeric ID respawns"
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+
+    // A new post-respawn session must be granted a fresh server-side lease.
+    let fresh_lease = defender_lease + 1;
+    let mut fresh = SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, boot)
+        .expect("respawned actor admits a fresh seat");
+    assert_eq!(
+        fresh
+            .accept_under_world_lock(&mut world, fresh_lease, boot, &old_press)
+            .unwrap()
+            .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::AttackWindup);
+}
