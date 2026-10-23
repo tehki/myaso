@@ -330,7 +330,6 @@ impl ReviewWorldOwnerLease {
     }
 }
 
-
 /// Review-only per-actor input commitment. The operation is not a transport
 /// ACK and never claims a Combat HIT until an actual World.step() reports one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -379,10 +378,18 @@ impl ReviewOwnedWorld {
             ReviewLightWorldDispatch::RejectedAndRetired
         };
         let (press, terminal) = match accepted.as_slice() {
-            [edge] if edge.action == GestureAction::Press
-                && gate.review_active_light_gesture.is_none() => (Some(*edge), None),
-            [edge] if matches!(edge.action, GestureAction::Release | GestureAction::Cancel)
-                && gate.review_active_light_gesture == Some(edge.gesture_id) => (None, Some(*edge)),
+            [edge]
+                if edge.action == GestureAction::Press
+                    && gate.review_active_light_gesture.is_none() =>
+            {
+                (Some(*edge), None)
+            }
+            [edge]
+                if matches!(edge.action, GestureAction::Release | GestureAction::Cancel)
+                    && gate.review_active_light_gesture == Some(edge.gesture_id) =>
+            {
+                (None, Some(*edge))
+            }
             [first, last]
                 if first.action == GestureAction::Press
                     && matches!(last.action, GestureAction::Release | GestureAction::Cancel)
