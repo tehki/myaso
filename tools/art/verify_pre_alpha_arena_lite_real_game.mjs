@@ -51,7 +51,7 @@ async function startW3C(engine,index){
 async function evaluate(s,source){return (await request(s.base,"POST","/session/"+s.id+"/execute/sync",{script:source,args:[]})).value}
 async function startOriginalRust(){
  const bin=join(root,"server","target","debug","myaso-server");
- const build=spawnSync("cargo",["build","--offline","--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
+ const build=spawnSync("cargo",["build",...(process.env.MYASO_ARENA_LITE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
  const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4"},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
