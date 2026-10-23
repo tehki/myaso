@@ -15,6 +15,8 @@ import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../
 import { NETWORK } from "../src/network/constants.mjs";
 import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { createArenaLiteLayer } from "../src/browser/prealpha-arena-lite-floor.mjs";
+import { chooseArenaFloorLayer } from "../src/browser/prealpha-arena-lite-selection.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -169,7 +171,16 @@ const currentInput = {
   moveX: 0, moveY: 0, facing: 0, attack: false, heavyAttack: false, dash: false,
   dodge: false, block: false, kick: false, run: false, jump: false,
 };
-const arenaLayer = createArenaLayer();
+const arenaLayer = chooseArenaFloorLayer({
+  enabled: params.get("arenaLite") === "1",
+  createOriginal: createArenaLayer,
+  createOptional: () => createArenaLiteLayer(() => {
+    const layer = document.createElement("canvas");
+    layer.width = canvas.width;
+    layer.height = canvas.height;
+    return layer;
+  }),
+});
 const remoteScratch = new Map();
 const visibleEnemyPositions = [];
 const snapshotRenderClock = createSnapshotRenderClock();
