@@ -60,5 +60,5 @@ fn stale_ownership_cannot_apply_queued_gesture_to_replacement() {
         owner.review_apply_one_lmb_light(&mut gate, actor),
         ReviewLightWorldDispatch::Retired
     );
-    assert_eq!(owner.world().fighter(1).unwrap().input().attack, false);
+    assert!(!owner.world().fighter(1).unwrap().input().attack);
 }
