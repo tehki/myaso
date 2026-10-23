@@ -45,6 +45,9 @@ fn four_independent_world_slots_reuse_identical_gesture_ids_without_crossing_act
     }
     assert!(owner.review_step_events().is_empty());
     for id in 1..=4 {
-        assert_eq!(owner.world().fighter(id).unwrap().action, Action::AttackWindup);
+        assert_eq!(
+            owner.world().fighter(id).unwrap().action,
+            Action::AttackWindup
+        );
     }
 }
