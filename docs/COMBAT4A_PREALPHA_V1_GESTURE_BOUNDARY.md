@@ -1,6 +1,6 @@
 # Combat 4A — v1 LMB input/provenance boundary (P0 evidence, not a fix)
 
-**Repository:** `tehki/myaso` · **Base:** `main` at `6fa59b649112c272bcbc018b4a32bf963f9a5bba`  
+**Repository:** `tehki/myaso` · **Base:** `main` at `6fa59b649112c272bcbc018b4a32bf963f9a5bba`
 **Coordination:** [Pre-Alpha #695](https://github.com/tehki/myaso/issues/695), [Combat #696](https://github.com/tehki/myaso/issues/696), [wire #723](https://github.com/tehki/myaso/issues/723), [M156 #531](https://github.com/tehki/myaso/issues/531), [M144 #392](https://github.com/tehki/myaso/issues/392).
 
 ## Verified source-level defect
