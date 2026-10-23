@@ -1,0 +1,36 @@
+name: Graphics 3A authentic Silver relight four-player native review (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/knight-sprites.mjs"
+      - "web/online-game.mjs"
+      - "web/assets/knights/review/**"
+      - "tests/graphics3a-relit-source-select.test.mjs"
+      - "scripts/graphics3a_relight_four_native_review.mjs"
+      - ".github/workflows/graphics3a-relit-four-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-four-real-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable original asset manifest and opt-in source contract
+        run: |
+          node --check scripts/graphics3a_relight_four_native_review.mjs
+          node --test tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-source-direction-correction.test.mjs tests/prealpha-silver-knight.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build genuine local authoritative Rust arena
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real Chrome Firefox x4 relit Silver with native WASD chat and server actor roster
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 245s node scripts/graphics3a_relight_four_native_review.mjs

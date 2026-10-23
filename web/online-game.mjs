@@ -116,7 +116,12 @@ const params = new URLSearchParams(window.location.search);
 // Knights via the official lobby knights=1. Direct legacy Combat test URLs
 // and rollback without this flag keep original Combat-circle visuals.
 // Unsupported Silver animations always fall back to the original tells.
-const knightSprites = params.get("knights") === "1" ? createKnightSpriteRenderer() : null;
+// Visual-art review only: default original SHA-pinned five-clip Pre-Alpha.
+// A separate explicit knights=1&knightArt=relit previews only authentic
+// source-lit locomotion; the server roster and Combat stay authoritative.
+const knightSprites = params.get("knights") === "1"
+  ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "relit" ? "relit" : "original"})
+  : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");

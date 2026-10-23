@@ -79,7 +79,8 @@ test("same source Silver atlases draw for local and remote authenticated human s
 
 test("actual server-derived Greyhaven-free arena renderer uses Silver for both human viewpoints", () => {
   const src = readFileSync(new URL("../web/online-game.mjs", import.meta.url),"utf8");
-  assert.match(src,/const knightSprites = params\.get\("knights"\) === "1" \? createKnightSpriteRenderer\(\) : null/);
+  assert.match(src,/const knightSprites = params\.get\("knights"\) === "1"/);
+  assert.match(src,/createKnightSpriteRenderer\(\{sourceArtVariant: params\.get\("knightArt"\) === "relit" \? "relit" : "original"\}\)/);
   assert.match(src,/drawFighterWorld\(sampled,/);
   assert.match(src,/drawFighterScreen\(canvas\.width \/ 2,/);
   assert.match(src,/knightSprites\?\.draw\(ctx, fighter,/);
