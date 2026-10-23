@@ -2267,6 +2267,108 @@ mod r2_combat_control_tests {
         )));
     }
 
+    // M193/M194: three *admitted* light/button and held-block exchanges
+    // must consume guard 100→62→24→0 without changing combat constants.
+    // Resolve only original World edges; no direct action/guard injection.
+    #[test]
+    fn m193_three_real_lights_drain_exact_guard_without_parry_or_hp_loss() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+        let mut seen = Vec::new();
+        for attempt in 0..3 {
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    block: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut outcome = None;
+            for _ in 0..16 {
+                let events = world.step();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit { .. } | CombatEvent::Parry { .. }
+                )));
+                for event in &events {
+                    if matches!(
+                        event,
+                        CombatEvent::Block {
+                            attacker: 1,
+                            target: 2
+                        } | CombatEvent::GuardBreak {
+                            attacker: 1,
+                            target: 2
+                        }
+                    ) {
+                        assert!(outcome.is_none(), "single light can contact once");
+                        outcome = Some(event.clone());
+                    }
+                }
+                if outcome.is_some() {
+                    break;
+                }
+            }
+            let outcome = outcome.expect("admitted light must contact defender");
+            let expected_guard = match attempt {
+                0 => 62.0,
+                1 => 24.0,
+                _ => 0.0,
+            };
+            assert_eq!(world.fighter(2).unwrap().guard, expected_guard);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            if attempt == 2 {
+                assert!(matches!(
+                    outcome,
+                    CombatEvent::GuardBreak {
+                        attacker: 1,
+                        target: 2
+                    }
+                ));
+                assert_eq!(world.fighter(2).unwrap().action, Action::Stunned);
+            } else {
+                assert!(matches!(
+                    outcome,
+                    CombatEvent::Block {
+                        attacker: 1,
+                        target: 2
+                    }
+                ));
+            }
+            seen.push(expected_guard);
+            if attempt < 2 {
+                assert!(world.set_input(1, InputIntent::default()));
+                assert!(world.set_input(
+                    2,
+                    InputIntent {
+                        facing_radians: std::f32::consts::PI,
+                        ..InputIntent::default()
+                    }
+                ));
+                for _ in 0..40 {
+                    world.step();
+                    if world.fighter(1).unwrap().action == Action::Idle {
+                        break;
+                    }
+                }
+                assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+                assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            }
+        }
+        assert_eq!(seen, [62.0, 24.0, 0.0]);
+    }
+
     // 4B M194: genuine input edges enter the server at different ticks;
     // server elapsed state, not Firefox or Chrome wall time, chooses the
     // unchanged 125ms parry vs -38 guard block.
