@@ -15,6 +15,10 @@ on:
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
       - "scripts/core8_native_v2_keye_heavy_world_lab.mjs"
       - "scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs"
+      - "scripts/ui10-native-real-world-shared-gesture-review.mjs"
+      - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
+      - "src/browser/prealpha-keye-source-review.mjs"
+      - "src/browser/prealpha-shared-ui10-sources-review.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "src/network/prealpha-lmb-gesture-proposal.mjs"
       - "src/network/prealpha-shared-source-allocator-proposal.mjs"
@@ -71,5 +75,22 @@ jobs:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
         run: |
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: UI10 actual physical source0/source1 -> one outbox -> real original Rust World
+        run: |
+          node --check scripts/ui10-native-real-world-shared-gesture-review.mjs
+          node --test tests/ui10-prealpha-lmb-dom-review.test.mjs tests/ui10-shared-typed-sources-review.test.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 physical two-source lost PRESS -> bounded original World ordered replay
+        env:
+          CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 original World admitted PRESS + lost ACK -> genuine DUPLICATE no extra hit
+        env:
+          CORE8A_LAB_DROP_FIRST_ACK: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 true KeyE held READY with NO HIT until matching physical RELEASE
+        env:
+          CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
