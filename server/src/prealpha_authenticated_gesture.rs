@@ -180,7 +180,13 @@ impl SessionGestureWorldPath {
                 self.busy_source = None;
                 true
             }
-            GestureAction::Upgrade => false,
+            GestureAction::Upgrade => {
+                // Real held LMB may UPGRADE while a different KeyE attack
+                // owns World. Tombstone this physical edge as no-combat too;
+                // REJECTED would fatally retire the one shared outbox.
+                busy == Some((GestureSource::Lmb, event.gesture_id))
+                    && typed.source == GestureSource::Lmb
+            }
         };
         if !valid {
             return None;
@@ -227,7 +233,8 @@ impl SessionGestureWorldPath {
                 AckStatus::Stale
             }
         } else if (self.busy_source == Some((typed.source, event.gesture_id))
-            && matches!(event.action, GestureAction::Release | GestureAction::Cancel))
+            && (matches!(event.action, GestureAction::Release | GestureAction::Cancel)
+                || (typed.source == GestureSource::Lmb && event.action == GestureAction::Upgrade)))
             || (event.action == GestureAction::Press
                 && self.world_source.is_some_and(|owner| owner != typed.source)
                 && event.gesture_id > self.highest_gesture_id

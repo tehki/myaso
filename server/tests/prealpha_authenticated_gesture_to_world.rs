@@ -1082,8 +1082,22 @@ fn independent_lmb_busy_press_cannot_start_light_during_keye_heavy() {
             &mut w,
             LEASE,
             GestureSource::Lmb,
-            GestureAction::Release,
+            GestureAction::Upgrade,
             3,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    // Original physical LMB remains held: independent UPGRADE while KeyE
+    // owns World is a valid no-combat packet, not a fatal transport reject.
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
             2
         ),
         AckStatus::Accepted
@@ -1095,7 +1109,7 @@ fn independent_lmb_busy_press_cannot_start_light_during_keye_heavy() {
             LEASE,
             GestureSource::KeyE,
             GestureAction::Release,
-            4,
+            5,
             1
         ),
         AckStatus::Accepted
@@ -1109,7 +1123,7 @@ fn independent_lmb_busy_press_cannot_start_light_during_keye_heavy() {
             LEASE,
             GestureSource::Lmb,
             GestureAction::Release,
-            3,
+            4,
             2
         ),
         AckStatus::Duplicate

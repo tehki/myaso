@@ -386,3 +386,70 @@ async fn real_quic_busy_keye_does_not_strand_authenticated_lmb_release() {
     println!("CORE8_NATIVE_BUSY_CROSS_SOURCE_ACK_WORLD_PASS");
     drop(seat);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn real_quic_busy_lmb_upgrade_does_not_retire_authentic_keye_heavy() {
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+    let mut keye_press = event(1, 1);
+    keye_press[3] = 1;
+    let mut lmb_press = event(1, 2);
+    lmb_press[8..12].copy_from_slice(&2_u32.to_le_bytes());
+    let mut lmb_upgrade = event(2, 3);
+    lmb_upgrade[8..12].copy_from_slice(&2_u32.to_le_bytes());
+    let mut lmb_release = event(3, 4);
+    lmb_release[8..12].copy_from_slice(&2_u32.to_le_bytes());
+    let mut keye_release = event(3, 5);
+    keye_release[3] = 1;
+
+    for (packet, seq, gesture) in [
+        (keye_press, 1, 1),
+        (lmb_press, 2, 2),
+        (lmb_upgrade, 3, 2),
+        (lmb_release, 4, 2),
+        (keye_release, 5, 1),
+    ] {
+        seat.connection
+            .send_datagram(packet)
+            .expect("original QUIC datagram");
+        let received = timeout(WAIT, seat.connection.receive_datagram())
+            .await
+            .expect("typed BUSY LMB 0x12 ACK timeout")
+            .expect("genuine QUIC connection remains admitted");
+        assert_eq!(received.len(), 16);
+        assert_eq!(
+            &received[..4],
+            &[2, 0x12, 1, 0],
+            "physical held LMB UPGRADE during real KeyE heavy must not close shared outbox"
+        );
+        assert_eq!(u32::from_le_bytes(received[4..8].try_into().unwrap()), seq);
+        assert_eq!(
+            u32::from_le_bytes(received[8..12].try_into().unwrap()),
+            gesture
+        );
+    }
+    timeout(Duration::from_secs(3), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            if lines.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=1 from=9 to=10")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("original World standalone KeyE HeavyWindup9→HeavyActive10");
+    sleep(Duration::from_millis(400)).await;
+    let lines = server.lines.lock().unwrap().clone();
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("M201_AUTH_ACTION tick=")
+                && line.contains(" fighter=1 from=1 to=2")),
+        "busy LMB with held upgrade may not add a 34HP light"
+    );
+    println!("CORE8_NATIVE_BUSY_LMB_UPGRADE_KEYE_HEAVY_PASS");
+    drop(seat);
+}
