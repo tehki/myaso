@@ -531,3 +531,114 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     .await
     .expect("survivors attack; only matching current KeyE release can strike");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn original_quic_v2_grant_is_one_shot_not_reissued_on_second_hello() {
+    let (server, url, digest) = real_server();
+    let mut seat = admitted_seat(&url, &digest).await;
+
+    // The original server already sent exactly one reliable 02 13 GRANTED
+    // to this independently authenticated transport. Repeat the *same*
+    // valid client-unidirectional HELLO+FIN without closing the connection.
+    // There must NOT be a second lease grant or implicit rebind.
+    let mut repeated_hello = timeout(WAIT, async {
+        seat.connection
+            .open_uni()
+            .await
+            .expect("second uni stream")
+            .await
+            .expect("second uni opened")
+    })
+    .await
+    .expect("second uni opening bounded");
+    timeout(WAIT, repeated_hello.write_all(&HELLO))
+        .await
+        .expect("second HELLO write bounded")
+        .expect("second HELLO sent");
+    timeout(WAIT, repeated_hello.finish())
+        .await
+        .expect("second HELLO FIN bounded")
+        .expect("second HELLO FIN");
+
+    let duplicate_grant = timeout(Duration::from_millis(550), async {
+        loop {
+            let payload = framed_recv(&mut seat._recv).await;
+            if payload == GRANTED {
+                return true;
+            }
+        }
+    })
+    .await;
+    assert!(
+        duplicate_grant.is_err(),
+        "one original WebTransport seat must not receive a second 02 13 grant"
+    );
+
+    // Existing one-shot authorized source1 path still works. This is NOT
+    // in-band reauthorization: original session and actor remain current.
+    seat.connection
+        .send_datagram(typed_event(1, 1, 1, 1))
+        .expect("current KeyE PRESS");
+    let press = timeout(WAIT, async {
+        loop {
+            let packet = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("current source1 QUIC live");
+            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
+                break packet;
+            }
+        }
+    })
+    .await
+    .expect("current original World PRESS ACK");
+    assert_eq!(press[2], 1);
+    assert_eq!(u32::from_le_bytes(press[4..8].try_into().unwrap()), 1);
+    assert_eq!(u32::from_le_bytes(press[8..12].try_into().unwrap()), 1);
+    assert!(u32::from_le_bytes(press[12..16].try_into().unwrap()) > 0);
+
+    sleep(Duration::from_millis(425)).await;
+    assert!(
+        !server.lines.lock().unwrap().iter().any(|line| {
+            line.contains("M201_AUTH_ACTION")
+                && line.contains(" fighter=1 from=9 to=10")
+        }),
+        "even after attempted second HELLO, held KeyE must not auto-hit"
+    );
+
+    seat.connection
+        .send_datagram(typed_event(1, 3, 2, 1))
+        .expect("current source1 matching RELEASE");
+    let release = timeout(WAIT, async {
+        loop {
+            let packet = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("current source1 RELEASE ACK");
+            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
+                break packet;
+            }
+        }
+    })
+    .await
+    .expect("matching RELEASE original World ACK");
+    assert_eq!(release[2], 1);
+    assert_eq!(u32::from_le_bytes(release[4..8].try_into().unwrap()), 2);
+    assert_eq!(u32::from_le_bytes(release[8..12].try_into().unwrap()), 1);
+
+    timeout(Duration::from_secs(3), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION")
+                    && line.contains(" fighter=1 from=9 to=10")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("only current actor's genuine KeyE release drives World heavy");
+}
