@@ -111,7 +111,7 @@ function localSmoke() {
   // Deterministic tests are useful evidence, but a success is NOT Combat QA PASS.
   const commands = [
     ["node", ["--test", "tests/combat-model.test.mjs", "tests/networking.test.mjs",
-      "tests/combat4d-acceptance.test.mjs"]],
+      "tests/combat4d-acceptance.test.mjs", "tests/combat4d-m107-proof.test.mjs"]],
     ["cargo", ["test", "--manifest-path", "server/Cargo.toml"]]
   ];
   let failed = false;
