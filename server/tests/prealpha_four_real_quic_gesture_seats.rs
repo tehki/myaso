@@ -601,8 +601,7 @@ async fn original_quic_v2_grant_is_one_shot_not_reissued_on_second_hello() {
     sleep(Duration::from_millis(425)).await;
     assert!(
         !server.lines.lock().unwrap().iter().any(|line| {
-            line.contains("M201_AUTH_ACTION")
-                && line.contains(" fighter=1 from=9 to=10")
+            line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
         }),
         "even after attempted second HELLO, held KeyE must not auto-hit"
     );
@@ -631,8 +630,7 @@ async fn original_quic_v2_grant_is_one_shot_not_reissued_on_second_hello() {
     timeout(Duration::from_secs(3), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_AUTH_ACTION")
-                    && line.contains(" fighter=1 from=9 to=10")
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
             }) {
                 break;
             }
