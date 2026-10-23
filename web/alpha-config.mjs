@@ -18,15 +18,25 @@ export function parseAlphaConfig(raw, expectedHost = "game.open-trust-layer.org"
   if (!Number.isInteger(raw.maxPlayers) || raw.maxPlayers < 2 || raw.maxPlayers > 8) {
     throw new TypeError("alpha player cap must be between 2 and 8");
   }
+  if (raw.chatC1Enabled !== undefined && typeof raw.chatC1Enabled !== "boolean") {
+    throw new TypeError("chat C1 rollout must be a boolean");
+  }
   return Object.freeze({
     serverUrl: url.href,
     certificateSha256: raw.certificateSha256.toLowerCase(),
     maxPlayers: raw.maxPlayers,
+    ...(raw.chatC1Enabled === true ? {chatC1Enabled: true} : {}),
   });
 }
 export function alphaPlayPath(config) {
   return "/web/?" + new URLSearchParams({
     server: config.serverUrl,
     cert: config.certificateSha256,
+    // The official Pre-Alpha 0.1 lobby always gives every human a Silver Knight.
+    // Direct legacy Combat acceptance URLs retain their original pixel baseline.
+    knights: "1",
+    // Only a trusted, operator-served alpha config can advertise chat.
+    // The Rust server separately requires MYASO_CHAT_C1_ENABLED=1.
+    ...(config.chatC1Enabled === true ? {chatC1: "1"} : {}),
   });
 }

@@ -1,0 +1,56 @@
+name: Main 0 Silver Knights original-world four-browser QA (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/knight-sprites.mjs"
+      - "web/online-game.mjs"
+      - "web/assets/knights/review/**"
+      - "tests/graphics3a-relit-source-select.test.mjs"
+      - "tools/art/main0_knights_four_native.mjs"
+      - "scripts/graphics3a_live_shadow_ground_native_review.py"
+      - "tests/graphics3a-ground-shadow-airborne.test.mjs"
+      - ".github/workflows/graphics3a-relit-four-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-four-real-browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable original asset manifest and opt-in source contract
+        run: |
+          node --check tools/art/main0_knights_four_native.mjs
+          node --test tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-source-direction-correction.test.mjs tests/prealpha-silver-knight.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build genuine local authoritative Rust arena
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four genuine Chrome Firefox original World Silver WebP and roster, no Chat/terrain dependency
+        env:
+          MYASO_KNIGHTS_NATIVE_BROWSERS: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 245s node tools/art/main0_knights_four_native.mjs
+  native-four-grounded-shadows:
+    # Separate VM prevents previous four native Chrome+Firefox browsers
+    # from biasing the genuine server-tick jump/landing and shadow audit.
+    # This is NOT an optional/reduced gate: both native jobs must succeed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact original Silver source and presentation assertions
+        run: |
+          python3 -m py_compile scripts/graphics3a_live_shadow_ground_native_review.py
+          node --test tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-relit-source-select.test.mjs
+          google-chrome --version
+          chromedriver --version
+      - name: Build genuine independently authoritative Rust server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four native Chrome players prove source-grounded shadows and real jumping
+        run: timeout --signal=TERM --kill-after=5s 130s python3 scripts/graphics3a_live_shadow_ground_native_review.py
