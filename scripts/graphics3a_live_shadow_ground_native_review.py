@@ -51,7 +51,7 @@ try:
  for _ in range(30):
   try:urllib.request.urlopen(f"http://127.0.0.1:{drv_port}/status",timeout=2);break
   except Exception:time.sleep(.1)
- page=f"http://127.0.0.1:{siteport}/web/?server={urllib.parse.quote(url,safe='')}&cert={cert}&knights=1&knightArt=relit&chatC1Preview=1&netstats=1"
+ page=f"http://127.0.0.1:{siteport}/web/?server={urllib.parse.quote(url,safe='')}&cert={cert}&knights=1&knightArt=relit&chatC1Preview=1&netstats=1&scenario=uijumpbuffer"
  for i in range(4):
   props={"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"binary":(shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable") or "/usr/bin/chromium"),"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-background-networking","--window-size=1200,850"]}}}}
   session=request("POST","/session",props,drv_port)["sessionId"]
@@ -121,6 +121,28 @@ if(!window.__G3A_SHADOW_AUDIT__) {
  script(sessions[1],"document.querySelector('#arena').focus();return document.activeElement.id;")
  action(sessions[1],keyact(" ",True));time.sleep(.24);action(sessions[1],keyact(" ",False))
  time.sleep(1.2)
+ # Existing first-party acceptance instrumentation records authentic replicated
+ # server ticks/actions, not predicted local pose nor synthetic action injection.
+ # It is opt-in via scenario=uijumpbuffer and has no authority over gameplay.
+ # COMBAT_ACTION.jump=15, idle=0 in src/browser/combat-readability.mjs.
+ landing=script(sessions[1], """const a=window.__MYASO_ACCEPTANCE_STATE__;
+return a ? {playerNetId:a.playerNetId,serverTick:a.serverTick,
+ actions:a.ownActionTransitions?.map(v=>({action:v.action,tick:v.serverTick}))} : null;""")
+ assert landing and landing["playerNetId"]>0, "No authenticated own fighter acceptance"
+ transitions=landing.get("actions") or []
+ jump_index=next((i for i,entry in enumerate(transitions) if entry["action"]==15),None)
+ assert jump_index is not None, "Real native Space never admitted authoritative Jump (15)"
+ landing_index=next((i for i in range(jump_index+1,len(transitions))
+                     if transitions[i]["action"]==0),None)
+ assert landing_index is not None, "Authoritative Jump never returned to Idle (0)"
+ jump_tick=transitions[jump_index]["tick"]
+ landing_tick=transitions[landing_index]["tick"]
+ assert 1<=landing_tick-jump_tick<=120, "Invalid authoritative jump/landing tick transition"
+ assert landing["serverTick"]>landing_tick, "No authoritative ticks observed after landing"
+ print("AUTHENTIC_JUMP_LANDING_SERVER_TICKS",json.dumps({
+     "playerNetId":landing["playerNetId"],"jumpTick":jump_tick,
+     "landingTick":landing_tick,"durationTicks":landing_tick-jump_tick,
+     "observedAfterLandingTick":landing["serverTick"]}),flush=True)
  seen_jump=False
  for i,s in enumerate(sessions):
   measure=script(s,"return window.__G3A_SHADOW_AUDIT__?.()??null;")
