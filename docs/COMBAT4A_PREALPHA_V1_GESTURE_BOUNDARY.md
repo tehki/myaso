@@ -31,6 +31,14 @@ No gameplay bindings, normal click/light/heavy algorithm, sampled input bits, ne
 
 Do **not** merge this proof as a substitute for fix or unlock Pre-Alpha based on it. Build the actual fix on a single selected #723 protocol lineage, not by changing v1 flags to guess KeyE vs LMB. Existing Core/Combat/UI experimental proposals and their ancestry need Main/4C coordination before incorporation. Server-owned 34HP/46HP and 135ms/320ms rules remain unchanged.
 
+## Additional independent pointer identity regressions
+
+The live online `onLeftPointerUp` previously cleared `leftButtonDown` and the captured strafe movement **before** checking whether `leftButtonCharge.release(pointerId)` actually belonged to the active LMB; a foreign pointer's pointerUP could therefore destroy an unrelated valid chord reservation. It now returns when the charge controller reports no matching release, without clearing the active gesture's flags.
+
+The online `lostpointercapture` previously cleared captured left movement **even for a nonmatching pointer** and failed to clear `leftButtonDown` after a matching loss. It now clears both only after a successful pointerId-scoped cancel and only when the native pointer has no left button held. Practice lost-capture previously called `cancel(undefined)`, which cancels any active gesture in the underlying controller; it now requires an actual integer pointerId.
+
+Three further deterministic tests execute the **real live handler source** in an isolated Node VM (not hand-copied fake handlers): foreign pointerUP, foreign vs matching lost capture, and missing pointer identity in practice. They are regression coverage for state integrity, not W3C/QUIC multiplayer acceptance. No protocol format, LMB hit semantics, input timing or authoritative combat damage changes.
+
 ## Required next verifications
 
 - Add strict actual browser-to-World assertion: pointerDOWN starts authoritative LightWindup without requiring pointerUP; preserve legitimate sub-sample quick taps.
