@@ -34,3 +34,5 @@ jobs:
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
         run: timeout --signal=TERM --kill-after=5s 245s node scripts/graphics3a_relight_four_native_review.mjs
+      - name: Read-only authentic four-player jump foot and unlifted source shadow acceptance
+        run: timeout --signal=TERM --kill-after=5s 130s python3 scripts/graphics3a_live_shadow_ground_native_review.py
