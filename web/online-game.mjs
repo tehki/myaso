@@ -234,12 +234,12 @@ function onLeftPointerUp(event) {
   }
   if (event.button !== 0) return;
   // A foreign pointerUP must not reset another pointer's live LMB chord.
-  const committed = leftButtonCharge.release(event.pointerId);
-  if (committed === null) return;
+  if (!leftButtonCharge.isActivePointer(event.pointerId)) return;
   leftButtonDown = false;
   updateMouse(event);
+  const committed = leftButtonCharge.release(event.pointerId);
   leftButtonPressMovement = null;
-  if (!audio.isUnlocked()) {
+  if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
     audio.unlock();
     audio.play(committed === "heavy" ? "heavy" : "light");
