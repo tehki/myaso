@@ -464,7 +464,10 @@ fn rapid_source_edge(source: u8, action: u8, sequence: u32, gesture: u32) -> [u8
 async fn rapid_checked_ack(conn: &Connection, sequence: u32, gesture: u32) {
     let receipt = timeout(WAIT, async {
         loop {
-            let packet = conn.receive_datagram().await.expect("same authenticated QUIC session");
+            let packet = conn
+                .receive_datagram()
+                .await
+                .expect("same authenticated QUIC session");
             if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
                 break packet;
             }
@@ -472,9 +475,19 @@ async fn rapid_checked_ack(conn: &Connection, sequence: u32, gesture: u32) {
     })
     .await
     .expect("bounded genuine server receipt for rapid same-source gesture");
-    assert_eq!(&receipt[0..4], &[2, 0x12, 1, 0], "valid busy physical repeat must be transport-only ACCEPTED");
-    assert_eq!(u32::from_le_bytes(receipt[4..8].try_into().unwrap()), sequence);
-    assert_eq!(u32::from_le_bytes(receipt[8..12].try_into().unwrap()), gesture);
+    assert_eq!(
+        &receipt[0..4],
+        &[2, 0x12, 1, 0],
+        "valid busy physical repeat must be transport-only ACCEPTED"
+    );
+    assert_eq!(
+        u32::from_le_bytes(receipt[4..8].try_into().unwrap()),
+        sequence
+    );
+    assert_eq!(
+        u32::from_le_bytes(receipt[8..12].try_into().unwrap()),
+        gesture
+    );
     assert!(u32::from_le_bytes(receipt[12..16].try_into().unwrap()) > 0);
 }
 
@@ -489,24 +502,27 @@ async fn native_rapid_same_source_press_is_acked_once_without_second_world_strik
         // a single global monotonically ordered lease sequence 1,2,3,4.
         // Sending the next datagram only after ACK removes sender reordering
         // as an alternative explanation for the BUSY status.
-        for (action, sequence, gesture) in [
-            (1_u8, 1_u32, 1_u32),
-            (3, 2, 1),
-            (1, 3, 2),
-            (3, 4, 2),
-        ] {
+        for (action, sequence, gesture) in [(1_u8, 1_u32, 1_u32), (3, 2, 1), (1, 3, 2), (3, 4, 2)] {
             seat.connection
                 .send_datagram(rapid_source_edge(source, action, sequence, gesture))
                 .expect("real original QUIC typed event");
             rapid_checked_ack(&seat.connection, sequence, gesture).await;
         }
 
-        let active_edge = if source == 0 { " fighter=1 from=1 to=2" } else { " fighter=1 from=9 to=10" };
+        let active_edge = if source == 0 {
+            " fighter=1 from=1 to=2"
+        } else {
+            " fighter=1 from=9 to=10"
+        };
         timeout(Duration::from_secs(4), async {
             loop {
-                if server.lines.lock().unwrap().iter().any(|line| {
-                    line.contains("M201_AUTH_ACTION") && line.contains(active_edge)
-                }) {
+                if server
+                    .lines
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|line| line.contains("M201_AUTH_ACTION") && line.contains(active_edge))
+                {
                     break;
                 }
                 sleep(Duration::from_millis(20)).await;
@@ -515,12 +531,20 @@ async fn native_rapid_same_source_press_is_acked_once_without_second_world_strik
         .await
         .expect("first source alone reached actual original World Active");
         // Real World recovery must finish without a phantom second strike.
-        let recovery_edge = if source == 0 { " fighter=1 from=3 to=0" } else { " fighter=1 from=11 to=0" };
+        let recovery_edge = if source == 0 {
+            " fighter=1 from=3 to=0"
+        } else {
+            " fighter=1 from=11 to=0"
+        };
         timeout(Duration::from_secs(4), async {
             loop {
-                if server.lines.lock().unwrap().iter().any(|line| {
-                    line.contains("M201_AUTH_ACTION") && line.contains(recovery_edge)
-                }) {
+                if server
+                    .lines
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|line| line.contains("M201_AUTH_ACTION") && line.contains(recovery_edge))
+                {
                     break;
                 }
                 sleep(Duration::from_millis(20)).await;
@@ -530,7 +554,10 @@ async fn native_rapid_same_source_press_is_acked_once_without_second_world_strik
         .expect("genuine original World full attack recovery");
         let before = server.lines.lock().unwrap().clone();
         assert_eq!(
-            before.iter().filter(|line| line.contains("M201_AUTH_ACTION") && line.contains(active_edge)).count(),
+            before
+                .iter()
+                .filter(|line| line.contains("M201_AUTH_ACTION") && line.contains(active_edge))
+                .count(),
             1,
             "same-source no-combat busy press must not create a second original World strike"
         );
@@ -545,11 +572,18 @@ async fn native_rapid_same_source_press_is_acked_once_without_second_world_strik
         }
         timeout(Duration::from_secs(4), async {
             loop {
-                let count = server.lines.lock().unwrap().iter().filter(|line| {
-                    line.contains("M201_AUTH_ACTION") && line.contains(active_edge)
-                }).count();
+                let count = server
+                    .lines
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|line| line.contains("M201_AUTH_ACTION") && line.contains(active_edge))
+                    .count();
                 if count >= 2 {
-                    assert_eq!(count, 2, "exactly one World action per real nonbusy gesture");
+                    assert_eq!(
+                        count, 2,
+                        "exactly one World action per real nonbusy gesture"
+                    );
                     break;
                 }
                 sleep(Duration::from_millis(20)).await;
