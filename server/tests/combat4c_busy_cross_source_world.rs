@@ -165,7 +165,9 @@ fn independent_keye_busy_press_must_not_strand_legitimate_lmb_release() {
             LEASE,
             BOOT,
             &event(GestureSource::Lmb, GestureAction::Press, 5, 3),
-        ).unwrap().status,
+        )
+        .unwrap()
+        .status,
         AckStatus::Accepted
     );
     assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
@@ -175,13 +177,21 @@ fn independent_keye_busy_press_must_not_strand_legitimate_lmb_release() {
             LEASE,
             BOOT,
             &event(GestureSource::Lmb, GestureAction::Release, 6, 3),
-        ).unwrap().status,
+        )
+        .unwrap()
+        .status,
         AckStatus::Accepted
     );
     let mut next_hits = vec![];
     for _ in 0..55 {
         for outcome in world.step() {
-            if let CombatEvent::Hit { attacker: 1, target: 2, damage, hp } = outcome {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = outcome
+            {
                 next_hits.push((damage, hp));
             }
         }
