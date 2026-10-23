@@ -674,3 +674,261 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert!(advance(&mut p, &mut w, 55).is_empty());
 }
+
+#[test]
+fn same_tick_actor_reuse_refuses_retired_release_and_allows_fresh_lease_hit() {
+    let mut world = arena();
+    let mut retired =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, LEASE, BOOT).unwrap();
+    let old_life = retired.binding().incarnation;
+    let owner = retired.binding().world_instance;
+
+    assert_eq!(
+        admit(
+            &mut retired,
+            &mut world,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    // Remove and replace the fighter before the next World tick. Numeric ID
+    // and World owner are unchanged, but actor authority is not transferable.
+    assert!(world.remove_player(2));
+    assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    assert_eq!(world.world_instance(), owner);
+    assert_ne!(world.fighter(2).unwrap().world_incarnation(), old_life);
+    assert_eq!(
+        admit(
+            &mut retired,
+            &mut world,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert!(retired.retired());
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+
+    // The new server-issued lease gets its own gesture ID/sequence namespace.
+    // Old actor retirement must not deny the legitimate replacement.
+    let fresh_lease = LEASE + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut hits = Vec::new();
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 2,
+                target: 1,
+                damage,
+                hp,
+            } = event
+            {
+                hits.push((damage, hp));
+            }
+        }
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        retired.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert_eq!(hits, vec![(34, 66)]);
+    assert_eq!(world.fighter(1).unwrap().hp, 66.0);
+    assert!(retired.retired());
+}
+
+#[test]
+fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
+    let mut world = arena();
+    let mut attacker =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let stale_lease = LEASE + 1;
+    let mut old_target =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, stale_lease, BOOT).unwrap();
+    let original_life = old_target.binding().incarnation;
+
+    // A real admitted source0 PRESS/CANCEL proves the old target has a
+    // gesture ID to replay, but cancels before contact to avoid fake damage.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Cancel,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+
+    let mut damage = Vec::new();
+    let mut saw_death = false;
+    for gesture in 1..=3_u32 {
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                2 * gesture - 1,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut attacker,
+                &mut world,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2 * gesture,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        for _ in 0..55 {
+            for event in world.step() {
+                match event {
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: dealt,
+                        hp,
+                    } => damage.push((dealt, hp)),
+                    CombatEvent::Death { fighter: 2, .. } => saw_death = true,
+                    _ => {}
+                }
+            }
+            attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+            old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+        }
+    }
+    assert_eq!(damage, vec![(34, 66), (34, 32), (34, 0)]);
+    assert!(saw_death, "death must come from original World combat");
+    assert_eq!(world.fighter(2).unwrap().action, Action::Dead);
+    assert!(old_target.retired(), "death retires old gesture authority");
+
+    let mut saw_respawn = false;
+    for _ in 0..90 {
+        for event in world.step() {
+            if let CombatEvent::Respawn { fighter: 2 } = event {
+                saw_respawn = true;
+            }
+        }
+        attacker.advance_under_world_lock(&mut world, LEASE, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert!(saw_respawn, "actual World respawn must occur");
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    assert_ne!(
+        world.fighter(2).unwrap().world_incarnation(),
+        original_life
+    );
+
+    // Never rebind an already retired lease in place: an in-flight RELEASE
+    // must not be mistaken for a current actor's release after respawn.
+    assert_eq!(
+        admit(
+            &mut old_target,
+            &mut world,
+            stale_lease,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert_eq!(world.fighter(1).unwrap().hp, 100.0);
+    let fresh_lease = stale_lease + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 2, fresh_lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut fresh_hits = Vec::new();
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 2,
+                target: 1,
+                damage: dealt,
+                hp,
+            } = event
+            {
+                fresh_hits.push((dealt, hp));
+            }
+        }
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        old_target.advance_under_world_lock(&mut world, stale_lease, BOOT);
+    }
+    assert_eq!(fresh_hits, vec![(34, 66)]);
+    assert!(old_target.retired());
+}
