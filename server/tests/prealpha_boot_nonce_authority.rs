@@ -107,3 +107,113 @@ fn nonzero_boot_nonce_required_even_for_valid_local_actor_and_lease() {
     assert!(SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, 0).is_none());
     assert_ne!(new_server_boot_nonce().unwrap(), 0);
 }
+
+#[test]
+fn four_concurrent_ephemeral_seats_deny_fifth_and_recover_after_disconnect() {
+    // Exercise the same atomic AdmissionGate used by the live WebTransport
+    // accept loop. This is a thread-level capacity check, not multi-host QA.
+    let gate = myaso_server::AdmissionGate::new(4);
+    let seated = std::sync::Arc::new(std::sync::Barrier::new(5));
+    let release = std::sync::Arc::new(std::sync::Barrier::new(5));
+    let workers: Vec<_> = (0..4)
+        .map(|_| {
+            let gate = std::sync::Arc::clone(&gate);
+            let seated = std::sync::Arc::clone(&seated);
+            let release = std::sync::Arc::clone(&release);
+            std::thread::spawn(move || {
+                let permit = gate.try_acquire().expect("one of four permitted seats");
+                seated.wait();
+                release.wait();
+                drop(permit);
+            })
+        })
+        .collect();
+    seated.wait(); // Four simultaneous accepted seats are held.
+    assert_eq!(gate.current(), 4);
+    assert!(gate.try_acquire().is_none(), "fifth seat must fail closed");
+    release.wait();
+    for worker in workers {
+        worker.join().expect("seat worker");
+    }
+    assert_eq!(gate.current(), 0, "disconnect returns all seat capacity");
+    let replacement = gate.try_acquire().expect("seat reusable after leave");
+    assert_eq!(gate.current(), 1);
+    drop(replacement);
+    assert_eq!(gate.current(), 0);
+}
+
+#[test]
+fn delayed_old_lease_release_cannot_attack_replacement_with_reused_numeric_actor() {
+    // Original Rust World: same numeric actor slot, new actor incarnation and
+    // session lease. An old pending RELEASE must not hijack the new occupant.
+    let boot = new_server_boot_nonce().expect("OS boot nonce");
+    let mut world = World::new(800.0, 600.0);
+    assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+    assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    let mut old = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, boot)
+        .expect("old admitted actor");
+    let old_life = old.binding().incarnation;
+    let press = encode_event(GestureEvent {
+        action: GestureAction::Press,
+        sequence: 1,
+        gesture_id: 1,
+        client_tick: u32::MAX,
+    })
+    .unwrap();
+    let release = encode_event(GestureEvent {
+        action: GestureAction::Release,
+        sequence: 2,
+        gesture_id: 1,
+        client_tick: u32::MAX,
+    })
+    .unwrap();
+    assert_eq!(
+        old.accept_under_world_lock(&mut world, LEASE, boot, &press)
+            .unwrap()
+            .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+    assert!(world.remove_player(1));
+    assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+    assert_ne!(world.fighter(1).unwrap().world_incarnation(), old_life);
+    let new_lease = LEASE + 1;
+    let mut current = SessionGestureWorldPath::from_admitted_world(
+        &world, 1, new_lease, boot
+    )
+    .expect("freshly admitted replacement");
+
+    let stale = old.accept_under_world_lock(&mut world, LEASE, boot, &release)
+        .expect("stale receipt");
+    assert_eq!(stale.status, AckStatus::Stale);
+    assert!(old.retired());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+    assert_eq!(
+        current.accept_under_world_lock(&mut world, new_lease, boot, &press)
+            .unwrap()
+            .status,
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        current.accept_under_world_lock(&mut world, new_lease, boot, &release)
+            .unwrap()
+            .status,
+        AckStatus::Accepted
+    );
+    let mut legitimate_hits = 0;
+    for _ in 0..55 {
+        for event in world.step() {
+            if let myaso_server::simulation::CombatEvent::Hit {
+                attacker: 1, target: 2, damage: 34, hp: 66,
+            } = event {
+                legitimate_hits += 1;
+            }
+        }
+        current.advance_under_world_lock(&mut world, new_lease, boot);
+    }
+    assert_eq!(legitimate_hits, 1, "only replacement's current attack lands");
+    assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+}
