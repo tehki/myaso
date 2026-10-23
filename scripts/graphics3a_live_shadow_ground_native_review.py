@@ -58,10 +58,12 @@ try:
   sessions.append(session)
   request("POST",f"/session/{session}/url",{"url":page},drv_port)
   for _ in range(90):
-   val=script(session,"const n=document.querySelector('[data-local-chat]');return {ok:n?.dataset.connected==='true',event:document.querySelector('#event-text')?.textContent};")
+   val=script(session,"const t=document.querySelector('#event-text')?.textContent||'';const m=t.match(/Online - player #([0-9]+) - server tick ([0-9]+)/);return {ok:!!m,playerId:m?Number(m[1]):null,serverTick:m?Number(m[2]):null,event:t};")
    if val.get("ok"):break
    time.sleep(.12)
   assert val.get("ok"),val
+  assert val.get("playerId")==i+1, "Native World actor ID must match the genuine WebTransport seat"
+  assert val.get("serverTick",0)>0, "Original authoritative server must be ticking"
   print("AUTHENTIC_PLAYER_JOINED",i+1,flush=True)
  inspect=r"""
 if(!window.__G3A_SHADOW_AUDIT__) {

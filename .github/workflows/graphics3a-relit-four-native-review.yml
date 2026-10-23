@@ -1,4 +1,4 @@
-name: Graphics 3A authentic Silver relight four-player native review (NONRELEASE)
+name: Main 0 Silver Knights original-world four-browser QA (NONRELEASE)
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - "web/online-game.mjs"
       - "web/assets/knights/review/**"
       - "tests/graphics3a-relit-source-select.test.mjs"
-      - "scripts/graphics3a_relight_four_native_review.mjs"
+      - "tools/art/main0_knights_four_native.mjs"
       - "scripts/graphics3a_live_shadow_ground_native_review.py"
       - "tests/graphics3a-ground-shadow-airborne.test.mjs"
       - ".github/workflows/graphics3a-relit-four-native-review.yml"
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify immutable original asset manifest and opt-in source contract
         run: |
-          node --check scripts/graphics3a_relight_four_native_review.mjs
+          node --check tools/art/main0_knights_four_native.mjs
           node --test tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-source-direction-correction.test.mjs tests/prealpha-silver-knight.test.mjs
           google-chrome --version
           firefox --version
@@ -32,13 +32,13 @@ jobs:
           geckodriver --version
       - name: Build genuine local authoritative Rust arena
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
-      - name: Real Chrome Firefox x4 relit Silver with native WASD chat and server actor roster
+      - name: Four genuine Chrome Firefox original World Silver WebP and roster, no Chat/terrain dependency
         env:
-          C1_BROWSER_MATRIX: chrome,firefox,chrome,chrome
-        run: timeout --signal=TERM --kill-after=5s 245s node scripts/graphics3a_relight_four_native_review.mjs
+          MYASO_KNIGHTS_NATIVE_BROWSERS: chrome,firefox,chrome,chrome
+        run: timeout --signal=TERM --kill-after=5s 245s node tools/art/main0_knights_four_native.mjs
   native-four-grounded-shadows:
-    # A distinct clean VM is essential: the preceding full Chrome+Firefox
-    # 4-seat Chat/crowd flight leaves browser and GPU processes under load.
+    # Separate VM prevents previous four native Chrome+Firefox browsers
+    # from biasing the genuine server-tick jump/landing and shadow audit.
     # This is NOT an optional/reduced gate: both native jobs must succeed.
     runs-on: ubuntu-latest
     timeout-minutes: 18
