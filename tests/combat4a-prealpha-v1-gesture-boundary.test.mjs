@@ -149,6 +149,9 @@ test("Combat 4A: online active LMB survives foreign pointerup and release remain
     now: () => clock, onLight: () => events.push("LIGHT"), onHeavy: () => events.push("HEAVY"),
   });
   leftButtonCharge.press(7);
+  assert.equal(leftButtonCharge.isActivePointer(12), false);
+  assert.equal(leftButtonCharge.isActivePointer(7), true);
+  assert.equal(leftButtonCharge.isActivePointer(undefined), false);
   const context = {
     leftButtonDown: true,
     leftButtonPressMovement: { moveX: 1 },
