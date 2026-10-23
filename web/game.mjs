@@ -166,10 +166,31 @@ function onChordedLeftMouseUp(event) {
 canvas.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("mouseup", onChordedLeftMouseUp);
 
+// W3C Pointer Events do not fire a second pointerdown or intermediate
+// pointerup for additional mouse buttons. A held LMB/RMB therefore requires
+// native mousedown/up edges to start and finish middle-button guard.
+const CHORDED_MIDDLE_POINTER_ID = -2;
+function onChordedMiddleMouseDown(event) {
+  if (event.button !== 1 || !(event.buttons & 4) || middleBlockPointerId !== null) return;
+  event.preventDefault();
+  canvas.focus();
+  middleBlockPointerId = CHORDED_MIDDLE_POINTER_ID;
+  middleBlockHeld = true;
+}
+function onChordedMiddleMouseUp(event) {
+  if (event.button !== 1 || (event.buttons & 4) || middleBlockPointerId === null) return;
+  middleBlockHeld = false;
+  middleBlockPointerId = null;
+}
+canvas.addEventListener("mousedown", onChordedMiddleMouseDown);
+canvas.addEventListener("mouseup", onChordedMiddleMouseUp);
+window.addEventListener("mouseup", onChordedMiddleMouseUp);
+
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   // W3C pointercancel can report button=-1: identify the held middle pointer.
-  if (middleBlockPointerId === event.pointerId) {
+  if (middleBlockPointerId === event.pointerId
+    || (middleBlockPointerId === CHORDED_MIDDLE_POINTER_ID && event.pointerType === "mouse")) {
     middleBlockHeld = false;
     middleBlockPointerId = null;
   }
@@ -179,6 +200,10 @@ canvas.addEventListener("pointercancel", (event) => {
 canvas.addEventListener("lostpointercapture", (event) => {
   // Do not drop a physically held MMB when only capture ownership changes.
   if (middleBlockPointerId === event.pointerId && !(event.buttons & 4)) {
+    middleBlockHeld = false;
+    middleBlockPointerId = null;
+  } else if (middleBlockPointerId === CHORDED_MIDDLE_POINTER_ID
+    && event.pointerType === "mouse" && !(event.buttons & 4)) {
     middleBlockHeld = false;
     middleBlockPointerId = null;
   }
