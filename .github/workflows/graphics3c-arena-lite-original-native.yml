@@ -8,6 +8,7 @@ on:
       - "src/browser/prealpha-arena-lite-floor.mjs"
       - "src/browser/prealpha-arena-lite-selection.mjs"
       - "tools/art/verify_pre_alpha_arena_lite_real_game.mjs"
+      - "tools/art/check_pre_alpha_arena_lite_native_matrix.mjs"
   workflow_dispatch:
 
 permissions:
@@ -33,6 +34,7 @@ jobs:
         run: |
           node --version
           node --check tools/art/verify_pre_alpha_arena_lite_real_game.mjs
+          node --check tools/art/check_pre_alpha_arena_lite_native_matrix.mjs
           node --check web/online-game.mjs
           node --test tests/prealpha-arena-lite-floor.test.mjs tests/prealpha-arena-lite-optin.test.mjs
       - name: Verify native engines and original Rust availability
@@ -46,17 +48,19 @@ jobs:
         env:
           MYASO_ARENA_LITE_CARGO_OFFLINE: "0"
           MYASO_ARENA_LITE_NATIVE_BROWSERS: "chrome,firefox,chrome,firefox"
-          MYASO_ARENA_LITE_NATIVE_OUT: "alpha-p0-arena-lite-original-game-native"
+          MYASO_ARENA_LITE_NATIVE_OUT: "alpha-p0-arena-lite-original-game-native/normal"
           MYASO_ARENA_LITE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p alpha-p0-arena-lite-original-game-native
           timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_pre_alpha_arena_lite_real_game.mjs
+          MYASO_ARENA_LITE_INVERT_MODE=1 MYASO_ARENA_LITE_NATIVE_OUT=alpha-p0-arena-lite-original-game-native/inverted timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_pre_alpha_arena_lite_real_game.mjs
+          node tools/art/check_pre_alpha_arena_lite_native_matrix.mjs alpha-p0-arena-lite-original-game-native/normal alpha-p0-arena-lite-original-game-native/inverted
       - name: Upload authentic in-game Canvas/page PNGs and SHA report
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: graphics3c-arena-lite-original-four-player-chrome-firefox
-          path: alpha-p0-arena-lite-original-game-native/*
+          path: alpha-p0-arena-lite-original-game-native/**
           if-no-files-found: ignore
           retention-days: 7

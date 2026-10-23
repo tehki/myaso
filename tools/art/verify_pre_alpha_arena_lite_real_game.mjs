@@ -13,6 +13,9 @@ const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_ARENA_LITE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
+const invertMode=process.env.MYASO_ARENA_LITE_INVERT_MODE||"0";
+assert.ok(invertMode==="0"||invertMode==="1","explicit mode inversion must be 0 or 1");
+
 const output=resolve(process.env.MYASO_ARENA_LITE_NATIVE_OUT||join(root,".artifacts","arena-lite-real-game"));
 const sha=x=>createHash("sha256").update(x).digest("hex");
 const sleeps=ms=>delay(ms);
@@ -102,7 +105,7 @@ try{
  const {url:rustUrl,cert}=await startOriginalRust(),host=await startStatic();
  const actors=[];
  for(let i=0;i<4;i++){
-  const s=await startW3C(engines[i],i);const flag=i%2===0?"1":"0";
+  const s=await startW3C(engines[i],i);const flag=(i%2===0)!==(invertMode==="1")?"1":"0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);if(flag==="1")u.searchParams.set("arenaLite","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
@@ -123,17 +126,31 @@ try{
   const bytes=Buffer.from(image,"base64");assert.ok(bytes.length>1000&&bytes.subarray(0,4).equals(Buffer.from([137,80,78,71])),"genuine W3C PNG");
   const name=s.engine+"-"+s.index+"-"+(flag==="1"?"lite":"grid")+".png";
   await writeFile(join(output,name),bytes);
-  trial.push({browser:s.engine,actorId:actor.id,mode:flag==="1"?"lite":"grid",data,screenshot:name,pngSha256:sha(bytes)});
+  // Capture actual original client Canvas pixels, not the cropped browser viewport.
+  // W3C screenshots above remain unchanged as contextual UI/HUD evidence.
+  const canvasData=await evaluate(s,"return document.querySelector('#arena')?.toDataURL('image/png')||null;");
+  assert.ok(typeof canvasData==="string"&&canvasData.startsWith("data:image/png;base64,"),"genuine same-origin original 960x540 Canvas PNG required");
+  const canvasBytes=Buffer.from(canvasData.slice("data:image/png;base64,".length),"base64");
+  assert.ok(canvasBytes.length>1500&&canvasBytes.subarray(0,4).equals(Buffer.from([137,80,78,71])),"genuine full original game Canvas bytes required");
+  const canvasName="canvas-"+name;
+  await writeFile(join(output,canvasName),canvasBytes);
+  trial.push({browser:s.engine,actorId:actor.id,mode:flag==="1"?"lite":"grid",data,
+    screenshot:name,pngSha256:sha(bytes),fullCanvasScreenshot:canvasName,
+    fullCanvasSha256:sha(canvasBytes),fullCanvasBytes:canvasBytes.length});
  }
  const original=trial.filter(x=>x.mode==="grid").map(x=>x.data.floor.centerLuminance);
  const optional=trial.filter(x=>x.mode==="lite").map(x=>x.data.floor.centerLuminance);
  assert.ok(Math.min(...optional)>Math.max(...original)+12,"same-server native ground source actually changed");
+ const originalClientSource=await readFile(join(root,"web","online-game.mjs"),"utf8");
+ const originalAbstractFighters=originalClientSource.includes("ctx.arc(0, 0, COMBAT.fighterRadius")
+   && !originalClientSource.includes("createKnightSpriteRenderer");
  const report={sourceCommit:process.env.MYASO_ARENA_LITE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:4,independentPhysicalHumanHosts:false,
+  sourceArenaHasOriginalAbstractFightersOnly:originalAbstractFighters,modeInverted:invertMode==="1",
   authenticSilverKnightIntegrationVerified:false,modeIsOptional:true,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,trials:trial};
  await writeFile(join(output,"arena-lite-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
- console.log("ARENA_LITE_ORIGINAL_GAME_QUIC_W3C "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms})),screenshots:trial.map(x=>x.screenshot)}));
+ console.log("ARENA_LITE_ORIGINAL_GAME_QUIC_W3C "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms})),screenshots:trial.map(x=>x.screenshot),fullCanvases:trial.map(x=>x.fullCanvasScreenshot)}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}
