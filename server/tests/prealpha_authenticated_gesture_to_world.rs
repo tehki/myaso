@@ -1763,3 +1763,44 @@ fn release_only_keye_real_death_respawn_stales_old_release_and_allows_fresh_heav
     assert_eq!(fresh_hits, vec![(46, 54)]);
     assert!(old_target.retired());
 }
+
+#[test]
+fn fail_first_same_quic_regrant_must_not_admit_prior_incarnation_0x11_event() {
+    // This is a prospective protocol-security gate, NOT a claim that the
+    // current server regrants v2 on the same connection. It does NOT.
+    // Demonstrate why server-only lease rotation cannot be enabled without
+    // explicit per-packet generation (or a completely fresh QUIC transport).
+    let mut observed = Vec::new();
+    for source in [GestureSource::Lmb, GestureSource::KeyE] {
+        let mut world = arena();
+        let mut old = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+        let original_life = old.binding().incarnation;
+
+        // Packet bytes were queued by the old authenticated connection BEFORE
+        // this fighter was replaced, and have never yet reached its World.
+        let delayed_old_packet = edge(source, GestureAction::Press, 1, 1);
+        assert_eq!(delayed_old_packet.len(), 16);
+        assert!(world.remove_player(1));
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert_ne!(world.fighter(1).unwrap().world_incarnation(), original_life);
+        old.advance_under_world_lock(&mut world, LEASE, BOOT);
+        assert!(old.retired());
+
+        // Simulate the UNSAFE proposed same-QUIC "fresh grant" using a
+        // distinct server-only lease, but the unchanged old 16-byte datagram.
+        // No real server accepts this in-band regrant today. This must be
+        // rejected BEFORE any future implementation permits that transition.
+        let fresh_lease = LEASE + 1;
+        let mut tentative =
+            SessionGestureWorldPath::from_admitted_world(&world, 1, fresh_lease, BOOT).unwrap();
+        let received = tentative
+            .accept_under_world_lock(&mut world, fresh_lease, BOOT, &delayed_old_packet)
+            .expect("well-formed old datagram has a server response");
+        observed.push(received.status);
+    }
+    assert_eq!(
+        observed,
+        vec![AckStatus::Stale, AckStatus::Stale],
+        "UNSAFE TO REGRANT SAME QUIC: unversioned old LMB/KeyE PRESS can appear fresh. Require a newly authenticated transport OR explicit authenticated generation bytes and one bounded shared outbox reset before adding any in-band regrant."
+    );
+}
