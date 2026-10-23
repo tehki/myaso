@@ -34,9 +34,11 @@ test("4D browser success feedback cannot substitute for a genuine trusted wheel"
 });
 test("4D a hypothetical on-time dodge is not auto-classified as public PASS", () => {
   const future = structuredClone(witness);
-  const entry = future.authoritative_server_events.find(e => e.kind === "hit");
-  entry.source = entry.source.replace("tick=280", "tick=284");
-  entry.tick = 284;
+  for (const entry of future.authoritative_server_events.filter(e =>
+    e.kind === "hit" || (e.kind === "action" && e.actor === 2 && e.to === 10))) {
+    entry.source = entry.source.replace("tick=280", "tick=284");
+    entry.tick = 284;
+  }
   // keep chronology sorted for this pure evidence-contract test
   future.authoritative_server_events.sort((a, b) => a.tick - b.tick);
   assert.equal(assessM107Witness(future).status, "NOT QUALIFIED");
