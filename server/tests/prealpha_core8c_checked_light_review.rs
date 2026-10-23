@@ -63,7 +63,6 @@ fn stale_ownership_cannot_apply_queued_gesture_to_replacement() {
     assert!(!owner.world().fighter(1).unwrap().input().attack);
 }
 
-
 #[test]
 fn canceled_same_tick_gesture_cannot_stage_an_unintended_attack() {
     let mut world = World::default();
