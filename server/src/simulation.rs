@@ -2389,6 +2389,140 @@ mod r2_combat_control_tests {
         assert_eq!(seen, [62.0, 24.0, 0.0]);
     }
 
+    // M193/M194 native negative: after two valid -38 guard blocks, a later
+    // Firefox block that is still within the 125ms server parry phase MUST
+    // parry the third admitted light, not count a phantom guard break.
+    #[test]
+    fn m193_third_attack_inside_parry_window_never_completes_guard_break() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+        for expected_guard in [62.0, 24.0] {
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    block: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut block_events = 0;
+            for _ in 0..16 {
+                let events = world.step();
+                block_events += events
+                    .iter()
+                    .filter(|event| {
+                        matches!(
+                            event,
+                            CombatEvent::Block {
+                                attacker: 1,
+                                target: 2
+                            }
+                        )
+                    })
+                    .count();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Parry { .. }
+                        | CombatEvent::GuardBreak { .. }
+                        | CombatEvent::Hit { .. }
+                )));
+                if block_events > 0 {
+                    break;
+                }
+            }
+            assert_eq!(block_events, 1);
+            assert_eq!(world.fighter(2).unwrap().guard, expected_guard);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            assert!(world.set_input(1, InputIntent::default()));
+            assert!(world.set_input(
+                2,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..40 {
+                let events = world.step();
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Parry { .. }
+                        | CombatEvent::GuardBreak { .. }
+                        | CombatEvent::Hit { .. }
+                        | CombatEvent::Block { .. }
+                )));
+                if world.fighter(1).unwrap().action == Action::Idle {
+                    break;
+                }
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(world.fighter(2).unwrap().action, Action::Idle);
+        }
+        assert_eq!(world.fighter(2).unwrap().guard, 24.0);
+
+        // Attacker first enters its genuine 135ms light windup; defender
+        // blocks two World ticks later, leaving only ~100ms to impact.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        let mut parries = 0;
+        for _ in 0..16 {
+            let events = world.step();
+            parries += events
+                .iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        CombatEvent::Parry {
+                            attacker: 1,
+                            target: 2
+                        }
+                    )
+                })
+                .count();
+            assert!(!events.iter().any(|event| matches!(
+                event,
+                CombatEvent::GuardBreak { .. }
+                    | CombatEvent::Block { .. }
+                    | CombatEvent::Hit { .. }
+            )));
+            if parries > 0 {
+                break;
+            }
+        }
+        assert_eq!(
+            parries, 1,
+            "a valid server parry is never an M193 guarded hit"
+        );
+        assert_eq!(world.fighter(2).unwrap().guard, 24.0);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
+    }
+
     // M107: a genuine authoritative dodge MUST already exist at contact.
     // A real heavy HIT at tick T cannot be reversed by a later dodge at T+1;
     // nor can the same heavy advertise a server Evade after its one HIT.
