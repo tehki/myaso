@@ -9774,15 +9774,14 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // that WAIT, but require the actual event to precede Chrome release
         // (read-only epoch evidence below), and require the wheel W3C ACK.
         // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
+        // QA-only M194 alternative uses a trusted real Firefox wheel
+        // 35ms ahead of Chrome LMB; original World parry/block is unchanged.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
           // M194 main-push #39453669647: the actual trusted Firefox wheel
           // arrived after the fixed 100ms Chrome release on attempt 5/5.
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
-          // M194 review: actual Firefox wheel-back attests first; then one
-          // real Chrome LMB down/up. The ORIGINAL World must independently
-          // confirm -38 guard/100HP/zero parry, else strict M194 still fails.
           preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
