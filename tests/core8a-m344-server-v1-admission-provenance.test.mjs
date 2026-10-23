@@ -39,7 +39,8 @@ test("genuine v1 packet gets decoded, ingested and selected before original Worl
 });
 
 test("M156 Rust loopback adds original 60Hz Combat action witness; other cases unaffected",()=>{
-  assert.match(runner,/MYASO_FLIGHT_ACTION_PROOF: \(scenario === "uirollknockdownffahit"/);
+  assert.match(runner,/MYASO_FLIGHT_ACTION_PROOF: \(scenario === "uiguardbreakpunishffahit"[\s\S]*?\|\| scenario === "uirollknockdownffahit"/,
+    "M206 protected original prefix stays adjacent; M156 adds only read-only World proof");
   assert.match(rust,/M201_AUTH_ACTION tick=/);
   assert.match(rust,/M201_AUTH_HIT tick=/);
   assert.match(rust,/M344_V1_RX/);
