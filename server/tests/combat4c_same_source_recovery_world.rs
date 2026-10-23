@@ -349,3 +349,86 @@ fn older_keye_terminal_must_not_unlock_a_newer_held_lmb_world_owner() {
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 20)]);
     assert_eq!(w.fighter(2).unwrap().hp, 20.0);
 }
+
+#[test]
+fn original_physical_hold_stays_owned_after_world_returns_idle() {
+    // World 60Hz recovery is NOT an authenticated physical RELEASE.
+    // A second same-source PRESS cannot be manufactured just because the
+    // previous World strike fully completed while original key/button is held.
+    for source in [GestureSource::Lmb, GestureSource::KeyE] {
+        let mut w = arena();
+        let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 1, 1),
+            AckStatus::Accepted
+        );
+        let first = if source == GestureSource::Lmb {
+            vec![(34, 66)]
+        } else {
+            vec![(46, 54)]
+        };
+        assert_eq!(hits(&mut p, &mut w, 55), first);
+        assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 2, 2),
+            AckStatus::Rejected,
+            "World returning Idle must NOT impersonate physical source1/0 terminal"
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Release, 2, 1),
+            AckStatus::Accepted,
+            "a forged second PRESS may not consume the original matching release"
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Press, 3, 2),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(&mut p, &mut w, source, GestureAction::Release, 4, 2),
+            AckStatus::Accepted
+        );
+        let next = if source == GestureSource::Lmb {
+            vec![(34, 32)]
+        } else {
+            vec![(46, 8)]
+        };
+        assert_eq!(hits(&mut p, &mut w, 55), next);
+    }
+}
+
+#[test]
+fn earlier_held_lmb_cannot_be_pressed_again_during_newer_keye_world_action() {
+    // Source0 LMB physically held: original light lands without a RELEASE.
+    // Independent source1 may later become a real World heavy owner, but a
+    // forged second LMB DOWN must still be rejected (not no-combat ACK).
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Press, 2, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+
+    assert_eq!(
+        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Press, 3, 3),
+        AckStatus::Rejected,
+        "independent KeyE World ownership must not release earlier held LMB"
+    );
+    assert_eq!(
+        admit(&mut p, &mut w, GestureSource::Lmb, GestureAction::Release, 3, 1),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(&mut p, &mut w, GestureSource::KeyE, GestureAction::Release, 4, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 20)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+}
