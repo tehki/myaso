@@ -90,6 +90,16 @@ Recorded exact runner error / browser transitions: [qa/evidence/m121-run-3993813
 
 **Routing:** 4A/8A compare true W3C held-strafe and LMB submission lifetime with original World input/attack state; UI10 validates HUD and recovery cues from original server lane; 4B checks server action and coalescing, 4D independently retains red and reenacts only as unwaived exact-head QA.
 
+## Exact native M172/M173 stamina-confirmation race — 2026-10-23
+
+Latest test-only Combat4D #865 exact head `f4b7016214ce7ca4d2808a248426451abbdaa7b7` protected [quality #39942285919](https://github.com/tehki/myaso/actions/runs/39942285919) job `120376453404` **FAILED** at step `Validate M173 confirmed jump-attack chord denial`, within the original **M172 confirmed airborne jump-attack denial** subphase. Its original 4D evidence-integrity step passed and does **not** override the protected native red result.
+
+**Actual original online Chrome + Firefox evidence:** prior first actor real Space+LMB executed original jump attack 16→17→18 and exactly one 42HP hit. In the follow-up low-stamina phase, the original fighter1 ordinary Jump15 began **server tick570**; authoritative stamina had reached 10 after the genuine 14-stamina jump expenditure. The W3C LMB at Chrome epoch `1792753704940` produced a **queued** `jump-attack` at stamina10, then **submitted** client tick346 at epoch `1792753704954`. The eventual original server-acknowledged snapshot at processed client tick361, server tick594, had **stamina12** after ordinary regeneration and `authoritativeAction:0`; the original client correctly staged `confirmed-not-stamina`, **not** `confirmed-rejected`, and no required `Low stamina — jump attack needs 12.` display occurred. No false 42HP airborne conversion is asserted. Native M172 timed out, exactly as [existing issue #604](https://github.com/tehki/myaso/issues/604) describes.
+
+This records a real *test setup / confirmation window timing sensitivity*, **not** proof of an original server bug, fake or lost ACK, or reason to change 14/12 stamina costs, 135ms combat window, or relax denied-feedback lifecycle. To qualify, Combat4A/4B/UI10 must establish genuine W3C jump-only stamina setup and confirm sub-cost authority at the server snapshot; 4D must retain the original queued→submitted→confirmed-rejected→shown chain under real native Chrome/Firefox on an integrated exact head. The original M173 later subphase was **not executed**, because prerequisite M172 failed first. Never report M173's own chord as tested on this run.
+
+Recorded original client trace: [qa/evidence/m172-run-39942285919.json](../qa/evidence/m172-run-39942285919.json). `node scripts/combat4d-m172-proof.mjs qa/evidence/m172-run-39942285919.json` checks the original 10→12 and 346→361 acknowledgement timeline and intentionally prints **HOLD**. Its seven negative tests refuse a fabricated low-stamina outcome, wrong actor, W3C gestures, original server ticks, and a fake successful protected job. Offline fixture integrity PASS is never true game certification and does not authenticate GitHub by itself; independently verify the exact source run and immutable logs.
+
 ## Known runnable entry points
 
 ~~~bash
