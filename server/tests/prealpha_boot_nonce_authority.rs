@@ -179,12 +179,11 @@ fn delayed_old_lease_release_cannot_attack_replacement_with_reused_numeric_actor
     assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
     assert_ne!(world.fighter(1).unwrap().world_incarnation(), old_life);
     let new_lease = LEASE + 1;
-    let mut current = SessionGestureWorldPath::from_admitted_world(
-        &world, 1, new_lease, boot
-    )
-    .expect("freshly admitted replacement");
+    let mut current = SessionGestureWorldPath::from_admitted_world(&world, 1, new_lease, boot)
+        .expect("freshly admitted replacement");
 
-    let stale = old.accept_under_world_lock(&mut world, LEASE, boot, &release)
+    let stale = old
+        .accept_under_world_lock(&mut world, LEASE, boot, &release)
         .expect("stale receipt");
     assert_eq!(stale.status, AckStatus::Stale);
     assert!(old.retired());
@@ -192,13 +191,15 @@ fn delayed_old_lease_release_cannot_attack_replacement_with_reused_numeric_actor
     assert_eq!(world.fighter(2).unwrap().hp, 100.0);
 
     assert_eq!(
-        current.accept_under_world_lock(&mut world, new_lease, boot, &press)
+        current
+            .accept_under_world_lock(&mut world, new_lease, boot, &press)
             .unwrap()
             .status,
         AckStatus::Accepted
     );
     assert_eq!(
-        current.accept_under_world_lock(&mut world, new_lease, boot, &release)
+        current
+            .accept_under_world_lock(&mut world, new_lease, boot, &release)
             .unwrap()
             .status,
         AckStatus::Accepted
@@ -207,13 +208,20 @@ fn delayed_old_lease_release_cannot_attack_replacement_with_reused_numeric_actor
     for _ in 0..55 {
         for event in world.step() {
             if let myaso_server::simulation::CombatEvent::Hit {
-                attacker: 1, target: 2, damage: 34, hp: 66,
-            } = event {
+                attacker: 1,
+                target: 2,
+                damage: 34,
+                hp: 66,
+            } = event
+            {
                 legitimate_hits += 1;
             }
         }
         current.advance_under_world_lock(&mut world, new_lease, boot);
     }
-    assert_eq!(legitimate_hits, 1, "only replacement's current attack lands");
+    assert_eq!(
+        legitimate_hits, 1,
+        "only replacement's current attack lands"
+    );
     assert_eq!(world.fighter(2).unwrap().hp, 66.0);
 }
