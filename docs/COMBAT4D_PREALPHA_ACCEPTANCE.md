@@ -40,6 +40,19 @@ For a real PASS report, each record must provide: candidate_sha, outcome PASS, i
 - Historical genuine failures requiring exact-candidate regression: [M144 #392](https://github.com/tehki/myaso/issues/392) missing jump attack, [M155 #591](https://github.com/tehki/myaso/issues/591) punish on victim recovery tick, [M156 #531](https://github.com/tehki/myaso/issues/531) very short light classified heavy, [M194 #298](https://github.com/tehki/myaso/issues/298) missed block loses 34HP, [M41 #402](https://github.com/tehki/myaso/issues/402) late parry loses 34HP, and [M171 #245](https://github.com/tehki/myaso/issues/245) failed feint hit. Their old failed runs must not be erased by an unrelated green run.
 - Experimental PRs [#841](https://github.com/tehki/myaso/pull/841), [#848](https://github.com/tehki/myaso/pull/848), [#858](https://github.com/tehki/myaso/pull/858), [#860](https://github.com/tehki/myaso/pull/860), [#859](https://github.com/tehki/myaso/pull/859), [#861](https://github.com/tehki/myaso/pull/861) and [#862](https://github.com/tehki/myaso/pull/862) are draft/nonrelease proposals. Isolated tests do not qualify a combined playable exact head.
 
+## Independent native M107 failure captured on 2026-10-23
+
+On isolated QA PR #865 at `1d4c165ee10d68509edb9d80f07e138f4f009d89`, exact-head protected [CI #39930443888](https://github.com/tehki/myaso/actions/runs/39930443888) **FAILED** at step 20, `Validate M107 real heavy counterplay`. Original real native Chrome/Firefox evidence from job `120337091363`:
+
+- Rust original World: fighter2 HeavyWindup tick 261; HeavyActive and **46HP contact tick 280** against fighter1, defender HP 100→54.
+- Fighter1 starts Dodge only **tick 282**, two authoritative ticks after the hit; Dodge recovery tick 292.
+- Chrome defender's same-client feedback chronology: `Hit taken - 46 HP.` then `Dodge! Strike avoided.`; final HP 54, stamina 72.
+- Thus the dodge was too late **and** readability incorrectly suggested success after an actual committed hit. It is not a missing frontend redraw, a synthetic client action, or a proven packet loss. Do not infer root cause solely from this run.
+
+The exact transcribed source lines, GitHub job ID and native client observations are retained in [qa/evidence/m107-run-39930443888.json](../qa/evidence/m107-run-39930443888.json). `node scripts/combat4d-m107-proof.mjs qa/evidence/m107-run-39930443888.json` verifies log/field consistency and emits **HOLD**. Tests also reject missing trusted input, falsified event records, unsorted server ticks and retrospective success. This evidence integrity check itself can pass while gameplay M107 legitimately stays red.
+
+**Routing:** 4A/Core8A own physical wheel admission/30Hz scheduling investigation; UI10/Combat4 own post-contact dodge-success suppression; 4B/Physics6 verify original World action/timing only if further evidence implicates them. Draft [#851](https://github.com/tehki/myaso/pull/851) proposes truthful contact feedback; [#854](https://github.com/tehki/myaso/pull/854) proposes immediate physical-wheel admission. Neither experimental proposal qualifies this separate exact candidate or the full Pre-Alpha.
+
 ## Known runnable entry points
 
 ~~~bash
