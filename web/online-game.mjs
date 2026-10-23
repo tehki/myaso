@@ -761,19 +761,24 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M336/M156: read-only, scenario-scoped evidence of packets submitted
-    // by the genuine 30Hz sender. A 5-7ms W3C tap can cross one sample and
-    // yield combined attack+heavyAttack HOLD before the LMB release pulse.
-    // Retain neutral post-release samples for M156 so an absent light pulse
-    // cannot be mistaken for an original server/World combat classification.
-    // This never adds, resends, alters or delays an actual network input.
+    // M336/M156/M205: acceptance-only observation of real 30Hz sender packets.
+    // M205's genuine W3C wheel may reach original World Block fewer than
+    // 125ms before a true LightActive; only original server ticks decide
+    // Parry vs 38-guard Block. Keep the actual wheel-window and sampled
+    // block bits visible to QA, including following neutral sends.
+    // Never fabricate input, alter packet bytes, resend or change timing.
     const m156NativeInputTrace = acceptanceScenario === "uirollknockdownffahit";
-    if (acceptanceScenario === "uimultirecoveryspatial" || m156NativeInputTrace) {
+    const m205NativeBlockTrace = acceptanceScenario === "uiguardbreakpunishffahit"
+      || acceptanceScenario === "uiguardbreak"
+      || acceptanceScenario === "uiguardbreaktell";
+    if (acceptanceScenario === "uimultirecoveryspatial"
+      || m156NativeInputTrace || m205NativeBlockTrace) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (m156NativeInputTrace || currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        if (m156NativeInputTrace || m205NativeBlockTrace
+          || currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
@@ -786,8 +791,14 @@ function simulatePrediction(stepMs) {
               pendingLight: attackRequested,
               pendingHeavy: heavyAttackRequested,
             } : {}),
+            ...(m205NativeBlockTrace ? {
+              block: Boolean(currentInput.block),
+              wheelBlockRemainingMs: Math.max(0,
+                Math.round(shortBlockUntil - performance.now())),
+            } : {}),
           });
-          if (debug.inputSubmissions.length > (m156NativeInputTrace ? 64 : 32)) {
+          const maxEntries = m156NativeInputTrace || m205NativeBlockTrace ? 64 : 32;
+          if (debug.inputSubmissions.length > maxEntries) {
             debug.inputSubmissions.shift();
           }
         }
