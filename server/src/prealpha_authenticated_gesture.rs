@@ -313,8 +313,10 @@ impl SessionGestureWorldPath {
                         if event.action == GestureAction::Press {
                             self.world_source = Some(GestureSource::Lmb);
                             self.world_source_terminal = false;
-                        } else if matches!(event.action, GestureAction::Release | GestureAction::Cancel)
-                            && self.world_source == Some(GestureSource::Lmb)
+                        } else if matches!(
+                            event.action,
+                            GestureAction::Release | GestureAction::Cancel
+                        ) && self.world_source == Some(GestureSource::Lmb)
                         {
                             self.world_source_terminal = true;
                         }
