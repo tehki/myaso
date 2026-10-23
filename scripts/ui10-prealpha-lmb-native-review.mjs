@@ -168,6 +168,10 @@ try{
   assert.equal(keySolo.keySnapshot.active,false);
   await nav();
   await run([move(),down]);
+  // The original game focuses its canvas on pointerdown; this isolated QA
+  // fixture has no game input handler, so reproduce that focus boundary.
+  await evaluate("document.querySelector('#arena').focus()");
+  assert.equal(await evaluate("return document.activeElement?.id"),"arena");
   await pressE();
   const chord=await evaluate("return ui10.report()");
   assert.deepEqual(chord.keyEdges.map(e=>[e.source,e.action]),[[1,1],[1,3]]);
