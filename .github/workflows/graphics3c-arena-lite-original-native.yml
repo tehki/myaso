@@ -19,8 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
-      - name: Checkout exact original source
+      - name: Checkout exact original PR head (never temporary merge SHA)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify test source is exactly the requested branch head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --check
       - name: Original source and bounded test-only native QA contract
         run: |
           node --version
@@ -39,7 +47,7 @@ jobs:
           MYASO_ARENA_LITE_CARGO_OFFLINE: "0"
           MYASO_ARENA_LITE_NATIVE_BROWSERS: "chrome,firefox,chrome,firefox"
           MYASO_ARENA_LITE_NATIVE_OUT: "alpha-p0-arena-lite-original-game-native"
-          MYASO_ARENA_LITE_SOURCE_SHA: ${{ github.sha }}
+          MYASO_ARENA_LITE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p alpha-p0-arena-lite-original-game-native
           timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_pre_alpha_arena_lite_real_game.mjs
