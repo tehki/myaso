@@ -48,6 +48,11 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      - name: Validate Combat 4A legacy gesture boundary witnesses
+        run: |
+          node --check tests/combat4a-prealpha-v1-gesture-boundary.test.mjs
+          node --test tests/combat4a-prealpha-v1-gesture-boundary.test.mjs
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
