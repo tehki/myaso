@@ -931,8 +931,235 @@ fn later_keye_press_cannot_overtake_lost_earlier_lmb_press_on_same_lease() {
             2,
             2
         ),
-        AckStatus::Rejected,
-        "standalone heavy cannot interrupt a real current light windup"
+        AckStatus::Accepted,
+        "ordered busy KeyE is admitted as transport-only, never a second heavy"
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            3,
+            2
+        ),
+        AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
+}
+
+#[test]
+fn independent_keye_busy_press_cannot_retire_original_lmb_or_start_heavy() {
+    let mut w = arena();
+    let mut path = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Accepted,
+        "valid distinct KeyE while LMB busy is a noncombat transport receipt"
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            2
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(advance(&mut path, &mut w, 55), vec![(34, 66)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    // Neither the admitted busy KeyE nor its duplicate can suppress a later light.
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            5,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            6,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut path, &mut w, 55), vec![(34, 32)]);
+}
+
+#[test]
+fn independent_lmb_busy_press_cannot_start_light_during_keye_heavy() {
+    let mut w = arena();
+    let mut path = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            4,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut path, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            2
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+}
+
+#[test]
+fn cross_source_spoof_terminal_stays_rejected_and_world_unchanged() {
+    let mut w = arena();
+    let mut path = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    // Fatal spoof is rejected without consuming legitimate per-lease seq2:
+    // source0 terminal still applies if presented by an authenticated peer.
+    assert_eq!(
+        admit(
+            &mut path,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut path, &mut w, 55), vec![(34, 66)]);
 }

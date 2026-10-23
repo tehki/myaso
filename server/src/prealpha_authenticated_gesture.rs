@@ -5,8 +5,8 @@
 //! holding the live GameState/World mutex, with no await between checks & hit.
 use crate::prealpha_lmb_gesture_authority::{Command, Disposition, GestureAuthority};
 use crate::prealpha_lmb_gesture_proposal::{
-    decode_typed_event, AckStatus, GestureAck, GestureAction, GestureEvent, GestureSource, BYTES,
-    EVENT_TYPE, VERSION,
+    decode_typed_event, AckStatus, GestureAck, GestureAction, GestureEvent, GestureSource,
+    TypedGestureEvent, BYTES, EVENT_TYPE, VERSION,
 };
 use crate::simulation::{Action, World};
 use std::collections::VecDeque;
@@ -32,6 +32,11 @@ pub struct SessionGestureWorldPath {
     keye_active_id: Option<u32>,
     keye_terminal: bool,
     keye_accepted: VecDeque<GestureEvent>,
+    // A physically distinct source may press while the other owns World combat.
+    // Consume those edges as transport-only, never as a second World action.
+    world_source: Option<GestureSource>,
+    busy_source: Option<(GestureSource, u32)>,
+    busy_accepted: VecDeque<TypedGestureEvent>,
 }
 
 impl SessionGestureWorldPath {
@@ -65,6 +70,9 @@ impl SessionGestureWorldPath {
             keye_active_id: None,
             keye_terminal: false,
             keye_accepted: VecDeque::with_capacity(64),
+            world_source: None,
+            busy_source: None,
+            busy_accepted: VecDeque::with_capacity(64),
         })
     }
 
@@ -104,6 +112,7 @@ impl SessionGestureWorldPath {
                 if !world.apply_review_only_keye_press(self.binding.player_id) {
                     return Some(AckStatus::Rejected);
                 }
+                self.world_source = Some(GestureSource::KeyE);
                 self.keye_active_id = Some(event.gesture_id);
                 self.keye_terminal = false;
                 self.highest_gesture_id = event.gesture_id;
@@ -132,6 +141,58 @@ impl SessionGestureWorldPath {
         Some(AckStatus::Accepted)
     }
 
+    /// A valid independent physical source may arrive while the original
+    /// World is executing the OTHER source's action. Accept that source's
+    /// contiguous input as *no-combat* receipt, not as a second strike.
+    /// The original 0x12 ACCEPTED status confirms input admission only.
+    fn admit_busy_source(&mut self, world: &World, typed: TypedGestureEvent) -> Option<AckStatus> {
+        let event = typed.event;
+        if self.busy_accepted.iter().any(|previous| *previous == typed) {
+            return Some(AckStatus::Duplicate);
+        }
+        if event.sequence <= self.highest_sequence {
+            return Some(AckStatus::Stale);
+        }
+        let busy = self.busy_source;
+        let valid = match event.action {
+            GestureAction::Press => {
+                if busy.is_some()
+                    || self.world_source
+                        != Some(match typed.source {
+                            GestureSource::Lmb => GestureSource::KeyE,
+                            GestureSource::KeyE => GestureSource::Lmb,
+                        })
+                    || event.gesture_id <= self.highest_gesture_id
+                    || !world
+                        .fighter(self.binding.player_id)
+                        .is_some_and(|fighter| fighter.action != Action::Idle)
+                {
+                    return None;
+                }
+                self.busy_source = Some((typed.source, event.gesture_id));
+                self.highest_gesture_id = event.gesture_id;
+                true
+            }
+            GestureAction::Release | GestureAction::Cancel => {
+                if busy != Some((typed.source, event.gesture_id)) {
+                    return None;
+                }
+                self.busy_source = None;
+                true
+            }
+            GestureAction::Upgrade => false,
+        };
+        if !valid {
+            return None;
+        }
+        self.highest_sequence = event.sequence;
+        self.busy_accepted.push_back(typed);
+        if self.busy_accepted.len() > 64 {
+            self.busy_accepted.pop_front();
+        }
+        Some(AckStatus::Accepted)
+    }
+
     /// Called synchronously under original GameState/World mutex, not after
     /// unlocking or by a transport ACK handler. Returns real World tick ACK.
     /// Source0 LMB and source1 KeyE share the same session lease, monotonic
@@ -155,6 +216,26 @@ impl SessionGestureWorldPath {
             // (or later LMB event) first and permanently stale the earlier
             // valid gesture. Withhold ACK so the same bounded outbox retries.
             return None;
+        } else if let Some(previous) = self
+            .busy_accepted
+            .iter()
+            .find(|previous| previous.event.sequence == event.sequence)
+        {
+            if *previous == typed {
+                AckStatus::Duplicate
+            } else {
+                AckStatus::Stale
+            }
+        } else if (self.busy_source == Some((typed.source, event.gesture_id))
+            && matches!(event.action, GestureAction::Release | GestureAction::Cancel))
+            || (event.action == GestureAction::Press
+                && self.world_source.is_some_and(|owner| owner != typed.source)
+                && event.gesture_id > self.highest_gesture_id
+                && world
+                    .fighter(self.binding.player_id)
+                    .is_some_and(|f| f.action != Action::Idle))
+        {
+            self.admit_busy_source(world, typed)?
         } else if typed.source == GestureSource::KeyE {
             // Already validated typed action/source and immutable server lease.
             // No separate source1 QUIC connection, actor or ACK family.
@@ -215,6 +296,9 @@ impl SessionGestureWorldPath {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
                         self.authority = proposed;
+                        if event.action == GestureAction::Press {
+                            self.world_source = Some(GestureSource::Lmb);
+                        }
                         self.highest_sequence = event.sequence;
                         if event.action == GestureAction::Press {
                             self.highest_gesture_id = event.gesture_id;
