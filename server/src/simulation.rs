@@ -2389,6 +2389,103 @@ mod r2_combat_control_tests {
         assert_eq!(seen, [62.0, 24.0, 0.0]);
     }
 
+    // M107: a genuine authoritative dodge MUST already exist at contact.
+    // A real heavy HIT at tick T cannot be reversed by a later dodge at T+1;
+    // nor can the same heavy advertise a server Evade after its one HIT.
+    #[test]
+    fn m107_timely_dodge_evades_but_late_dodge_cannot_erase_heavy_hit() {
+        for timely_dodge in [true, false] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 310.0, 300.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            world.step();
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            // Approach the actual 320ms server windup without injecting
+            // HeavyActive, then deliver an ordinary physical-input intent.
+            while world.fighter(1).unwrap().action_elapsed_ms + SERVER_DT_MS
+                < HEAVY_ATTACK_WINDUP_MS
+            {
+                world.step();
+            }
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            let pre_contact_tick = world.tick;
+            if timely_dodge {
+                assert!(world.set_input(
+                    2,
+                    InputIntent {
+                        dodge: true,
+                        ..InputIntent::default()
+                    }
+                ));
+            }
+            let events = world.step();
+            assert_eq!(world.tick, pre_contact_tick + 1);
+            assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
+            if timely_dodge {
+                assert_eq!(world.fighter(2).unwrap().action, Action::Dodge);
+                assert!(events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Evade {
+                        attacker: 1,
+                        target: 2
+                    }
+                )));
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        ..
+                    }
+                )));
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            } else {
+                assert!(events.iter().any(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 46,
+                        hp: 54
+                    }
+                )));
+                assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+                assert!(world.set_input(
+                    2,
+                    InputIntent {
+                        dodge: true,
+                        ..InputIntent::default()
+                    }
+                ));
+                for _ in 0..12 {
+                    let later = world.step();
+                    assert!(
+                        !later.iter().any(|event| matches!(
+                            event,
+                            CombatEvent::Evade {
+                                attacker: 1,
+                                target: 2
+                            } | CombatEvent::Hit {
+                                attacker: 1,
+                                target: 2,
+                                ..
+                            }
+                        )),
+                        "one already-committed heavy cannot be both HIT and Evade"
+                    );
+                    assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+                }
+            }
+        }
+    }
+
     // M156/M237: real World input admission distinguishes a legitimate
     // very short LMB charge-release LIGHT from an all-neutral cancellation.
     // Neither path is allowed to manufacture an attack from a lost release.
