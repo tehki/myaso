@@ -39,6 +39,7 @@ function harness(path) {
   const context = {
     middleBlockHeld: false,
     middleBlockPointerId: null,
+    CHORDED_MIDDLE_POINTER_ID: -2,
     leftButtonCharge,
     leftButtonDown: false,
     leftButtonPressMovement: null,
