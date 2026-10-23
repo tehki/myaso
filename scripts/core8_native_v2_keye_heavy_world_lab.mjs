@@ -139,6 +139,18 @@ try {
     script:"("+initBrowser.toString()+").apply(null,arguments)",args:[info.url,info.pin],
   });
   assert(boot.ok,JSON.stringify(boot));
+  // Synchronize the READ-ONLY original Rust 60Hz World flight observer.
+  // Without an already-observed Idle actor, a valid very fast native PRESS
+  // can win the actor-admission/first-tick race: server ACKs ACCEPTED and
+  // real World enters windup, but M201's previous-action journal had no
+  // earlier Idle sample and cannot report Idle→Windup. Do not weaken the
+  // World transition assertion, invent actor state or sleep by wall clock.
+  const originalIdle=await poll("server-owned initial Idle baseline before W3C input",()=>{
+    const witness=output.split("\n").find(line=>
+      /M201_FLIGHT_ACTOR_BASELINE tick=\d+ fighter=1 action=0/.test(line));
+    return {ok:!!witness,witness};
+  });
+  assert(originalIdle.witness,"actual server 60Hz Idle baseline is required");
   // Real physical W3C KEY DOWN, not a JS-dispatched event.
   await wd("POST",base+"/actions",{actions:[{
     type:"key",id:"native-real-keye",actions:[{type:"keyDown",value:"e"}],
