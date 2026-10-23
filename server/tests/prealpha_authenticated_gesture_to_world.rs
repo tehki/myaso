@@ -678,8 +678,7 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
 #[test]
 fn same_tick_actor_reuse_refuses_retired_release_and_allows_fresh_lease_hit() {
     let mut world = arena();
-    let mut retired =
-        SessionGestureWorldPath::from_admitted_world(&world, 2, LEASE, BOOT).unwrap();
+    let mut retired = SessionGestureWorldPath::from_admitted_world(&world, 2, LEASE, BOOT).unwrap();
     let old_life = retired.binding().incarnation;
     let owner = retired.binding().world_instance;
 
@@ -866,10 +865,7 @@ fn real_world_death_and_respawn_require_fresh_actor_gesture_authority() {
     }
     assert!(saw_respawn, "actual World respawn must occur");
     assert_eq!(world.fighter(2).unwrap().hp, 100.0);
-    assert_ne!(
-        world.fighter(2).unwrap().world_incarnation(),
-        original_life
-    );
+    assert_ne!(world.fighter(2).unwrap().world_incarnation(), original_life);
 
     // Never rebind an already retired lease in place: an in-flight RELEASE
     // must not be mistaken for a current actor's release after respawn.
