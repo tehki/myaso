@@ -274,10 +274,11 @@ window.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) {
+  // Pointer cancellation need not carry button=0 (W3C commonly reports -1).
+  // The charge controller checks the active pointerId before retiring LMB.
+  if (leftButtonCharge.cancel(event.pointerId)) {
     leftButtonDown = false;
     leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
   }
 });
 canvas.addEventListener("lostpointercapture", (event) => {
