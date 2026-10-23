@@ -276,7 +276,10 @@ fn busy_lmb_upgrade_while_keye_owns_world_must_not_retire_shared_outbox() {
         }
         path.advance_under_world_lock(&mut world, LEASE, BOOT);
     }
-    assert!(before_release.is_empty(), "busy LMB cannot cause phantom 34/46HP");
+    assert!(
+        before_release.is_empty(),
+        "busy LMB cannot cause phantom 34/46HP"
+    );
     assert_eq!(world.fighter(2).unwrap().hp, 100.0);
     assert_eq!(
         path.accept_under_world_lock(
