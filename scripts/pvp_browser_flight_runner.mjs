@@ -9780,6 +9780,10 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
+          // M194 review: actual Firefox wheel-back attests first; then one
+          // real Chrome LMB down/up. The ORIGINAL World must independently
+          // confirm -38 guard/100HP/zero parry, else strict M194 still fails.
+          preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
