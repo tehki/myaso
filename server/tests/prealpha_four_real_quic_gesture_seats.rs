@@ -402,8 +402,7 @@ async fn admitted_windup_session_retirement_cannot_attack_from_departed_quic_act
                 })
             });
             let retired_actor_has_no_new_active_action = !recent.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=")
-                    && line.contains(" fighter=2 from=1 to=2")
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=1 to=2")
             });
             if fresh_actor_is_admitted
                 && all_current_actors_attack
