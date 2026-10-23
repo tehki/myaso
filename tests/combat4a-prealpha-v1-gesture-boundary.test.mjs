@@ -120,6 +120,11 @@ test("Combat 4A: live pointercancel handlers do not require a pointer-button tra
     assert.match(match[1], /leftButtonCharge\.cancel\(event\.pointerId\)/,
       path + " must cancel by active pointer identity, not event.button");
   }
+  const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(online, /leftButtonCharge\.release\(event\.pointerId\);\s*leftButtonPressMovement = null;/,
+    "keep the exact original R1 release/movement-clear contract");
+  assert.match(online, /leftButtonPressMovement = null;\s*leftButtonCharge\.cancel\(event\.pointerId\)/,
+    "keep the exact original R1 cancel/movement-clear contract");
 });
 
 function loadRealInputHandler(filePath, kind, context) {
