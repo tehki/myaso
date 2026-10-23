@@ -525,7 +525,12 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+      // M344 only: original v1 live QUIC packet decoding, ingress/dedup and
+      // World.set_input provenance. Rust itself refuses this on non-loopback.
+      MYASO_FLIGHT_INPUT_ADMISSION_TRACE:
+        scenario === "uirollknockdownffahit" ? "1" : "0",
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uirollknockdownffahit"
+        || scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
