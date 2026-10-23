@@ -338,7 +338,12 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (!reviewedGestureLab && event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  // Preserve the exact legacy physical KeyE edge behind the reviewed-v2
+  // isolation gate. The public/v1 handler must remain unchanged, while the
+  // local experiment's independent source1 owner is the only KeyE producer.
+  if (!reviewedGestureLab) {
+    if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  }
   if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
