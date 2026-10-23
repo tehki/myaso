@@ -1132,7 +1132,10 @@ fn release_only_keye_same_tick_actor_reuse_fences_stale_terminal_and_fresh_hit()
     assert!(world.remove_player(1));
     assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
     assert_eq!(world.world_instance(), initial_world);
-    assert_ne!(world.fighter(1).unwrap().world_incarnation(), initial_incarnation);
+    assert_ne!(
+        world.fighter(1).unwrap().world_incarnation(),
+        initial_incarnation
+    );
     assert_eq!(
         admit(
             &mut former,
