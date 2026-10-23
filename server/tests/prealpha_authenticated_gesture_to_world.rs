@@ -1177,3 +1177,161 @@ fn cross_source_spoof_terminal_stays_rejected_and_world_unchanged() {
     );
     assert_eq!(advance(&mut path, &mut w, 55), vec![(34, 66)]);
 }
+
+#[test]
+fn keye_source1_same_tick_actor_reuse_retires_old_lease_but_fresh_heavy_hits_once() {
+    let mut world = arena();
+    let mut old = SessionGestureWorldPath::from_admitted_world(&world, 1, LEASE, BOOT).unwrap();
+    let old_life = old.binding().incarnation;
+    let world_owner = world.world_instance();
+
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut world,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+    // Actor identity changes without a World tick or numeric ID change.
+    // Old KeyE RELEASE must not control the newly created fighter.
+    assert!(world.remove_player(1));
+    assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+    assert_eq!(world.world_instance(), world_owner);
+    assert_ne!(world.fighter(1).unwrap().world_incarnation(), old_life);
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut world,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert!(old.retired());
+
+    // Fresh trusted transport admission obtains a separate lease; the same
+    // numerical gesture id is legitimate ONLY in this new lease.
+    let fresh_lease = LEASE + 1;
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&world, 1, fresh_lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut fresh,
+            &mut world,
+            fresh_lease,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut hits = Vec::new();
+    for _ in 0..55 {
+        for event in world.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = event
+            {
+                hits.push((damage, hp));
+            }
+        }
+        fresh.advance_under_world_lock(&mut world, fresh_lease, BOOT);
+        old.advance_under_world_lock(&mut world, LEASE, BOOT);
+    }
+    assert_eq!(hits, vec![(46, 54)]);
+    assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+    assert!(old.retired());
+}
+
+#[test]
+fn keye_source1_world_replacement_rejects_prior_owner_even_with_equal_actor_numbers() {
+    let mut first = arena();
+    let mut retired = SessionGestureWorldPath::from_admitted_world(&first, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut retired,
+            &mut first,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+
+    // Complete World replacement can reuse all local numerical identities,
+    // actor incarnations and ticks, but NEVER the old World ownership.
+    let mut replacement = arena();
+    assert_ne!(first.world_instance(), replacement.world_instance());
+    assert_eq!(first.tick, replacement.tick);
+    assert_eq!(
+        first.fighter(1).unwrap().world_incarnation(),
+        replacement.fighter(1).unwrap().world_incarnation()
+    );
+    assert_eq!(
+        admit(
+            &mut retired,
+            &mut replacement,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Stale
+    );
+    assert!(retired.retired());
+    assert_eq!(replacement.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(replacement.fighter(2).unwrap().hp, 100.0);
+
+    let new_lease = LEASE + 1;
+    let mut current =
+        SessionGestureWorldPath::from_admitted_world(&replacement, 1, new_lease, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut current,
+            &mut replacement,
+            new_lease,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    let mut hits = Vec::new();
+    for _ in 0..55 {
+        for event in replacement.step() {
+            if let CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage,
+                hp,
+            } = event
+            {
+                hits.push((damage, hp));
+            }
+        }
+        current.advance_under_world_lock(&mut replacement, new_lease, BOOT);
+        retired.advance_under_world_lock(&mut replacement, LEASE, BOOT);
+    }
+    assert_eq!(hits, vec![(46, 54)]);
+    assert_eq!(replacement.fighter(2).unwrap().hp, 54.0);
+}
