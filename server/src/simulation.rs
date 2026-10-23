@@ -2283,5 +2283,4 @@ mod r2_combat_control_tests {
             }
         }
     }
-
 }
