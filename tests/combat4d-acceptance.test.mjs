@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadMatrix, assessRow, qualify } from "../scripts/combat4d-acceptance.mjs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const matrix = loadMatrix();
 const baselineSha = matrix.baseline.sha;
@@ -82,6 +87,23 @@ test("45 fabricated but structurally complete PASS reports remain HOLD", () => {
   assert.equal(classification.classification, "HOLD");
   assert.equal(classification.counts["REVIEW REQUIRED"], matrix.rows.length);
   assert.equal(classification.deploymentAuthorized, false);
+  // Acceptance must also fail at the actual CLI boundary, not just helper API.
+  const directory = mkdtempSync(join(tmpdir(), "combat4d-unverified-"));
+  try {
+    const evidencePath = join(directory, "unverified-evidence.json");
+    writeFileSync(evidencePath, JSON.stringify({ records: forged }));
+    const script = fileURLToPath(new URL("../scripts/combat4d-acceptance.mjs", import.meta.url));
+    const run = spawnSync(process.execPath, [script, "--gate", candidateSha, evidencePath], {
+      encoding: "utf8", timeout: 15000
+    });
+    assert.equal(run.status, 1, run.stderr || run.stdout);
+    const cliReport = JSON.parse(run.stdout);
+    assert.equal(cliReport.classification, "HOLD");
+    assert.equal(cliReport.counts["REVIEW REQUIRED"], matrix.rows.length);
+    assert.equal(cliReport.deploymentAuthorized, false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 test("overall release remains HOLD/NOT QUALIFIED until independent acceptance", () => {
   const missing = qualify(matrix, candidateSha);
