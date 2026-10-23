@@ -58,6 +58,11 @@ jobs:
           node --check tests/combat4a-middle-pointer-cancel-owner.test.mjs
           node --test tests/combat4a-middle-pointer-cancel-owner.test.mjs
 
+      - name: Validate Combat 4A M172 native low-stamina setup contract
+        run: |
+          node --check tests/combat4a-m172-native-stamina-window.test.mjs
+          node --test tests/combat4a-m172-native-stamina-window.test.mjs
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
