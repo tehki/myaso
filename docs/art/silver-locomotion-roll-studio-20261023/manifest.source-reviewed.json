@@ -1,0 +1,2616 @@
+{
+  "source": {
+    "sourceSHA256": "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+    "originalRigBones": 22,
+    "lighting": "SOURCE Blender Cycles, exact original Silver Roll key/fill/world",
+    "rows": 8,
+    "frameSize": 160,
+    "actions": {
+      "idle": {
+        "frames": 4,
+        "sourceFrameRange": [
+          2.5,
+          152.5
+        ],
+        "sampleTimes": [
+          2.5,
+          40.0,
+          77.5,
+          115.0
+        ]
+      },
+      "walk": {
+        "frames": 8,
+        "sourceFrameRange": [
+          2.5,
+          82.5
+        ],
+        "sampleTimes": [
+          2.5,
+          12.5,
+          22.5,
+          32.5,
+          42.5,
+          52.5,
+          62.5,
+          72.5
+        ]
+      },
+      "sprint": {
+        "frames": 8,
+        "sourceFrameRange": [
+          2.5,
+          42.5
+        ],
+        "sampleTimes": [
+          2.5,
+          7.5,
+          12.5,
+          17.5,
+          22.5,
+          27.5,
+          32.5,
+          37.5
+        ]
+      },
+      "jump": {
+        "frames": 6,
+        "sourceFrameRange": [
+          2.5,
+          152.5
+        ],
+        "sampleTimes": [
+          2.5,
+          32.5,
+          62.5,
+          92.5,
+          122.5,
+          152.5
+        ]
+      }
+    },
+    "authoritativeGameplayChanged": false,
+    "sourceAssetChanged": false,
+    "originalMeshRedistributed": false
+  },
+  "atlas": {
+    "idle": {
+      "path": "silver_idle_roll_studio.webp",
+      "width": 640,
+      "height": 1280,
+      "frames": 4,
+      "sha256": "37e355e5622e983a6150894724fa2d176efe851867ffd860b09508d16761036c",
+      "bytes": 127622,
+      "cells": [
+        {
+          "direction": 0,
+          "frame": 0,
+          "sourcePNGsha256": "9abcfdb3234fb35ab10616d8ca891348822eee756b6746cd5d01015d4d8df369",
+          "alphaBBox": [
+            55,
+            38,
+            110,
+            123
+          ],
+          "bytes": 22674
+        },
+        {
+          "direction": 0,
+          "frame": 1,
+          "sourcePNGsha256": "6371b269aab4421b34d4b0e8939aab67b43525c6d93e97a0dfec0aebcbf600a1",
+          "alphaBBox": [
+            55,
+            38,
+            110,
+            123
+          ],
+          "bytes": 22503
+        },
+        {
+          "direction": 0,
+          "frame": 2,
+          "sourcePNGsha256": "4c1fb28bdfae48a1bbb26657c374f8b47216bc59ebb23f62ad0e52d1cda1c0b9",
+          "alphaBBox": [
+            55,
+            38,
+            109,
+            123
+          ],
+          "bytes": 22595
+        },
+        {
+          "direction": 0,
+          "frame": 3,
+          "sourcePNGsha256": "5ae4c9eb7c4145f1bf9340548ee6a074d6c4b162b1edce1291d5acb5e98f76b7",
+          "alphaBBox": [
+            55,
+            38,
+            110,
+            123
+          ],
+          "bytes": 22469
+        },
+        {
+          "direction": 1,
+          "frame": 0,
+          "sourcePNGsha256": "d9f1a6947b2b7ef2c1d09762f53e88f0d2754d7b74da200176212824364e3205",
+          "alphaBBox": [
+            62,
+            38,
+            99,
+            127
+          ],
+          "bytes": 21012
+        },
+        {
+          "direction": 1,
+          "frame": 1,
+          "sourcePNGsha256": "ea280bd34474ef4b9b4071ab098d3ae2a6c86efe87109a2a787713bea6a11098",
+          "alphaBBox": [
+            62,
+            38,
+            98,
+            127
+          ],
+          "bytes": 20926
+        },
+        {
+          "direction": 1,
+          "frame": 2,
+          "sourcePNGsha256": "d532d4e62109a7064653615183a077e60718acbffcda8a90d6637ad3e63e3cf9",
+          "alphaBBox": [
+            62,
+            38,
+            99,
+            126
+          ],
+          "bytes": 21020
+        },
+        {
+          "direction": 1,
+          "frame": 3,
+          "sourcePNGsha256": "07f38953343c8bd5a81e9628111065469774645965840f4dc119d3d6a5cce838",
+          "alphaBBox": [
+            62,
+            38,
+            98,
+            127
+          ],
+          "bytes": 20897
+        },
+        {
+          "direction": 2,
+          "frame": 0,
+          "sourcePNGsha256": "0ea73cd07a80605262b7fc7cc163d792058c4506f44280ce2de7c4792d796557",
+          "alphaBBox": [
+            61,
+            38,
+            101,
+            122
+          ],
+          "bytes": 20875
+        },
+        {
+          "direction": 2,
+          "frame": 1,
+          "sourcePNGsha256": "c99f068c25f7ce5919c203beb0973dd2ba6c835cd523dfcc12717fe212d13cf5",
+          "alphaBBox": [
+            60,
+            38,
+            101,
+            122
+          ],
+          "bytes": 20901
+        },
+        {
+          "direction": 2,
+          "frame": 2,
+          "sourcePNGsha256": "a4b902ecdaa201d311e6b765d3bf528a26381b2159e9c113e990299303415595",
+          "alphaBBox": [
+            61,
+            37,
+            101,
+            122
+          ],
+          "bytes": 20859
+        },
+        {
+          "direction": 2,
+          "frame": 3,
+          "sourcePNGsha256": "8d8803024e217b91f4b92b2f990277e48e4d76fdebbb94d0200b2a7a24de3b22",
+          "alphaBBox": [
+            60,
+            38,
+            101,
+            122
+          ],
+          "bytes": 20913
+        },
+        {
+          "direction": 3,
+          "frame": 0,
+          "sourcePNGsha256": "7ce63c92f41dae354d7bc97c34b3d37741e8c54916a6f3f09437a7dc679a9733",
+          "alphaBBox": [
+            56,
+            35,
+            111,
+            116
+          ],
+          "bytes": 21808
+        },
+        {
+          "direction": 3,
+          "frame": 1,
+          "sourcePNGsha256": "a3fe5d8cc1b21aae1cbdcf3d843da3398db86700eb5911bfd3319eac0beee10b",
+          "alphaBBox": [
+            56,
+            35,
+            111,
+            116
+          ],
+          "bytes": 21736
+        },
+        {
+          "direction": 3,
+          "frame": 2,
+          "sourcePNGsha256": "9e8c270552a4765fdf51c56c7b0312c1b5883100f10afaa35b154bf9a972fb0b",
+          "alphaBBox": [
+            56,
+            35,
+            111,
+            116
+          ],
+          "bytes": 21741
+        },
+        {
+          "direction": 3,
+          "frame": 3,
+          "sourcePNGsha256": "2befc377fb3ab5ca9c23f8842f83da21faf4882f5976a63ac61ccb7ef5086405",
+          "alphaBBox": [
+            56,
+            35,
+            111,
+            116
+          ],
+          "bytes": 21746
+        },
+        {
+          "direction": 4,
+          "frame": 0,
+          "sourcePNGsha256": "3138a289a9d68316af4c987647dc789d6cd55e5872601d207e107cfc2a74385d",
+          "alphaBBox": [
+            50,
+            33,
+            105,
+            120
+          ],
+          "bytes": 21410
+        },
+        {
+          "direction": 4,
+          "frame": 1,
+          "sourcePNGsha256": "1dd4aa5135599fb478a94b19c68fc78ca6533fc06b88927d3f41178323a62f00",
+          "alphaBBox": [
+            50,
+            33,
+            106,
+            120
+          ],
+          "bytes": 21341
+        },
+        {
+          "direction": 4,
+          "frame": 2,
+          "sourcePNGsha256": "ece7444d54ea43919c3fa32108fa2e22f99fa5de586bbb1f71cb7a8c251de2f2",
+          "alphaBBox": [
+            50,
+            33,
+            105,
+            120
+          ],
+          "bytes": 21470
+        },
+        {
+          "direction": 4,
+          "frame": 3,
+          "sourcePNGsha256": "e5896a127f1bfc2275b82a0e0ebbdd012df8649f39f6c52c7de6bd3de23831df",
+          "alphaBBox": [
+            50,
+            33,
+            106,
+            120
+          ],
+          "bytes": 21322
+        },
+        {
+          "direction": 5,
+          "frame": 0,
+          "sourcePNGsha256": "7915362518b730d840d2d3f8dcde31b03aacacd69cc3db5347caceed340b968f",
+          "alphaBBox": [
+            61,
+            37,
+            98,
+            124
+          ],
+          "bytes": 21007
+        },
+        {
+          "direction": 5,
+          "frame": 1,
+          "sourcePNGsha256": "3c4441b22c3c75285335bc5406e0c8f9fb693ff55bdb2d790efa0dc8b1b629fd",
+          "alphaBBox": [
+            61,
+            37,
+            98,
+            125
+          ],
+          "bytes": 20889
+        },
+        {
+          "direction": 5,
+          "frame": 2,
+          "sourcePNGsha256": "e3d641d84657e01d36209d35e51f83a763f05c91f0d754a092ff7d100f2222f5",
+          "alphaBBox": [
+            61,
+            37,
+            98,
+            124
+          ],
+          "bytes": 20879
+        },
+        {
+          "direction": 5,
+          "frame": 3,
+          "sourcePNGsha256": "702a34f20564028eb11665c5b788175fcd26745933557c27ea8aff5381daea7f",
+          "alphaBBox": [
+            61,
+            37,
+            98,
+            125
+          ],
+          "bytes": 20871
+        },
+        {
+          "direction": 6,
+          "frame": 0,
+          "sourcePNGsha256": "e115ca1cf675f9bdae301fd46498ad685c76e31eb8a4be291d44cda9ef9ccca1",
+          "alphaBBox": [
+            59,
+            37,
+            99,
+            126
+          ],
+          "bytes": 21139
+        },
+        {
+          "direction": 6,
+          "frame": 1,
+          "sourcePNGsha256": "631817d34b05d092f047a0180b67db739a79fa4dbaccf6c0509ee351d0994ebe",
+          "alphaBBox": [
+            59,
+            37,
+            100,
+            126
+          ],
+          "bytes": 21177
+        },
+        {
+          "direction": 6,
+          "frame": 2,
+          "sourcePNGsha256": "1c25df3b9a72f7d017e80c43ecd43a3412fe84673bbb1d5d0e7c0ce66ad383df",
+          "alphaBBox": [
+            59,
+            37,
+            99,
+            126
+          ],
+          "bytes": 21020
+        },
+        {
+          "direction": 6,
+          "frame": 3,
+          "sourcePNGsha256": "fe86f3da5ec6a7da1cf7c2b9567191b48a891d84f132c1a7fa09b757562a45a7",
+          "alphaBBox": [
+            59,
+            37,
+            100,
+            126
+          ],
+          "bytes": 21103
+        },
+        {
+          "direction": 7,
+          "frame": 0,
+          "sourcePNGsha256": "b8f7e680c4c5f25d7a56f45789c7571613b34f288f4b1d70a9325d2131939ea6",
+          "alphaBBox": [
+            50,
+            37,
+            105,
+            120
+          ],
+          "bytes": 22606
+        },
+        {
+          "direction": 7,
+          "frame": 1,
+          "sourcePNGsha256": "95f68be3f4edc51fa923072ef493b139e6bb0e6e9c5830158db08f4922e074b4",
+          "alphaBBox": [
+            49,
+            38,
+            105,
+            120
+          ],
+          "bytes": 22515
+        },
+        {
+          "direction": 7,
+          "frame": 2,
+          "sourcePNGsha256": "3efbd2810c993bcb6c3e4b677a7c5f41ac12d8da9863e6e6124b89f7ecd6cd27",
+          "alphaBBox": [
+            49,
+            37,
+            104,
+            120
+          ],
+          "bytes": 22610
+        },
+        {
+          "direction": 7,
+          "frame": 3,
+          "sourcePNGsha256": "d840d45a6bc9cee42c5c201c05a4468daba8193a3d85bfe44320909210a43f43",
+          "alphaBBox": [
+            49,
+            38,
+            105,
+            120
+          ],
+          "bytes": 22492
+        }
+      ]
+    },
+    "walk": {
+      "path": "silver_walk_roll_studio.webp",
+      "width": 1280,
+      "height": 1280,
+      "frames": 8,
+      "sha256": "7c414f51c492c2a6ffaeae71db5ef5243a7e66e344b9e242215612a7c268c4a0",
+      "bytes": 246174,
+      "cells": [
+        {
+          "direction": 0,
+          "frame": 0,
+          "sourcePNGsha256": "2cc7bc96d9b1e6b385d33948dab2dc6575513d17e9fada5effa0516f71ded26d",
+          "alphaBBox": [
+            52,
+            40,
+            107,
+            123
+          ],
+          "bytes": 22069
+        },
+        {
+          "direction": 0,
+          "frame": 1,
+          "sourcePNGsha256": "6519940690359943b29c61a0049826e45f901d0c0464f435f9cd5c03ca0eb7fb",
+          "alphaBBox": [
+            53,
+            41,
+            107,
+            122
+          ],
+          "bytes": 21867
+        },
+        {
+          "direction": 0,
+          "frame": 2,
+          "sourcePNGsha256": "b74f64697dd585a7ebc611cdf61bc66e713c5adf78bfa0e20bab0ae04c4bcf9b",
+          "alphaBBox": [
+            54,
+            39,
+            107,
+            118
+          ],
+          "bytes": 21759
+        },
+        {
+          "direction": 0,
+          "frame": 3,
+          "sourcePNGsha256": "2034858e143f13e94958aa3f409545b1383d1635d2f0735f53c2712adfd2bc75",
+          "alphaBBox": [
+            54,
+            39,
+            108,
+            120
+          ],
+          "bytes": 22145
+        },
+        {
+          "direction": 0,
+          "frame": 4,
+          "sourcePNGsha256": "e0fd8aa42852ad595d35d8b672353a709eb8ef868ac074a1be63ea98bd8cd5d6",
+          "alphaBBox": [
+            54,
+            40,
+            108,
+            122
+          ],
+          "bytes": 22041
+        },
+        {
+          "direction": 0,
+          "frame": 5,
+          "sourcePNGsha256": "2cf203f88e52db2841ac4cca47d1671e2758cf42b9745601d7249d93362943a8",
+          "alphaBBox": [
+            53,
+            41,
+            107,
+            122
+          ],
+          "bytes": 21892
+        },
+        {
+          "direction": 0,
+          "frame": 6,
+          "sourcePNGsha256": "aeb125e2ef2253c2c0f92d79f77e528105fea82772ccc4ad903eb7c88c2ff332",
+          "alphaBBox": [
+            52,
+            40,
+            106,
+            118
+          ],
+          "bytes": 21648
+        },
+        {
+          "direction": 0,
+          "frame": 7,
+          "sourcePNGsha256": "b31b312e66a9da860c16119ae5b2de48dd1f67f3e4f280a438e2548b3efd8ce6",
+          "alphaBBox": [
+            52,
+            39,
+            106,
+            120
+          ],
+          "bytes": 22131
+        },
+        {
+          "direction": 1,
+          "frame": 0,
+          "sourcePNGsha256": "a0575cd957a2242fc3e6b8507900b1a555e220421c59f59aa21e4e242cece8ba",
+          "alphaBBox": [
+            53,
+            40,
+            99,
+            123
+          ],
+          "bytes": 21520
+        },
+        {
+          "direction": 1,
+          "frame": 1,
+          "sourcePNGsha256": "7e7a5be3755e25c8487b8b7ee9745376ba22f2e8dc3848a9ad084ff81c94c1d0",
+          "alphaBBox": [
+            55,
+            41,
+            100,
+            124
+          ],
+          "bytes": 21413
+        },
+        {
+          "direction": 1,
+          "frame": 2,
+          "sourcePNGsha256": "9648531ed2bf3ea7e6bc5e73b28f87dc3c6557ba88ef59c394c4ffaf4f9589c8",
+          "alphaBBox": [
+            57,
+            40,
+            104,
+            121
+          ],
+          "bytes": 21260
+        },
+        {
+          "direction": 1,
+          "frame": 3,
+          "sourcePNGsha256": "7308a4ed6d4545b3b10a1f951818bb84f033c194a92f49f38787928dc3a344b5",
+          "alphaBBox": [
+            58,
+            38,
+            105,
+            120
+          ],
+          "bytes": 21625
+        },
+        {
+          "direction": 1,
+          "frame": 4,
+          "sourcePNGsha256": "d94abf0e7e45786e4afa793bd8db68e1961ec32dba792f246ba2d57c4a4c42aa",
+          "alphaBBox": [
+            56,
+            39,
+            106,
+            117
+          ],
+          "bytes": 21437
+        },
+        {
+          "direction": 1,
+          "frame": 5,
+          "sourcePNGsha256": "807568f712807185aab0b4cd987f250771d13c11c61a7b16a91c04eff2f27395",
+          "alphaBBox": [
+            57,
+            39,
+            104,
+            115
+          ],
+          "bytes": 21190
+        },
+        {
+          "direction": 1,
+          "frame": 6,
+          "sourcePNGsha256": "d79687785de48ade8335a72da72bb74cc603d1a7a3ec22ca4d987c38acd6aaee",
+          "alphaBBox": [
+            56,
+            39,
+            97,
+            112
+          ],
+          "bytes": 20982
+        },
+        {
+          "direction": 1,
+          "frame": 7,
+          "sourcePNGsha256": "89873563a49d2dc5d88903b8251279c345f8d8d20a124bbeec40fd760b47627d",
+          "alphaBBox": [
+            55,
+            39,
+            97,
+            122
+          ],
+          "bytes": 21390
+        },
+        {
+          "direction": 2,
+          "frame": 0,
+          "sourcePNGsha256": "a03b52e2b420ef879d1ba29049ae89fee723efb125f4c40ab7eb1546c952d98c",
+          "alphaBBox": [
+            56,
+            39,
+            99,
+            119
+          ],
+          "bytes": 20923
+        },
+        {
+          "direction": 2,
+          "frame": 1,
+          "sourcePNGsha256": "b1c6a0b9af21c087129138236ac1b7ae7877b5cab695f5f0a16c663cad5a9629",
+          "alphaBBox": [
+            56,
+            39,
+            97,
+            120
+          ],
+          "bytes": 20768
+        },
+        {
+          "direction": 2,
+          "frame": 2,
+          "sourcePNGsha256": "0215cb894c589bd20e258226a8e6ddee9b55729a7c96e08d8abae4d7e1a1f72c",
+          "alphaBBox": [
+            55,
+            37,
+            92,
+            120
+          ],
+          "bytes": 20515
+        },
+        {
+          "direction": 2,
+          "frame": 3,
+          "sourcePNGsha256": "81d6f129a21daa155cdef9695027bc97c0f76a7999289ca206d9289b3181399c",
+          "alphaBBox": [
+            56,
+            37,
+            93,
+            121
+          ],
+          "bytes": 20919
+        },
+        {
+          "direction": 2,
+          "frame": 4,
+          "sourcePNGsha256": "8332313eac50488aae7831dd5dc2170352429ca31d0b89d692b4e512fd243955",
+          "alphaBBox": [
+            56,
+            37,
+            97,
+            121
+          ],
+          "bytes": 21499
+        },
+        {
+          "direction": 2,
+          "frame": 5,
+          "sourcePNGsha256": "bb3ac73e1ce8b3327c7e05fd609eac6f37168a7ad1e2d4c7d3cedb36b8f2f680",
+          "alphaBBox": [
+            55,
+            37,
+            98,
+            120
+          ],
+          "bytes": 21128
+        },
+        {
+          "direction": 2,
+          "frame": 6,
+          "sourcePNGsha256": "17f9b2dc92d2eb2fd48838b658bdef059dbaade32795a72de69052f7cfe34973",
+          "alphaBBox": [
+            55,
+            35,
+            91,
+            116
+          ],
+          "bytes": 20399
+        },
+        {
+          "direction": 2,
+          "frame": 7,
+          "sourcePNGsha256": "eeff0343e334a4bf72e91a6b7a194970e07cc3c2da0241b9914edab79e588b9e",
+          "alphaBBox": [
+            56,
+            37,
+            93,
+            118
+          ],
+          "bytes": 20621
+        },
+        {
+          "direction": 3,
+          "frame": 0,
+          "sourcePNGsha256": "51cd7da347202b3b05be303186f100890f8b0ed003615d08ebe54fb748bd7940",
+          "alphaBBox": [
+            57,
+            36,
+            109,
+            113
+          ],
+          "bytes": 21160
+        },
+        {
+          "direction": 3,
+          "frame": 1,
+          "sourcePNGsha256": "1aeef4ad47f98e9b02a7a526d4e6cdcd142b5945051662a59870f9974bfe0bb9",
+          "alphaBBox": [
+            57,
+            35,
+            104,
+            115
+          ],
+          "bytes": 21103
+        },
+        {
+          "direction": 3,
+          "frame": 2,
+          "sourcePNGsha256": "a1d49b4b45a2bad977ebd6d06e950d1b8f8479472a98a2b873d1353b86c6f758",
+          "alphaBBox": [
+            55,
+            34,
+            97,
+            118
+          ],
+          "bytes": 21250
+        },
+        {
+          "direction": 3,
+          "frame": 3,
+          "sourcePNGsha256": "6e2c60796797239602965d08ed1550464d3f831ee899db77cae1d55caafecf7a",
+          "alphaBBox": [
+            54,
+            34,
+            97,
+            119
+          ],
+          "bytes": 21066
+        },
+        {
+          "direction": 3,
+          "frame": 4,
+          "sourcePNGsha256": "0617ebcf58a3bfb047623780c190f7d6743ceb319ae104dbb2fb62641c668648",
+          "alphaBBox": [
+            52,
+            34,
+            99,
+            121
+          ],
+          "bytes": 21404
+        },
+        {
+          "direction": 3,
+          "frame": 5,
+          "sourcePNGsha256": "23ae8e53b41cde1a26c66883ae12d9075998f4aa85bd4ec02c0dee3193141e2b",
+          "alphaBBox": [
+            54,
+            33,
+            99,
+            124
+          ],
+          "bytes": 21419
+        },
+        {
+          "direction": 3,
+          "frame": 6,
+          "sourcePNGsha256": "d6117ecce77d7a1915cbb9a39e90c7f3429d55910d03c630483d70bc02d2b565",
+          "alphaBBox": [
+            57,
+            33,
+            102,
+            118
+          ],
+          "bytes": 21403
+        },
+        {
+          "direction": 3,
+          "frame": 7,
+          "sourcePNGsha256": "e007381464d2944a1e39bdd967a9668affbd90f954337f905c5dc220a502d42b",
+          "alphaBBox": [
+            58,
+            34,
+            105,
+            110
+          ],
+          "bytes": 21037
+        },
+        {
+          "direction": 4,
+          "frame": 0,
+          "sourcePNGsha256": "dd0cbb748a56860d8f8713c9e3b9760d1877243feb449a26b5218a81a7e4a581",
+          "alphaBBox": [
+            54,
+            31,
+            108,
+            119
+          ],
+          "bytes": 20966
+        },
+        {
+          "direction": 4,
+          "frame": 1,
+          "sourcePNGsha256": "9e531882a64a11043e49de5d927144eb1c8a478942e900ff82179607d65d080e",
+          "alphaBBox": [
+            53,
+            31,
+            107,
+            120
+          ],
+          "bytes": 21228
+        },
+        {
+          "direction": 4,
+          "frame": 2,
+          "sourcePNGsha256": "d5c0aa51089a6745855b98d6ea2d8da2e3092ef12b0950e6f6751e1824c3a480",
+          "alphaBBox": [
+            51,
+            29,
+            106,
+            115
+          ],
+          "bytes": 21072
+        },
+        {
+          "direction": 4,
+          "frame": 3,
+          "sourcePNGsha256": "bde7bf8763764ff3a6da6dc258b6e921e5e3c9c396758cb89113aa4dfb19da2f",
+          "alphaBBox": [
+            51,
+            29,
+            106,
+            115
+          ],
+          "bytes": 20951
+        },
+        {
+          "direction": 4,
+          "frame": 4,
+          "sourcePNGsha256": "a9bb12eb6957a9efcbd7b225155a1692b2b89c5ba623fab6ab31fb767982f36b",
+          "alphaBBox": [
+            52,
+            31,
+            107,
+            118
+          ],
+          "bytes": 20925
+        },
+        {
+          "direction": 4,
+          "frame": 5,
+          "sourcePNGsha256": "eedcd240c7e9bfb67c8b86c95ca35f21f232ab37751518b007ab101a85a6bf0a",
+          "alphaBBox": [
+            53,
+            30,
+            107,
+            120
+          ],
+          "bytes": 21390
+        },
+        {
+          "direction": 4,
+          "frame": 6,
+          "sourcePNGsha256": "eaf8feef104a8fe0a48ebba2efb772a25fdcc814c6c4cb51e037c77f601ff04e",
+          "alphaBBox": [
+            54,
+            29,
+            107,
+            115
+          ],
+          "bytes": 21138
+        },
+        {
+          "direction": 4,
+          "frame": 7,
+          "sourcePNGsha256": "955e7c193a132a1be58b0b0a712e95fe5b84ba9dbc19a46828b74cae0def3d80",
+          "alphaBBox": [
+            54,
+            29,
+            108,
+            115
+          ],
+          "bytes": 20926
+        },
+        {
+          "direction": 5,
+          "frame": 0,
+          "sourcePNGsha256": "faeb8bf31e8688bfae68166cdab7a23207a5cdded8888d544a685cb4b3ff7ebc",
+          "alphaBBox": [
+            61,
+            34,
+            107,
+            122
+          ],
+          "bytes": 21170
+        },
+        {
+          "direction": 5,
+          "frame": 1,
+          "sourcePNGsha256": "af52dc16c0405c7494ffb4a4e57998ae5282ca34b3b229e07ec122998d032e4f",
+          "alphaBBox": [
+            60,
+            33,
+            105,
+            124
+          ],
+          "bytes": 21370
+        },
+        {
+          "direction": 5,
+          "frame": 2,
+          "sourcePNGsha256": "a823abbf5b48a6d608a18cc33b3a4889c0134f62d04cefc784173974878a013e",
+          "alphaBBox": [
+            56,
+            32,
+            103,
+            118
+          ],
+          "bytes": 21342
+        },
+        {
+          "direction": 5,
+          "frame": 3,
+          "sourcePNGsha256": "886d0007bddbf310b64f6600babd315347b579dece6b2e785e02e2663f6ffea0",
+          "alphaBBox": [
+            55,
+            34,
+            102,
+            110
+          ],
+          "bytes": 21048
+        },
+        {
+          "direction": 5,
+          "frame": 4,
+          "sourcePNGsha256": "81a275c0b4846efeaa19cf84aecb120f5d25406cf1a52fe365b9ff11293ea0db",
+          "alphaBBox": [
+            53,
+            36,
+            104,
+            113
+          ],
+          "bytes": 21213
+        },
+        {
+          "direction": 5,
+          "frame": 5,
+          "sourcePNGsha256": "f5ec96c15c734db0cc2de1a7829975363825f798b4c539404900ee9cf38757c5",
+          "alphaBBox": [
+            55,
+            35,
+            104,
+            115
+          ],
+          "bytes": 21332
+        },
+        {
+          "direction": 5,
+          "frame": 6,
+          "sourcePNGsha256": "45bbc67eff3b7690a077014dca1cdc4f003b9daa4c8d7609903e4c5b6eea7953",
+          "alphaBBox": [
+            63,
+            34,
+            104,
+            117
+          ],
+          "bytes": 21214
+        },
+        {
+          "direction": 5,
+          "frame": 7,
+          "sourcePNGsha256": "49327254e8b7a10d4fef9620c4cc6fd186dcce39f8a24223eb662939312ebc5c",
+          "alphaBBox": [
+            63,
+            34,
+            105,
+            119
+          ],
+          "bytes": 21119
+        },
+        {
+          "direction": 6,
+          "frame": 0,
+          "sourcePNGsha256": "77123add970f4c7c953d39a57842280e48bd447b599e703905ea12d75240b1c5",
+          "alphaBBox": [
+            62,
+            36,
+            104,
+            121
+          ],
+          "bytes": 21587
+        },
+        {
+          "direction": 6,
+          "frame": 1,
+          "sourcePNGsha256": "e32c2f6acb6678e306d9c3980feef39fd7e4c96ea9300d348dfe5127b733d23e",
+          "alphaBBox": [
+            62,
+            35,
+            104,
+            120
+          ],
+          "bytes": 20958
+        },
+        {
+          "direction": 6,
+          "frame": 2,
+          "sourcePNGsha256": "842272cf479af5c354c7baecec8e79df8fa2319724caffa19f7960996ee00d2f",
+          "alphaBBox": [
+            68,
+            35,
+            105,
+            116
+          ],
+          "bytes": 20307
+        },
+        {
+          "direction": 6,
+          "frame": 3,
+          "sourcePNGsha256": "b11048408ee9e9927c01418c1eac047c31d60ff8ced3b5111a16e706036d5a28",
+          "alphaBBox": [
+            67,
+            36,
+            104,
+            118
+          ],
+          "bytes": 20659
+        },
+        {
+          "direction": 6,
+          "frame": 4,
+          "sourcePNGsha256": "d07a962a90eed53b2aa2ab0667aacece55a4bd2e70cef212ca358158dd464946",
+          "alphaBBox": [
+            64,
+            38,
+            105,
+            119
+          ],
+          "bytes": 20913
+        },
+        {
+          "direction": 6,
+          "frame": 5,
+          "sourcePNGsha256": "adb53c2ddd88624fb06f7013f97d8fc81f7544751dee72747f9d515bb8f98b37",
+          "alphaBBox": [
+            62,
+            38,
+            105,
+            120
+          ],
+          "bytes": 20843
+        },
+        {
+          "direction": 6,
+          "frame": 6,
+          "sourcePNGsha256": "c852e86b9b1a74f167d07208556b1e68a98f1ca55fa85577a1986bd9351a281a",
+          "alphaBBox": [
+            69,
+            36,
+            105,
+            121
+          ],
+          "bytes": 20461
+        },
+        {
+          "direction": 6,
+          "frame": 7,
+          "sourcePNGsha256": "22b568c8d11621b5c3a8a31225f4c6c101525018901b8740d54219e32c31a7e0",
+          "alphaBBox": [
+            66,
+            36,
+            104,
+            121
+          ],
+          "bytes": 20880
+        },
+        {
+          "direction": 7,
+          "frame": 0,
+          "sourcePNGsha256": "fe4b3141fcad1ad8196c9901ec5c5f9a1a9afa7c9dedb15554edc6595412157c",
+          "alphaBBox": [
+            52,
+            38,
+            104,
+            116
+          ],
+          "bytes": 21332
+        },
+        {
+          "direction": 7,
+          "frame": 1,
+          "sourcePNGsha256": "20b40f2e3263d3c2479c094eaa81f8af704d0172863e159adbbdf4c6d0beba74",
+          "alphaBBox": [
+            56,
+            38,
+            103,
+            115
+          ],
+          "bytes": 21202
+        },
+        {
+          "direction": 7,
+          "frame": 2,
+          "sourcePNGsha256": "1192e86b143c7d2fe73a7491f71f32c372c1a760567d4f1725867eab0255c03e",
+          "alphaBBox": [
+            63,
+            37,
+            104,
+            112
+          ],
+          "bytes": 20898
+        },
+        {
+          "direction": 7,
+          "frame": 3,
+          "sourcePNGsha256": "b87b9e9ac1cdf0175397cb543cbda1fc49b0b9dc130a094982d3513ed9848ef1",
+          "alphaBBox": [
+            63,
+            38,
+            106,
+            122
+          ],
+          "bytes": 21539
+        },
+        {
+          "direction": 7,
+          "frame": 4,
+          "sourcePNGsha256": "9090b0079b5c35d2f782679918a313ffcf4d51dc31621eef9cffb492a13f2279",
+          "alphaBBox": [
+            62,
+            39,
+            108,
+            123
+          ],
+          "bytes": 21643
+        },
+        {
+          "direction": 7,
+          "frame": 5,
+          "sourcePNGsha256": "0521d348ba8769f661bc82459fbae1523737e6f1cc6c91e5e521789dcc284c10",
+          "alphaBBox": [
+            61,
+            40,
+            106,
+            124
+          ],
+          "bytes": 21484
+        },
+        {
+          "direction": 7,
+          "frame": 6,
+          "sourcePNGsha256": "103393a8a348cefdd76843792b976b7c612828954ce51513cd016df5cf51cab5",
+          "alphaBBox": [
+            58,
+            39,
+            102,
+            121
+          ],
+          "bytes": 21356
+        },
+        {
+          "direction": 7,
+          "frame": 7,
+          "sourcePNGsha256": "93988a12a45b7902051d48b4275e87ec523b738ea306da1838d961c99840d40d",
+          "alphaBBox": [
+            55,
+            38,
+            102,
+            119
+          ],
+          "bytes": 21406
+        }
+      ]
+    },
+    "sprint": {
+      "path": "silver_sprint_roll_studio.webp",
+      "width": 1280,
+      "height": 1280,
+      "frames": 8,
+      "sha256": "0b1fdd69fe1819d372f80167d5b353dfdb414e22f63c51a2833bc85c4fc5499b",
+      "bytes": 245150,
+      "cells": [
+        {
+          "direction": 0,
+          "frame": 0,
+          "sourcePNGsha256": "c3fb33c6ae70d9e614fdc18b04621fcea792483b468beecc5d1917d06c06c948",
+          "alphaBBox": [
+            53,
+            58,
+            109,
+            121
+          ],
+          "bytes": 21194
+        },
+        {
+          "direction": 0,
+          "frame": 1,
+          "sourcePNGsha256": "da6830d8cf744962aeb51a62c3e77d3db8928278ca44a9465ca74be629d1b4f1",
+          "alphaBBox": [
+            54,
+            63,
+            110,
+            115
+          ],
+          "bytes": 20386
+        },
+        {
+          "direction": 0,
+          "frame": 2,
+          "sourcePNGsha256": "1292e685b8c91e6c933c2648c7ff49fecc23f6b8aecbf84acd38f30fc85b4c65",
+          "alphaBBox": [
+            54,
+            63,
+            107,
+            112
+          ],
+          "bytes": 19883
+        },
+        {
+          "direction": 0,
+          "frame": 3,
+          "sourcePNGsha256": "a97698c73feefb3a7bfb07e79774e77302c7cf8d0d58d074322df083a3bccfff",
+          "alphaBBox": [
+            53,
+            58,
+            106,
+            120
+          ],
+          "bytes": 20645
+        },
+        {
+          "direction": 0,
+          "frame": 4,
+          "sourcePNGsha256": "334e9d4f8bb69c4016137bae9aa3e66d120a266a45369242932b8edbe98b7636",
+          "alphaBBox": [
+            51,
+            58,
+            106,
+            120
+          ],
+          "bytes": 20816
+        },
+        {
+          "direction": 0,
+          "frame": 5,
+          "sourcePNGsha256": "072c9bb87b20aed864e54ca969bc3346abca9b071aa9f96ac8122b970da35c0f",
+          "alphaBBox": [
+            51,
+            62,
+            106,
+            121
+          ],
+          "bytes": 20347
+        },
+        {
+          "direction": 0,
+          "frame": 6,
+          "sourcePNGsha256": "36d7bcb0d101e90e4f4c0ba9bcbd8160e124dbdd5462be36a15f747be74a92ee",
+          "alphaBBox": [
+            53,
+            59,
+            107,
+            118
+          ],
+          "bytes": 20342
+        },
+        {
+          "direction": 0,
+          "frame": 7,
+          "sourcePNGsha256": "d9f1732ed3f1e2d77c079cdd94a845fac554bd73ea51ad22c755c7e08bd397a6",
+          "alphaBBox": [
+            54,
+            59,
+            107,
+            120
+          ],
+          "bytes": 20884
+        },
+        {
+          "direction": 1,
+          "frame": 0,
+          "sourcePNGsha256": "af45a00ac2e8d42e01d2ce1556cb6cb51a7b85647d9021cac51a4593a6ad7305",
+          "alphaBBox": [
+            46,
+            56,
+            102,
+            121
+          ],
+          "bytes": 21376
+        },
+        {
+          "direction": 1,
+          "frame": 1,
+          "sourcePNGsha256": "0ff97e2524a2de184dd14313d20100b9e9d7b816830fc499004af5ea43e52f91",
+          "alphaBBox": [
+            48,
+            57,
+            100,
+            120
+          ],
+          "bytes": 20407
+        },
+        {
+          "direction": 1,
+          "frame": 2,
+          "sourcePNGsha256": "838e40d2bd1e489e236ded1e68de00b11bc619200a997bc1bf6500b679e1e1a4",
+          "alphaBBox": [
+            46,
+            56,
+            110,
+            108
+          ],
+          "bytes": 20628
+        },
+        {
+          "direction": 1,
+          "frame": 3,
+          "sourcePNGsha256": "09be62c7c68dd9aaaf898189ee93b855076c9fa2832a634080797ad027b77485",
+          "alphaBBox": [
+            45,
+            52,
+            109,
+            111
+          ],
+          "bytes": 21025
+        },
+        {
+          "direction": 1,
+          "frame": 4,
+          "sourcePNGsha256": "f1eac30772c168c187835391cca8c60c933d9b62fbd2d188636a60414c4a46b7",
+          "alphaBBox": [
+            47,
+            52,
+            106,
+            111
+          ],
+          "bytes": 20839
+        },
+        {
+          "direction": 1,
+          "frame": 5,
+          "sourcePNGsha256": "600fd3942e4615d1fba8a72fe927a887dd3d876caae7c2c13f64385881cd15c2",
+          "alphaBBox": [
+            49,
+            57,
+            98,
+            114
+          ],
+          "bytes": 20196
+        },
+        {
+          "direction": 1,
+          "frame": 6,
+          "sourcePNGsha256": "ef8517683897cac86bd9b463f1992a19c513376a29e3b3e62f68edc7e5ecb15b",
+          "alphaBBox": [
+            47,
+            54,
+            97,
+            120
+          ],
+          "bytes": 20128
+        },
+        {
+          "direction": 1,
+          "frame": 7,
+          "sourcePNGsha256": "c2ddab46148f4bd0190f655e9362f46145339459f9a2ca45974db8f13b8f7629",
+          "alphaBBox": [
+            46,
+            54,
+            100,
+            120
+          ],
+          "bytes": 21015
+        },
+        {
+          "direction": 2,
+          "frame": 0,
+          "sourcePNGsha256": "b708a9cc24dd011f71b8492904de9d0aa32d25ecc265e7f97795356a1f860edc",
+          "alphaBBox": [
+            38,
+            43,
+            107,
+            117
+          ],
+          "bytes": 21451
+        },
+        {
+          "direction": 2,
+          "frame": 1,
+          "sourcePNGsha256": "eae4beb8330a498c132e5d062ed588dc9c5ddea83c4d74421054d18c20e8ae30",
+          "alphaBBox": [
+            38,
+            45,
+            98,
+            121
+          ],
+          "bytes": 20787
+        },
+        {
+          "direction": 2,
+          "frame": 2,
+          "sourcePNGsha256": "e4cb5fe0eaa15b32da1952d26122cd3d6f07b3db0858f6d8753df38cb8366747",
+          "alphaBBox": [
+            37,
+            44,
+            106,
+            119
+          ],
+          "bytes": 21667
+        },
+        {
+          "direction": 2,
+          "frame": 3,
+          "sourcePNGsha256": "126077faa326e6f9937cbd76da5ffcd5f1a60d8a79bf52325194a7f6dff7f42b",
+          "alphaBBox": [
+            37,
+            43,
+            109,
+            111
+          ],
+          "bytes": 21855
+        },
+        {
+          "direction": 2,
+          "frame": 4,
+          "sourcePNGsha256": "d4cd6e0fe7bfe2340e3dda2273131d5caaf05d6a8e485f047258d788084dcddb",
+          "alphaBBox": [
+            39,
+            44,
+            105,
+            110
+          ],
+          "bytes": 21987
+        },
+        {
+          "direction": 2,
+          "frame": 5,
+          "sourcePNGsha256": "fccf0d9cb85ee6041506611c5683d9f233bd9dbe463fff5f23d7170c29d9fa59",
+          "alphaBBox": [
+            39,
+            45,
+            90,
+            114
+          ],
+          "bytes": 20847
+        },
+        {
+          "direction": 2,
+          "frame": 6,
+          "sourcePNGsha256": "35e57b1b82721a50189d80d95294bb355fb30e72494616557b01331d0f507e23",
+          "alphaBBox": [
+            38,
+            42,
+            104,
+            115
+          ],
+          "bytes": 21446
+        },
+        {
+          "direction": 2,
+          "frame": 7,
+          "sourcePNGsha256": "47421f3e132c23b3477d28e41155d477a6daf3520b7f779da586f5f50c2d67e5",
+          "alphaBBox": [
+            38,
+            41,
+            108,
+            113
+          ],
+          "bytes": 21540
+        },
+        {
+          "direction": 3,
+          "frame": 0,
+          "sourcePNGsha256": "74a73098dccff913f717c8a0f4979c64f96ef82eb129ba431a672bf86ff11722",
+          "alphaBBox": [
+            46,
+            31,
+            107,
+            114
+          ],
+          "bytes": 21697
+        },
+        {
+          "direction": 3,
+          "frame": 1,
+          "sourcePNGsha256": "00b9745f3da124bdc90ed50b39b5b3ea7428527c2348300cfc38767bd45fd5fc",
+          "alphaBBox": [
+            49,
+            33,
+            102,
+            118
+          ],
+          "bytes": 21599
+        },
+        {
+          "direction": 3,
+          "frame": 2,
+          "sourcePNGsha256": "53e3c8ca370a84a459a5b4e41a76ae6bf94aef6a3c7c91fe8c49b817cf286321",
+          "alphaBBox": [
+            47,
+            30,
+            98,
+            125
+          ],
+          "bytes": 21409
+        },
+        {
+          "direction": 3,
+          "frame": 3,
+          "sourcePNGsha256": "bf79a79dd7686c49c7640b1039243e5cb220eac5e20fc6157ee66ac31b81fc40",
+          "alphaBBox": [
+            47,
+            30,
+            101,
+            122
+          ],
+          "bytes": 21505
+        },
+        {
+          "direction": 3,
+          "frame": 4,
+          "sourcePNGsha256": "62584b2ce74d92b332df01c5b8f888b97bba11d534c82d56cee5694fbb4f2976",
+          "alphaBBox": [
+            46,
+            31,
+            103,
+            119
+          ],
+          "bytes": 21753
+        },
+        {
+          "direction": 3,
+          "frame": 5,
+          "sourcePNGsha256": "2e108f4c42dbd40e390d726feafab17558885d15b76baf2787058b36b6842bce",
+          "alphaBBox": [
+            49,
+            33,
+            99,
+            116
+          ],
+          "bytes": 21351
+        },
+        {
+          "direction": 3,
+          "frame": 6,
+          "sourcePNGsha256": "71cda1e751f8dc42dc94de1920867f17e8492169d4b2ad3653bbdc368d563207",
+          "alphaBBox": [
+            48,
+            30,
+            111,
+            113
+          ],
+          "bytes": 21582
+        },
+        {
+          "direction": 3,
+          "frame": 7,
+          "sourcePNGsha256": "643bd506b0a0e0975c7e437b786a3cbbc602cb84a307a7acd63d105fd73c54b1",
+          "alphaBBox": [
+            47,
+            29,
+            109,
+            114
+          ],
+          "bytes": 21839
+        },
+        {
+          "direction": 4,
+          "frame": 0,
+          "sourcePNGsha256": "16abbe0d090cb7a0052ac719f850a01ff04c9576607b66a226844ed7432a91bc",
+          "alphaBBox": [
+            52,
+            26,
+            106,
+            124
+          ],
+          "bytes": 21302
+        },
+        {
+          "direction": 4,
+          "frame": 1,
+          "sourcePNGsha256": "5741587a4b84293a97c5a09f705e2d84a4e720520283a3ce123df33d5f74c61f",
+          "alphaBBox": [
+            50,
+            28,
+            107,
+            118
+          ],
+          "bytes": 21255
+        },
+        {
+          "direction": 4,
+          "frame": 2,
+          "sourcePNGsha256": "cc0fa7e7a96e028256d591ae075e80684dea6afe7f80ac98453a555581974a73",
+          "alphaBBox": [
+            53,
+            25,
+            106,
+            125
+          ],
+          "bytes": 21852
+        },
+        {
+          "direction": 4,
+          "frame": 3,
+          "sourcePNGsha256": "741b64ef91b425784ddbbd4fb578fd1a6197fc91077b5a69e221ac2d1fc1d3ee",
+          "alphaBBox": [
+            54,
+            24,
+            108,
+            122
+          ],
+          "bytes": 21344
+        },
+        {
+          "direction": 4,
+          "frame": 4,
+          "sourcePNGsha256": "a7ddfe42a565f241a1f800c63ed74b408401ce6b7573cd6eb92ccd6220916b7c",
+          "alphaBBox": [
+            54,
+            26,
+            108,
+            118
+          ],
+          "bytes": 21249
+        },
+        {
+          "direction": 4,
+          "frame": 5,
+          "sourcePNGsha256": "5e8a9131bb5e73f730e606da67fe321bf8ab13cf1b6c575d5af72b2e018b2c3d",
+          "alphaBBox": [
+            54,
+            28,
+            109,
+            113
+          ],
+          "bytes": 20987
+        },
+        {
+          "direction": 4,
+          "frame": 6,
+          "sourcePNGsha256": "4e3b7344a2375240cecb4a4060cf606569831df65b108083fe9c4ed764e895fe",
+          "alphaBBox": [
+            54,
+            25,
+            107,
+            120
+          ],
+          "bytes": 21478
+        },
+        {
+          "direction": 4,
+          "frame": 7,
+          "sourcePNGsha256": "e82fc2380ceef0ab967aeb4b2cdabff4292360c20b93912fae1bbb0fa239749a",
+          "alphaBBox": [
+            53,
+            24,
+            107,
+            124
+          ],
+          "bytes": 21374
+        },
+        {
+          "direction": 5,
+          "frame": 0,
+          "sourcePNGsha256": "5059c5d432212f37a5d8840cb86492ea19112cc7aca70c4111b8ce2edfc20adc",
+          "alphaBBox": [
+            58,
+            31,
+            115,
+            122
+          ],
+          "bytes": 21778
+        },
+        {
+          "direction": 5,
+          "frame": 1,
+          "sourcePNGsha256": "8d551551a115416417bad7abf9412d13ec672b60a35743fbe558a11502973b19",
+          "alphaBBox": [
+            60,
+            33,
+            112,
+            120
+          ],
+          "bytes": 21956
+        },
+        {
+          "direction": 5,
+          "frame": 2,
+          "sourcePNGsha256": "b4014ec73d5197bc0aee28e05e804413d692cf4453a2b992f84e6c8a0ff3e34e",
+          "alphaBBox": [
+            50,
+            30,
+            114,
+            117
+          ],
+          "bytes": 21999
+        },
+        {
+          "direction": 5,
+          "frame": 3,
+          "sourcePNGsha256": "395800845b9c2771514c434dc8cd3e8a1d7b9cfd68a7198324dd00f3f3b0dc1a",
+          "alphaBBox": [
+            51,
+            29,
+            115,
+            113
+          ],
+          "bytes": 21366
+        },
+        {
+          "direction": 5,
+          "frame": 4,
+          "sourcePNGsha256": "7076f4e63e7e8cd89be8fc584a9968cb45f24db375727014fd75c27ca2f2732d",
+          "alphaBBox": [
+            54,
+            30,
+            114,
+            111
+          ],
+          "bytes": 21605
+        },
+        {
+          "direction": 5,
+          "frame": 5,
+          "sourcePNGsha256": "d833ddf7b7208a473cd27720d7e844ed7a2d5e9524930c2ff0288da1147ec84d",
+          "alphaBBox": [
+            62,
+            34,
+            112,
+            113
+          ],
+          "bytes": 21627
+        },
+        {
+          "direction": 5,
+          "frame": 6,
+          "sourcePNGsha256": "6ece9fad90cdf948e04abec847de3f8961e5d16880825495668850300344d839",
+          "alphaBBox": [
+            63,
+            31,
+            113,
+            123
+          ],
+          "bytes": 21294
+        },
+        {
+          "direction": 5,
+          "frame": 7,
+          "sourcePNGsha256": "608803f2ede312fd8455dc914508f952799719a38a1235e9804a4018c708ff79",
+          "alphaBBox": [
+            60,
+            30,
+            113,
+            124
+          ],
+          "bytes": 21768
+        },
+        {
+          "direction": 6,
+          "frame": 0,
+          "sourcePNGsha256": "1543d49f4e3102a6f18967933de8ea112a6598a3020e399a52aefd01e2638074",
+          "alphaBBox": [
+            53,
+            44,
+            123,
+            113
+          ],
+          "bytes": 22144
+        },
+        {
+          "direction": 6,
+          "frame": 1,
+          "sourcePNGsha256": "f761c290f1fca93053939c91094b30ac2f994efd6de3da3c23054077e7685951",
+          "alphaBBox": [
+            63,
+            45,
+            122,
+            115
+          ],
+          "bytes": 21297
+        },
+        {
+          "direction": 6,
+          "frame": 2,
+          "sourcePNGsha256": "ddea52551bec3da987d29a81870d0af83761beef49211cc81e6cd9b7f73e05ec",
+          "alphaBBox": [
+            54,
+            43,
+            123,
+            116
+          ],
+          "bytes": 21083
+        },
+        {
+          "direction": 6,
+          "frame": 3,
+          "sourcePNGsha256": "6c7e2642727b21b937c3b860f3d0c684bebe212981203f1bc6389b98f2a29c62",
+          "alphaBBox": [
+            51,
+            42,
+            123,
+            112
+          ],
+          "bytes": 21421
+        },
+        {
+          "direction": 6,
+          "frame": 4,
+          "sourcePNGsha256": "81b1ad4680979e39e3c1bf87791e9975ce1aa3b049c9fc39724f8bd7b735719a",
+          "alphaBBox": [
+            55,
+            42,
+            122,
+            117
+          ],
+          "bytes": 21271
+        },
+        {
+          "direction": 6,
+          "frame": 5,
+          "sourcePNGsha256": "f8f3419a815a8cffc779ff705d97ec9aeeb3446943a5491f420a6b93f367521e",
+          "alphaBBox": [
+            69,
+            45,
+            122,
+            120
+          ],
+          "bytes": 20449
+        },
+        {
+          "direction": 6,
+          "frame": 6,
+          "sourcePNGsha256": "320e8c896606e313b958cd3edc3b18dcfe7c179e81753d1222babb319d4c7450",
+          "alphaBBox": [
+            56,
+            42,
+            123,
+            119
+          ],
+          "bytes": 21734
+        },
+        {
+          "direction": 6,
+          "frame": 7,
+          "sourcePNGsha256": "808d0e315e947494315f9dbab213bb495b9145b35595672db16743b98ab79ed3",
+          "alphaBBox": [
+            51,
+            42,
+            122,
+            113
+          ],
+          "bytes": 21759
+        },
+        {
+          "direction": 7,
+          "frame": 0,
+          "sourcePNGsha256": "da9c4b9f4213e17977eb84a412df63747e551689f596ebb677eeb3a4b7683f79",
+          "alphaBBox": [
+            53,
+            51,
+            114,
+            112
+          ],
+          "bytes": 20792
+        },
+        {
+          "direction": 7,
+          "frame": 1,
+          "sourcePNGsha256": "bdda669faf61a5f715b26dd44d7518d2d2cc8d9e7f2c8c69f0fcded8d65a12cb",
+          "alphaBBox": [
+            60,
+            57,
+            111,
+            110
+          ],
+          "bytes": 19890
+        },
+        {
+          "direction": 7,
+          "frame": 2,
+          "sourcePNGsha256": "3efd0bc9601570ab097b4ef0ecdd7ac521aa8ffb723a8b5e0959e689df0a3d91",
+          "alphaBBox": [
+            62,
+            56,
+            112,
+            117
+          ],
+          "bytes": 19921
+        },
+        {
+          "direction": 7,
+          "frame": 3,
+          "sourcePNGsha256": "5d48fc727c5bc37ec7e3cfd907dd8b679950396aea155b28cdd37d78690b8110",
+          "alphaBBox": [
+            59,
+            56,
+            113,
+            120
+          ],
+          "bytes": 20947
+        },
+        {
+          "direction": 7,
+          "frame": 4,
+          "sourcePNGsha256": "f7c8112574bf919ab29484b43b7d66e0321edc74be436355582e521a52f81037",
+          "alphaBBox": [
+            57,
+            55,
+            114,
+            121
+          ],
+          "bytes": 21267
+        },
+        {
+          "direction": 7,
+          "frame": 5,
+          "sourcePNGsha256": "5e0931ea245eb21eadc25534089f8601889192213d541a02cfa0c2359abd07ae",
+          "alphaBBox": [
+            61,
+            57,
+            111,
+            124
+          ],
+          "bytes": 20425
+        },
+        {
+          "direction": 7,
+          "frame": 6,
+          "sourcePNGsha256": "ca9412ed73c4248cf233826ad7f60787ba2289910105147de3f63be5210ceedf",
+          "alphaBBox": [
+            49,
+            55,
+            112,
+            111
+          ],
+          "bytes": 20820
+        },
+        {
+          "direction": 7,
+          "frame": 7,
+          "sourcePNGsha256": "e9900f3091c29a3536892225ff8a678f1d7ee59ed3a1bd1b846e4aeb1fa6822f",
+          "alphaBBox": [
+            51,
+            52,
+            114,
+            111
+          ],
+          "bytes": 20867
+        }
+      ]
+    },
+    "jump": {
+      "path": "silver_jump_roll_studio.webp",
+      "width": 960,
+      "height": 1280,
+      "frames": 6,
+      "sha256": "86f4402cc3dc375bc3691cb9701b5520229556df1b998e2c14e2b09c022912fc",
+      "bytes": 193198,
+      "cells": [
+        {
+          "direction": 0,
+          "frame": 0,
+          "sourcePNGsha256": "46456b2596230f899cd07560e44306ff0ffd9bc3e02ee31ff5743859ef80ff3c",
+          "alphaBBox": [
+            33,
+            42,
+            122,
+            118
+          ],
+          "bytes": 23868
+        },
+        {
+          "direction": 0,
+          "frame": 1,
+          "sourcePNGsha256": "56d9573b12d9d86bf41c702f0091d6a4a0e0306655e90361cd6ae674c11415eb",
+          "alphaBBox": [
+            33,
+            42,
+            122,
+            118
+          ],
+          "bytes": 23898
+        },
+        {
+          "direction": 0,
+          "frame": 2,
+          "sourcePNGsha256": "23847afa758a43a265c7a28e4375405e3ed62dac4fffadcee8d331310d363383",
+          "alphaBBox": [
+            33,
+            42,
+            122,
+            118
+          ],
+          "bytes": 23827
+        },
+        {
+          "direction": 0,
+          "frame": 3,
+          "sourcePNGsha256": "7fa213e36da9420ab6f27190e346c295f95812c35043e0accffa39ce2d31c386",
+          "alphaBBox": [
+            33,
+            43,
+            120,
+            117
+          ],
+          "bytes": 23866
+        },
+        {
+          "direction": 0,
+          "frame": 4,
+          "sourcePNGsha256": "c44d1e6cf6d1bbb299cdb0d7d7c9834fad2e59ec1dd755acd5860c8c2dc86aed",
+          "alphaBBox": [
+            33,
+            42,
+            120,
+            117
+          ],
+          "bytes": 23829
+        },
+        {
+          "direction": 0,
+          "frame": 5,
+          "sourcePNGsha256": "fc099307084f2d4f89d7f959843fca523bf4da510883cf06bdf2c0d5ffd75ec6",
+          "alphaBBox": [
+            33,
+            42,
+            122,
+            118
+          ],
+          "bytes": 23875
+        },
+        {
+          "direction": 1,
+          "frame": 0,
+          "sourcePNGsha256": "3ec76c4be5075079a71dc3b15c61532a5ef47395264bda1fed1742c03817ed63",
+          "alphaBBox": [
+            53,
+            41,
+            102,
+            117
+          ],
+          "bytes": 21627
+        },
+        {
+          "direction": 1,
+          "frame": 1,
+          "sourcePNGsha256": "b970a2800b8a7e2911b9f2d1ebf9ff0208026740443999c20adcb9d8745387e2",
+          "alphaBBox": [
+            53,
+            40,
+            102,
+            117
+          ],
+          "bytes": 21849
+        },
+        {
+          "direction": 1,
+          "frame": 2,
+          "sourcePNGsha256": "870edb8874e5ceb1198ce256eaf4ac95bbd1e5175c7f87c9c9c8113fb981500e",
+          "alphaBBox": [
+            51,
+            39,
+            103,
+            117
+          ],
+          "bytes": 21797
+        },
+        {
+          "direction": 1,
+          "frame": 3,
+          "sourcePNGsha256": "ad866f43bc4c656b6c1b27361c3deb2b716cb7500e41d469d81761bc560a9cda",
+          "alphaBBox": [
+            51,
+            39,
+            104,
+            117
+          ],
+          "bytes": 21965
+        },
+        {
+          "direction": 1,
+          "frame": 4,
+          "sourcePNGsha256": "cab5ca3b145f2b535abf78ca9416a89b2bc8a2590dcf1adb96c621c289d683ec",
+          "alphaBBox": [
+            51,
+            40,
+            104,
+            117
+          ],
+          "bytes": 21998
+        },
+        {
+          "direction": 1,
+          "frame": 5,
+          "sourcePNGsha256": "2e436767ce1f9cd1ebfc88c25a616cf9b89a63f3751d3355b688cdf497f2fb01",
+          "alphaBBox": [
+            53,
+            41,
+            102,
+            117
+          ],
+          "bytes": 21641
+        },
+        {
+          "direction": 2,
+          "frame": 0,
+          "sourcePNGsha256": "a0a6a45e9dbef104f9671c9d1442e6c1eba0a7bc4a1a08778cbe2454284029c3",
+          "alphaBBox": [
+            57,
+            38,
+            96,
+            118
+          ],
+          "bytes": 21219
+        },
+        {
+          "direction": 2,
+          "frame": 1,
+          "sourcePNGsha256": "402aedea879242febbb0c5938c08fb0416aa2707f78fbc9e0249cf47a76c09b7",
+          "alphaBBox": [
+            57,
+            37,
+            97,
+            118
+          ],
+          "bytes": 21420
+        },
+        {
+          "direction": 2,
+          "frame": 2,
+          "sourcePNGsha256": "1a8707020a19a9ba9dd598b97212bf900eba80685aa87bbe45b157adac6ef3ff",
+          "alphaBBox": [
+            57,
+            36,
+            96,
+            119
+          ],
+          "bytes": 21280
+        },
+        {
+          "direction": 2,
+          "frame": 3,
+          "sourcePNGsha256": "0f6a2cf99411422a9736a24d1a6c7463632e76536056c16f364d9fc3de351937",
+          "alphaBBox": [
+            57,
+            37,
+            96,
+            118
+          ],
+          "bytes": 21286
+        },
+        {
+          "direction": 2,
+          "frame": 4,
+          "sourcePNGsha256": "4aefb9f04bed7e2e16a32c857dad458d516f0dfeef4849c282d7d4f615d7e5c8",
+          "alphaBBox": [
+            57,
+            38,
+            96,
+            118
+          ],
+          "bytes": 21220
+        },
+        {
+          "direction": 2,
+          "frame": 5,
+          "sourcePNGsha256": "dbf175e2b36bd96aead094da17c2edf701de9944cbffc4e6809e60e14db4b43f",
+          "alphaBBox": [
+            57,
+            38,
+            96,
+            118
+          ],
+          "bytes": 21247
+        },
+        {
+          "direction": 3,
+          "frame": 0,
+          "sourcePNGsha256": "cd86365c5b1e7387470ff6ac0cff88fd784244dad86aa2dd22d9945922845e87",
+          "alphaBBox": [
+            38,
+            36,
+            122,
+            114
+          ],
+          "bytes": 22263
+        },
+        {
+          "direction": 3,
+          "frame": 1,
+          "sourcePNGsha256": "68fef84e838a3e43863d7fc6031470a55edc30e52e6af68d6b0ddb382f2397ea",
+          "alphaBBox": [
+            38,
+            35,
+            123,
+            114
+          ],
+          "bytes": 22123
+        },
+        {
+          "direction": 3,
+          "frame": 2,
+          "sourcePNGsha256": "45068e3ea57a12cd4513662bfe2e94314ef0a74feda593f4b6032945495f1c36",
+          "alphaBBox": [
+            39,
+            34,
+            121,
+            114
+          ],
+          "bytes": 22278
+        },
+        {
+          "direction": 3,
+          "frame": 3,
+          "sourcePNGsha256": "c2c83dfecbd9cc83ae1b576b0e60962a1f63cd9f1fd2a74d1c21c779eb492844",
+          "alphaBBox": [
+            39,
+            35,
+            120,
+            114
+          ],
+          "bytes": 22211
+        },
+        {
+          "direction": 3,
+          "frame": 4,
+          "sourcePNGsha256": "9c12e460bbcfc2f7147e96aefb4f71ede3417a64fc7d99b3149a32a1fa532fc4",
+          "alphaBBox": [
+            39,
+            36,
+            122,
+            114
+          ],
+          "bytes": 22186
+        },
+        {
+          "direction": 3,
+          "frame": 5,
+          "sourcePNGsha256": "0ee778e28fd5f54106ca38f7225135464e2d6b1719c9b295b1d3ad3b115e985b",
+          "alphaBBox": [
+            38,
+            36,
+            122,
+            114
+          ],
+          "bytes": 22228
+        },
+        {
+          "direction": 4,
+          "frame": 0,
+          "sourcePNGsha256": "7b28ef26b33a970125dc06e246b2c8e539096075a80d30debb1655a51134e059",
+          "alphaBBox": [
+            39,
+            34,
+            127,
+            117
+          ],
+          "bytes": 21935
+        },
+        {
+          "direction": 4,
+          "frame": 1,
+          "sourcePNGsha256": "3de1005eefdfe29abe2014f764b8ac224ddcedda841d9942e7f560b7284e752c",
+          "alphaBBox": [
+            38,
+            35,
+            126,
+            118
+          ],
+          "bytes": 22023
+        },
+        {
+          "direction": 4,
+          "frame": 2,
+          "sourcePNGsha256": "72eeafe8e0d63bde41f234140fb442967820dc750810246361d18903ca9679ff",
+          "alphaBBox": [
+            38,
+            34,
+            127,
+            117
+          ],
+          "bytes": 21998
+        },
+        {
+          "direction": 4,
+          "frame": 3,
+          "sourcePNGsha256": "20ee7b0d68f06a73df80b727deaf1307cc824aefbd531b33b5e0f84d11d3966c",
+          "alphaBBox": [
+            39,
+            35,
+            127,
+            116
+          ],
+          "bytes": 21957
+        },
+        {
+          "direction": 4,
+          "frame": 4,
+          "sourcePNGsha256": "f2f97eda8cc74bc96f73ff91c8e6e5a6cc2c2c7aba3248e18d771ed65877a578",
+          "alphaBBox": [
+            40,
+            34,
+            127,
+            116
+          ],
+          "bytes": 21941
+        },
+        {
+          "direction": 4,
+          "frame": 5,
+          "sourcePNGsha256": "805829c4d88f1c1d1874fc137b50173b0911c837365f65b607c0811b35f14aef",
+          "alphaBBox": [
+            39,
+            34,
+            127,
+            117
+          ],
+          "bytes": 21936
+        },
+        {
+          "direction": 5,
+          "frame": 0,
+          "sourcePNGsha256": "4256274b6d2d09c83b1fdb95c247f3866a9f2cfb23defe8b7630fe3faafc8714",
+          "alphaBBox": [
+            58,
+            36,
+            108,
+            122
+          ],
+          "bytes": 21926
+        },
+        {
+          "direction": 5,
+          "frame": 1,
+          "sourcePNGsha256": "0015f961fdb5f7707aa194121066ad0a0acb2898a4db9f0ac185649c6f83d220",
+          "alphaBBox": [
+            58,
+            37,
+            107,
+            122
+          ],
+          "bytes": 21960
+        },
+        {
+          "direction": 5,
+          "frame": 2,
+          "sourcePNGsha256": "8d3ce2ed65d38e4519bbf86e685b38f8dae1ae0f88c20c421d9479450166ec98",
+          "alphaBBox": [
+            57,
+            38,
+            109,
+            121
+          ],
+          "bytes": 22139
+        },
+        {
+          "direction": 5,
+          "frame": 3,
+          "sourcePNGsha256": "f6014bbf69cd25818396568938320840dda3bb7e76bc3325593464aa3c55964b",
+          "alphaBBox": [
+            55,
+            38,
+            110,
+            121
+          ],
+          "bytes": 22232
+        },
+        {
+          "direction": 5,
+          "frame": 4,
+          "sourcePNGsha256": "c68dea4cbcb6bfc62eeb4e33112657a5dc8e6766cba42ae9734bc1ea978e842e",
+          "alphaBBox": [
+            56,
+            36,
+            109,
+            121
+          ],
+          "bytes": 22035
+        },
+        {
+          "direction": 5,
+          "frame": 5,
+          "sourcePNGsha256": "b4329158f521f39494f0830ad6901daae1c4102068d73d216b0c8c1808afc943",
+          "alphaBBox": [
+            58,
+            36,
+            108,
+            122
+          ],
+          "bytes": 21920
+        },
+        {
+          "direction": 6,
+          "frame": 0,
+          "sourcePNGsha256": "17284e9e8cf3c4933aeff5c74f51a5d85660cf03259e8169d6f5c7933c8c3526",
+          "alphaBBox": [
+            64,
+            38,
+            103,
+            125
+          ],
+          "bytes": 21223
+        },
+        {
+          "direction": 6,
+          "frame": 1,
+          "sourcePNGsha256": "608aa557bd2a74d17804b85453049580907984dd283372af2551645a88eefeb3",
+          "alphaBBox": [
+            63,
+            40,
+            103,
+            125
+          ],
+          "bytes": 21156
+        },
+        {
+          "direction": 6,
+          "frame": 2,
+          "sourcePNGsha256": "235a5a4e4824b90c95464f449e3dd36518bff55d8b42554a4117b3c4a8816e33",
+          "alphaBBox": [
+            63,
+            41,
+            103,
+            124
+          ],
+          "bytes": 21126
+        },
+        {
+          "direction": 6,
+          "frame": 3,
+          "sourcePNGsha256": "0474e68be62b61ee66c89646ab756c777080ca7edee54b9fbf3bdda4a27316d2",
+          "alphaBBox": [
+            65,
+            40,
+            104,
+            124
+          ],
+          "bytes": 20934
+        },
+        {
+          "direction": 6,
+          "frame": 4,
+          "sourcePNGsha256": "14e9402650f410541d67fff32288d223b3733718b683be4bea012a03ea881b56",
+          "alphaBBox": [
+            65,
+            39,
+            104,
+            124
+          ],
+          "bytes": 20968
+        },
+        {
+          "direction": 6,
+          "frame": 5,
+          "sourcePNGsha256": "599c44dbaa8b0cce1b3ccb0d7f55b7999b92ade1092d7de3c0d8a35429744486",
+          "alphaBBox": [
+            64,
+            38,
+            103,
+            125
+          ],
+          "bytes": 21225
+        },
+        {
+          "direction": 7,
+          "frame": 0,
+          "sourcePNGsha256": "ca1c9ada7a15759f0727609f7234b66aebe3fe5ea29ddd1313c2070f2324b607",
+          "alphaBBox": [
+            38,
+            41,
+            121,
+            122
+          ],
+          "bytes": 23405
+        },
+        {
+          "direction": 7,
+          "frame": 1,
+          "sourcePNGsha256": "c93143f72ba6fb1862f35ff471fad2d17baae3bdc773420c252bb770822af072",
+          "alphaBBox": [
+            38,
+            42,
+            122,
+            123
+          ],
+          "bytes": 23582
+        },
+        {
+          "direction": 7,
+          "frame": 2,
+          "sourcePNGsha256": "fe82839b32c9826704cb0d9be27ae58d39541e3082a602da5b42e63cb6353d6c",
+          "alphaBBox": [
+            39,
+            43,
+            121,
+            122
+          ],
+          "bytes": 23273
+        },
+        {
+          "direction": 7,
+          "frame": 3,
+          "sourcePNGsha256": "a57c588080f875312f5be199e5d5ff6ff6872e4e2394e45d214b8fdb5037bde1",
+          "alphaBBox": [
+            40,
+            42,
+            121,
+            122
+          ],
+          "bytes": 23296
+        },
+        {
+          "direction": 7,
+          "frame": 4,
+          "sourcePNGsha256": "bbe139077af4e42e30eaef42d2c850343791bf79399b9b4c3127e7565c3ffcac",
+          "alphaBBox": [
+            39,
+            42,
+            121,
+            122
+          ],
+          "bytes": 23375
+        },
+        {
+          "direction": 7,
+          "frame": 5,
+          "sourcePNGsha256": "0b519c4d2c6fbb2371ddaeba5325fe8ffde375cf04d7afd3a17279eb508a084a",
+          "alphaBBox": [
+            38,
+            41,
+            121,
+            122
+          ],
+          "bytes": 23407
+        }
+      ]
+    }
+  },
+  "originalModelRedistributed": false,
+  "pixelRetouch": false
+}
