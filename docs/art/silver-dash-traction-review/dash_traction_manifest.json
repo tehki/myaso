@@ -1,0 +1,137 @@
+{
+  "status": "AUTHENTIC_BLENDER_SOURCE_ART_ONLY_HUMAN_VISUAL_HOLD",
+  "action": "Graphics3A_P0_Silver_Dash_Traction_140ms",
+  "phaseSamplesMs": [
+    0,
+    10,
+    26,
+    45,
+    72,
+    96,
+    119,
+    140
+  ],
+  "durationMs": 140,
+  "directionRows": 8,
+  "samplesPerRow": 8,
+  "frameSizePx": [
+    160,
+    160
+  ],
+  "atlasSizePx": [
+    1280,
+    1280
+  ],
+  "frameMinimumTransparentMarginPx": 15,
+  "genuineSourcePixelChangeFromFirstToMidPerDirection": [
+    4435,
+    3767,
+    4358,
+    5490,
+    5439,
+    4677,
+    3709,
+    4227
+  ],
+  "originalSourceBottomPixelPositionsByDirection": [
+    [
+      135,
+      133,
+      134,
+      135,
+      132,
+      133,
+      134,
+      135
+    ],
+    [
+      139,
+      138,
+      137,
+      138,
+      138,
+      137,
+      139,
+      139
+    ],
+    [
+      134,
+      133,
+      129,
+      131,
+      134,
+      134,
+      134,
+      134
+    ],
+    [
+      125,
+      124,
+      124,
+      123,
+      129,
+      128,
+      126,
+      125
+    ],
+    [
+      131,
+      134,
+      136,
+      134,
+      130,
+      131,
+      131,
+      131
+    ],
+    [
+      136,
+      138,
+      139,
+      138,
+      137,
+      137,
+      136,
+      136
+    ],
+    [
+      138,
+      137,
+      135,
+      137,
+      139,
+      139,
+      138,
+      138
+    ],
+    [
+      132,
+      128,
+      123,
+      128,
+      132,
+      132,
+      133,
+      132
+    ]
+  ],
+  "serverRootTranslation": false,
+  "realWorldFootContactValidated": false,
+  "originalKnightGlbRedistributed": false,
+  "runtimeEnabled": false,
+  "artApproved": false,
+  "assets": {
+    "oldDash": {
+      "name": "silver_dash_p0.webp",
+      "sha256": "b3152d729e3a7065eced1ab4da99d710479e75a2b3109007a95b9fce305629a5"
+    },
+    "newDash": {
+      "name": "silver_dash_traction_p0.webp",
+      "sha256": "ac399c5ce02473ca68d8d99474b230c4782f6bfb2f6e8232b950fcce5cf707fe"
+    },
+    "newGif": {
+      "name": "silver_dash_traction_8direction_loop.gif",
+      "sha256": "aaf25ea0d2a6688e9499fad78912059e9b59692a6ba1803e2d6360d88d9044cb"
+    }
+  }
+}
