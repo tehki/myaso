@@ -9,6 +9,7 @@ on:
       - "server/src/prealpha_lmb_gesture_authority.rs"
       - "server/src/lib.rs"
       - "server/tests/prealpha_authenticated_gesture_to_world.rs"
+      - "server/tests/combat4c_late_busy_original_world.rs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
@@ -28,6 +29,8 @@ jobs:
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
       - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
+      - name: Combat4C independent original World delayed busy terminal and next-hit regression
+        run: cargo test --locked --manifest-path server/Cargo.toml --test combat4c_late_busy_original_world -- --nocapture
       - name: Fresh-process OS CSPRNG boot nonce and server World auth gate
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_boot_nonce_authority -- --nocapture
       - name: Real original Rust QUIC 4 distinct admitted seats + fifth denied and World light
