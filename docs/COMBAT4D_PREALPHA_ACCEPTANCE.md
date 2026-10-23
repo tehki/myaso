@@ -112,6 +112,20 @@ The immutable transcript is in [qa/evidence/m40-run-39944996021.json](../qa/evid
 
 **Routing:** 4A/8A observe true W3C defender block-headstart → submitted input, 4B original parry-age World branch, UI10 native HUD, 4D timing reproducibility and honest evidence. Preserve original parry, block, HP, 125ms and unwaived M40/M193 assertions. No old-run rewrite, main merge, gameplay change or deployment.
 
+## Protected M194 second guard-block attempt becomes real parry — 2026-10-23
+
+Independent 4D draft [#865](https://github.com/tehki/myaso/pull/865) exact head `f6c8122228231d7467bcdaaa4f4c9afc7a342b36` [protected quality #39948482124](https://github.com/tehki/myaso/actions/runs/39948482124), job `120398827130`: **COMPLETED FAILURE step `Validate M194 repeated real guard-break block-only pressure`**, inside preserved M193 second exchange.
+
+The authentic original Rust World and Chrome/Firefox native W3C log independently show:
+
+- First exchange: attacker fighter1 LightWindup1 tick275, defender fighter2 Block6 tick276, real LightActive2 **`M201_AUTH_BLOCK tick283`**; defender guard **100→62** (−38), HP100. This source's first BLOCK is true despite its **7 integer log ticks** between Block6 and contact; coarse integer tick labels alone do not establish the exact fractional parry-age onset.
+- Second exchange: LightWindup1 tick309, Block6 tick311, legitimate `M201_AUTH_PARRY tick317 attacker=1 target=2` and attacker ParryStun7; **six ticks (~100ms)** inside unchanged 125ms parry. Defender still guard62/HP100, correct `Parry!` UI. Original second required -38 block was absent; the native runner correctly rejected the invalid repeated-block prerequisite.
+- Trusted wheel→Chrome UP chronology and physical Chrome LMB pointerDOWN/UP twice are recorded by the original `M212_GUARD_BREAK_INGRESS`. Do not compare raw cross-browser epoch values as proof of packet transmission duration; do not invent guard loss to make M194 pass or blame source1/KeyE transport without trace correlation.
+
+Source transcript and raw W3C fields: [qa/evidence/m194-run-39948482124.json](../qa/evidence/m194-run-39948482124.json). `node scripts/combat4d-m194-proof.mjs qa/evidence/m194-run-39948482124.json` checks source consistency and prints **HOLD**; seven tests reject false 24 guard, reclassified block/parry, missing real World action, spoofed browser inputs or protected green. A passing offline evidence-integrity check is **not** gameplay PASS or independent GitHub authentication; immutable CI job must be reviewed separately. Original 125ms/60Hz, -38 guard, full M194 assertion and protected suite are untouched.
+
+**Routing:** Combat4A real wheel/input staging; Combat4B original World parry transition; UI10 event truth; 4D native reproducibility across exact integrated heads. All P0 still HOLD.
+
 ## Known runnable entry points
 
 ~~~bash
