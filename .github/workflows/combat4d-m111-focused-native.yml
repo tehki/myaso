@@ -31,6 +31,8 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
+      - name: Build unchanged original Rust server before native timing acceptance
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: M111 independent first genuine W3C Chrome Firefox input and World punishment
         run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
       - name: M111 independent second genuine W3C Chrome Firefox input and World punishment
