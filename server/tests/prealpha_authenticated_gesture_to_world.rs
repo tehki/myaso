@@ -426,11 +426,19 @@ fn cross_source_release_cancel_and_replay_cannot_mutate_other_sources_world() {
             admit(&mut p, &mut w, LEASE, other, GestureAction::Cancel, 2, 1),
             AckStatus::Rejected
         );
+        // A genuine independent source2 gesture with its own monotonic
+        // identity cannot make World do a second attack. Its ordered edge is
+        // admitted as NO-COMBAT, never as a forged terminal or a HIT.
         assert_eq!(
             admit(&mut p, &mut w, LEASE, other, GestureAction::Press, 2, 2),
-            AckStatus::Rejected
+            AckStatus::Accepted
         );
         assert_eq!(w.fighter(1).unwrap().action, before);
+        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, other, GestureAction::Press, 2, 2),
+            AckStatus::Duplicate
+        );
         assert_eq!(
             admit(&mut p, &mut w, LEASE, original, GestureAction::Press, 1, 1),
             AckStatus::Duplicate
@@ -447,12 +455,18 @@ fn cross_source_release_cancel_and_replay_cannot_mutate_other_sources_world() {
                 LEASE,
                 original,
                 GestureAction::Release,
-                2,
+                3,
                 1
             ),
             AckStatus::Accepted,
-            "rejecting wrong source may not consume valid release sequence"
+            "busy source must not strand original attack terminal"
         );
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, other, GestureAction::Release, 4, 2),
+            AckStatus::Accepted,
+            "busy-source terminal is transport-admitted but never World damage"
+        );
+        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
     }
 }
 #[test]
