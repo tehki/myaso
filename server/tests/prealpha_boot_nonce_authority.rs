@@ -321,10 +321,12 @@ fn four_distinct_current_leases_isolate_identical_gesture_sequence_numbers() {
 fn genuine_combat_death_and_respawn_revoke_prior_actor_session_authority() {
     // Three real original-World 34 HP hits kill fighter #2; no fixture
     // mutation of HP, Action or actor incarnation may substitute for death.
+    // Start at 36 units so two genuine 18-unit hit knockbacks still leave
+    // the third attack in the original World's authoritative light reach.
     let boot = new_server_boot_nonce().expect("OS boot nonce");
     let mut world = World::new(800.0, 600.0);
     assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
-    assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    assert!(world.add_player_at(2, 286.0, 300.0, std::f32::consts::PI));
     let attacker_lease = LEASE;
     let defender_lease = LEASE + 1;
     let mut attacker =
