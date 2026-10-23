@@ -65,6 +65,7 @@ impl Decision {
 }
 
 /// One authenticated connection's unactivated LMB intent.
+#[derive(Clone)]
 pub struct GestureAuthority {
     lease_epoch: u64,
     last_server_ms: u64,

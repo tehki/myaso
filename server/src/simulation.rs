@@ -228,6 +228,7 @@ struct ActionEdges {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fighter {
     pub net_id: u32,
+    world_incarnation: u64,
     pub x: f32,
     pub y: f32,
     pub spawn_x: f32,
@@ -284,9 +285,14 @@ pub struct Fighter {
 }
 
 impl Fighter {
-    fn new(net_id: u32, x: f32, y: f32, facing: f32) -> Self {
+    pub fn world_incarnation(&self) -> u64 {
+        self.world_incarnation
+    }
+
+    fn new(net_id: u32, x: f32, y: f32, facing: f32, world_incarnation: u64) -> Self {
         Self {
             net_id,
+            world_incarnation,
             x,
             y,
             spawn_x: x,
@@ -552,7 +558,7 @@ pub enum CombatEvent {
     MatchReset,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct World {
     pub width: f32,
     pub height: f32,
@@ -561,6 +567,26 @@ pub struct World {
     winner: Option<u32>,
     reset_at_ms: f32,
     fighters: Vec<Fighter>,
+    next_world_incarnation: u64,
+    world_instance: u64,
+}
+
+// Cloning an entire World creates a NEW owner; never alias the source
+// instance epoch across independent authoritative World objects.
+impl Clone for World {
+    fn clone(&self) -> Self {
+        Self {
+            width: self.width,
+            height: self.height,
+            now_ms: self.now_ms,
+            tick: self.tick,
+            winner: self.winner,
+            reset_at_ms: self.reset_at_ms,
+            fighters: self.fighters.clone(),
+            next_world_incarnation: self.next_world_incarnation,
+            world_instance: reserve_world_instance(),
+        }
+    }
 }
 
 impl Default for World {
@@ -570,6 +596,16 @@ impl Default for World {
 }
 
 impl World {
+    pub fn world_instance(&self) -> u64 {
+        self.world_instance
+    }
+
+    fn new_incarnation(&mut self) -> u64 {
+        let n = self.next_world_incarnation;
+        self.next_world_incarnation = n.checked_add(1).expect("World actor life epoch exhausted");
+        n
+    }
+
     pub fn new(width: f32, height: f32) -> Self {
         assert!(width > FIGHTER_RADIUS * 2.0);
         assert!(height > FIGHTER_RADIUS * 2.0);
@@ -581,6 +617,8 @@ impl World {
             winner: None,
             reset_at_ms: 0.0,
             fighters: Vec::new(),
+            next_world_incarnation: 1,
+            world_instance: reserve_world_instance(),
         }
     }
 
@@ -631,11 +669,13 @@ impl World {
             Ok(_) => return false,
             Err(index) => index,
         };
+        let world_incarnation = self.new_incarnation();
         let fighter = Fighter::new(
             net_id,
             clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
             clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
             facing,
+            world_incarnation,
         );
         self.fighters.insert(insertion_index, fighter);
         true
@@ -807,6 +847,8 @@ impl World {
         for fighter in &mut self.fighters {
             if fighter.action == Action::Dead {
                 if self.now_ms >= fighter.respawn_at_ms {
+                    fighter.world_incarnation =
+                        reserve_actor_life(&mut self.next_world_incarnation);
                     respawn_fighter(fighter);
                     events.push(CombatEvent::Respawn {
                         fighter: fighter.net_id,
@@ -872,6 +914,7 @@ impl World {
             fighter.clear_pending_actions();
             fighter.guard_regen_blocked_until_ms = 0.0;
             fighter.stamina_regen_blocked_until_ms = 0.0;
+            fighter.world_incarnation = reserve_actor_life(&mut self.next_world_incarnation);
             respawn_fighter(fighter);
         }
     }
@@ -1805,6 +1848,24 @@ pub fn angle_delta(a: f32, b: f32) -> f32 {
 
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
+}
+
+// Ephemeral nonreusable World and fighter-life identifiers; process scoped.
+static NEXT_GESTURE_WORLD_INSTANCE: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+fn reserve_world_instance() -> u64 {
+    NEXT_GESTURE_WORLD_INSTANCE
+        .fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |n| n.checked_add(1),
+        )
+        .expect("World owner instance epoch exhausted")
+}
+fn reserve_actor_life(next: &mut u64) -> u64 {
+    let n = *next;
+    *next = n.checked_add(1).expect("World actor life epoch exhausted");
+    n
 }
 
 #[cfg(test)]
