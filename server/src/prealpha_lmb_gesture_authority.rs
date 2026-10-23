@@ -178,6 +178,16 @@ impl GestureAuthority {
                 self.highest_gesture_id = event.gesture_id;
                 Command::None
             }
+            // A real held LMB may UPGRADE while the independent KeyE is the
+            // only World attack. ACK this ordered input without changing the
+            // KeyE-owned World or upgrading it to an accidental second heavy.
+            // UI10 shares ONE fatal-on-REJECTED outbox for both sources.
+            GestureAction::Upgrade
+                if source == GestureSource::Lmb
+                    && self.busy_source == Some((source, event.gesture_id)) =>
+            {
+                Command::None
+            }
             GestureAction::Release | GestureAction::Cancel
                 if self.busy_source == Some((source, event.gesture_id)) =>
             {
