@@ -482,14 +482,8 @@ async fn retired_keye_windup_cannot_ghost_attack_replacement_and_four_seats_keep
                 .expect("original KeyE QUIC session live");
             if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
                 assert_eq!(packet[2], 1, "KeyE PRESS accepted by original World");
-                assert_eq!(
-                    u32::from_le_bytes(packet[4..8].try_into().unwrap()),
-                    1
-                );
-                assert_eq!(
-                    u32::from_le_bytes(packet[8..12].try_into().unwrap()),
-                    1
-                );
+                assert_eq!(u32::from_le_bytes(packet[4..8].try_into().unwrap()), 1);
+                assert_eq!(u32::from_le_bytes(packet[8..12].try_into().unwrap()), 1);
                 assert!(u32::from_le_bytes(packet[12..16].try_into().unwrap()) > 0);
                 break;
             }
@@ -533,8 +527,7 @@ async fn retired_keye_windup_cannot_ghost_attack_replacement_and_four_seats_keep
         loop {
             let lines = server.lines.lock().unwrap().clone();
             let recent = &lines[after_replacement..];
-            let replacement_admitted =
-                lines.iter().any(|line| line.contains("assigned player 5 "));
+            let replacement_admitted = lines.iter().any(|line| line.contains("assigned player 5 "));
             let current_lights = [1_u32, 3, 4].iter().all(|id| {
                 recent.iter().any(|line| {
                     line.contains("M201_AUTH_ACTION tick=")
@@ -542,12 +535,10 @@ async fn retired_keye_windup_cannot_ghost_attack_replacement_and_four_seats_keep
                 })
             });
             let current_keye_heavy = recent.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=")
-                    && line.contains(" fighter=5 from=9 to=10")
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=5 from=9 to=10")
             });
             let no_retired_heavy = !recent.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=")
-                    && line.contains(" fighter=2 from=9 to=10")
+                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=9 to=10")
             });
             if replacement_admitted && current_lights && current_keye_heavy && no_retired_heavy {
                 break;
