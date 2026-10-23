@@ -403,8 +403,14 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     .await
     .expect("original World source1 PRESS admitted");
     assert_eq!(old_press_ack[2], 1);
-    assert_eq!(u32::from_le_bytes(old_press_ack[4..8].try_into().unwrap()), 1);
-    assert_eq!(u32::from_le_bytes(old_press_ack[8..12].try_into().unwrap()), 1);
+    assert_eq!(
+        u32::from_le_bytes(old_press_ack[4..8].try_into().unwrap()),
+        1
+    );
+    assert_eq!(
+        u32::from_le_bytes(old_press_ack[8..12].try_into().unwrap()),
+        1
+    );
     assert!(u32::from_le_bytes(old_press_ack[12..16].try_into().unwrap()) > 0);
 
     // No matching KeyE terminal is sent by the departing player.
@@ -446,8 +452,14 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     .await
     .expect("replacement #5 source1 PRESS admitted");
     assert_eq!(new_press_ack[2], 1);
-    assert_eq!(u32::from_le_bytes(new_press_ack[4..8].try_into().unwrap()), 1);
-    assert_eq!(u32::from_le_bytes(new_press_ack[8..12].try_into().unwrap()), 1);
+    assert_eq!(
+        u32::from_le_bytes(new_press_ack[4..8].try_into().unwrap()),
+        1
+    );
+    assert_eq!(
+        u32::from_le_bytes(new_press_ack[8..12].try_into().unwrap()),
+        1
+    );
     for survivor in [&seats[0], &seats[2], &seats[3]] {
         assert_both_server_acks(&survivor.connection).await;
     }
@@ -458,15 +470,13 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     let ready = server.lines.lock().unwrap().clone();
     assert!(
         !ready[boundary..].iter().any(|line| {
-            line.contains("M201_AUTH_ACTION tick=")
-                && line.contains(" fighter=5 from=9 to=10")
+            line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=5 from=9 to=10")
         }),
         "current KeyE heavy must not auto-hit while held beyond READY"
     );
     assert!(
         !ready[boundary..].iter().any(|line| {
-            line.contains("M201_AUTH_ACTION tick=")
-                && line.contains(" fighter=2 from=9 to=10")
+            line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=9 to=10")
         }),
         "departed KeyE lease cannot auto-commit after actor replacement"
     );
@@ -491,7 +501,10 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     .expect("replacement #5 release receipt received");
     assert_eq!(release_ack[2], 1);
     assert_eq!(u32::from_le_bytes(release_ack[4..8].try_into().unwrap()), 2);
-    assert_eq!(u32::from_le_bytes(release_ack[8..12].try_into().unwrap()), 1);
+    assert_eq!(
+        u32::from_le_bytes(release_ack[8..12].try_into().unwrap()),
+        1
+    );
 
     timeout(Duration::from_secs(4), async {
         loop {
