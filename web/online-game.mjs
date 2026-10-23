@@ -15,6 +15,7 @@ import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../
 import { NETWORK } from "../src/network/constants.mjs";
 import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { activateLoopbackGestureLab } from "./prealpha-gesture-live-lab.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -150,6 +151,16 @@ const acceptanceScenario = params.get("scenario");
 const server = params.get("server");
 const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
+// Opt-in NONRELEASE: the actual game page and the ORIGINAL pinned Rust World
+// must both be loopback. Public /web/ and official lobby never select v2.
+const gestureLabRequested = params.get("gestureLab") === "1";
+const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const reviewedGestureLab = gestureLabRequested
+  && loopbackHosts.has(window.location.hostname)
+  && loopbackHosts.has(new URL(server).hostname);
+if (gestureLabRequested && !reviewedGestureLab) {
+  throw new Error("experimental server-authoritative gestures are loopback-only");
+}
 
 const webTransportOptions = cert
   ? { serverCertificateHashes: [{ algorithm: "sha-256", value: parseSha256Hex(cert) }] }
@@ -178,6 +189,7 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+let experimentalGestureLab = null;
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -230,6 +242,7 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
+    if (reviewedGestureLab) return; // v2 capture owns edge, no sampled attack
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
@@ -244,6 +257,7 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
+  if (reviewedGestureLab) return; // v2 capture owns physical terminal
   leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
@@ -261,7 +275,7 @@ canvas.addEventListener("pointerup", onLeftPointerUp);
 const CHORDED_LEFT_POINTER_ID = -1;
 let chordedLeftDown = false;
 canvas.addEventListener("mousedown", (event) => {
-  if (event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
+  if (reviewedGestureLab || event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
   canvas.focus();
   updateMouse(event);
   leftButtonDown = true;
@@ -272,7 +286,7 @@ canvas.addEventListener("mousedown", (event) => {
   });
 });
 function onChordedLeftMouseUp(event) {
-  if (event.button !== 0 || !chordedLeftDown) return;
+  if (reviewedGestureLab || event.button !== 0 || !chordedLeftDown) return;
   chordedLeftDown = false;
   leftButtonDown = false;
   updateMouse(event);
@@ -286,6 +300,7 @@ window.addEventListener("pointerup", onLeftPointerUp);
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
   if (event.button === 0) {
+    if (reviewedGestureLab) return;
     leftButtonDown = false;
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
@@ -293,7 +308,7 @@ canvas.addEventListener("pointercancel", (event) => {
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.pointerId !== undefined && !(event.buttons & 1)) {
+  if (!reviewedGestureLab && event.pointerId !== undefined && !(event.buttons & 1)) {
     leftButtonPressMovement = null;
     leftButtonCharge.cancel(event.pointerId);
   }
@@ -323,7 +338,9 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  if (!reviewedGestureLab) {
+    if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
+  }
   if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
@@ -355,6 +372,17 @@ setStatus("Connecting to authoritative server…");
 networkClient = await connectAuthoritativeClient({
   webTransportUrl: server,
   webTransportOptions,
+  onExperimentalGestureAck(bytes, lease) {
+    if (!experimentalGestureLab || experimentalGestureLab.lease !== lease) {
+      networkClient?.close("late gesture ACK has no current owner");
+      throw new Error("typed ACK without same-connection gesture owner");
+    }
+    const result = experimentalGestureLab.outbox.receiveAck(bytes, lease);
+    experimentalGestureLab.noteAck(result);
+    if (!result.transportSettled) {
+      experimentalGestureLab.fail("World rejected or retired typed gesture edge");
+    }
+  },
   onProtocolError(error) {
     console.warn("authoritative protocol error", error);
     networkStatus = "Protocol error - invalid realtime packet ignored.";
@@ -402,6 +430,21 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+// Original first-party game-page v2 lab: this is the ONLY experimental
+// source0 LMB/source1 KeyE path on this physical canvas. A denied grant
+// closes the connection: there is NEVER a fallback phantom v1 attack.
+if (reviewedGestureLab) {
+  try {
+    experimentalGestureLab = await activateLoopbackGestureLab({
+      gameClient: networkClient, canvas, windowObj: window,
+      documentObj: document, getClientTick: () => clientTick >>> 0,
+    });
+  } catch (error) {
+    networkClient?.close("original World gesture grant rejected");
+    throw error;
+  }
+}
 
 // Chat C1 uses the current authenticated WebTransport connection and separate
 // bounded reliable streams. Public requests require the operator-served
@@ -764,8 +807,8 @@ function sampleInput() {
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   const leftChargeHeld = leftButtonCharge.isCharging();
-  currentInput.attack = attackRequested || leftChargeHeld;
-  currentInput.heavyAttack = heavyAttackRequested || leftChargeHeld;
+  currentInput.attack = !reviewedGestureLab && (attackRequested || leftChargeHeld);
+  currentInput.heavyAttack = !reviewedGestureLab && (heavyAttackRequested || leftChargeHeld);
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;

@@ -1,0 +1,46 @@
+name: Main 0 real first-party Silver Knights + v2 Combat W3C World proof (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/network-transport.mjs"
+      - "tools/art/main0_v2_knights_combat_four_native.mjs"
+      - ".github/workflows/main0-v2-knights-combat-four-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-browser-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: chrome,firefox,chrome,chrome
+      MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Source syntax and genuine native browser prerequisites
+        run: |
+          node --check tools/art/main0_v2_knights_combat_four_native.mjs
+          node --check web/online-game.mjs
+          node --check web/prealpha-gesture-live-lab.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Four real W3C original game Silver fighters and physical gesture World + 34/46HP
+        run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
+      - name: Preserve original native evidence and SHA256 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-localhost-original-game-gesture-w3c
+          path: .artifacts/main0-knights-combat-gesture/
+          if-no-files-found: ignore
+          retention-days: 5
