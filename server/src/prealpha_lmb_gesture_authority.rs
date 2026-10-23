@@ -80,6 +80,9 @@ pub struct GestureAuthority {
     // executing the other. Admit and tombstone its edges without World damage.
     // This is NOT another active combat action or an actor authorization.
     busy_source: Option<(GestureSource, u32)>,
+    // World may retire an un-released previous owner before it physically
+    // lifts the key; that one authentic old terminal is no-combat.
+    displaced_held_source: Option<(GestureSource, u32)>,
     highest_gesture_id: u32,
     highest_sequence: u32,
     press_ms: u64,
@@ -96,6 +99,7 @@ impl GestureAuthority {
             active_id: None,
             active_source: None,
             busy_source: None,
+            displaced_held_source: None,
             highest_gesture_id: 0,
             highest_sequence: 0,
             press_ms: 0,
@@ -170,7 +174,7 @@ impl GestureAuthority {
             // no-combat events, not as a second attack or a fabricated hit.
             GestureAction::Press
                 if self.active_id.is_some()
-                    && self.active_source != Some(source)
+                    && (self.active_source != Some(source) || self.released)
                     && self.busy_source.is_none()
                     && event.gesture_id > self.highest_gesture_id =>
             {
@@ -192,6 +196,14 @@ impl GestureAuthority {
                 if self.busy_source == Some((source, event.gesture_id)) =>
             {
                 self.busy_source = None;
+                Command::None
+            }
+            GestureAction::Release | GestureAction::Cancel
+                if self.displaced_held_source == Some((source, event.gesture_id)) =>
+            {
+                // Accepted into existing bounded transport journal; no hit,
+                // no release/upgrade of the CURRENT source1/0 World owner.
+                self.displaced_held_source = None;
                 Command::None
             }
             GestureAction::Press
@@ -338,6 +350,9 @@ impl GestureAuthority {
     pub fn retire(&mut self, lease: u64, gesture_id: u32) -> bool {
         if lease == 0 || lease != self.lease_epoch || self.active_id != Some(gesture_id) {
             return false;
+        }
+        if !self.released {
+            self.displaced_held_source = self.active_source.zip(self.active_id);
         }
         self.active_id = None;
         self.active_source = None;
