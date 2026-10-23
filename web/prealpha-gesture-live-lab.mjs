@@ -79,18 +79,29 @@ export async function activateLoopbackGestureLab({
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
     detachGates = attachDormantSharedUi10Sources(gates, {canvas, windowObj, documentObj});
-    add(canvas,"pointerdown",event => {
-      drain(); // native capture already admitted real mouse pointer DOWN
-      if (event.button !== 0 || !gates.lmb.snapshot.active) return;
-      const pointerId = gates.lmb.snapshot.pointerId;
-      // This is only an UPGRADE *intent*. Rust checks <135ms on ITS clock
-      // and refuses late upgrades; READY320ms and hits are never client timers.
+    function scheduleSource0HoldUpgrade(pointerId) {
+      // This is only UPGRADE intent. Rust alone validates its <135ms
+      // unlanded-light boundary and its independent READY320ms clock.
       setTimeout(() => {
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId) return;
         if (gates.lmb.approvedHoldUpgrade(pointerId)) drain();
       },85);
+    }
+    add(canvas,"pointerdown",event => {
+      drain();
+      if (event.button !== 0 || !gates.lmb.snapshot.active) return;
+      scheduleSource0HoldUpgrade(gates.lmb.snapshot.pointerId);
     });
+    add(canvas,"mousedown",event => {
+      if (event.button !== 0 || (event.buttons & 3) !== 3) return;
+      // With RMB already down W3C may emit no second pointerdown; the
+      // shared source0 gate's capture-phase mousedown owns this physical LMB.
+      drain();
+      if (gates.lmb.snapshot.active && gates.lmb.snapshot.pointerId === -1)
+        scheduleSource0HoldUpgrade(-1);
+    });
+    add(windowObj,"mouseup",drain);
     add(windowObj,"pointerup",drain);
     add(windowObj,"pointercancel",drain);
     add(canvas,"lostpointercapture",drain);
