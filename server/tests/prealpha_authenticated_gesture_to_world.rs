@@ -1262,8 +1262,7 @@ fn keye_source1_same_tick_actor_reuse_retires_old_lease_but_fresh_heavy_hits_onc
 #[test]
 fn keye_source1_world_replacement_rejects_prior_owner_even_with_equal_actor_numbers() {
     let mut first = arena();
-    let mut retired =
-        SessionGestureWorldPath::from_admitted_world(&first, 1, LEASE, BOOT).unwrap();
+    let mut retired = SessionGestureWorldPath::from_admitted_world(&first, 1, LEASE, BOOT).unwrap();
     assert_eq!(
         admit(
             &mut retired,
