@@ -2154,6 +2154,13 @@ mod r2_combat_control_tests {
         assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
         assert!(world.add_player_at(2, 240.0, 250.0, std::f32::consts::PI));
         assert!(world.add_player_at(3, 330.0, 250.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
         world.fighters[0].set_action(Action::KickActive, KICK_ACTIVE_MS);
         world.step();
         assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
@@ -2192,6 +2199,13 @@ mod r2_combat_control_tests {
         assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
         assert!(world.add_player_at(2, 240.0, 250.0, std::f32::consts::PI));
         assert!(world.add_player_at(3, 330.0, 250.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            3,
+            InputIntent {
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
         world.fighters[0].set_action(Action::KickActive, KICK_ACTIVE_MS);
         world.step();
         assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
@@ -2239,6 +2253,7 @@ mod r2_combat_control_tests {
                 2,
                 InputIntent {
                     block: true,
+                    facing_radians: std::f32::consts::PI,
                     ..InputIntent::default()
                 }
             ));
