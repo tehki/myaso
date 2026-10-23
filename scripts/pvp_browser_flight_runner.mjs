@@ -3198,8 +3198,8 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     const stamina = state.acceptance?.authoritativeStamina;
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
-      && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+      && stamina >= COMBAT.jump.staminaCost + 2
+      && stamina < COMBAT.jump.staminaCost + 6
       && idle) {
       ready = state;
       break;
@@ -3209,7 +3209,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+            < COMBAT.jump.staminaCost + 6
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1600,
         "regen into the jump-only stamina window",
@@ -3225,7 +3225,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 16-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
@@ -3390,8 +3390,8 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
     const stamina = state.acceptance?.authoritativeStamina;
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
-      && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+      && stamina >= COMBAT.jump.staminaCost + 2
+      && stamina < COMBAT.jump.staminaCost + 6
       && idle) {
       ready = state;
       break;
@@ -3401,7 +3401,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost
+            < COMBAT.jump.staminaCost + 6
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1800,
         "regen into the jump-only chord window",
@@ -3417,7 +3417,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 16-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
