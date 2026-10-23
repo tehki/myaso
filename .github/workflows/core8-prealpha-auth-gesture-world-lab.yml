@@ -48,5 +48,11 @@ jobs:
         run: |
           node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Native Chromium W3C shared typed outbox lost LMB PRESS and actual bounded ordered retry
+        env:
+          CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
