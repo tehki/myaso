@@ -9611,8 +9611,14 @@ async function runCombat4aNativeMiddleMouseChordFlight(entries) {
         }
         await sleep(20);
       }
-      if (!seenIdleAfterBlock) throw new Error(label + ": released middle stayed blocked on "
-        + session.name + " " + JSON.stringify(await readUiEvidence(session)));
+      if (!seenIdleAfterBlock) {
+        const nativeEvents = await execute(session.base, session.sessionId,
+          "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
+        throw new Error(label + ": released middle stayed blocked on "
+          + session.name + " " + JSON.stringify({
+            nativeEvents, actualWorld: await readUiEvidence(session),
+          }));
+      }
       const events = await execute(session.base, session.sessionId,
         "return (window.__COMBAT4A_NATIVE_CHORD_PROOF__??[]).slice();");
       const count = (type, button) => events.filter(e =>
