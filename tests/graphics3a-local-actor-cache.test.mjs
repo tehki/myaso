@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 import { KNIGHT_CLIPS, createKnightSpriteRenderer } from "../web/knight-sprites.mjs";
 
@@ -50,4 +51,12 @@ test("replacement local server actor does not inherit stale Silver sprint veloci
   });
   assert.equal(draws.at(-1).clip, "silver_idle",
     "fresh server actor must not inherit old authenticated actor's motion cache");
+});
+
+test("the live first-party local renderer carries its authenticated server netId into Silver cache", () => {
+  const src = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(src, /const ownId = networkClient\.playerNetId;/,
+    "local visual identity must come from the existing authenticated network client");
+  assert.match(src, /if \(ownId && local\.initialized\) \{\s*local\.netId = ownId;\s*drawFighterScreen\(/,
+    "the real local fighter object must be tagged before the existing sprite renderer call");
 });
