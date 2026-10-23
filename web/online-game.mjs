@@ -194,6 +194,10 @@ const leftButtonCharge = createLeftButtonCharge({
       queueStaminaDenial("running-attack");
     }
     audio.play("light");
+    // Submit this *real* LMB/Space light commitment with its captured key
+    // direction before a later 30Hz sample can lose the lateral phase.
+    // Server World still decides windup, reach, damage and eligibility.
+    flushPhysicalCommittedLightInput();
   },
   onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
 });
@@ -760,6 +764,16 @@ function simulatePrediction(stepMs) {
 // monotonic clientTick and v1 redundancy as the normal frame path; the server
 // still decides if a Dodge/Block can actually start before attack contact.
 function flushPhysicalWheelInput() {
+  return flushAuthenticatedPhysicalInput();
+}
+
+function flushPhysicalCommittedLightInput() {
+  return flushAuthenticatedPhysicalInput();
+}
+
+// One real authenticated input sequence for both urgent physical callbacks;
+// no separate packets, outbox, actor identity or World-clock authorization.
+function flushAuthenticatedPhysicalInput() {
   if (!networkClient?.playerNetId || !local.initialized || matchOver || document.hidden) return false;
   sampleInput();
   submitAuthoritativeInputSample();
