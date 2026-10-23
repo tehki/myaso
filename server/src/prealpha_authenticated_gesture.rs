@@ -32,8 +32,9 @@ pub struct SessionGestureWorldPath {
     keye_active_id: Option<u32>,
     keye_terminal: bool,
     keye_accepted: VecDeque<GestureEvent>,
-    // A physically distinct source may press while the other owns World combat.
-    // Consume those edges as transport-only, never as a second World action.
+    // A physically valid newer gesture may be pressed while original World
+    // is busy, including a fresh click of the SAME source during recovery.
+    // Consume that one held source as transport-only: never a second attack.
     world_source: Option<GestureSource>,
     busy_source: Option<(GestureSource, u32)>,
     busy_accepted: VecDeque<TypedGestureEvent>,
@@ -141,9 +142,10 @@ impl SessionGestureWorldPath {
         Some(AckStatus::Accepted)
     }
 
-    /// A valid independent physical source may arrive while the original
-    /// World is executing the OTHER source's action. Accept that source's
-    /// contiguous input as *no-combat* receipt, not as a second strike.
+    /// A distinct monotonic physical gesture may arrive while the original
+    /// World is busy, whether from the OTHER source or the SAME source after
+    /// an earlier physical release. Accept its contiguous input as *no-combat*
+    /// rather than fatally retiring the shared source0+source1 outbox.
     /// The original 0x12 ACCEPTED status confirms input admission only.
     fn admit_busy_source(&mut self, world: &World, typed: TypedGestureEvent) -> Option<AckStatus> {
         let event = typed.event;
@@ -157,11 +159,7 @@ impl SessionGestureWorldPath {
         let valid = match event.action {
             GestureAction::Press => {
                 if busy.is_some()
-                    || self.world_source
-                        != Some(match typed.source {
-                            GestureSource::Lmb => GestureSource::KeyE,
-                            GestureSource::KeyE => GestureSource::Lmb,
-                        })
+                    || self.world_source.is_none()
                     || event.gesture_id <= self.highest_gesture_id
                     || !world
                         .fighter(self.binding.player_id)
@@ -236,7 +234,7 @@ impl SessionGestureWorldPath {
             && (matches!(event.action, GestureAction::Release | GestureAction::Cancel)
                 || (typed.source == GestureSource::Lmb && event.action == GestureAction::Upgrade)))
             || (event.action == GestureAction::Press
-                && self.world_source.is_some_and(|owner| owner != typed.source)
+                && self.world_source.is_some()
                 && event.gesture_id > self.highest_gesture_id
                 && world
                     .fighter(self.binding.player_id)
