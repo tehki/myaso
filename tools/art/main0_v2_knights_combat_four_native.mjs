@@ -217,6 +217,21 @@ try{
    return after>=0 && lines.slice(after+1).find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
  },14000);
  assert(heavyReturnedIdle,"new physically pressed light starts only after original World returns to Idle");
+ // Real original World spawns fighter #1/#2 96px apart. Light reaches
+ // 76px + 18px fighter radius = 94px, while the preceding true 46HP
+ // heavy reaches 82+18=100px and knocks the target BACK 28px.
+ // Correct the authentic 4-human-actor QA staging, NOT World reach, hit
+ // events or strict 34HP assertion: physically walk the real attacker
+ // toward the knockback-displaced target using a trusted W3C key hold.
+ // 220ms at the original 215px/s nominal walk speed is ~47px of reach
+ // recovery, leaving genuine World collision/damage to decide success.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"key",id:"real-original-post-heavy-forward-step",actions:[
+   {type:"keyDown",value:"d"},
+   {type:"pause",duration:220},
+   {type:"keyUp",value:"d"},
+  ]}]
+ });
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
  // One physical W3C pointer action tick sequence. Do NOT wait for a
