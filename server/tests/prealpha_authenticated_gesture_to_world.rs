@@ -537,11 +537,27 @@ fn second_gesture_release_overtakes_lost_press_without_retiring_sender_or_extra_
 
     // The first fully completed legitimate light stays authoritative.
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
@@ -567,16 +583,40 @@ fn second_gesture_release_overtakes_lost_press_without_retiring_sender_or_extra_
     // Once the first missing edge is genuinely readmitted, seq3 and seq4
     // produce the *second* original World light at normal server timing.
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Duplicate
     );
     assert!(advance(&mut p, &mut w, 55).is_empty());
@@ -588,18 +628,42 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE).unwrap();
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
     // An unrecognized terminal against a *completed* ID is not an unseen
     // greater-ID PRESS awaiting recovery. Never restart the old light.
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Cancel, 3, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Cancel,
+            3,
+            1
+        ),
         AckStatus::Rejected
     );
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
