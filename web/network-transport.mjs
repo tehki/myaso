@@ -47,6 +47,9 @@ class WebTransportGameConnection {
     this.experimentalGestureState = "off";
     this.gestureGrantWaiter = null;
     this.gestureWriteQueue = Promise.resolve();
+    // This is a transport safety ceiling, not a Combat retry policy.
+    // The one-lease outbox may independently bound or retry genuine edges.
+    this.pendingGestureEdges = 0;
   }
 
   static async connect({ webTransportUrl, webTransportOptions, onRealtime, onReliable }) {
@@ -137,7 +140,15 @@ class WebTransportGameConnection {
     if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11) {
       throw new TypeError("only original typed 16-byte v2 gesture events accepted");
     }
+    // Never let a stalled datagram writer accumulate arbitrarily many
+    // outstanding 16-byte gesture events/promises. Overflow is not an ACK,
+    // not a skipped RELEASE, and must retire the whole same-QUIC lease.
+    if (this.pendingGestureEdges >= 64) {
+      this.close("experimental gesture queue overflow");
+      throw new RangeError("bounded experimental gesture queue overflow");
+    }
     const owned = payload.slice();
+    this.pendingGestureEdges += 1;
     const send = this.gestureWriteQueue.then(async () => {
       if (this.closed || this.experimentalGestureState !== "granted") {
         throw new Error("old gesture edge cannot outlive its QUIC lease");
@@ -146,9 +157,13 @@ class WebTransportGameConnection {
       if (this.closed) throw new Error("gesture lease ended before send");
       await this.datagramWriter.write(owned);
     });
-    this.gestureWriteQueue = send.catch(() => {
-      this.close("gesture delivery failed");
-    });
+    this.gestureWriteQueue = send.then(
+      () => { this.pendingGestureEdges -= 1; },
+      () => {
+        this.pendingGestureEdges -= 1;
+        this.close("gesture delivery failed");
+      },
+    );
     return send;
   }
 
