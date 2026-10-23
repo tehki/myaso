@@ -22,6 +22,8 @@ import {ProposedLmbGestureOutbox} from "/src/network/prealpha-lmb-gesture-outbox
 import {decodeProposedGestureEvent} from "/src/network/prealpha-lmb-gesture-proposal.mjs";
 import {createDormantPrealphaLmbDomGate,attachDormantPrealphaLmbDomGate}
  from "/src/browser/prealpha-lmb-dom-gesture-review.mjs";
+import {createDormantKeyEOrigin,attachDormantKeyEOrigin}
+ from "/src/browser/prealpha-keye-source-review.mjs";
 const canvas=document.querySelector("#arena"),lease={};
 const outbox=new ProposedLmbGestureOutbox({negotiatedVersion:2,trustedLease:lease});
 let chat=false,jump=false;
@@ -29,6 +31,19 @@ const gate=createDormantPrealphaLmbDomGate({
  outbox,getClientTick:()=>123,isCanvasTarget:e=>e.target===canvas,
  isChatFocused:()=>chat,isJumpAttackChord:()=>jump
 });
+const keyEdges=[],trustedKey=[];
+const keyOrigin=createDormantKeyEOrigin({
+ emitIntent:intent=>{keyEdges.push(intent);return true;},
+ hasGameplayFocus:()=>document.activeElement===canvas,
+ isTextEditing:()=>chat
+});
+attachDormantKeyEOrigin(keyOrigin,{windowObj:window,documentObj:document});
+window.addEventListener("keydown",e=>{
+ if(e.code==="KeyE")trustedKey.push({type:"down",trusted:e.isTrusted,repeat:e.repeat});
+},true);
+window.addEventListener("keyup",e=>{
+ if(e.code==="KeyE")trustedKey.push({type:"up",trusted:e.isTrusted});
+},true);
 const trusted=[];
 canvas.addEventListener("pointerdown",e=>trusted.push({type:"down",trusted:e.isTrusted}),true);
 window.addEventListener("pointerup",e=>trusted.push({type:"up",trusted:e.isTrusted}),true);
@@ -36,15 +51,18 @@ attachDormantPrealphaLmbDomGate(gate,{canvas,windowObj:window,documentObj:docume
 window.ui10={
  ready:true,
  report:()=>({trusted:[...trusted],snapshot:gate.snapshot,
+  keyEdges:[...keyEdges],trustedKey:[...trustedKey],keySnapshot:keyOrigin.snapshot,
   edges:outbox.nextSendBatch(8).map(e=>decodeProposedGestureEvent(e.bytes)),
   realServer:false,combatCommit:false}),
  upgrade:()=>gate.approvedHoldUpgrade(gate.snapshot.pointerId),
- blur:()=>gate.blur(),chat:x=>{chat=x;if(x)gate.chatOpened();},
+ blur:()=>{gate.blur();keyOrigin.blur();},
+ chat:x=>{chat=x;if(x){gate.chatOpened();keyOrigin.chatOpened();}},
  jump:x=>jump=x
 };
 </script>`;
 const allowed=new Set([
 "/src/browser/prealpha-lmb-dom-gesture-review.mjs",
+"/src/browser/prealpha-keye-source-review.mjs",
 "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
 "/src/network/prealpha-lmb-gesture-proposal.mjs"
 ]);
@@ -100,6 +118,10 @@ try{
     {script:"return {ok:window.ui10?.ready===true}",args:[]}));
   };
   const run=arr=>wd(dport,"POST","/session/"+id+"/actions",pointer(arr));
+  const keys=arr=>wd(dport,"POST","/session/"+id+"/actions",{
+   actions:[{type:"key",id:"ui10-keyboard",actions:arr}]
+  });
+  const pressE=()=>keys([{type:"keyDown",value:"e"},{type:"keyUp",value:"e"}]);
   const evaluate=script=>wd(dport,"POST","/session/"+id+"/execute/sync",{script,args:[]});
   await nav();
   await run([move(),down,up]);
@@ -135,10 +157,35 @@ try{
    [GESTURE_ACTION.PRESS,GESTURE_ACTION.CANCEL]);
   assert.equal(cancel.combatCommit,false);
   assert.equal(cancel.realServer,false);
+  // True W3C keyboard events, independent from the existing LMB capture.
+  await nav();
+  await evaluate("document.querySelector('#arena').focus()");
+  await pressE();
+  const keySolo=await evaluate("return ui10.report()");
+  assert.deepEqual(keySolo.keyEdges.map(e=>[e.source,e.action]),[[1,1],[1,3]]);
+  assert.equal(keySolo.trustedKey.length,2);
+  assert.ok(keySolo.trustedKey.every(e=>e.trusted));
+  assert.equal(keySolo.keySnapshot.active,false);
+  await nav();
+  await run([move(),down]);
+  await pressE();
+  const chord=await evaluate("return ui10.report()");
+  assert.deepEqual(chord.keyEdges.map(e=>[e.source,e.action]),[[1,1],[1,3]]);
+  assert.deepEqual(chord.edges.map(e=>e.action),[GESTURE_ACTION.PRESS]);
+  assert.equal(chord.snapshot.active,true,"KeyE UP cannot release active LMB");
+  await run([up]);
+  const completed=await evaluate("return ui10.report()");
+  assert.deepEqual(completed.edges.map(e=>e.action),[GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+  assert.equal(completed.edges[0].gestureId,completed.edges[1].gestureId);
+  await nav();
+  await evaluate("document.querySelector('#arena').focus();ui10.chat(true)");
+  await pressE();
+  assert.equal((await evaluate("return ui10.report()")).keyEdges.length,0);
   console.log("UI10_V2_NATIVE_DOM_REVIEW_PASS",JSON.stringify({
    browser:family,realPointerTrusted:true,shortTap:true,
    longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
+   realKeyETrusted:true,keyEIndependentFromHeldLmb:true,chatKeyEPrevented:true,
    authenticatedServer:false,combatHits:false,enabledLive:false
   }));
  }
