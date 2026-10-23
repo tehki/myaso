@@ -19,6 +19,7 @@ p=argparse.ArgumentParser()
 p.add_argument("--source",required=True)
 p.add_argument("--output",required=True)
 p.add_argument("--samples",type=int,default=3)
+p.add_argument("--ortho-scale",type=float,default=1.66,help="Original Roll studio camera framing; use 1.29 for legacy-matched apparent size")
 p.add_argument("--smoke",action="store_true")
 p.add_argument("--inspect",action="store_true")
 p.add_argument("--action",choices=["all",*CLIPS],default="all")
@@ -83,12 +84,13 @@ camera=bpy.data.objects.new("Original Roll eight directions",camera_data)
 sc.collection.objects.link(camera)
 sc.camera=camera
 camera_data.type="ORTHO"
-camera_data.ortho_scale=1.66
+assert 1.2<=args.ortho_scale<=1.9, "Review-only approved camera framing bounds"
+camera_data.ortho_scale=args.ortho_scale
 focus=Vector((0,0,-.07))
 manifest={"sourceSHA256":actual_sha,"originalRigBones":22,
           "lighting":"SOURCE Blender Cycles, exact original Silver Roll key/fill/world",
           "rows":8,"frameSize":160,"actions":{},"authoritativeGameplayChanged":False,
-          "sourceAssetChanged":False,"originalMeshRedistributed":False}
+          "sourceAssetChanged":False,"originalMeshRedistributed":False,"cameraOrthoScale":args.ortho_scale}
 count=0
 for action_name,frames in CLIPS.items():
     if args.action not in ("all",action_name):continue
