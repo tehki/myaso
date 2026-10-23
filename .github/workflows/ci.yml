@@ -237,6 +237,13 @@ jobs:
           node --test tests/r2-middle-held-guardbreak.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
+      - name: Validate Combat 4A authentic Chrome Firefox middle mouse chord
+        env:
+          MYASO_PVP_SCENARIO: "ui4amiddlemousechord"
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node scripts/pvp_browser_flight_runner.mjs
+
       - name: Validate M194 repeated real guard-break block-only pressure
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs

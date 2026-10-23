@@ -427,6 +427,16 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
+    // M144 FFA only: preserve authenticated server processed-client-tick
+    // evidence for a genuine Space+LMB which can otherwise remain World Idle.
+    // Observation only; no input admission, packet or prediction mutation.
+    if (acceptanceScenario === "uimultirecoveryffa") {
+      const witness = window.__MYASO_ACCEPTANCE_STATE__;
+      if (witness) {
+        witness.lastProcessedClientTick = networkClient.processedClientTick;
+        witness.lastProcessedServerTick = networkClient.latestServerTick;
+      }
+    }
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
@@ -472,7 +482,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "ui4amiddlemousechord", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -787,6 +797,23 @@ function sampleInput() {
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
+  // P0 acceptance-only: observe the exact original 30Hz outgoing physical
+  // middle state to disambiguate a missing mouseUP from a stale World action.
+  if (acceptanceScenario === "ui4amiddlemousechord") {
+    const witness = window.__MYASO_ACCEPTANCE_STATE__;
+    if (witness) {
+      const samples = witness.mmbBlockSamples ??= [];
+      const item = {
+        epochMs: Date.now(), middleBlockHeld, middleBlockPointerId,
+        inputBlock: currentInput.block, run: currentInput.run,
+      };
+      if (!samples.length || ["middleBlockHeld", "middleBlockPointerId", "inputBlock", "run"]
+        .some((key) => samples.at(-1)[key] !== item[key])) {
+        samples.push(item);
+        if (samples.length > 32) samples.shift();
+      }
+    }
+  }
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
@@ -806,7 +833,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
