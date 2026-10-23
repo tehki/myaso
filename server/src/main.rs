@@ -94,6 +94,8 @@ struct LoopbackFlightConfig {
     near_pressure_players: usize,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    // M344: explicit opt-in original-v1 ingress diagnosis, loopback-only.
+    flight_input_admission_trace: bool,
 }
 
 #[derive(Debug)]
@@ -205,6 +207,7 @@ struct SharedGame {
     next_player_id: AtomicU32,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    flight_input_admission_trace: bool,
 }
 
 impl SharedGame {
@@ -217,6 +220,7 @@ impl SharedGame {
             next_player_id: AtomicU32::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            flight_input_admission_trace: flight.flight_input_admission_trace,
         })
     }
 
@@ -407,13 +411,25 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         })
         .transpose()?
         .unwrap_or(false);
+    let flight_input_admission_trace = env::var("MYASO_FLIGHT_INPUT_ADMISSION_TRACE")
+        .ok()
+        .map(|value| match value.as_str() {
+            "0" => Ok(false),
+            "1" => Ok(true),
+            _ => bail!("MYASO_FLIGHT_INPUT_ADMISSION_TRACE must be 0 or 1"),
+        })
+        .transpose()?
+        .unwrap_or(false);
     if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
         bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
     }
     if near_pressure_players > background_players {
         bail!("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS exceeds background player count");
     }
-    if (background_players > 0 || reliable_delay_ms > 0 || drop_new_action_datagrams)
+    if (background_players > 0
+        || reliable_delay_ms > 0
+        || drop_new_action_datagrams
+        || flight_input_admission_trace)
         && !bind.ip().is_loopback()
     {
         bail!("flight impairment fixtures are permitted only on loopback binds");
@@ -423,6 +439,7 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         near_pressure_players,
         reliable_write_delay: Duration::from_millis(reliable_delay_ms),
         drop_new_action_datagrams,
+        flight_input_admission_trace,
     })
 }
 
@@ -533,6 +550,9 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
+    // Only four follow-up original v1 datagrams after an action-bearing one:
+    // enough to identify how newer idle samples may supersede the action.
+    let mut m344_followup_datagrams = 0_u8;
     let (mut reliable_send, _reliable_recv) = connection
         .accept_bi()
         .await
@@ -638,10 +658,49 @@ async fn handle_connection(
                     );
                 }
 
+                let m344_packet_has_action = game.flight_input_admission_trace
+                    && packet.samples().iter().any(|sample| one_shot_action_mask(sample) != 0);
+                let m344_inspect = m344_packet_has_action || m344_followup_datagrams > 0;
+                if game.flight_input_admission_trace && m344_inspect {
+                    let packet_actions: Vec<(u32, u8)> = packet
+                        .samples()
+                        .iter()
+                        .map(|sample| (sample.tick, one_shot_action_mask(sample)))
+                        .filter(|(_, bits)| *bits != 0)
+                        .collect();
+                    println!(
+                        "M344_V1_RX actor={player_id} session={stable_id} packet_tick={} packet_seq={} action_samples={packet_actions:?}",
+                        packet.client_tick,
+                        packet.sequence
+                    );
+                    if m344_packet_has_action {
+                        m344_followup_datagrams = 4;
+                    } else {
+                        m344_followup_datagrams -= 1;
+                    }
+                }
                 let accepted = ingress.ingest(&packet);
                 let coalesced: Option<(u32, InputIntent)> =
                     coalesce_accepted_input_batch(accepted.as_slice())
                         .map(|sample| (sample.tick, sample.into()));
+                // M344: original per-actor ingress/dedup and *actual newest*
+                // World.set_input choice. Highwater ACK can advance past an
+                // attack and is not evidence its edge was applied.
+                if game.flight_input_admission_trace && m344_inspect {
+                    let accepted_actions: Vec<(u32, u8)> = accepted
+                        .iter()
+                        .map(|sample| (sample.tick, one_shot_action_mask(sample)))
+                        .filter(|(_, bits)| *bits != 0)
+                        .collect();
+                    println!(
+                        "M344_V1_INGRESS actor={player_id} session={stable_id} packet_tick={} accepted_count={} accepted_actions={accepted_actions:?} selected_tick={:?} selected_attack={:?} selected_heavy={:?}",
+                        packet.client_tick,
+                        accepted.len(),
+                        coalesced.as_ref().map(|(tick, _)| tick),
+                        coalesced.as_ref().map(|(_, input)| input.attack),
+                        coalesced.as_ref().map(|(_, input)| input.heavy_attack)
+                    );
+                }
                 // M229: loopback-only read-only evidence after real ingress/dedup.
                 // Never claim that sending an action proved it was accepted.
                 if game.drop_new_action_datagrams {
@@ -662,6 +721,13 @@ async fn handle_connection(
                         }
                     }
                 }
+                let m344_selected = if game.flight_input_admission_trace && m344_inspect {
+                    coalesced.as_ref().map(|(tick, input)| {
+                        (*tick, input.attack, input.heavy_attack)
+                    })
+                } else {
+                    None
+                };
                 let server_tick = {
                     let mut state = game.state.lock().await;
                     apply_coalesced_input_and_read_tick(
@@ -671,6 +737,11 @@ async fn handle_connection(
                         &mut pending_input_acks,
                     )
                 };
+                if game.flight_input_admission_trace && m344_inspect {
+                    println!(
+                        "M344_V1_WORLD_SET actor={player_id} session={stable_id} world_tick={server_tick} selected={m344_selected:?}"
+                    );
+                }
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
                         "session {stable_id} stale server acknowledgement: client={} server={}",
