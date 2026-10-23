@@ -14091,6 +14091,8 @@ async function readUiEvidence(session) {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
+        lastProcessedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastProcessedClientTick ?? null,
+        lastProcessedServerTick: window.__MYASO_ACCEPTANCE_STATE__.lastProcessedServerTick ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
