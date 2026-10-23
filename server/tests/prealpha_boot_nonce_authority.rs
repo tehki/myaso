@@ -225,3 +225,94 @@ fn delayed_old_lease_release_cannot_attack_replacement_with_reused_numeric_actor
     );
     assert_eq!(world.fighter(2).unwrap().hp, 66.0);
 }
+
+#[test]
+fn four_distinct_current_leases_isolate_identical_gesture_sequence_numbers() {
+    // Each legitimate ephemeral seat owns its actor even when all four clients
+    // independently start with sequence=1 and gesture_id=1.
+    let boot = new_server_boot_nonce().expect("OS boot nonce");
+    let mut world = World::new(800.0, 600.0);
+    let seats = [(1_u32, 101_u64), (2, 102), (3, 103), (4, 104)];
+    for (index, (actor, _)) in seats.iter().enumerate() {
+        assert!(world.add_player_at(*actor, 100.0 + index as f32 * 160.0, 300.0, 0.0));
+    }
+    let mut paths: Vec<_> = seats
+        .iter()
+        .map(|(actor, lease)| {
+            SessionGestureWorldPath::from_admitted_world(&world, *actor, *lease, boot)
+                .expect("authorized current actor")
+        })
+        .collect();
+    let press = encode_event(GestureEvent {
+        action: GestureAction::Press,
+        sequence: 1,
+        gesture_id: 1,
+        client_tick: u32::MAX,
+    })
+    .unwrap();
+    let release = encode_event(GestureEvent {
+        action: GestureAction::Release,
+        sequence: 2,
+        gesture_id: 1,
+        client_tick: u32::MAX,
+    })
+    .unwrap();
+
+    // An attacker cannot substitute another actor's lease at the World gate.
+    let mut foreign = SessionGestureWorldPath::from_admitted_world(&world, 4, 104, boot)
+        .expect("fixture current actor");
+    assert_eq!(
+        foreign
+            .accept_under_world_lock(&mut world, 101, boot, &press)
+            .unwrap()
+            .status,
+        AckStatus::Stale
+    );
+    assert!(foreign.retired());
+    for (index, (actor, lease)) in seats.iter().enumerate() {
+        assert_eq!(
+            paths[index]
+                .accept_under_world_lock(&mut world, *lease, boot, &press)
+                .unwrap()
+                .status,
+            AckStatus::Accepted
+        );
+        assert_eq!(world.fighter(*actor).unwrap().action, Action::AttackWindup);
+    }
+
+    // Disconnect/pagehide retires one owner while all three others remain
+    // authorized, without accidentally consuming their sequence numbers.
+    paths[0].retire();
+    assert_eq!(
+        paths[0]
+            .accept_under_world_lock(&mut world, 101, boot, &release)
+            .unwrap()
+            .status,
+        AckStatus::Stale
+    );
+    for (index, (_, lease)) in seats.iter().enumerate().skip(1) {
+        assert_eq!(
+            paths[index]
+                .accept_under_world_lock(&mut world, *lease, boot, &release)
+                .unwrap()
+                .status,
+            AckStatus::Accepted
+        );
+    }
+    for _ in 0..55 {
+        let events = world.step();
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, myaso_server::simulation::CombatEvent::Hit { .. })),
+            "distant actors must not gain fabricated damage"
+        );
+        for (index, (_, lease)) in seats.iter().enumerate().skip(1) {
+            paths[index].advance_under_world_lock(&mut world, *lease, boot);
+        }
+    }
+    assert!(paths[0].retired());
+    for (_, (actor, _)) in seats.iter().enumerate() {
+        assert_eq!(world.fighter(*actor).unwrap().hp, 100.0);
+    }
+}
