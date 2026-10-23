@@ -247,6 +247,32 @@ try{
   .filter(line=>/M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
  assert.ok(honestWorldHits.some(line=>/damage=46(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 46 HP heavy strike against an independent fighter");
+ if(!honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line))){
+  // Forensics ONLY after the actual World light reached Active; retain the
+  // original hard 34HP gate below verbatim. A true whiff is not ACK-as-hit.
+  const rawWorld=readAuthoritativeWorld().split("\n");
+  const sourcePage=await evaluate(attacker,
+   "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,physicalKeyEAndProtocolErrors:window.__MYASO_COMBAT4_KEYE_TRACE__?.()??[]};"
+  ).catch(error=>({browserEvidenceError:String(error)}));
+  const evidence={
+   status:"genuine original 34HP light hit MISSING",
+   mandatoryTest:"original Rust World must prove true 34 HP light strike against an independent fighter",
+   heavyWorldAction:heavy,lightWorldPress:lightPress,lightWorldActive:lightActive,
+   actualHits:honestWorldHits,
+   originalWorldActionsAndHits:rawWorld.filter(line=>
+    /M201_(AUTH_ACTION|AUTH_HIT|AUTH_BLOCK|AUTH_PARRY|AUTH_BREAK|FLIGHT_ACTOR_BASELINE)/.test(line)
+   ).slice(-200),
+   originalServerWorldTail:rawWorld.slice(-240),
+   attackerPage:sourcePage,
+   fourRealIndependentSeatRoster:trial.map(x=>({browser:x.browser,actorId:x.actorId})),
+   caveat:"ACK/admitted action != actual 34HP hit; strict gate remains unchanged",
+  };
+  await writeFile(join(output,"combat4-original-light-no-34hp-world-diagnostic.json"),
+   JSON.stringify(evidence,null,2)+"\n");
+  console.error("COMBAT4C_REAL_WORLD_LIGHT_NO_34HP_DIAGNOSTIC",JSON.stringify({
+   ...evidence,originalServerWorldTail:evidence.originalServerWorldTail.slice(-50),
+  }));
+ }
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 34 HP light strike against an independent fighter");
  console.log("MAIN0_ORIGINAL_GAME_PHYSICAL_V2_QUIC_WORLD_ACTIONS",JSON.stringify({
