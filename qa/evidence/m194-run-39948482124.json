@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "source_kind": "protected original Chrome/Firefox real W3C M194 repeated guard break block-only World proof",
+  "source_run_url": "https://github.com/tehki/myaso/actions/runs/39948482124",
+  "source_job_id": 120398827130,
+  "candidate_sha": "f6c8122228231d7467bcdaaa4f4c9afc7a342b36",
+  "source_step": "Validate M194 repeated real guard-break block-only pressure",
+  "source_outcome": "failure",
+  "nested_failure": "M193 guard-break exchange 2 resolved as parry instead of -38 guard",
+  "world_hz": 60,
+  "parry_window_ms": 125,
+  "expected_single_guard_damage": 38,
+  "world_exchanges": [
+    {
+      "attempt": 1,
+      "attackerNetId": 1,
+      "defenderNetId": 2,
+      "tickLines": [
+        "M201_AUTH_ACTION tick=275 fighter=1 from=0 to=1",
+        "M201_AUTH_ACTION tick=276 fighter=2 from=0 to=6",
+        "M201_AUTH_ACTION tick=283 fighter=1 from=1 to=2",
+        "M201_AUTH_BLOCK tick=283 attacker=1 target=2",
+        "M201_AUTH_ACTION tick=288 fighter=1 from=2 to=3"
+      ]
+    },
+    {
+      "attempt": 2,
+      "attackerNetId": 1,
+      "defenderNetId": 2,
+      "tickLines": [
+        "M201_AUTH_ACTION tick=309 fighter=1 from=0 to=1",
+        "M201_AUTH_ACTION tick=311 fighter=2 from=0 to=6",
+        "M201_AUTH_ACTION tick=317 fighter=1 from=1 to=7",
+        "M201_AUTH_PARRY tick=317 attacker=1 target=2"
+      ]
+    }
+  ],
+  "original_w3c_ingress": [
+    {
+      "attempt": 1,
+      "harnessW3c": {
+        "wheelDispatchMs": 7.2,
+        "wheelAckMs": 16,
+        "attackDownDispatchMs": 0,
+        "attackDownAckMs": 7.2,
+        "attackUpDispatchMs": 14.8,
+        "attackUpAckMs": 22,
+        "completeMs": 22.2,
+        "trustedWheelObservedMs": 14.8,
+        "receiptGraceMs": 100,
+        "wheelHeadStartMs": 0,
+        "postTrustedWheelMs": 0,
+        "clickHoldMs": 14.8
+      },
+      "trustedWheelBeforeRelease": true,
+      "wheelEventEpochMs": 1792756560795,
+      "chromeReleaseEpochMs": 1792756560799,
+      "firefox": {
+        "wheelEventMs": 624,
+        "blockCueMs": 709,
+        "impactOrParryCueMs": 841,
+        "wheelToBlockCueMs": 85,
+        "wheelToImpactOrParryMs": 217,
+        "hp": 100,
+        "guard": 62
+      },
+      "chrome": {
+        "pointerDownMs": 634,
+        "pointerUpMs": 647.2,
+        "genuineClickHoldMs": 13.2,
+        "feedback": "block-confirm"
+      }
+    },
+    {
+      "attempt": 2,
+      "harnessW3c": {
+        "wheelDispatchMs": 6.7,
+        "wheelAckMs": 15.6,
+        "attackDownDispatchMs": 0,
+        "attackDownAckMs": 6.7,
+        "attackUpDispatchMs": 11.7,
+        "attackUpAckMs": 16.9,
+        "completeMs": 17.7,
+        "trustedWheelObservedMs": 11.7,
+        "receiptGraceMs": 100,
+        "wheelHeadStartMs": 0,
+        "postTrustedWheelMs": 0,
+        "clickHoldMs": 11.7
+      },
+      "trustedWheelBeforeRelease": true,
+      "wheelEventEpochMs": 1792756561362,
+      "chromeReleaseEpochMs": 1792756561366,
+      "firefox": {
+        "wheelEventMs": 1191,
+        "blockCueMs": 709,
+        "impactOrParryCueMs": 1390,
+        "wheelToBlockCueMs": null,
+        "wheelToImpactOrParryMs": 199,
+        "hp": 100,
+        "guard": 62
+      },
+      "chrome": {
+        "pointerDownMs": 1203.5,
+        "pointerUpMs": 1214.1,
+        "genuineClickHoldMs": 10.6,
+        "feedback": "parried"
+      }
+    }
+  ],
+  "native_browser": {
+    "chrome": {
+      "id": 1,
+      "hp": 100,
+      "guard": 100,
+      "feedback": [
+        "block-confirm",
+        "parried"
+      ],
+      "physical_w3c_clicks": [
+        {
+          "button": 0,
+          "epochMs": 1792756560786,
+          "t": 634,
+          "type": "pointerdown",
+          "x": 0.685,
+          "y": 0.5
+        },
+        {
+          "button": 0,
+          "epochMs": 1792756560799,
+          "t": 647.2,
+          "type": "pointerup",
+          "x": 0.685,
+          "y": 0.5
+        },
+        {
+          "button": 0,
+          "epochMs": 1792756561355,
+          "t": 1203.5,
+          "type": "pointerdown",
+          "x": 0.685,
+          "y": 0.5
+        },
+        {
+          "button": 0,
+          "epochMs": 1792756561366,
+          "t": 1214.1,
+          "type": "pointerup",
+          "x": 0.685,
+          "y": 0.5
+        }
+      ]
+    },
+    "firefox": {
+      "id": 2,
+      "hp": 100,
+      "guard": 62,
+      "feedback": [
+        "guard-pressure",
+        "parry-success"
+      ]
+    }
+  },
+  "qa_disposition": "HOLD",
+  "provenance_limit": "Historical CI transcription must be verified by independent job/log read; its own JSON and Node checker are not evidence of live browser/World authenticity or release."
+}

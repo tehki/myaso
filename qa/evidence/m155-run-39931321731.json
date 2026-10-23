@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "source_kind": "protected-native-Chrome-Firefox-Chrome2-original-Rust-World",
+  "source_run_url": "https://github.com/tehki/myaso/actions/runs/39931321731",
+  "source_job_id": 120340072943,
+  "source_step": "Validate M155 actionable third-party knockdown punish",
+  "candidate_sha": "91ab5c107cb88431c652329f760a7b68bfc35715",
+  "source_outcome": "failure",
+  "roles": {
+    "kicker": 1,
+    "victim": 2,
+    "punisher": 3
+  },
+  "authoritative_lines": [
+    "M201_AUTH_ACTION tick=348 fighter=1 from=0 to=12",
+    "M201_AUTH_ACTION tick=353 fighter=1 from=12 to=13",
+    "M201_AUTH_ACTION tick=353 fighter=2 from=0 to=19",
+    "M201_AUTH_ACTION tick=359 fighter=3 from=0 to=9",
+    "M201_AUTH_ACTION tick=367 fighter=3 from=9 to=1",
+    "M201_AUTH_ACTION tick=375 fighter=2 from=19 to=0",
+    "M201_AUTH_ACTION tick=375 fighter=3 from=1 to=2",
+    "M201_AUTH_HIT tick=375 attacker=3 target=2 damage=34 hp=66",
+    "M201_AUTH_ACTION tick=380 fighter=3 from=2 to=3"
+  ],
+  "native_runner_evidence": {
+    "punisher_w3c_pointerdown_epoch_ms": 1792747886333,
+    "punisher_w3c_pointerdown_x": 0.314,
+    "sampled_light_windup_server_tick": 369,
+    "sampled_light_active_server_tick": 375,
+    "original_verifier_failure": "M206 missing same-strike server attack-active edge"
+  },
+  "qa_finding": "Genuine 34HP hit commits on victim's server-authoritative recovery tick; strict inside-knockdown punish requires attack ACTIVE before recovery, so this fails. Not evidence of packet loss and not corrected by merely passing a later retry.",
+  "release_decision": "HOLD"
+}

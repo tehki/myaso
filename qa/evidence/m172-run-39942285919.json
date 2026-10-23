@@ -1,0 +1,675 @@
+{
+  "schema_version": 1,
+  "source_kind": "original protected full Chrome/Firefox native Space+LMB jump attack and low-stamina authoritative denial acceptance",
+  "source_run_url": "https://github.com/tehki/myaso/actions/runs/39942285919",
+  "source_job_id": 120376453404,
+  "candidate_sha": "f4b7016214ce7ca4d2808a248426451abbdaa7b7",
+  "source_step": "Validate M173 confirmed jump-attack chord denial",
+  "nested_failure": "M172 confirmed airborne jump-attack denial",
+  "source_outcome": "failure",
+  "original_runner_error": "Error: M172 confirmed airborne jump-attack denial timed out waiting for confirmed low-stamina airborne conversion denial:",
+  "original_runner_line": "scripts/pvp_browser_flight_runner.mjs:3184",
+  "expected_confirmation": "confirmed-rejected",
+  "required_denial_feedback": "Low stamina — jump attack needs 12.",
+  "reported_original_client": {
+    "browser": "chrome",
+    "player_net_id": 1,
+    "final_authoritative_stamina": 28,
+    "final_server_tick": 627,
+    "action_transitions": [
+      {
+        "action": 0,
+        "epochMs": 1792753699298,
+        "serverTick": 234
+      },
+      {
+        "action": 16,
+        "epochMs": 1792753700148,
+        "serverTick": 285
+      },
+      {
+        "action": 17,
+        "epochMs": 1792753700248,
+        "serverTick": 291
+      },
+      {
+        "action": 18,
+        "epochMs": 1792753700347,
+        "serverTick": 297
+      },
+      {
+        "action": 0,
+        "epochMs": 1792753700648,
+        "serverTick": 315
+      },
+      {
+        "action": 15,
+        "epochMs": 1792753704897,
+        "serverTick": 570
+      },
+      {
+        "action": 0,
+        "epochMs": 1792753705298,
+        "serverTick": 594
+      }
+    ],
+    "denial_transitions": [
+      {
+        "action": "jump-attack",
+        "baselineStamina": 10,
+        "epochMs": 1792753704940,
+        "stage": "queued"
+      },
+      {
+        "action": "jump-attack",
+        "clientTick": 346,
+        "epochMs": 1792753704954,
+        "stage": "submitted"
+      },
+      {
+        "action": "jump-attack",
+        "authoritativeAction": 0,
+        "authoritativeStamina": 12,
+        "clientTick": 346,
+        "epochMs": 1792753705298,
+        "processedClientTick": 361,
+        "stage": "confirmed-not-stamina"
+      }
+    ],
+    "stamina_trace": [
+      {
+        "epochMs": 1792753699298,
+        "serverTick": 234,
+        "stamina": 100
+      },
+      {
+        "epochMs": 1792753700148,
+        "serverTick": 285,
+        "stamina": 74
+      },
+      {
+        "epochMs": 1792753700497,
+        "serverTick": 306,
+        "stamina": 75
+      },
+      {
+        "epochMs": 1792753700548,
+        "serverTick": 309,
+        "stamina": 77
+      },
+      {
+        "epochMs": 1792753700598,
+        "serverTick": 312,
+        "stamina": 78
+      },
+      {
+        "epochMs": 1792753700648,
+        "serverTick": 315,
+        "stamina": 80
+      },
+      {
+        "epochMs": 1792753700698,
+        "serverTick": 318,
+        "stamina": 81
+      },
+      {
+        "epochMs": 1792753700755,
+        "serverTick": 321,
+        "stamina": 83
+      },
+      {
+        "epochMs": 1792753700797,
+        "serverTick": 324,
+        "stamina": 84
+      },
+      {
+        "epochMs": 1792753700847,
+        "serverTick": 327,
+        "stamina": 86
+      },
+      {
+        "epochMs": 1792753700897,
+        "serverTick": 330,
+        "stamina": 87
+      },
+      {
+        "epochMs": 1792753700948,
+        "serverTick": 333,
+        "stamina": 89
+      },
+      {
+        "epochMs": 1792753700998,
+        "serverTick": 336,
+        "stamina": 88
+      },
+      {
+        "epochMs": 1792753701047,
+        "serverTick": 339,
+        "stamina": 87
+      },
+      {
+        "epochMs": 1792753701098,
+        "serverTick": 342,
+        "stamina": 86
+      },
+      {
+        "epochMs": 1792753701147,
+        "serverTick": 345,
+        "stamina": 85
+      },
+      {
+        "epochMs": 1792753701197,
+        "serverTick": 348,
+        "stamina": 83
+      },
+      {
+        "epochMs": 1792753701248,
+        "serverTick": 351,
+        "stamina": 82
+      },
+      {
+        "epochMs": 1792753701298,
+        "serverTick": 354,
+        "stamina": 81
+      },
+      {
+        "epochMs": 1792753701348,
+        "serverTick": 357,
+        "stamina": 80
+      },
+      {
+        "epochMs": 1792753701398,
+        "serverTick": 360,
+        "stamina": 79
+      },
+      {
+        "epochMs": 1792753701448,
+        "serverTick": 363,
+        "stamina": 77
+      },
+      {
+        "epochMs": 1792753701497,
+        "serverTick": 366,
+        "stamina": 76
+      },
+      {
+        "epochMs": 1792753701548,
+        "serverTick": 369,
+        "stamina": 75
+      },
+      {
+        "epochMs": 1792753701598,
+        "serverTick": 372,
+        "stamina": 74
+      },
+      {
+        "epochMs": 1792753701647,
+        "serverTick": 375,
+        "stamina": 73
+      },
+      {
+        "epochMs": 1792753701698,
+        "serverTick": 378,
+        "stamina": 71
+      },
+      {
+        "epochMs": 1792753701747,
+        "serverTick": 381,
+        "stamina": 70
+      },
+      {
+        "epochMs": 1792753701797,
+        "serverTick": 384,
+        "stamina": 69
+      },
+      {
+        "epochMs": 1792753701857,
+        "serverTick": 387,
+        "stamina": 68
+      },
+      {
+        "epochMs": 1792753701897,
+        "serverTick": 390,
+        "stamina": 67
+      },
+      {
+        "epochMs": 1792753702298,
+        "serverTick": 414,
+        "stamina": 65
+      },
+      {
+        "epochMs": 1792753702348,
+        "serverTick": 417,
+        "stamina": 64
+      },
+      {
+        "epochMs": 1792753702397,
+        "serverTick": 420,
+        "stamina": 63
+      },
+      {
+        "epochMs": 1792753702448,
+        "serverTick": 423,
+        "stamina": 62
+      },
+      {
+        "epochMs": 1792753702497,
+        "serverTick": 426,
+        "stamina": 61
+      },
+      {
+        "epochMs": 1792753702548,
+        "serverTick": 429,
+        "stamina": 59
+      },
+      {
+        "epochMs": 1792753702597,
+        "serverTick": 432,
+        "stamina": 58
+      },
+      {
+        "epochMs": 1792753702648,
+        "serverTick": 435,
+        "stamina": 57
+      },
+      {
+        "epochMs": 1792753702698,
+        "serverTick": 438,
+        "stamina": 56
+      },
+      {
+        "epochMs": 1792753702747,
+        "serverTick": 441,
+        "stamina": 55
+      },
+      {
+        "epochMs": 1792753702798,
+        "serverTick": 444,
+        "stamina": 53
+      },
+      {
+        "epochMs": 1792753702847,
+        "serverTick": 447,
+        "stamina": 52
+      },
+      {
+        "epochMs": 1792753702897,
+        "serverTick": 450,
+        "stamina": 51
+      },
+      {
+        "epochMs": 1792753702947,
+        "serverTick": 453,
+        "stamina": 50
+      },
+      {
+        "epochMs": 1792753702998,
+        "serverTick": 456,
+        "stamina": 49
+      },
+      {
+        "epochMs": 1792753703048,
+        "serverTick": 459,
+        "stamina": 47
+      },
+      {
+        "epochMs": 1792753703098,
+        "serverTick": 462,
+        "stamina": 46
+      },
+      {
+        "epochMs": 1792753703147,
+        "serverTick": 465,
+        "stamina": 45
+      },
+      {
+        "epochMs": 1792753703548,
+        "serverTick": 489,
+        "stamina": 44
+      },
+      {
+        "epochMs": 1792753703597,
+        "serverTick": 492,
+        "stamina": 43
+      },
+      {
+        "epochMs": 1792753703648,
+        "serverTick": 495,
+        "stamina": 41
+      },
+      {
+        "epochMs": 1792753703698,
+        "serverTick": 498,
+        "stamina": 40
+      },
+      {
+        "epochMs": 1792753703747,
+        "serverTick": 501,
+        "stamina": 39
+      },
+      {
+        "epochMs": 1792753703798,
+        "serverTick": 504,
+        "stamina": 38
+      },
+      {
+        "epochMs": 1792753703847,
+        "serverTick": 507,
+        "stamina": 37
+      },
+      {
+        "epochMs": 1792753703897,
+        "serverTick": 510,
+        "stamina": 35
+      },
+      {
+        "epochMs": 1792753703948,
+        "serverTick": 513,
+        "stamina": 34
+      },
+      {
+        "epochMs": 1792753703998,
+        "serverTick": 516,
+        "stamina": 33
+      },
+      {
+        "epochMs": 1792753704047,
+        "serverTick": 519,
+        "stamina": 32
+      },
+      {
+        "epochMs": 1792753704098,
+        "serverTick": 522,
+        "stamina": 31
+      },
+      {
+        "epochMs": 1792753704448,
+        "serverTick": 543,
+        "stamina": 30
+      },
+      {
+        "epochMs": 1792753704498,
+        "serverTick": 546,
+        "stamina": 29
+      },
+      {
+        "epochMs": 1792753704547,
+        "serverTick": 549,
+        "stamina": 28
+      },
+      {
+        "epochMs": 1792753704597,
+        "serverTick": 552,
+        "stamina": 27
+      },
+      {
+        "epochMs": 1792753704648,
+        "serverTick": 555,
+        "stamina": 25
+      },
+      {
+        "epochMs": 1792753704698,
+        "serverTick": 558,
+        "stamina": 24
+      },
+      {
+        "epochMs": 1792753704897,
+        "serverTick": 570,
+        "stamina": 10
+      },
+      {
+        "epochMs": 1792753705298,
+        "serverTick": 594,
+        "stamina": 12
+      },
+      {
+        "epochMs": 1792753705348,
+        "serverTick": 597,
+        "stamina": 13
+      },
+      {
+        "epochMs": 1792753705397,
+        "serverTick": 600,
+        "stamina": 15
+      },
+      {
+        "epochMs": 1792753705447,
+        "serverTick": 603,
+        "stamina": 16
+      },
+      {
+        "epochMs": 1792753705497,
+        "serverTick": 606,
+        "stamina": 18
+      },
+      {
+        "epochMs": 1792753705547,
+        "serverTick": 609,
+        "stamina": 19
+      },
+      {
+        "epochMs": 1792753705597,
+        "serverTick": 612,
+        "stamina": 21
+      },
+      {
+        "epochMs": 1792753705647,
+        "serverTick": 615,
+        "stamina": 22
+      },
+      {
+        "epochMs": 1792753705697,
+        "serverTick": 618,
+        "stamina": 24
+      },
+      {
+        "epochMs": 1792753705747,
+        "serverTick": 621,
+        "stamina": 25
+      },
+      {
+        "epochMs": 1792753705798,
+        "serverTick": 624,
+        "stamina": 27
+      },
+      {
+        "epochMs": 1792753705847,
+        "serverTick": 627,
+        "stamina": 28
+      }
+    ],
+    "pointer_transitions": [
+      {
+        "button": 0,
+        "epochMs": 1792753700060,
+        "t": 718.5,
+        "type": "pointerdown",
+        "x": 0.685,
+        "y": 0.5
+      },
+      {
+        "button": 0,
+        "epochMs": 1792753700152,
+        "t": 810.1,
+        "type": "pointerup",
+        "x": 0.685,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753700740,
+        "t": 1398.5,
+        "type": "pointerdown",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753701842,
+        "t": 2500.1,
+        "type": "pointerup",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753702008,
+        "t": 2666.3,
+        "type": "pointerdown",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753703109,
+        "t": 3767.7,
+        "type": "pointerup",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753703274,
+        "t": 3932.7,
+        "type": "pointerdown",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753704026,
+        "t": 4684,
+        "type": "pointerup",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753704189,
+        "t": 4847.9,
+        "type": "pointerdown",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 2,
+        "epochMs": 1792753704672,
+        "t": 5330.2,
+        "type": "pointerup",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 0,
+        "epochMs": 1792753704940,
+        "t": 5598,
+        "type": "pointerdown",
+        "x": 0.314,
+        "y": 0.5
+      },
+      {
+        "button": 0,
+        "epochMs": 1792753704981,
+        "t": 5639.3,
+        "type": "pointerup",
+        "x": 0.314,
+        "y": 0.5
+      }
+    ],
+    "key_transitions": [
+      {
+        "code": "KeyD",
+        "epochMs": 1792753699634,
+        "t": 292.3,
+        "type": "keydown"
+      },
+      {
+        "code": "KeyD",
+        "epochMs": 1792753699902,
+        "t": 560.9,
+        "type": "keyup"
+      },
+      {
+        "code": "Space",
+        "epochMs": 1792753700058,
+        "t": 716.1,
+        "type": "keydown"
+      },
+      {
+        "code": "Space",
+        "epochMs": 1792753700151,
+        "t": 809.9,
+        "type": "keyup"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753700740,
+        "t": 1398.8,
+        "type": "keydown"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753701842,
+        "t": 2500.8,
+        "type": "keyup"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753702008,
+        "t": 2666.6,
+        "type": "keydown"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753703109,
+        "t": 3767.8,
+        "type": "keyup"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753703275,
+        "t": 3933.1,
+        "type": "keydown"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753704026,
+        "t": 4684.2,
+        "type": "keyup"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753704190,
+        "t": 4848.1,
+        "type": "keydown"
+      },
+      {
+        "code": "KeyA",
+        "epochMs": 1792753704672,
+        "t": 5330.3,
+        "type": "keyup"
+      },
+      {
+        "code": "Space",
+        "epochMs": 1792753704833,
+        "t": 5491.1,
+        "type": "keydown"
+      },
+      {
+        "code": "Space",
+        "epochMs": 1792753704879,
+        "t": 5536.9,
+        "type": "keyup"
+      }
+    ],
+    "events": [
+      "Jump attack committed - the narrow lane is readable.",
+      "Opponent hit - 42 HP."
+    ],
+    "feedback": [
+      "hit-confirm"
+    ]
+  },
+  "diagnosis_boundary": "The original server processed a jump-attack denial candidate when authoritative stamina was 12, not 10. The accepted test predicate needs shown low-stamina denial. Preserve this historical native failure even if the World correctly did not deny at 12. Not proof of lost packet or stamina gameplay defect.",
+  "qa_disposition": "HOLD"
+}
