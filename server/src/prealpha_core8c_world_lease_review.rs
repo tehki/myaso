@@ -12,9 +12,9 @@
 //! a World only intermittently cannot prove that no life transition was missed.
 //! The model therefore closes on any gap larger than one World tick.
 use crate::{
-    prealpha_lmb_gesture_proposal::GestureEvent,
+    prealpha_lmb_gesture_proposal::{GestureAction, GestureEvent},
     prealpha_lmb_ingress_review::{IngressResult, ReviewLmbIngress, TrustedLeaseKey},
-    simulation::{Action, World},
+    simulation::{Action, CombatEvent, InputIntent, World},
 };
 use std::collections::VecDeque;
 
@@ -246,6 +246,11 @@ impl ReviewOwnedWorld {
         let _ = self.world.step();
     }
 
+    /// Only for review acceptance: observe genuine original Combat events.
+    pub fn review_step_events(&mut self) -> Vec<CombatEvent> {
+        self.world.step()
+    }
+
     pub fn review_remove_player(&mut self, actor: u32) -> bool {
         self.world.remove_player(actor)
     }
@@ -261,6 +266,7 @@ pub struct ReviewWorldOwnerLease {
     bound_owner_epoch: u64,
     actor: ReviewActorLease,
     inner: ReviewWorldLease,
+    review_active_light_gesture: Option<u32>,
 }
 
 impl ReviewWorldOwnerLease {
@@ -273,6 +279,7 @@ impl ReviewWorldOwnerLease {
             bound_owner_epoch: owner.owner_epoch(),
             actor,
             inner,
+            review_active_light_gesture: None,
         })
     }
 
@@ -320,5 +327,111 @@ impl ReviewWorldOwnerLease {
         }
         self.inner
             .review_drain_for_world(owner.world(), presented_actor)
+    }
+}
+
+/// Review-only per-actor input commitment. The operation is not a transport
+/// ACK and never claims a Combat HIT until an actual World.step() reports one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReviewLightWorldDispatch {
+    NoReadyEdges,
+    LightPressStaged { gesture_id: u32 },
+    LightTerminalObserved { gesture_id: u32 },
+    ForeignActor,
+    RejectedAndRetired,
+    Retired,
+}
+
+impl ReviewOwnedWorld {
+    /// REVIEW ONLY: consume exactly one already-ordered source=0 light PRESS,
+    /// optionally paired with its matching RELEASE in the same 60Hz tick.
+    ///
+    /// The exclusive &mut self borrow spans current owner/life verification,
+    /// event drainage and the ACTUAL World::set_input mutation. Thus the World
+    /// cannot be replaced, respawned or reassigned by another safe Rust caller
+    /// between these steps. The original server's tokio Mutex<SharedGame> is
+    /// NOT wired here; the QUIC actor lease is a fixture, not authenticated.
+    ///
+    /// CANCEL also remains unsupported: original Combat4 must decide if and
+    /// when an unlanded attack may be aborted under the World lock.
+    /// This small bridge intentionally does NOT implement LMB UPGRADE/HEAVY
+    /// or KeyE. Unsupported multi-press batches retire instead of silently
+    /// merging independent attacks into one World 60Hz edge.
+    pub fn review_apply_one_lmb_light(
+        &mut self,
+        gate: &mut ReviewWorldOwnerLease,
+        presented_actor: ReviewActorLease,
+    ) -> ReviewLightWorldDispatch {
+        if presented_actor != gate.actor {
+            return ReviewLightWorldDispatch::ForeignActor;
+        }
+        if !gate.verify_owner(self) {
+            return ReviewLightWorldDispatch::Retired;
+        }
+        let accepted = gate
+            .inner
+            .review_drain_for_world(self.world(), presented_actor);
+        if accepted.is_empty() {
+            return ReviewLightWorldDispatch::NoReadyEdges;
+        }
+        let reject = |gate: &mut ReviewWorldOwnerLease| {
+            gate.inner.retire();
+            gate.review_active_light_gesture = None;
+            ReviewLightWorldDispatch::RejectedAndRetired
+        };
+        let (press, terminal) = match accepted.as_slice() {
+            [edge]
+                if edge.action == GestureAction::Press
+                    && gate.review_active_light_gesture.is_none() =>
+            {
+                (Some(*edge), None)
+            }
+            [edge]
+                if edge.action == GestureAction::Release
+                    && gate.review_active_light_gesture == Some(edge.gesture_id) =>
+            {
+                (None, Some(*edge))
+            }
+            [first, last]
+                if first.action == GestureAction::Press
+                    && last.action == GestureAction::Release
+                    && first.gesture_id == last.gesture_id
+                    && first.sequence.checked_add(1) == Some(last.sequence)
+                    && gate.review_active_light_gesture.is_none() =>
+            {
+                (Some(*first), Some(*last))
+            }
+            _ => return reject(gate),
+        };
+        // A subsequent matching RELEASE is bookkeeping, never another
+        // attack and never client-authorized damage.
+        if press.is_none() {
+            gate.review_active_light_gesture = None;
+            return ReviewLightWorldDispatch::LightTerminalObserved {
+                gesture_id: terminal.expect("validated terminal").gesture_id,
+            };
+        }
+        let gesture_id = press.expect("validated press").gesture_id;
+        // Server-owned facing, zero movement, one real original light edge:
+        // PRESS/neutral latches exactly one pending attack even when both
+        // arrive before a single World::step(). No client tick is consulted.
+        let attack = InputIntent {
+            attack: true,
+            ..InputIntent::default()
+        };
+        let actor = presented_actor.actor_net_id;
+        if !self.world.set_input(actor, attack)
+            || !self.world.set_input(actor, InputIntent::default())
+        {
+            gate.inner.retire();
+            gate.review_active_light_gesture = None;
+            return ReviewLightWorldDispatch::Retired;
+        }
+        gate.review_active_light_gesture = if terminal.is_some() {
+            None
+        } else {
+            Some(gesture_id)
+        };
+        ReviewLightWorldDispatch::LightPressStaged { gesture_id }
     }
 }
