@@ -52,11 +52,14 @@ test("invalid sizes, factory, context and seed fail closed",()=>{
  assert.throws(()=>createArenaLiteLayer(()=>({width:1,height:540,getContext(){}})),TypeError);
  assert.throws(()=>createArenaLiteLayer(()=>({width:960,height:540,getContext:()=>null})));
 });
-test("candidate is review-only; original live arena and pre-alpha input are byte-unmodified",()=>{
+test("original grid remains unchanged and Arena Lite requires explicit in-game opt-in",()=>{
  const live=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
  assert.match(live,/function createArenaLayer\(\)/);
  assert.match(live,/layerContext\.strokeRect\(12, 12, layer\.width - 24, layer\.height - 24\)/);
- assert.doesNotMatch(live,/prealpha-arena-lite-floor|arenaLite=1|paintArenaLiteFloor/);
+ assert.match(live,/enabled: params\.get\("arenaLite"\) === "1"/);
+ assert.match(live,/createOriginal: createArenaLayer/);
+ assert.match(live,/createOptional: \(\) => createArenaLiteLayer/);
+ assert.match(live,/ctx\.drawImage\(arenaLayer, 0, 0\)/);
  const preview=readFileSync(new URL("../web/prealpha-arena-lite-review.html",import.meta.url),"utf8");
  assert.match(preview,/PREVIEW ONLY/);
  assert.match(preview,/prealpha-arena-lite-floor\.mjs/);
