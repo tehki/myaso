@@ -9624,12 +9624,17 @@ async function runCombat4aNativeMiddleMouseChordFlight(entries) {
         intermediateMiddleMouseUp: count("mouseup", 1),
         intermediateMiddlePointerUp: count("pointerup", 1),
         realWorldBlockAndRelease: true };
+      // ChromeDriver/Firefox are allowed to emit a trusted pointer edge for
+      // an additional button: native mouse DOWN/UP + original World Block/Idle
+      // are mandatory, and extra pointer edges must never duplicate a gesture.
+      // The first genuine Chrome trace had pointerdown(button=1) despite
+      // RMB already down; "must be zero" was an incorrect browser assumption.
       if (verdict.rightPointerDown !== 1
         || verdict.intermediateMiddleMouseDown !== 1
-        || verdict.intermediateMiddlePointerDown !== 0
+        || verdict.intermediateMiddlePointerDown > 1
         || verdict.intermediateMiddleMouseUp !== 1
-        || verdict.intermediateMiddlePointerUp !== 0) {
-        throw new Error(label + ": genuine intermediate W3C event proof failed "
+        || verdict.intermediateMiddlePointerUp > 1) {
+        throw new Error(label + ": genuine multi-button W3C event proof failed "
           + JSON.stringify(verdict));
       }
       results.push(verdict);
