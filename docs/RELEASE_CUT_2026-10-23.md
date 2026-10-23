@@ -2,6 +2,12 @@
 
 **Prepared 23 October 2026; branch anchored to protected `main` `6fa59b649112c272bcbc018b4a32bf963f9a5bba`.** Release authority: **Main 0**. This file is an audit/handoff, **not an executable deployment authorization, merged game feature, validated artifact or uptime claim**.
 
+## Owner's required triple launch — single integrated release or HOLD
+
+Main [#695 owner scope update](https://github.com/tehki/myaso/issues/695#issuecomment-6365526766) explicitly requires **Multiplayer + authentic Silver Knights + UPDATED authoritative Combat together** for the new 23 October release. The existing installed R2/v1 multiplayer alpha may remain available for existing testers, **but it does not fulfill this new release request**, even if today's external two-host legacy-alphas checks are eventually green. The readiness of the five Silver motion assets [#904](https://github.com/tehki/myaso/pull/904) also does **not** independently authorize a Knights-only public rollout as fulfillment.
+
+**Priority order:** (1) retain existing R2 service without a forced cutover, (2) Main 0 integrate canonical original-page physical LMB0+release-only KeyE1 source over server-authenticated QUIC into ONE Rust World with one World-authoritative 34/46HP outcome, (3) add original first-party Silver graphics (existing review-ready five-motion packet, optional independent terrain excluded), (4) strict exact candidate whole-protected native Combat, actor/death/reconnect/2–4 independently operated humans + staging/rollback signoff, (5) only then announce actual new Pre-Alpha multiplayer release. Until each criterion is evidenced, **NEW REQUIRED TRIPLE RELEASE = HOLD**. This is an implementation and acceptance gate, not permission to waive native timing tests.
+
 ## Later same-day exact-head release evidence — NOT an automatic GO
 
 This delta was verified after the first manifest freeze; retain the older immutable findings as historical provenance, not as a competing final status.
