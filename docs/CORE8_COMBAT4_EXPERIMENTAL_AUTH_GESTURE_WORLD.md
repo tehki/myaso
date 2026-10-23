@@ -58,7 +58,20 @@ PRESS and later replay; wrong session epoch, same-tick actor slot reuse, a
 different World with coincident actor/tick/incarnation, KeyE/source unsupported,
 malformed bytes and incompatible `0x52`.
 
-The test suite is **not** evidence of live Chrome/Firefox authenticated v2,
+**Native experimental proof — X230i / original Rust server / real Chromium:**
+`node scripts/core8_native_v2_quic_gesture_lab.mjs` **PASS** with genuine W3C
+pointer down/up measured ~10.9ms, two actual accepted 0x12 ACKs at
+server ticks 87 and 88, and original Rust `M201_AUTH_ACTION` LightWindup1
+at server tick88. The test opened the accepted QUIC bidi stream, negotiated
+v2 via client uni stream on that same connection, and sent two independent
+16B edge datagrams. The browser did NOT supply an actor or World identifier.
+This is an isolated one-client lab, **not** a native 2–4 player Combat test;
+it does not prove the client resend outbox, network loss recovery, or
+one 34HP hit on a second player. New real native workflow covers this exact
+path on PR head; local proof alone is not GitHub CI green.
+
+The test suite is **not** evidence of the original game's integrated
+Chrome/Firefox authenticated v2,
 fully validated player-account authentication, persistent 8B CAS/generation,
 cluster-wide owner epoch, loss-resistant browser outbox transmission, or
 finished source1 KeyE handling. Account authentication does not exist on the
