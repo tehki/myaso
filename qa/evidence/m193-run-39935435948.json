@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "source_kind": "protected-native-chrome-firefox-three-browser-original-Rust-World",
+  "source_run_url": "https://github.com/tehki/myaso/actions/runs/39935435948",
+  "source_job_id": 120353730262,
+  "source_step": "Validate M205 repeated M201 server-tick FFA punish proof",
+  "candidate_sha": "488467b87d13c51d5bfc2e657ff7714772a8a3d3",
+  "source_outcome": "failure",
+  "scenario": "M205 FFA punish setup fails M193 second block-only exchange",
+  "actors": {
+    "attacker": 1,
+    "defender": 2,
+    "observer": 3
+  },
+  "world_hz": 60,
+  "parry_window_ms": 125,
+  "expected_guard_pressure": 38,
+  "exchanges": [
+    {
+      "attempt": 1,
+      "authoritative_lines": [
+        "M201_AUTH_ACTION tick=324 fighter=1 from=0 to=1",
+        "M201_AUTH_ACTION tick=324 fighter=2 from=0 to=6",
+        "M201_AUTH_ACTION tick=332 fighter=1 from=1 to=2",
+        "M201_AUTH_BLOCK tick=332 attacker=1 target=2",
+        "M201_AUTH_ACTION tick=337 fighter=1 from=2 to=3"
+      ],
+      "outcome": "BLOCK",
+      "defender_hp": 100,
+      "defender_guard": 62
+    },
+    {
+      "attempt": 2,
+      "authoritative_lines": [
+        "M201_AUTH_ACTION tick=359 fighter=1 from=9 to=1",
+        "M201_AUTH_ACTION tick=361 fighter=2 from=0 to=6",
+        "M201_AUTH_ACTION tick=367 fighter=1 from=1 to=7",
+        "M201_AUTH_PARRY tick=367 attacker=1 target=2"
+      ],
+      "outcome": "PARRY",
+      "defender_hp": 100,
+      "defender_guard": 62,
+      "native_browser_witness": {
+        "chrome_pointerdown_epoch_ms": 1792749876749,
+        "chrome_pointerup_epoch_ms": 1792749876768,
+        "firefox_wheel_event_epoch_ms": 1792749876762,
+        "trusted_firefox_wheel_before_chrome_release": true,
+        "wheel_head_start_ms": 0,
+        "firefox_wheel_to_impact_or_parry_ms": 221
+      }
+    }
+  ],
+  "qa_disposition": "HOLD",
+  "interpretation": "Exchange 1 legally blocks 38 guard after 8 World ticks of Block6; exchange 2 legally parries inside 125ms after 6 World ticks of Block6. M205 FFA punisher cannot proceed because its M193 3x block-only prerequisite fails. This does not prove an upstream transport loss or a fault in dormant typed gesture code."
+}
