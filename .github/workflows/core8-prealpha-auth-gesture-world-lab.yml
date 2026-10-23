@@ -14,6 +14,10 @@ on:
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
       - "scripts/core8_native_v2_keye_heavy_world_lab.mjs"
+      - "scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "src/network/prealpha-shared-source-allocator-proposal.mjs"
       - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
   workflow_dispatch:
 
@@ -48,5 +52,24 @@ jobs:
         run: |
           node --check scripts/core8_native_v2_keye_heavy_world_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_keye_heavy_world_lab.mjs
+      - name: Genuine Chromium native one shared outbox normal LMB0 and busy KeyE1 to original World
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: One real Core8A outbox lost LMB PRESS original QUIC admission fence and ordered replay
+        env:
+          CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: One real Core8A outbox genuine server ACK loss and duplicate retransmit without extra hit
+        env:
+          CORE8A_LAB_DROP_FIRST_ACK: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Genuine W3C held standalone KeyE through same shared Core8A outbox strikes ONLY upon UP
+        env:
+          CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
