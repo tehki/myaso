@@ -54,5 +54,11 @@ jobs:
         run: |
           node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Native Chromium genuine server ACK loss returns DUPLICATE and exactly one original World attack
+        env:
+          CORE8A_LAB_DROP_FIRST_ACK: "1"
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Strict Rust Clippy across original game and experimental integration
         run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
