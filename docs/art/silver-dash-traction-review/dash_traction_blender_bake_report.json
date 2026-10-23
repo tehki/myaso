@@ -1,0 +1,558 @@
+{
+    "source":  "Owner Silver original 22-bone GLB (not bundled or modified)",
+    "sourceSha256":  "d679fccd00df868d600b4c5e2fcf8a4a46cc062dbd432be5b6a7f533eb30141f",
+    "clipKeyframesMs":  {
+                            "silver_kick_p0":  [
+                                                   0,
+                                                   45,
+                                                   90,
+                                                   125,
+                                                   160,
+                                                   208,
+                                                   283,
+                                                   380
+                                               ],
+                            "silver_dash_traction_p0":  [
+                                                            0,
+                                                            10,
+                                                            26,
+                                                            45,
+                                                            72,
+                                                            96,
+                                                            119,
+                                                            140
+                                                        ]
+                        },
+    "authoritativePhases":  {
+                                "kickMs":  [
+                                               90,
+                                               70,
+                                               220
+                                           ],
+                                "dashMs":  140
+                            },
+    "framesPerDirection":  8,
+    "directions":  8,
+    "sourceFramePx":  160,
+    "sourceRigBones":  22,
+    "worldGroundValidated":  false,
+    "originalArtReplaced":  false,
+    "realGreyhaven":  false,
+    "humanVisualApproved":  false,
+    "trueServerEvent":  false,
+    "sourceEditableBlend":  true,
+    "rendered":  [
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  26314
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  25541
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  24576
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  24514
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  24875
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  25534
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  25986
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  0,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  26314
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  23919
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  23881
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  23487
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  23854
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  24269
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  24024
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  24021
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  1,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  23919
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  23969
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  24399
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  24977
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  25200
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  24813
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  24462
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  24326
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  2,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  23969
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  24911
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  24977
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  25403
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  25320
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  25305
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  25300
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  24993
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  3,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  24911
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  24542
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  24728
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  25023
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  25222
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  25028
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  24956
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  24580
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  4,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  24542
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  23910
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  24156
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  24812
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  24825
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  25414
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  24450
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  24051
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  5,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  23910
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  24161
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  24409
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  24718
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  24678
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  23997
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  24023
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  23985
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  6,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  24161
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  0,
+                         "sourceFrame":  1,
+                         "sampledBlenderFrame":  1,
+                         "bytes":  26024
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  1,
+                         "sourceFrame":  1.6,
+                         "sampledBlenderFrame":  1.6,
+                         "bytes":  25389
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  2,
+                         "sourceFrame":  2.55,
+                         "sampledBlenderFrame":  2.55,
+                         "bytes":  24357
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  3,
+                         "sourceFrame":  3.7,
+                         "sampledBlenderFrame":  3.7,
+                         "bytes":  24225
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  4,
+                         "sourceFrame":  5.3,
+                         "sampledBlenderFrame":  5.3,
+                         "bytes":  24299
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  5,
+                         "sourceFrame":  6.75,
+                         "sampledBlenderFrame":  6.75,
+                         "bytes":  25222
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  6,
+                         "sourceFrame":  8.14,
+                         "sampledBlenderFrame":  8.14,
+                         "bytes":  25770
+                     },
+                     {
+                         "clip":  "silver_dash_traction_p0",
+                         "direction":  7,
+                         "phase":  7,
+                         "sourceFrame":  9.4,
+                         "sampledBlenderFrame":  9.4,
+                         "bytes":  26024
+                     }
+                 ]
+}
