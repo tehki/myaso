@@ -1,5 +1,5 @@
 // Combat 4D -- independent, fail-closed P0 acceptance inventory and evidence gate.
-// This checker validates evidence provenance; it does NOT simulate player inputs,
+// This checker validates claimed evidence structure, NOT independent provenance; it does NOT simulate player inputs,
 // substitute for the real Rust World, or grant deployment authority.
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -87,8 +87,13 @@ export function assessRow(row, report, candidateSha, baselineSha) {
   if (row.evidence_kind === "ci"
     && (report.full_protected !== true || report.conclusion !== "success"))
     fails.push("successful protected exact-head CI");
+  // JSON supplied by the claimant is not proof that a GitHub workflow ran at
+  // this SHA, that its artifacts are authentic, or that two humans played.
+  // This script has NO independent verifier. Never issue a release-facing
+  // PASS from syntactically plausible but unaudited evidence.
   return fails.length ? { status: "BLOCKED", reason: "Missing/invalid: " + fails.join(", ") }
-    : { status: "PASS", reason: "Evidence supplied; QA must still inspect linked artifacts" };
+    : { status: "REVIEW REQUIRED",
+      reason: "Manifest is structurally complete; independently verify exact-head run, immutable artifacts, W3C and World traces, humans/hosts and QA sign-off" };
 }
 
 export function qualify(matrix, candidateSha, evidence = {}) {
@@ -101,9 +106,12 @@ export function qualify(matrix, candidateSha, evidence = {}) {
     ...assessRow(row, records[row.id], candidateSha, matrix.baseline.sha)
   }));
   const counts = rows.reduce((n, row) => (n[row.status] = (n[row.status] ?? 0) + 1, n), {});
-  return { candidateSha, classification: rows.every(row => row.status === "PASS")
-    ? "PASS" : rows.some(row => row.status === "FAIL" || row.status === "BLOCKED")
-      ? "HOLD" : "NOT QUALIFIED", counts, rows,
+  // This offline preflight does not connect to GitHub or verify human/host
+  // attestations. A collection of 45 self-declared PASS records cannot
+  // upgrade release status. Independent QA/Main handles verified acceptance.
+  return { candidateSha, classification: rows.some(row =>
+    ["FAIL", "BLOCKED", "REVIEW REQUIRED"].includes(row.status))
+    ? "HOLD" : "NOT QUALIFIED", counts, rows,
     deploymentAuthorized: false };
 }
 
