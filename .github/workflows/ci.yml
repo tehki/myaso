@@ -48,6 +48,14 @@ jobs:
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
 
+      # Independent 4D source/evidence integrity; never substitutes for native World gates.
+      - name: Validate Combat 4D independent QA evidence
+        run: |
+          node --check scripts/combat4d-acceptance.mjs
+          node --check scripts/combat4d-m107-proof.mjs
+          node --test tests/combat4d-acceptance.test.mjs tests/combat4d-m107-proof.test.mjs
+          node scripts/combat4d-m107-proof.mjs qa/evidence/m107-run-39930443888.json
+
       - name: Validate R3 low-latency combat audio
         run: |
           node --check src/browser/game-audio.mjs
