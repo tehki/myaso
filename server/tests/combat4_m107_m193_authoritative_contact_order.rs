@@ -16,41 +16,76 @@ fn step(world: &mut World, attack: InputIntent, defend: InputIntent) -> Vec<Comb
 }
 
 fn light() -> InputIntent {
-    InputIntent { attack: true, ..InputIntent::default() }
+    InputIntent {
+        attack: true,
+        ..InputIntent::default()
+    }
 }
 fn block() -> InputIntent {
-    InputIntent { block: true, facing_radians: std::f32::consts::PI, ..InputIntent::default() }
+    InputIntent {
+        block: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    }
 }
 
 #[test]
 fn m107_real_heavy_hit_before_dodge_remains_committed_and_never_becomes_evade() {
     let mut world = duel();
-    let heavy = InputIntent { heavy_attack: true, ..InputIntent::default() };
+    let heavy = InputIntent {
+        heavy_attack: true,
+        ..InputIntent::default()
+    };
     let mut hit_tick = None;
     for _ in 0..36 {
         let events = step(&mut world, heavy, InputIntent::default());
-        if events.iter().any(|e| matches!(e, CombatEvent::Hit {
-            attacker: 1, target: 2, damage: 46, hp: 54
-        })) {
+        if events.iter().any(|e| {
+            matches!(
+                e,
+                CombatEvent::Hit {
+                    attacker: 1,
+                    target: 2,
+                    damage: 46,
+                    hp: 54
+                }
+            )
+        }) {
             hit_tick = Some(world.tick);
             break;
         }
     }
     let hit_tick = hit_tick.expect("original World must emit one genuine 46HP Hit");
     assert_eq!(world.fighter(2).unwrap().hp, 54.0);
-    let dodge = InputIntent { dodge: true, ..InputIntent::default() };
+    let dodge = InputIntent {
+        dodge: true,
+        ..InputIntent::default()
+    };
     let later = step(&mut world, InputIntent::default(), dodge);
     assert!(world.tick > hit_tick);
     assert_eq!(world.fighter(2).unwrap().action, Action::Dodge);
     assert_eq!(world.fighter(2).unwrap().hp, 54.0);
-    assert!(!later.iter().any(|e| matches!(e, CombatEvent::Evade {
-        attacker: 1, target: 2
-    })), "post-contact dodge cannot retroactively evade the same heavy");
+    assert!(
+        !later.iter().any(|e| matches!(
+            e,
+            CombatEvent::Evade {
+                attacker: 1,
+                target: 2
+            }
+        )),
+        "post-contact dodge cannot retroactively evade the same heavy"
+    );
     for _ in 0..15 {
         let events = step(&mut world, InputIntent::default(), InputIntent::default());
-        assert!(!events.iter().any(|e| matches!(e, CombatEvent::Evade {
-            attacker: 1, target: 2
-        })), "no Evade of a previously committed attack");
+        assert!(
+            !events.iter().any(|e| matches!(
+                e,
+                CombatEvent::Evade {
+                    attacker: 1,
+                    target: 2
+                }
+            )),
+            "no Evade of a previously committed attack"
+        );
         assert_eq!(world.fighter(2).unwrap().hp, 54.0);
     }
 }
@@ -68,16 +103,25 @@ fn m193_fresh_six_tick_block_is_real_parry_not_guard_break() {
         if block_tick.is_none() && world.fighter(2).unwrap().action == Action::Block {
             block_tick = Some(world.tick);
         }
-        if events.iter().any(|e| matches!(e, CombatEvent::Parry {
-            attacker: 1, target: 2
-        })) {
+        if events.iter().any(|e| {
+            matches!(
+                e,
+                CombatEvent::Parry {
+                    attacker: 1,
+                    target: 2
+                }
+            )
+        }) {
             parry_tick = Some(world.tick);
             break;
         }
     }
-    let age = parry_tick.expect("real Block must parry within original 125ms") -
-        block_tick.expect("real defender Block transition");
-    assert!(age <= 7, "parry must be within the genuine 125ms guard window");
+    let age = parry_tick.expect("real Block must parry within original 125ms")
+        - block_tick.expect("real defender Block transition");
+    assert!(
+        age <= 7,
+        "parry must be within the genuine 125ms guard window"
+    );
     assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
     assert_eq!(world.fighter(2).unwrap().guard, 100.0);
 }
@@ -92,14 +136,30 @@ fn m193_aged_held_block_receives_real_guard_pressure_not_parry() {
     let mut saw_block = false;
     for _ in 0..22 {
         let events = step(&mut world, light(), block());
-        assert!(!events.iter().any(|e| matches!(e, CombatEvent::Parry {
-            attacker: 1, target: 2
-        })), "aged held Block cannot reset its parry window");
-        saw_block |= events.iter().any(|e| matches!(e, CombatEvent::Block {
-            attacker: 1, target: 2
-        }));
+        assert!(
+            !events.iter().any(|e| matches!(
+                e,
+                CombatEvent::Parry {
+                    attacker: 1,
+                    target: 2
+                }
+            )),
+            "aged held Block cannot reset its parry window"
+        );
+        saw_block |= events.iter().any(|e| {
+            matches!(
+                e,
+                CombatEvent::Block {
+                    attacker: 1,
+                    target: 2
+                }
+            )
+        });
     }
-    assert!(saw_block, "genuine 34HP light must apply the existing 38 guard pressure");
+    assert!(
+        saw_block,
+        "genuine 34HP light must apply the existing 38 guard pressure"
+    );
     assert_eq!(world.fighter(2).unwrap().guard, 62.0);
     assert_eq!(world.fighter(2).unwrap().hp, 100.0);
 }
