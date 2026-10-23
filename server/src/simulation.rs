@@ -2389,6 +2389,114 @@ mod r2_combat_control_tests {
         assert_eq!(seen, [62.0, 24.0, 0.0]);
     }
 
+    // M156/M237: real World input admission distinguishes a legitimate
+    // very short LMB charge-release LIGHT from an all-neutral cancellation.
+    // Neither path is allowed to manufacture an attack from a lost release.
+    #[test]
+    fn m156_roll_knockdown_short_light_release_vs_cancel_is_authoritative() {
+        for release_is_light in [true, false] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 200.0, 250.0, 0.0));
+            assert!(world.add_player_at(2, 256.0, 250.0, std::f32::consts::PI));
+            assert!(world.add_player_at(3, 357.0, 250.0, std::f32::consts::PI));
+            assert!(world.set_input(
+                3,
+                InputIntent {
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    dodge: true,
+                    ..InputIntent::default()
+                }
+            ));
+            let mut knockdown_tick = None;
+            for _ in 0..16 {
+                world.step();
+                if world.fighter(2).unwrap().action == Action::Knockdown {
+                    knockdown_tick = Some(world.tick);
+                    break;
+                }
+            }
+            let knockdown_tick =
+                knockdown_tick.expect("genuine admitted roll must knock defender down");
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+            // One original server tick of the dual-bit LMB hold is a bona
+            // fide undercharged attack. The NEXT packet resolves its mode.
+            assert!(world.set_input(
+                3,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    facing_radians: std::f32::consts::PI,
+                    ..InputIntent::default()
+                }
+            ));
+            world.step();
+            assert_eq!(world.fighter(3).unwrap().action, Action::HeavyAttackWindup);
+            let mut release = InputIntent {
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            };
+            if release_is_light {
+                release.attack = true;
+            }
+            assert!(world.set_input(3, release));
+            world.step();
+            assert_eq!(
+                world.fighter(3).unwrap().action,
+                if release_is_light {
+                    Action::AttackWindup
+                } else {
+                    Action::Idle
+                },
+                "a lost release must cancel rather than invent damage"
+            );
+            let mut hit_ticks = Vec::new();
+            for _ in 0..25 {
+                let events = world.step();
+                for event in &events {
+                    if matches!(
+                        event,
+                        CombatEvent::Hit {
+                            attacker: 3,
+                            target: 2,
+                            ..
+                        }
+                    ) {
+                        assert_eq!(world.fighter(2).unwrap().action, Action::Knockdown);
+                        hit_ticks.push(world.tick);
+                        assert!(matches!(
+                            event,
+                            CombatEvent::Hit {
+                                attacker: 3,
+                                target: 2,
+                                damage: 34,
+                                hp: 66
+                            }
+                        ));
+                    }
+                }
+            }
+            if release_is_light {
+                assert_eq!(
+                    hit_ticks.len(),
+                    1,
+                    "single short LMB light hits exactly once"
+                );
+                assert!(hit_ticks[0] > knockdown_tick);
+                assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+            } else {
+                assert!(hit_ticks.is_empty(), "cancel may not become phantom hit");
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
+        }
+    }
+
     // 4B M194: genuine input edges enter the server at different ticks;
     // server elapsed state, not Firefox or Chrome wall time, chooses the
     // unchanged 125ms parry vs -38 guard block.
