@@ -33,7 +33,7 @@ Do **not** merge this proof as a substitute for fix or unlock Pre-Alpha based on
 
 ## Additional independent pointer identity regressions
 
-The live online `onLeftPointerUp` previously cleared `leftButtonDown` and the captured strafe movement **before** checking whether `leftButtonCharge.release(pointerId)` actually belonged to the active LMB; a foreign pointer's pointerUP could therefore destroy an unrelated valid chord reservation. It now returns when the charge controller reports no matching release, without clearing the active gesture's flags.
+The live online `onLeftPointerUp` previously cleared `leftButtonDown` and the captured strafe movement **before** checking whether a release actually belonged to the active LMB; a foreign pointer's pointerUP could therefore destroy an unrelated valid chord reservation. The controller now exposes a read-only `isActivePointer(pointerId)` predicate that prevents entering the handler's existing real release/movement-clear sequence for a foreign pointer, preserving the pre-existing exact-order `r1-directional-release-capture.test.mjs` contract. This check never commits a hit or changes charge timings.
 
 The online `lostpointercapture` previously cleared captured left movement **even for a nonmatching pointer** and failed to clear `leftButtonDown` after a matching loss. It now clears both only after a successful pointerId-scoped cancel and only when the native pointer has no left button held. Practice lost-capture previously called `cancel(undefined)`, which cancels any active gesture in the underlying controller; it now requires an actual integer pointerId.
 
@@ -47,3 +47,5 @@ Three further deterministic tests execute the **real live handler source** in an
 - Run fail-first authoritative Rust tests, native real Chrome/Firefox (2–4 humans), unchanged M-series and exact-head protected CI. Combat4D independent acceptance and Combat4/Main sign-off required.
 
 **Current verdict: HOLD — no safe live fix in this evidence-only branch.**
+
+**Protected CI learning:** exact prior head `b69f60238038b1bc97232283c3893fea98428065` passed all nine dedicated focused tests but [full quality #39930488204](https://github.com/tehki/myaso/actions/runs/39930488204) **FAILED** in `Validate R1 zoom, offscreen targets and bounded WAN render catch-up`: original protected `r1-directional-release-capture.test.mjs` checks `leftButtonCharge.release(event.pointerId);` immediately followed by `leftButtonPressMovement = null;`. The first patch had inserted a conditional between these two statements. The current narrowly revised handler restores that original sequencing with a **pre-release active-pointer guard**, without modifying or weakening original tests. The new head must qualify independently.
