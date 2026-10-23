@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
@@ -119,4 +120,90 @@ test("Combat 4A: live pointercancel handlers do not require a pointer-button tra
     assert.match(match[1], /leftButtonCharge\.cancel\(event\.pointerId\)/,
       path + " must cancel by active pointer identity, not event.button");
   }
+});
+
+function loadRealInputHandler(filePath, kind, context) {
+  const source = readFileSync(new URL(filePath, import.meta.url), "utf8");
+  let start, end;
+  if (kind === "onLeftPointerUp") {
+    start = source.indexOf("function onLeftPointerUp(event) {");
+    end = source.indexOf("\n}\ncanvas.addEventListener(\"pointerup\"", start);
+    assert.ok(start >= 0 && end > start, filePath + " pointerup function present");
+    runInNewContext(source.slice(start, end + 2), context);
+    return context.onLeftPointerUp;
+  }
+  const marker = 'canvas.addEventListener("' + kind + '", (event) => {';
+  start = source.indexOf(marker);
+  end = source.indexOf("\n});", start);
+  assert.ok(start >= 0 && end > start, filePath + " " + kind + " handler present");
+  const listeners = new Map();
+  context.canvas = { addEventListener: (event, fn) => listeners.set(event, fn) };
+  runInNewContext(source.slice(start, end + 4), context);
+  return listeners.get(kind);
+}
+
+test("Combat 4A: online active LMB survives foreign pointerup and release remains genuine", () => {
+  let clock = 100;
+  const events = [];
+  const leftButtonCharge = createLeftButtonCharge({
+    now: () => clock, onLight: () => events.push("LIGHT"), onHeavy: () => events.push("HEAVY"),
+  });
+  leftButtonCharge.press(7);
+  const context = {
+    leftButtonDown: true,
+    leftButtonPressMovement: { moveX: 1 },
+    leftButtonCharge,
+    updateMouse: () => {},
+    audio: { isUnlocked: () => true },
+  };
+  const up = loadRealInputHandler("../web/online-game.mjs", "onLeftPointerUp", context);
+  up({ pointerId: 12, button: 0 });
+  assert.equal(leftButtonCharge.isPressed(), true);
+  assert.equal(context.leftButtonDown, true, "other pointer cannot end real held LMB");
+  assert.ok(context.leftButtonPressMovement, "foreign release cannot erase captured left movement");
+  clock = 112;
+  up({ pointerId: 7, button: 0 });
+  assert.equal(context.leftButtonDown, false);
+  assert.equal(context.leftButtonPressMovement, null);
+  assert.deepEqual(events, ["LIGHT"]);
+});
+
+test("Combat 4A: lost capture retires only own LMB, clears online latch and never yields hit", () => {
+  const events = [];
+  const leftButtonCharge = createLeftButtonCharge({
+    onLight: () => events.push("LIGHT"), onHeavy: () => events.push("HEAVY"),
+  });
+  leftButtonCharge.press(7);
+  const context = {
+    leftButtonDown: true,
+    leftButtonPressMovement: { moveY: 1 },
+    middleBlockHeld: false,
+    leftButtonCharge,
+  };
+  const lost = loadRealInputHandler("../web/online-game.mjs", "lostpointercapture", context);
+  lost({ pointerId: 19, button: -1, buttons: 0 });
+  assert.equal(leftButtonCharge.isPressed(), true);
+  assert.equal(context.leftButtonDown, true);
+  assert.ok(context.leftButtonPressMovement, "unrelated capture loss cannot clear movement");
+  lost({ pointerId: 7, button: -1, buttons: 0 });
+  assert.equal(leftButtonCharge.isPressed(), false);
+  assert.equal(context.leftButtonDown, false, "own loss must clear Space+LMB latch");
+  assert.equal(context.leftButtonPressMovement, null);
+  assert.equal(leftButtonCharge.release(7), null);
+  assert.deepEqual(events, []);
+});
+
+test("Combat 4A: practice lost-capture without pointer identity cannot cancel current LMB", () => {
+  const leftButtonCharge = createLeftButtonCharge({
+    onLight: () => {}, onHeavy: () => {},
+  });
+  leftButtonCharge.press(7);
+  const lost = loadRealInputHandler("../web/game.mjs", "lostpointercapture", {
+    middleBlockHeld: false,
+    leftButtonCharge,
+  });
+  lost({ button: -1, buttons: 0 });
+  assert.equal(leftButtonCharge.isPressed(), true, "missing pointerId is not authority to cancel");
+  lost({ pointerId: 7, button: -1, buttons: 0 });
+  assert.equal(leftButtonCharge.isPressed(), false);
 });
