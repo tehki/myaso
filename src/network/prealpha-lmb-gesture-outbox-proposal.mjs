@@ -9,6 +9,9 @@ import {
 import {ProposedSharedSourceGestureAllocator} from "./prealpha-shared-source-allocator-proposal.mjs";
 
 const U32_MAX = 0xffff_ffff;
+// Retain only a finite number of same-lease settled typed edge identities.
+// Older ACKs remain unrecognized and fail closed; no hit authorization here.
+const MAX_SETTLED_TYPED_ACKS = 64;
 const validTick = tick => Number.isInteger(tick) && tick >= 0 && tick <= U32_MAX;
 function requireTick(tick) {
   if (!validTick(tick)) throw new RangeError("clientTick must be a diagnostic u32");
@@ -167,6 +170,7 @@ export class ProposedSharedTypedGestureOutbox {
   #trustedLease;
   #allocator;
   #pending = new Map();
+  #settled = new Map();
   #reservations = new Map();
   #maxPending;
   #maxAttempts;
@@ -274,7 +278,25 @@ export class ProposedSharedTypedGestureOutbox {
       throw new Error("foreign connection lease ACK denied");
     const ack = decodeProposedGestureAck(bytes);
     const event = this.#pending.get(ack.sequence);
-    if (!event) throw new Error("replayed, unexpected or retired typed ACK");
+    if (!event) {
+      // The original QUIC server can send ACCEPTED for an initial PRESS and
+      // DUPLICATE for its already-dispatched retry. Both replies may arrive
+      // after the first has settled. Correlate only authenticated same-lease
+      // previously SENT and settled (sequence, gestureId) tuples.
+      const settled = this.#settled.get(ack.sequence);
+      if (!settled) throw new Error("replayed, unexpected or retired typed ACK");
+      if (settled.gestureId !== ack.gestureId)
+        throw new Error("typed ACK does not identify settled gesture");
+      if (ack.status !== GESTURE_ACK_STATUS.ACCEPTED
+          && ack.status !== GESTURE_ACK_STATUS.DUPLICATE)
+        throw new Error("settled typed ACK status rejected");
+      return Object.freeze({
+        source:settled.source,action:settled.action,
+        sequence:ack.sequence,gestureId:ack.gestureId,status:ack.status,
+        serverTick:ack.serverTick,transportSettled:true,
+        alreadySettled:true,combatCommitted:false,
+      });
+    }
     if (event.gestureId !== ack.gestureId)
       throw new Error("typed ACK does not identify pending gesture");
     if (event.attempts === 0)
@@ -283,21 +305,30 @@ export class ProposedSharedTypedGestureOutbox {
     const transportSettled = ack.status === GESTURE_ACK_STATUS.ACCEPTED
       || ack.status === GESTURE_ACK_STATUS.DUPLICATE;
     if (!transportSettled) this.retire();
+    else {
+      this.#settled.set(event.sequence,Object.freeze({
+        source:event.source,action:event.action,gestureId:event.gestureId,
+      }));
+      if (this.#settled.size > MAX_SETTLED_TYPED_ACKS)
+        this.#settled.delete(this.#settled.keys().next().value);
+    }
     return Object.freeze({
       source:event.source,action:event.action,sequence:event.sequence,
       gestureId:event.gestureId,status:ack.status,serverTick:ack.serverTick,
-      transportSettled,combatCommitted:false,
+      transportSettled,alreadySettled:false,combatCommitted:false,
     });
   }
   retire() {
     this.#closed = true;
     this.#allocator.retire();
     this.#pending.clear();
+    this.#settled.clear();
     this.#reservations.clear();
   }
   get snapshot() {
     return Object.freeze({
       pending:this.#pending.size,
+      settledReceipts:this.#settled.size,
       reservedTerminalCapacity:this.#reservedCount(),
       activeSources:Object.freeze([...this.#reservations.keys()]),
       closed:this.#closed,
