@@ -6,6 +6,11 @@ on:
       - "web/online-game.mjs"
       - "web/prealpha-gesture-live-lab.mjs"
       - "web/network-transport.mjs"
+      # The true first-party KeyE native World flight consumes the live outbox:
+      # changes to settled ACK handling must rerun the original game, not
+      # merely smaller outbox unit/QUIC fixtures.
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
       - "tools/art/main0_v2_knights_combat_four_native.mjs"
       - ".github/workflows/main0-v2-knights-combat-four-native.yml"
   workflow_dispatch:
