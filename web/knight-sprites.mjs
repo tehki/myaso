@@ -109,7 +109,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     atlases.set(name, atlas);
   }
   return {
-    draw(ctx, fighter, { remote = false, actorKind = null, rotation = 0, nowMs = performance.now() } = {}) {
+    draw(ctx, fighter, { remote = false, actorKind = null, rotation = 0, visualLift = 0, nowMs = performance.now() } = {}) {
       if (actorKind !== "player") return false;
       // A fresh authenticated local player is a distinct animation timeline.
       // Never reuse the previous server actor's movement speed or late roll frame.
@@ -163,11 +163,16 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       // contains an eight-direction facing. Undo only that presentation rotation.
       ctx.save();
       ctx.rotate(-rotation);
+      // The caller lifts the airborne pose, but its floor shadow must remain
+      // at the unlifted authoritative world origin. Undo lift for shadow only;
+      // restore the original pose transform before drawing the real WebP.
+      if (visualLift > 0) ctx.translate(0, visualLift);
       ctx.fillStyle = "rgba(49, 38, 28, .45)";
       ctx.beginPath();
       ctx.ellipse(0, 11 * presentationScale, 20 * presentationScale,
         8 * presentationScale, 0, 0, Math.PI * 2);
       ctx.fill();
+      if (visualLift > 0) ctx.translate(0, -visualLift);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       // A2.11 keeps the visual sprite horizontally centered on the existing

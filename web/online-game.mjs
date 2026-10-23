@@ -1165,7 +1165,8 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   // is a viewpoint, never an NPC role. No costume or weapon ownership is
   // generated; source-missing actions retain the original honest Combat tell.
   const drewKnight = knightSprites?.draw(ctx, fighter, {
-    remote, actorKind: "player", rotation: presentationRotation, nowMs: performance.now(),
+    remote, actorKind: "player", rotation: presentationRotation,
+    visualLift: lift, nowMs: performance.now(),
   }) ?? false;
   if (!drewKnight) {
     ctx.fillStyle = shadow;
