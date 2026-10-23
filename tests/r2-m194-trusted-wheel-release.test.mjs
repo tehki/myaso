@@ -109,3 +109,74 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   }
   assert.equal(downCount, 0);
 });
+
+test("M194 wheel-first native chronology requires trusted Firefox wheel BEFORE one real Chrome click", async () => {
+  const trusted = deferred(), ack = deferred(), timeoutCeiling = deferred();
+  const calls = [];
+  let now = 0;
+  const flight = dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs: 35, trustedWheelWaitMs: 190,
+    now: () => now,
+    sleep: ms => {
+      calls.push("wait:" + ms);
+      if (ms === 190) return timeoutCeiling.promise;
+      now += ms;
+      return Promise.resolve();
+    },
+    sendWheel: () => { calls.push("real-fox-wheel"); return ack.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackDown: () => { calls.push("real-chrome-down"); now += 7; },
+    sendAttackUp: () => { calls.push("real-chrome-up"); now += 9; },
+  });
+  await tick();
+  assert.equal(calls.includes("real-chrome-down"), false);
+  now = 15;
+  trusted.resolve({ trusted: true, deltaY: 120 });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")), [
+    "real-fox-wheel", "real-chrome-down", "real-chrome-up",
+  ]);
+  const pending = Promise.race([flight.then(() => "complete"), tick().then(() => "still-awaiting-original-wheel-ACK")]);
+  assert.equal(await pending, "still-awaiting-original-wheel-ACK");
+  now = 75;
+  ack.resolve();
+  const receipt = await flight;
+  assert.equal(receipt.wheelHeadStartMs, 35);
+  assert.equal(receipt.postTrustedWheelMs, 35);
+  assert.equal(receipt.attackDownDispatchMs, 50);
+  assert.equal(receipt.attackUpDispatchMs, 57);
+  assert.equal(receipt.clickHoldMs, 7);
+  assert.ok(receipt.clickHoldMs < COMBAT.heavyAttack.windupMs);
+  assert.equal(calls.filter(x => x === "real-chrome-up").length, 1);
+});
+
+test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB down", async () => {
+  let downs = 0, ups = 0;
+  await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs: 35, trustedWheelWaitMs: 190,
+    sendWheel: () => {},
+    awaitTrustedWheel: () => new Promise(() => {}),
+    sendAttackDown: () => { downs++; },
+    sendAttackUp: () => { ups++; },
+    sleep: ms => ms === 190 ? Promise.resolve() : Promise.reject(Error("unexpected extra wait")),
+  }), /wheel not delivered before wheel-first attack/);
+  assert.equal(downs, 0);
+  assert.equal(ups, 0);
+  for (const invalid of [NaN, -1, 81, Infinity]) {
+    await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+      preWheelHeadStartMs: invalid, trustedWheelWaitMs: 190,
+      sendWheel: () => {}, awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+      sendAttackDown: () => { downs++; }, sendAttackUp: () => { ups++; },
+    }), TypeError);
+  }
+  assert.equal(downs, 0);
+});
+
+test("M194 original W3C guard-only scenario alone opts into real wheel-first order", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  assert.match(runner, /preWheelHeadStartMs: scenario === "uiguardbreak" \? 35 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
+  assert.equal(COMBAT.block.parryWindowMs, 125);
+  assert.equal(COMBAT.block.shortBlockMs, 240);
+  assert.equal(COMBAT.attack.guardDamage, 38);
+});
