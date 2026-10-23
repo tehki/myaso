@@ -721,6 +721,13 @@ async fn handle_connection(
                         }
                     }
                 }
+                let m344_selected = if game.flight_input_admission_trace && m344_inspect {
+                    coalesced.as_ref().map(|(tick, input)| {
+                        (*tick, input.attack, input.heavy_attack)
+                    })
+                } else {
+                    None
+                };
                 let server_tick = {
                     let mut state = game.state.lock().await;
                     apply_coalesced_input_and_read_tick(
@@ -732,10 +739,7 @@ async fn handle_connection(
                 };
                 if game.flight_input_admission_trace && m344_inspect {
                     println!(
-                        "M344_V1_WORLD_SET actor={player_id} session={stable_id} world_tick={server_tick} selected_tick={:?} applied_attack={:?} applied_heavy={:?}",
-                        coalesced.as_ref().map(|(tick, _)| tick),
-                        coalesced.as_ref().map(|(_, input)| input.attack),
-                        coalesced.as_ref().map(|(_, input)| input.heavy_attack)
+                        "M344_V1_WORLD_SET actor={player_id} session={stable_id} world_tick={server_tick} selected={m344_selected:?}"
                     );
                 }
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
