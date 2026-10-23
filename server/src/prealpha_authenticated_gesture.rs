@@ -12,6 +12,8 @@ use crate::simulation::{Action, World};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ServerActorBinding {
     pub player_id: u32,
+    /// Unpredictable CSPRNG boot nonce, server side only (never on wire).
+    pub boot_nonce: u128,
     pub lease_epoch: u64,
     pub world_instance: u64,
     pub incarnation: u64,
@@ -25,9 +27,14 @@ pub struct SessionGestureWorldPath {
 }
 
 impl SessionGestureWorldPath {
-    /// Construct only after real server admission, never from client bytes.
-    pub fn from_admitted_world(world: &World, player_id: u32, lease_epoch: u64) -> Option<Self> {
-        if lease_epoch == 0 || world.match_over() {
+    /// Construct only after trusted server admission with a fresh boot nonce.
+    pub fn from_admitted_world(
+        world: &World,
+        player_id: u32,
+        lease_epoch: u64,
+        boot_nonce: u128,
+    ) -> Option<Self> {
+        if boot_nonce == 0 || lease_epoch == 0 || world.match_over() {
             return None;
         }
         let actor = world.fighter(player_id)?;
@@ -37,6 +44,7 @@ impl SessionGestureWorldPath {
         Some(Self {
             binding: ServerActorBinding {
                 player_id,
+                boot_nonce,
                 lease_epoch,
                 world_instance: world.world_instance(),
                 incarnation: actor.world_incarnation(),
@@ -57,8 +65,10 @@ impl SessionGestureWorldPath {
         self.retired = true;
     }
 
-    fn current(&self, world: &World, lease_epoch: u64) -> bool {
+    fn current(&self, world: &World, lease_epoch: u64, boot_nonce: u128) -> bool {
         !self.retired
+            && boot_nonce != 0
+            && boot_nonce == self.binding.boot_nonce
             && lease_epoch == self.binding.lease_epoch
             && world.world_instance() == self.binding.world_instance
             && !world.match_over()
@@ -77,12 +87,13 @@ impl SessionGestureWorldPath {
         &mut self,
         world: &mut World,
         lease_epoch: u64,
+        boot_nonce: u128,
         bytes: &[u8],
     ) -> Option<GestureAck> {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
-        let status = if !self.current(world, lease_epoch) {
+        let status = if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             AckStatus::Stale
         } else if typed.source != GestureSource::Lmb {
@@ -158,8 +169,13 @@ impl SessionGestureWorldPath {
     /// Once each real 60Hz World tick, while caller owns same mutation lock.
     /// World already steps the light/held-heavy action; reducer gets the real
     /// server clock for READY and refusal of late/duplicate attack events.
-    pub fn advance_under_world_lock(&mut self, world: &mut World, lease_epoch: u64) {
-        if !self.current(world, lease_epoch) {
+    pub fn advance_under_world_lock(
+        &mut self,
+        world: &mut World,
+        lease_epoch: u64,
+        boot_nonce: u128,
+    ) {
+        if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             return;
         }
@@ -177,4 +193,15 @@ impl SessionGestureWorldPath {
 /// Untrusted datagrams are always rejected before session negotiation.
 pub fn is_v2_event(bytes: &[u8]) -> bool {
     bytes.len() == BYTES && bytes[0] == VERSION && bytes[1] == EVENT_TYPE
+}
+
+/// Fresh, non-client-selectable ephemeral server boot identity.
+/// No time/PID/connection counters or non-cryptographic hashes permitted.
+pub fn new_server_boot_nonce() -> anyhow::Result<u128> {
+    let mut bytes = [0_u8; 16];
+    getrandom::fill(&mut bytes)
+        .map_err(|error| anyhow::anyhow!("OS CSPRNG failed to issue boot nonce: {error:?}"))?;
+    let nonce = u128::from_le_bytes(bytes);
+    anyhow::ensure!(nonce != 0, "refusing zero boot nonce");
+    Ok(nonce)
 }

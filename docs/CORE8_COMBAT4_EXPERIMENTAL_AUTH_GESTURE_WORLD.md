@@ -84,3 +84,32 @@ M156 6ms pointer case and full original protected M-series, test 8B identity/
 session generation, integrate source1 KeyE, deliver 2–4 independently
 operated humans and Main immutable staging/rollback. Main is sole public
 integration/release writer. **NO MAIN MERGE / PUBLIC PROTOCOL / DEPLOY / GO.**
+
+
+## Core 8B cross-boot authority correction (P0, separate stacked draft)
+
+- A separate Core8B source review showed the first actor/session/World/life
+  tuple `1:1:1:1` repeats in independent process boots. Those process-local
+  numeric identifiers cannot be cross-restart proof of game-seat identity.
+- This child obtains a **fresh nonzero 128-bit CSPRNG boot nonce** from the
+  operating system before an experimental v2 server starts accepting connections; failure to
+  obtain randomness or an improbable all-zero result causes startup to fail.
+  No timestamp, PID, network client input or MYCH checksum is used.
+- The server stores the boot nonce in trusted `GameState`, and its
+  `SessionGestureWorldPath` immutable actor binding now includes the nonce.
+  Actual World admission and 60Hz dispatch verify the **current live boot
+  nonce under the same GameState World mutex** together with current lease,
+  World instance and actor incarnation. The nonce is **never transmitted on
+  wire**, nor can a client choose it.
+- New Rust tests launch **two independently booted OS subprocesses** and
+  require a distinct real CSPRNG nonce while demonstrating identical local
+  numeric actor tuple. Wrong-boot/zero-boot adversarial PRESS is rejected
+  before the original World can enter windup. Exactly one OS boot identity
+  is generated when the experimental v2 lab is enabled; new admissions use its immutable value.
+  Disabled legacy v1 mode has no new entropy requirement.
+- Security limit remains: this implements a **server-issued ephemeral game
+  seat authority token** bound to the admitted QUIC session, not a human login,
+  persistent account authentication, dedicated QUIC client identity or
+  cluster-zone globally fenced epoch. Production approval still requires
+  cross-department 8A/8B/8C explicit sign-off, original strict M-series,
+  multi-host and Main single-writer release gates.

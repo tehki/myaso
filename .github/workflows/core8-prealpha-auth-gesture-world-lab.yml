@@ -9,6 +9,7 @@ on:
       - "server/src/prealpha_lmb_gesture_authority.rs"
       - "server/src/lib.rs"
       - "server/tests/prealpha_authenticated_gesture_to_world.rs"
+      - "server/tests/prealpha_boot_nonce_authority.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
       - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
   workflow_dispatch:
@@ -26,6 +27,8 @@ jobs:
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
       - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
+      - name: Fresh-process OS CSPRNG boot nonce and server World auth gate
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_boot_nonce_authority -- --nocapture
       - name: Server binary real QUIC transport integration compiles
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Genuine Chromium real W3C fast-click and QUIC session v2 ACK to original World
