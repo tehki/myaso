@@ -214,16 +214,17 @@ let shortBlockUntil = 0;
 let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
-    if (m111InputProbe) {
-      m111InputProbe.lightReleases.push({
-        epochMs: Date.now(), actionAtRelease: local.action,
-      });
-      if (m111InputProbe.lightReleases.length > 32) m111InputProbe.lightReleases.shift();
-    }
+    const m111ReleaseEpochMs = m111InputProbe ? Date.now() : null;
     attackRequested = true;
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
+    if (m111InputProbe) {
+      m111InputProbe.lightReleases.push({
+        epochMs: m111ReleaseEpochMs, actionAtRelease: local.action,
+      });
+      if (m111InputProbe.lightReleases.length > 32) m111InputProbe.lightReleases.shift();
+    }
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
