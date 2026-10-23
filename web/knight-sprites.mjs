@@ -64,8 +64,14 @@ export function knightClip(action, actorKind, speed = 0, moving = false) {
   return moving ? "silver_walk" : "silver_idle";
 }
 
-export function spriteAtlasRect(facing, frame, frames) {
-  const direction = knightDirectionIndex(facing);
+// The first four original Silver atlases were baked with reversed horizontal
+// camera traversal. This is a SOURCE-CLIP orientation fix, not actor facing,
+// input direction, Combat or camera rotation. Roll and future art stay native.
+const MIRRORED_HORIZONTAL_CLIPS = new Set(["silver_idle", "silver_walk", "silver_sprint", "silver_jump"]);
+export function spriteAtlasRect(facing, frame, frames, clip = null) {
+  const sourceDirection = knightDirectionIndex(facing);
+  const direction = MIRRORED_HORIZONTAL_CLIPS.has(clip)
+    ? (8 - sourceDirection) % 8 : sourceDirection;
   const index = ((Math.floor(frame) % frames) + frames) % frames;
   return { x: index * KNIGHT_FRAME_PX, y: direction * KNIGHT_FRAME_PX,
     width: KNIGHT_FRAME_PX, height: KNIGHT_FRAME_PX };
@@ -141,7 +147,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
           : clip === "silver_jump" ? 430 : 470;
         frame = Math.min(frames - 1, Math.floor((nowMs - state.clipStartedMs) / duration * frames));
       }
-      const src = spriteAtlasRect(fighter.facing ?? 0, frame, frames);
+      const src = spriteAtlasRect(fighter.facing ?? 0, frame, frames, clip);
       // The combat context is rotated for attack telegraphs; the sprite already
       // contains an eight-direction facing. Undo only that presentation rotation.
       ctx.save();
