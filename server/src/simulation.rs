@@ -817,6 +817,31 @@ impl World {
         }
     }
 
+    /// Negotiated source1 KeyE: one standalone, server-timed 320ms heavy.
+    /// Caller must hold the same live World/lease mutation lock as LMB.
+    /// KeyE RELEASE/CANCEL are receipts only and never release a held LMB.
+    pub fn apply_review_only_keye_press(&mut self, net_id: u32) -> bool {
+        if self.winner.is_some() {
+            return false;
+        }
+        let Ok(index) = self.fighter_index(net_id) else {
+            return false;
+        };
+        let fighter = &mut self.fighters[index];
+        if fighter.action != Action::Idle
+            || fighter.latest_input.block
+            || fighter.latest_input.dodge
+            || fighter.latest_input.kick
+            || fighter.latest_input.jump
+            || fighter.latest_input.dash
+        {
+            return false;
+        }
+        fighter.attack_hit_targets.clear();
+        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        true
+    }
+
     pub fn step(&mut self) -> Vec<CombatEvent> {
         self.step_by(SERVER_DT_MS)
     }
