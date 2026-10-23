@@ -181,10 +181,13 @@ test("RMB-held LMB native mouse chord preserves ordered source0 PRESS/UPGRADE/RE
   assert.equal(gate.pointerUp(event(7,{button:2,buttons:1})),false);
   assert.equal(gate.mouseUp({button:0,buttons:2}),true);
   assert.equal(gate.mouseUp({button:0,buttons:2}),false);
-  const edges=actions(outbox);
+  // Source ownership belongs to Core8A's shared-queue packet metadata;
+  // v2 event bytes intentionally carry no additional source field.
+  const packets=outbox.nextSendBatch(8);
+  const edges=packets.map(x=>decodeProposedGestureEvent(x.bytes));
   assert.deepEqual(edges.map(x=>x.action),[
     GESTURE_ACTION.PRESS,GESTURE_ACTION.UPGRADE,GESTURE_ACTION.RELEASE]);
-  assert.deepEqual(edges.map(x=>x.source),[0,0,0]);
+  assert.deepEqual(packets.map(x=>x.source),[0,0,0]);
   assert.equal(new Set(edges.map(x=>x.gestureId)).size,1);
   assert.equal(new Set(edges.map(x=>x.clientTick)).size,1);
   assert.equal(gate.snapshot.active,false);
