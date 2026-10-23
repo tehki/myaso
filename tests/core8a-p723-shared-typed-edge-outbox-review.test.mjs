@@ -34,7 +34,10 @@ test("two LMB edges inside one 30Hz client tick survive actual typed queue and o
   }
   assert.equal(q.snapshot.pending,0);
   assert.equal(q.snapshot.reservedTerminalCapacity,0);
-  assert.throws(()=>q.receiveAck(ack(press),token),/replayed/);
+  const repeated=q.receiveAck(ack(press),token);
+  assert.equal(repeated.alreadySettled,true,
+    "an exact same-lease duplicate must be transport-only, not replay-authoritative");
+  assert.equal(repeated.combatCommitted,false);
 });
 
 test("one sequence/gesture namespace spans interleaved LMB and KeyE, ACK source inferred only from pending",()=>{
@@ -182,4 +185,67 @@ test("reject invalid version, forged lease and unknown source without mutating q
   }),/opaque current review lease/);
   assert.equal(q.transportSend,undefined);
   assert.equal(q.combatCommitted,undefined);
+});
+
+test("late same-lease ACK for already-settled retried KeyE PRESS must not strand authentic RELEASE",()=>{
+  const token=lease(),q=newQueue(token);
+  const press=q.begin(S.KEY_E,5);
+  assert.equal(q.nextSendBatch(1)[0].attempt,1);
+  assert.equal(q.nextSendBatch(1)[0].attempt,2,
+    "real Core8A bounded retry retransmits original PRESS before first ACK arrives");
+  const original=q.receiveAck(ack(press,ACK.ACCEPTED),token);
+  assert.equal(original.transportSettled,true);
+  assert.equal(original.combatCommitted,false);
+  const delayed=q.receiveAck(ack(press,ACK.DUPLICATE),token);
+  assert.equal(delayed.transportSettled,true,
+    "same-lease ACK for an authenticated already-settled edge cannot retire active KeyE");
+  assert.equal(delayed.alreadySettled,true,"idempotent duplicate ACK is not new World admission");
+  assert.equal(delayed.combatCommitted,false);
+  assert.equal(q.snapshot.closed,false);
+  const physicalRelease=q.release(S.KEY_E,30);
+  assert.equal(q.nextSendBatch(1)[0].action,A.RELEASE);
+  assert.equal(q.receiveAck(ack(physicalRelease),token).transportSettled,true);
+  assert.equal(q.snapshot.pending,0);
+});
+
+test("settled ACK replay scope rejects forged IDs, stale status, and cross-lease ACK",()=>{
+  const token=lease(),q=newQueue(token);
+  const p=q.begin(S.KEY_E,1);
+  q.nextSendBatch(1);
+  q.receiveAck(ack(p),token);
+  assert.throws(()=>q.receiveAck(ack(p),lease()),/foreign connection/);
+  assert.throws(()=>q.receiveAck(ack({...p,gestureId:p.gestureId+42}),token),/gesture|identify|replayed/i);
+  assert.throws(()=>q.receiveAck(ack({...p,sequence:p.sequence+999}),token),/replayed|unexpected/);
+  assert.throws(()=>q.receiveAck(ack(p,ACK.STALE),token),/stale|replay|unexpected|status/i);
+  assert.throws(()=>q.receiveAck(ack(p,ACK.REJECTED),token),/reject|replay|unexpected|status/i);
+  assert.equal(q.snapshot.closed,false,
+    "invalid second receipt must not authorize damage or erase existing active KeyE");
+  const r=q.release(S.KEY_E,10);
+  q.nextSendBatch(1);
+  assert.equal(q.receiveAck(ack(r),token).transportSettled,true);
+});
+
+test("bounded settled receipt history evicts stale sequences and retirement clears all",()=>{
+  const token=lease(),q=newQueue(token);
+  let oldest,latest;
+  for(let i=0;i<72;i++){
+    const p=q.begin(S.KEY_E,i*2);
+    if(i===0)oldest=p;
+    q.nextSendBatch(1);
+    assert.equal(q.receiveAck(ack(p),token).transportSettled,true);
+    const r=q.release(S.KEY_E,i*2+1);
+    q.nextSendBatch(1);
+    assert.equal(q.receiveAck(ack(r),token).transportSettled,true);
+    latest=r;
+    assert.ok(q.snapshot.settledReceipts<=64,"no unbounded replay receipt growth");
+  }
+  assert.equal(q.snapshot.settledReceipts,64);
+  assert.throws(()=>q.receiveAck(ack(oldest,ACK.DUPLICATE),token),/replayed/,
+    "once history is evicted a late ACK must still fail closed");
+  const validLatest=q.receiveAck(ack(latest,ACK.ACCEPTED),token);
+  assert.equal(validLatest.alreadySettled,true);
+  assert.equal(validLatest.combatCommitted,false);
+  q.retire();
+  assert.equal(q.snapshot.settledReceipts,0);
+  assert.throws(()=>q.receiveAck(ack(latest),token),/closed/);
 });

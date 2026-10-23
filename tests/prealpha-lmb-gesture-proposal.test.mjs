@@ -81,5 +81,11 @@ test("original v1 INPUT stays byte-for-byte identical, with provably ambiguous o
   const client = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(client, /prealpha-lmb-gesture-proposal/);
   const main = readFileSync(new URL("../server/src/main.rs", import.meta.url), "utf8");
-  assert.doesNotMatch(main, /prealpha_lmb_gesture_proposal/);
+  // The explicitly operator-enabled Rust lab is real but must never expose
+  // v2 gestures by default or on a nonloopback bind.
+  assert.match(main, /prealpha_lmb_gesture_proposal::encode_ack/);
+  assert.match(main, /let v2_lab = match env::var\("MYASO_EXPERIMENTAL_GESTURE_V2"\)\.as_deref\(\)/);
+  assert.match(main, /Ok\("0"\) \| Err\(_\) => false/);
+  assert.match(main, /if v2_lab && !bind\.ip\(\)\.is_loopback\(\)/);
+  assert.match(main, /bail!\("experimental v2 gesture ingress is loopback-only"\)/);
 });
