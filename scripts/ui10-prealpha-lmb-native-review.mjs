@@ -55,7 +55,7 @@ window.ui10={
   edges:outbox.nextSendBatch(8).map(e=>decodeProposedGestureEvent(e.bytes)),
   realServer:false,combatCommit:false}),
  upgrade:()=>gate.approvedHoldUpgrade(gate.snapshot.pointerId),
- blur:()=>{gate.blur();keyOrigin.blur();},
+ blur:()=>{const lmbCanceled=gate.blur();keyOrigin.blur();return lmbCanceled;},
  chat:x=>{chat=x;if(x){gate.chatOpened();keyOrigin.chatOpened();}},
  jump:x=>jump=x
 };
