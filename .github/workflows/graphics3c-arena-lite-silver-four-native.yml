@@ -8,6 +8,7 @@ on:
       - "src/browser/prealpha-arena-lite-floor.mjs"
       - "src/browser/prealpha-arena-lite-selection.mjs"
       - "tools/art/verify_prealpha_arena_lite_silver_four_native.mjs"
+      - "tools/art/check_arena_lite_silver_full_canvas_matrix.mjs"
       - "tests/prealpha-arena-lite-*.test.mjs"
   workflow_dispatch:
 
@@ -32,6 +33,7 @@ jobs:
           git diff --check
           node --check web/online-game.mjs
           node --check tools/art/verify_prealpha_arena_lite_silver_four_native.mjs
+          node --check tools/art/check_arena_lite_silver_full_canvas_matrix.mjs
           node --test tests/prealpha-silver-knight.test.mjs tests/prealpha-arena-lite-floor.test.mjs tests/prealpha-arena-lite-optin.test.mjs
       - name: Verify real browser drivers and toolchain
         run: |
@@ -44,18 +46,20 @@ jobs:
         env:
           MYASO_ARENA_LITE_CARGO_OFFLINE: "0"
           MYASO_ARENA_LITE_NATIVE_BROWSERS: "chrome,firefox,chrome,firefox"
-          MYASO_ARENA_LITE_NATIVE_OUT: "artifacts/arena-lite-silver-four-native"
+          MYASO_ARENA_LITE_NATIVE_OUT: "artifacts/arena-lite-silver-four-native/normal"
           MYASO_ARENA_LITE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p artifacts/arena-lite-silver-four-native
           timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_prealpha_arena_lite_silver_four_native.mjs
+          MYASO_ARENA_LITE_INVERT_MODE=1 MYASO_ARENA_LITE_NATIVE_OUT=artifacts/arena-lite-silver-four-native/inverted timeout --signal=TERM --kill-after=5s 720s node tools/art/verify_prealpha_arena_lite_silver_four_native.mjs
+          node tools/art/check_arena_lite_silver_full_canvas_matrix.mjs artifacts/arena-lite-silver-four-native/normal artifacts/arena-lite-silver-four-native/inverted
       - name: Preserve original unretouched four W3C PNGs, SHA manifest and timings
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: graphics3c-3a-real-four-silver-arena-lite-native
-          path: artifacts/arena-lite-silver-four-native/*
+          path: artifacts/arena-lite-silver-four-native/**
           if-no-files-found: ignore
           retention-days: 7
   real-silver-walk-jump-grounded-on-arena-lite:
