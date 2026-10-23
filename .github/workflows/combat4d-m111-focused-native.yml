@@ -1,0 +1,38 @@
+name: Combat 4D M111 real native input forensics (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/left-button-charge.mjs"
+      - "server/src/simulation.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/combat4d-m111-focused-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m111-world-punish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYASO_PVP_SCENARIO: uiheavyguardbreakpunish
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original production source, scenario and native browser tools
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: M111 independent first genuine W3C Chrome Firefox input and World punishment
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: M111 independent second genuine W3C Chrome Firefox input and World punishment
+        if: always()
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
