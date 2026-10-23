@@ -372,3 +372,99 @@ async fn one_native_keye_standalone_heavy_requires_320ms_then_matching_source1_r
     .await
     .expect("actual Rust World heavy became active only after matching KeyE RELEASE");
 }
+
+/// One real original QUIC session, two independent genuine typed sources,
+/// common sequence/outbox and original original World lock. ACK != HIT.
+/// Source1 BUSY is an admitted no-combat edge, never an extra 46HP strike.
+async fn receive_checked_receipt(conn: &Connection, seq: u32, gesture: u32, expected_status: u8) {
+    let receipt = timeout(WAIT, async {
+        loop {
+            let bytes = conn
+                .receive_datagram()
+                .await
+                .expect("real QUIC session intact");
+            if bytes.len() == 16 && bytes[0] == 2 && bytes[1] == 0x12 {
+                break bytes;
+            }
+        }
+    })
+    .await
+    .expect("bounded original Rust v2 ACK");
+    assert_eq!(receipt[2], expected_status, "real server ACK disposition");
+    assert_eq!(receipt[3], 0, "reserved ACK byte must remain zero");
+    assert_eq!(
+        u32::from_le_bytes(receipt[4..8].try_into().unwrap()),
+        seq,
+        "same one global lease sequence"
+    );
+    assert_eq!(
+        u32::from_le_bytes(receipt[8..12].try_into().unwrap()),
+        gesture,
+        "original session-owned gesture ID"
+    );
+    assert!(
+        u32::from_le_bytes(receipt[12..16].try_into().unwrap()) > 0,
+        "true original World 60Hz server tick, not client assertion"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn native_busy_keye_does_not_retire_original_lmb_release_or_create_heavy() {
+    for terminal_before_lmb_release in [false, true] {
+        let (server, url, digest) = real_server();
+        let seat = admitted_seat(&url, &digest).await;
+        // First real source0 PRESS must start the original 135ms light.
+        seat.connection
+            .send_datagram(typed_event(0, 1, 1, 1))
+            .expect("real LMB PRESS QUIC");
+        receive_checked_receipt(&seat.connection, 1, 1, 1).await;
+        // Second independently allocated source1 gesture is physically
+        // possible during source0 windup, but must not launch another action.
+        seat.connection
+            .send_datagram(typed_event(1, 1, 2, 2))
+            .expect("real independent KeyE PRESS QUIC");
+        receive_checked_receipt(&seat.connection, 2, 2, 1).await;
+        let tail = if terminal_before_lmb_release {
+            [(1, 3, 3, 2), (0, 3, 4, 1)]
+        } else {
+            [(0, 3, 3, 1), (1, 3, 4, 2)]
+        };
+        for (source, action, seq, id) in tail {
+            seat.connection
+                .send_datagram(typed_event(source, action, seq, id))
+                .expect("original ordered source terminal QUIC");
+            receive_checked_receipt(&seat.connection, seq, id, 1).await;
+        }
+        // Retransmitted KeyE busy terminal is DUPLICATE and not a strike.
+        let busy_terminal_seq = if terminal_before_lmb_release { 3 } else { 4 };
+        seat.connection
+            .send_datagram(typed_event(1, 3, busy_terminal_seq, 2))
+            .expect("replay real KeyE RELEASE");
+        receive_checked_receipt(&seat.connection, busy_terminal_seq, 2, 2).await;
+        // No attack/hit may be inferred from ACCEPTED transport receipts:
+        // inspect actual original Rust World authoritative action traces.
+        timeout(Duration::from_secs(3), async {
+            loop {
+                if server.lines.lock().unwrap().iter().any(|line| {
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=2")
+                }) {
+                    break;
+                }
+                sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("genuine current actor LMB reached LightActive after KeyE busy");
+        sleep(Duration::from_millis(85)).await;
+        let lines = server.lines.lock().unwrap().clone();
+        assert!(
+            !lines.iter().any(|line| {
+                line.contains("M201_AUTH_ACTION")
+                    && line.contains(" fighter=1 ")
+                    && (line.contains(" to=9") || line.contains(" to=10"))
+            }),
+            "source1 BUSY and duplicate terminals may NEVER start real World heavy"
+        );
+        println!("CORE8_NATIVE_QUIC_BUSY_KEYE_LMB_PRESERVED_PASS terminal_before_lmb_release={terminal_before_lmb_release}");
+    }
+}
