@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source": "GitHub Actions protected native Chrome+Firefox job log",
+  "run_url": "https://github.com/tehki/myaso/actions/runs/39930443888",
+  "job_id": 120337091363,
+  "job_step": "Validate M107 real heavy counterplay",
+  "candidate_sha": "1d4c165ee10d68509edb9d80f07e138f4f009d89",
+  "observed_outcome": "FAIL",
+  "actor_ids": {
+    "attacker": 2,
+    "defender": 1
+  },
+  "authoritative_server_events": [
+    {
+      "kind": "action",
+      "tick": 261,
+      "actor": 2,
+      "from": 0,
+      "to": 9,
+      "source": "M201_AUTH_ACTION tick=261 fighter=2 from=0 to=9"
+    },
+    {
+      "kind": "action",
+      "tick": 280,
+      "actor": 2,
+      "from": 9,
+      "to": 10,
+      "source": "M201_AUTH_ACTION tick=280 fighter=2 from=9 to=10"
+    },
+    {
+      "kind": "hit",
+      "tick": 280,
+      "attacker": 2,
+      "target": 1,
+      "damage": 46,
+      "hp": 54,
+      "source": "M201_AUTH_HIT tick=280 attacker=2 target=1 damage=46 hp=54"
+    },
+    {
+      "kind": "action",
+      "tick": 282,
+      "actor": 1,
+      "from": 0,
+      "to": 4,
+      "source": "M201_AUTH_ACTION tick=282 fighter=1 from=0 to=4"
+    },
+    {
+      "kind": "action",
+      "tick": 292,
+      "actor": 1,
+      "from": 4,
+      "to": 5,
+      "source": "M201_AUTH_ACTION tick=292 fighter=1 from=4 to=5"
+    }
+  ],
+  "native_browser_observation": {
+    "browser": "chrome",
+    "defender_actor": 1,
+    "trusted_wheel_back_recorded": true,
+    "player_hp": 54,
+    "player_stamina": 72,
+    "chronological_feedback": [
+      "Hit taken - 46 HP.",
+      "Dodge! Strike avoided."
+    ],
+    "combat_feedback": "dodge-success"
+  },
+  "attribution": "The server resolved the 46HP hit two ticks before actor1 entered Dodge; later dodge-success feedback cannot erase contact. Current legacy v1 30Hz physical input admission and post-contact readability need implementation owner investigation. This record does not prove a dropped packet or that a specific later branch is fixed.",
+  "qa_decision": "HOLD",
+  "reviewer_note": "Real W3C native test failed at step20; independent QA must inspect original trace before accepting a candidate. Previous healthy deterministic steps do not override the server timeline."
+}
