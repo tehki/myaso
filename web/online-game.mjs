@@ -498,7 +498,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uidirectionallight"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -846,6 +846,32 @@ function simulatePrediction(stepMs) {
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
+      }
+    }
+    // M121 loopback acceptance forensic only: record what the original 30Hz
+    // production v1 sender ACTUALLY submitted alongside trusted W3C strafe
+    // and LMB release. Never change outgoing input or infer a hit from this.
+    if (acceptanceScenario === "uidirectionallight") {
+      const proof = window.__MYASO_ACCEPTANCE_STATE__;
+      if (proof) {
+        const epochMs = Date.now();
+        proof.lastSubmittedClientTick = outgoingTick;
+        proof.lastSubmittedAtEpochMs = epochMs;
+        proof.inputSubmissions ??= [];
+        proof.inputSubmissions.push({
+          clientTick: outgoingTick,
+          epochMs,
+          moveX: currentInput.moveX,
+          moveY: currentInput.moveY,
+          facing: currentInput.facing,
+          attack: Boolean(currentInput.attack),
+          heavyAttack: Boolean(currentInput.heavyAttack),
+          heldLightCharge: Boolean(leftChargeHeld),
+          committedLightMove: committedLightMove
+            ? { moveX: committedLightMove.moveX, moveY: committedLightMove.moveY }
+            : null,
+        });
+        if (proof.inputSubmissions.length > 48) proof.inputSubmissions.shift();
       }
     }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
