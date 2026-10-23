@@ -1,0 +1,35 @@
+name: UI10 shared typed LMB and KeyE genuine browsers (DORMANT REVIEW)
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
+      - "src/browser/prealpha-keye-source-review.mjs"
+      - "src/browser/prealpha-shared-ui10-sources-review.mjs"
+      - "tests/ui10-shared-typed-sources-review.test.mjs"
+      - "scripts/ui10-shared-typed-native-review.mjs"
+      - ".github/workflows/ui10-shared-typed-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  true-dom-shared-outbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original UI10 and Core8A source isolation
+        run: |
+          node --check src/browser/prealpha-lmb-dom-gesture-review.mjs
+          node --check src/browser/prealpha-keye-source-review.mjs
+          node --check src/browser/prealpha-shared-ui10-sources-review.mjs
+          node --check scripts/ui10-shared-typed-native-review.mjs
+          node --test tests/ui10-prealpha-lmb-dom-review.test.mjs tests/ui10-shared-typed-sources-review.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Genuine Chrome and Firefox LMB plus KeyE one shared typed outbox
+        run: timeout --signal=TERM --kill-after=5s 130s node scripts/ui10-shared-typed-native-review.mjs
