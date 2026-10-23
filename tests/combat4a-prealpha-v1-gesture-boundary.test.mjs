@@ -186,6 +186,7 @@ test("Combat 4A: lost capture retires only own LMB, clears online latch and neve
     leftButtonDown: true,
     leftButtonPressMovement: { moveY: 1 },
     middleBlockHeld: false,
+    middleBlockPointerId: null,
     leftButtonCharge,
   };
   const lost = loadRealInputHandler("../web/online-game.mjs", "lostpointercapture", context);
@@ -208,6 +209,7 @@ test("Combat 4A: practice lost-capture without pointer identity cannot cancel cu
   leftButtonCharge.press(7);
   const lost = loadRealInputHandler("../web/game.mjs", "lostpointercapture", {
     middleBlockHeld: false,
+    middleBlockPointerId: null,
     leftButtonCharge,
   });
   lost({ button: -1, buttons: 0 });
