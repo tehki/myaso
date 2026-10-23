@@ -29,3 +29,16 @@ The existing original policy tests `tests/prealpha-lmb-gesture-proposal.test.mjs
 - Original strict M107/M108/M121/M143/M144/M156/M193/M194/M205, real Rust HP and stamina, independent 2–4 browser hosts, exact SHA protected/postmerge CI, immutable package/rollback and Main+owner GO remain mandatory.
 
 No production deployment, `main` merge, service restart, public network toggle, or browser game input remap is authorized by this source-only draft.
+
+
+## Additional native original Rust server bridge qualification — UI10 source-specific
+
+On this separate release-only child, `scripts/ui10-native-real-world-shared-gesture-review.mjs` uses the **actual UI10 dormant physical DOM event handlers** from this review (no test-only replacement listeners), the exact existing Core8A per-connection `ProposedSharedTypedGestureOutbox`, and real original Rust WebTransport with pinned certificate. It invokes a bounded QA transport pump after native events are queued; this **is not** the original game's negotiated production sender nor proof of automatic resend scheduling. Core8A owns send/ACK; original Rust 60Hz World owns LightWindup/HeavyWindup/Active.
+
+Four strict review modes using the unchanged original Rust server:
+- Physical LMB0 DOWN, KeyE1 DOWN+UP while LMB is active, LMB0 UP: source tags/order 0→1→1→0; exactly one original LightActive; no Phantom HeavyActive.
+- Deliberately discard original source0 PRESS on the QA transport, let later typed physical edges arrive first; no premature ACCEPTED; resend actual queue packets in order, confirm only one original LightActive.
+- Discard original **server** ACCEPTED ACK from the QA receiver; retry byte-identical pending original PRESS; get actual original server DUPLICATE ACK, no duplicate LightActive.
+- Physical standalone KeyE DOWN: actual original HeavyWindup then hold beyond 320ms server time, **no HeavyActive while still held**; only physical trusted KeyE UP commits exactly one HeavyActive. This is the Main-selected release-only contract; sibling auto-KeyE experimental branches are incompatible.
+
+The test asserts `M201_FLIGHT_ACTOR_BASELINE` from the actual Rust World before native input, not a fabricated actor state; native `isTrusted` pointer/key edges, actual World-tick ACKs and World action transitions. The in-test WebTransport pump is intentionally explicit, not integrated into `web/online-game.mjs`: original page's atomic v1→v2 authenticated transition, live end-to-end transport scheduling, four independently operated physical human hosts, HP-on-real-remote-victim, respawn/grant fencing, full protected CI and Main GO are not claimed.
