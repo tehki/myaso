@@ -978,9 +978,16 @@ mod tests {
         assert!(scopes
             .iter()
             .all(|s| s.pending() == 0 && s.next_sequence() == 0));
-        assert_eq!(scopes[0].gap(), Some(0), "victim must resync after lost receipt");
+        assert_eq!(
+            scopes[0].gap(),
+            Some(0),
+            "victim must resync after lost receipt"
+        );
         assert_eq!(scopes[2].gap(), Some(0), "second victim must resync too");
-        assert!(scopes[3].gap().is_none(), "uninvolved observer keeps current lease");
+        assert!(
+            scopes[3].gap().is_none(),
+            "uninvolved observer keeps current lease"
+        );
         // An unrelated empty tick is safe to close. An affected actor's
         // next actual World HIT remains blocked until authoritative resync.
         assert!(project_world_tick_for_recipients(601, &[], &mut scopes)
@@ -1019,7 +1026,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn absent_hit_participant_fails_closed_rather_than_silently_missing_credit() {
         let mut scopes = vec![scope(1), scope(4)];
@@ -1057,10 +1063,7 @@ mod tests {
             }
             for ordinal in 0..64 {
                 recipient
-                    .project_hit(
-                        &event(id, 800),
-                        commit(1, ordinal, id, 800),
-                    )
+                    .project_hit(&event(id, 800), commit(1, ordinal, id, 800))
                     .unwrap();
             }
             assert_eq!(recipient.pending(), 64);
@@ -1073,7 +1076,6 @@ mod tests {
         assert!(scopes[2..].iter().all(|s| s.pending() == 64));
         assert!(scopes[2..].iter().all(|s| s.gap().is_none()));
     }
-
 
     #[test]
     fn all_recipients_retired_later_scope_does_not_commit_first_scope() {
