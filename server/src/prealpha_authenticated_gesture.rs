@@ -99,6 +99,16 @@ impl SessionGestureWorldPath {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
+        // Source1 was historically Key E heavy; owner reserved E for Use.
+        // Reject before actor state, replay journal, or original World mutation.
+        if typed.source == GestureSource::KeyE {
+            return Some(GestureAck {
+                status: AckStatus::Rejected,
+                sequence: event.sequence,
+                gesture_id: event.gesture_id,
+                server_tick: tick,
+            });
+        }
         let source_index = match typed.source {
             GestureSource::Lmb => 0,
             GestureSource::KeyE => 1,
