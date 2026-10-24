@@ -170,7 +170,9 @@ impl ProposedWorldHitOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::combat_hit_delivery_proposal::{DeliveryError, ProposedRecipientHitDelivery};
+    use crate::combat_hit_delivery_proposal::{
+        project_world_tick_for_recipients, DeliveryError, ProposedRecipientHitDelivery,
+    };
     use crate::simulation::InputIntent;
 
     fn arena() -> World {
@@ -484,6 +486,99 @@ mod tests {
             delivery.project_committed_tick_batch(original_tick, &committed),
             Err(DeliveryError::ReplayedOrReorderedWorldHit),
             "a delayed second callback must not double-credit a committed World tick"
+        );
+    }
+
+    #[test]
+    fn one_original_two_target_world_tick_publishes_only_after_every_recipient_validates() {
+        // Four actual original Rust actors; true server World::step_into emits
+        // two distinct 34-HP HITs and immutable within-tick ordinals.
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 180.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 255.0, 220.0, std::f32::consts::PI));
+        assert!(world.add_player_at(4, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim_a = origin.bind_admitted(&world, 2, 102).unwrap();
+        let victim_b = origin.bind_admitted(&world, 3, 103).unwrap();
+        let spectator = origin.bind_admitted(&world, 4, 104).unwrap();
+        attack(&mut world);
+        let committed = (0..40)
+            .find_map(|_| {
+                let original = origin.step_and_capture(&mut world).unwrap();
+                (original.committed_hits.len() == 2).then_some(original.committed_hits)
+            })
+            .expect("original 60Hz LightActive hits both live World victims");
+        let tick = committed[0].1.server_tick;
+        assert_eq!(committed[1].1.server_tick, tick);
+        assert!(committed[0].1.within_tick_ordinal < committed[1].1.within_tick_ordinal);
+        assert!(committed.iter().all(|(event, _)| matches!(
+            event,
+            CombatEvent::Hit {
+                damage: 34,
+                hp: 66,
+                ..
+            }
+        )));
+
+        let fresh = || {
+            vec![
+                ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap(),
+                ProposedRecipientHitDelivery::new(victim_a, [2; 16], 64).unwrap(),
+                ProposedRecipientHitDelivery::new(victim_b, [3; 16], 64).unwrap(),
+                ProposedRecipientHitDelivery::new(spectator, [4; 16], 64).unwrap(),
+            ]
+        };
+        let mut scopes = fresh();
+        // A corrupt second original HIT must not grant even the attacker
+        // or first victim an observable earlier receipt.
+        let mut bad = committed.clone();
+        bad[1].1.victim = attacker;
+        assert_eq!(
+            project_world_tick_for_recipients(tick, &bad, &mut scopes),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert!(scopes
+            .iter()
+            .all(|scope| scope.pending() == 0 && scope.next_sequence() == 0));
+
+        // If the attacker scope only has room for one of two original HITs,
+        // the entire tick refuses publication; only the bottleneck GAPs.
+        let mut full = fresh();
+        full[0] = ProposedRecipientHitDelivery::new(attacker, [1; 16], 1).unwrap();
+        assert_eq!(
+            project_world_tick_for_recipients(tick, &committed, &mut full),
+            Err(DeliveryError::PendingOverflow { first_missing: 0 })
+        );
+        assert_eq!(full[0].gap(), Some(0));
+        assert!(full
+            .iter()
+            .all(|scope| scope.pending() == 0 && scope.next_sequence() == 0));
+        assert!(full.iter().skip(1).all(|scope| scope.gap().is_none()));
+
+        // Successful canonical tick publication is contiguous for the source
+        // and each involved victim, with no unrelated spectator receipt.
+        let actual = project_world_tick_for_recipients(tick, &committed, &mut scopes).unwrap();
+        assert_eq!(
+            actual
+                .iter()
+                .map(|(recipient, receipts)| (recipient.player_id, receipts.len()))
+                .collect::<Vec<_>>(),
+            vec![(1, 2), (2, 1), (3, 1), (4, 0)]
+        );
+        assert_eq!((actual[0].1[0].sequence, actual[0].1[1].sequence), (0, 1));
+        assert_eq!((actual[0].1[0].damage, actual[0].1[1].damage), (34.0, 34.0));
+        assert_eq!(scopes[3].pending(), 0);
+        assert_eq!(
+            scopes[0].ack_next(attacker, &[1; 16], 2),
+            Err(DeliveryError::FutureAck),
+            "a staged original World HIT is not a reliable network write or app ACK"
+        );
+        assert_eq!(
+            project_world_tick_for_recipients(tick, &committed, &mut scopes),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit),
+            "the complete original World tick cannot be recredited"
         );
     }
 }
