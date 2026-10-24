@@ -207,13 +207,14 @@ export class ProposedSharedTypedGestureOutbox {
 
   begin(source, clientTick = 0) {
     this.#requireOpen();
+    // Reject retired source1 BEFORE any queue-capacity checks or state updates.
+    // Key E is reserved for Use and cannot claim Combat sequence/capacity.
+    if (source !== 0)
+      throw new RangeError("Combat permits only physical LMB; Key E reserved for Use");
     if (this.#reservations.has(source))
       throw new Error("source already owns an active typed gesture");
-    // Reserve 3 slots total for a potential LMB press+upgrade+terminal;
-    // KeyE reserves 2 slots for press+terminal. Include ALL existing
-    // source reservations so one source can never strand another's RELEASE.
-    // Reject a new PRESS without retiring an older still-valid gesture.
-    const newSlots = source === 0 ? 3 : source === 1 ? 2 : 0;
+    // A valid LMB reserves PRESS, optional UPGRADE and terminal capacity.
+    const newSlots = 3;
     if (newSlots && this.#pending.size + this.#reservedCount() + newSlots > this.#maxPending)
       throw new Error("bounded typed queue lacks terminal capacity");
     const event = this.#allocator.begin(source,clientTick);
