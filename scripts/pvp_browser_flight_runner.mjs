@@ -1,3 +1,4 @@
+import { legacyM111HeavyOrigin } from "./m111-native-heavy-origin.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -8992,20 +8993,14 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
-        // M111 is a RELEASE-to-strike KeyE heavy: the original Rust World
-        // begins the 320+100+420ms commitment after genuine KeyE UP, never
-        // when W3C KeyE DOWN starts its physical hold. A keydown-based target
-        // can therefore fire LMB while the attacker is still recovering.
+        // Legacy KeyE requests heavy on actual DOWN; UP only clears the key.
+        // The negotiated experimental release-led source1 is a separate path.
+        // Require both genuine native edges, but do not add the120ms hold to
+        // the original840+60ms recovery floor by using the wrong origin.
         if (returnTiming) {
-          const secondRelease = (attackerState.keyTransitions ?? [])
-            .filter((event) => event.code === "KeyE"
-              && event.type === "keyup"
-              && Number.isFinite(event.epochMs)
-              && event.epochMs >= attemptIssuedAt).at(-1);
-          if (!secondRelease) {
-            throw new Error(`M111 accepted guard break lacked genuine second KeyE release epoch: ${JSON.stringify(attackerState.keyTransitions)}`);
-          }
-          secondHeavyIssuedAt = secondRelease.epochMs;
+          const origin = legacyM111HeavyOrigin(attackerState.keyTransitions ?? [], attemptIssuedAt);
+          secondHeavyIssuedAt = origin.downEpochMs;
+          console.log("M111_NATIVE_HEAVY_ORIGIN " + JSON.stringify(origin));
         }
         finalEvidence = states;
         break;
@@ -9121,13 +9116,13 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   let genuineNativePunish = null;
   const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, {
     returnTiming: true,
-    onAcceptedLiveBreak: (trustedSecondKeyEUpEpoch) => {
-      if (genuineNativePunish || !Number.isFinite(trustedSecondKeyEUpEpoch)) {
-        throw new Error("M111 must issue exactly one genuine key-release-based W3C punish");
+    onAcceptedLiveBreak: (trustedSecondKeyEDownEpoch) => {
+      if (genuineNativePunish || !Number.isFinite(trustedSecondKeyEDownEpoch)) {
+        throw new Error("M111 must issue exactly one genuine legacy KeyE-down-led W3C punish");
       }
       // Preserve ORIGINAL protected +60ms after 840ms recovery; only initiate
       // WebDriver command earlier, as soon as true live guard-break is seen.
-      const secondHeavyIssuedAt = trustedSecondKeyEUpEpoch;
+      const secondHeavyIssuedAt = trustedSecondKeyEDownEpoch;
       const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
       const firstClickTargetMs = COMBAT.heavyAttack.windupMs
         + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
@@ -9258,6 +9253,13 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // existing browser STUNNED/HP/pointer/W3C predicates unchanged.
   // Wait only for passive original loopback M201 stun-exit log if the hit
   // landed legitimately BEFORE exit; no extra inputs or simulation writes.
+  console.log("M111_NATIVE_INPUT_CHRONOLOGY " + JSON.stringify({
+    secondHeavyIssuedAt,
+    keyTransitions: attackerResult.keyTransitions,
+    pointers: attackerResult.pointers,
+    ownActionTransitions: attackerResult.acceptance?.ownActionTransitions,
+    inputPlane: attackerResult.m111InputPlane,
+  }));
   const worldDeadline = Date.now() + 950;
   let originalWorld = { status: "INDETERMINATE", reason: "waiting for original World exit" };
   while (Date.now() < worldDeadline) {

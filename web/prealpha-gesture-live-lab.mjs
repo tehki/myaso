@@ -82,12 +82,13 @@ export async function activateLoopbackGestureLab({
     add(canvas,"pointerdown",event => {
       drain(); // native capture already admitted real mouse pointer DOWN
       if (event.button !== 0 || !gates.lmb.snapshot.active) return;
-      const pointerId = gates.lmb.snapshot.pointerId;
+      const {pointerId,gestureId} = gates.lmb.snapshot;
       // This is only an UPGRADE *intent*. Rust checks <135ms on ITS clock
       // and refuses late upgrades; READY320ms and hits are never client timers.
       setTimeout(() => {
         if (detached || failed || !gates.lmb.snapshot.active
-            || gates.lmb.snapshot.pointerId !== pointerId) return;
+            || gates.lmb.snapshot.pointerId !== pointerId
+            || gates.lmb.snapshot.gestureId !== gestureId) return;
         if (gates.lmb.approvedHoldUpgrade(pointerId)) drain();
       },85);
     });

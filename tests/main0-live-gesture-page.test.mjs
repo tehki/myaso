@@ -109,3 +109,43 @@ test("original player-facing online client mutually excludes legacy v1 attack wr
  assert.match(game,/await activateLoopbackGestureLab\(/);
  assert.match(game,/if \(reviewedGestureLab\) return; \/\/ v2 capture owns edge/);
 });
+
+
+test("old held-pointer timer cannot upgrade a newer gesture reusing the native mouse pointer ID",async t=>{
+ t.mock.timers.enable({apis:["setTimeout"]});
+ const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
+ const settled=new Set();
+ const acknowledge=()=>{
+  for(const edge of f.wire){
+   if(settled.has(edge.sequence))continue;
+   const bytes=new Uint8Array(16),view=new DataView(bytes.buffer);
+   bytes.set([2,0x12,1,0]);
+   view.setUint32(4,edge.sequence,true);view.setUint32(8,edge.gestureId,true);view.setUint32(12,5,true);
+   lab.outbox.receiveAck(bytes,lab.lease);
+   settled.add(edge.sequence);
+  }
+ };
+ const down=()=>f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:1,button:0,buttons:1}));
+ const up=()=>f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:1,button:0,buttons:0}));
+ try{
+  down();
+  acknowledge();
+  t.mock.timers.tick(84);
+  up();
+  acknowledge();
+  down();
+  acknowledge();
+  const presses=f.wire.filter(e=>e.action===1);
+  const firstId=presses[0].gestureId,secondId=presses.at(-1).gestureId;
+  assert.notEqual(firstId,secondId,"two physical presses use distinct same-lease gestures");
+  t.mock.timers.tick(1);
+  assert.equal(f.wire.filter(e=>e.action===2).length,0,
+    "first gesture's 85ms deadline cannot upgrade a one-millisecond-old replacement press");
+  t.mock.timers.tick(84);
+  assert.deepEqual(f.wire.filter(e=>e.action===2).map(e=>e.gestureId),[secondId],
+    "replacement upgrades only from its own full 85ms hold intent");
+  assert.equal(f.wire.filter(e=>e.action===3).length,1,"timer never synthesizes release");
+  up();
+  assert.deepEqual(f.wire.filter(e=>e.action===3).map(e=>e.gestureId),[firstId,secondId]);
+ }finally{lab.close("test");}
+});

@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify original production source, scenario and native browser tools
         run: |
+          node --test tests/m111-native-heavy-origin.test.mjs
           node --check web/online-game.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           google-chrome --version
