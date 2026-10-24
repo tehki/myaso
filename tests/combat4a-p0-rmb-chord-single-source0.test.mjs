@@ -107,7 +107,7 @@ test("short LMB chord releases without a sampled 30Hz frame or heavyweight upgra
 test("held RMB/LMB upgrade, physical cancel and stale release cannot yield phantom hit",()=>{
   const x=setup();
   assert.equal(x.gate.chordedMouseDown(x.event({button:0,buttons:3})),true);
-  assert.equal(x.gate.approvedHoldUpgrade(-1).action,ACTION.UPGRADE);
+  assert.equal(x.gate.approvedHoldUpgrade(-1),true);
   assert.equal(x.gate.pointerCancel(x.event({button:-1,buttons:0,pointerId:8})),true);
   assert.equal(x.gate.mouseUp(x.event({button:0,buttons:2})),false);
   assert.deepEqual(x.bytes(),[
