@@ -110,7 +110,7 @@ test("selected-family immutable fixture matches actual JS EVENT/ACK encoding and
 
 test("selected Combat typed codec preserves LMB vectors and refuses archived Key E attack source",()=>{
   const lines=readFileSync(new URL("./fixtures/core8a-p723-selected-family-v2.golden",import.meta.url),"utf8")
-    .split(/\\r?\\n/).filter(line=>line&&!line.startsWith("#"));
+    .split(/\r?\n/).filter(line=>line&&!line.startsWith("#"));
   const fixture=new Map(lines.map(line=>line.split("=")));
   const fromHex=name=>Uint8Array.from(fixture.get(name).match(/../g),h=>parseInt(h,16));
   for(const [name,action,sequence,gestureId,clientTick] of [
