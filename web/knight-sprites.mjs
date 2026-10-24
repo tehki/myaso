@@ -4,6 +4,10 @@ import { COMBAT_ACTION } from "../src/browser/combat-readability.mjs";
 
 export const KNIGHT_FRAME_PX = 160;
 export const KNIGHT_ROLL_PRESENTATION_MS = 350;
+// Original Blender eight-way Dash traction study (#863), opt-in preview only.
+// Timing is the existing server-authored 140 ms Dash action, not a new ability.
+export const KNIGHT_DASH_TRACTION_PRESENTATION_MS = 140;
+export const KNIGHT_DASH_TRACTION_CLIP = "silver_dash_traction_p0";
 // Owner-approved A2.10 knight visual scale. This affects ONLY the optional
 // knight sprite renderer, not gameplay positions, roll physics or hitboxes.
 // Default Silver uses 120%; &knightScale=100 is a reviewed scale comparator.
@@ -49,8 +53,9 @@ export function knightDirectionIndex(facing) {
 
 // Pre-Alpha arena renders only authenticated human fighter snapshots.
 // No Sentinel/NPC assets or alternative actor roles are bundled.
-export function knightClip(action, actorKind, speed = 0, moving = false) {
+export function knightClip(action, actorKind, speed = 0, moving = false, dashArtVariant = "none") {
   if (actorKind !== "player") return null;
+  if (action === COMBAT_ACTION.dash && dashArtVariant === "traction") return KNIGHT_DASH_TRACTION_CLIP;
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
     return actorKind === "npc" ? "t1_roll" : "silver_roll";
   }
@@ -83,19 +88,23 @@ export function spriteAtlasRect(facing, frame, frames, clip = null, sourceArtVar
 export function createKnightSpriteRenderer({ ImageCtor = Image,
   assetBase = new URL("./assets/knights/", import.meta.url),
   presentationScale = KNIGHT_PRESENTATION_SCALE,
-  sourceArtVariant = "original" } = {}) {
+  sourceArtVariant = "original", dashArtVariant = "none" } = {}) {
   // Fail closed for unsupported visual transforms rather than silently
   // scaling A3 source art to arbitrary dimensions.
   knightPresentationRect(false, presentationScale);
   if (!["original", "relit"].includes(sourceArtVariant))
     throw new RangeError("Invalid original Silver source art variant");
+  if (!["none", "traction"].includes(dashArtVariant))
+    throw new RangeError("Invalid original Silver Dash preview art variant");
+  const sourceClips = dashArtVariant === "traction"
+    ? {...KNIGHT_CLIPS, [KNIGHT_DASH_TRACTION_CLIP]: 8} : KNIGHT_CLIPS;
   const atlases = new Map();
   const states = new Map();
-  for (const [name] of Object.entries(KNIGHT_CLIPS)) {
+  for (const [name] of Object.entries(sourceClips)) {
     const image = new ImageCtor();
     const atlas = { image, ready: false };
     image.onload = () => {
-      atlas.ready = image.naturalWidth === KNIGHT_CLIPS[name] * KNIGHT_FRAME_PX
+      atlas.ready = image.naturalWidth === sourceClips[name] * KNIGHT_FRAME_PX
         && image.naturalHeight === 8 * KNIGHT_FRAME_PX;
     };
     image.onerror = () => { atlas.ready = false; };
@@ -103,7 +112,9 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
     // Only a deliberate review URL can display the four source-authored,
     // size-matched Blender relights. Default five frozen Pre-Alpha atlases and
     // original 350ms Roll are unchanged; no new attack sprites are available.
-    const file = sourceArtVariant === "relit" && MIRRORED_HORIZONTAL_CLIPS.has(name)
+    const file = name === KNIGHT_DASH_TRACTION_CLIP
+      ? "review/" + KNIGHT_DASH_TRACTION_CLIP + ".webp"
+      : sourceArtVariant === "relit" && MIRRORED_HORIZONTAL_CLIPS.has(name)
       ? "review/" + name + "_relit.webp" : name + ".webp";
     image.src = new URL(file, assetBase).href;
     atlases.set(name, atlas);
@@ -134,7 +145,7 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.y = fighter.y;
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
-      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving);
+      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving, dashArtVariant);
       if (!clip) {
         // End the previous clip on unsupported states. A future roll must
         // start at frame zero rather than resume its previous final frame.
@@ -147,14 +158,15 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
         state.clip = clip;
         state.clipStartedMs = nowMs;
       }
-      const frames = KNIGHT_CLIPS[clip];
+      const frames = sourceClips[clip];
       let frame;
       if (clip.endsWith("_walk") || clip.endsWith("_sprint")) {
         frame = moving ? Math.floor(state.cycle * frames) : 0;
       } else if (clip === "silver_idle") {
         frame = Math.floor(nowMs / 300) % frames;
       } else {
-        const duration = clip.endsWith("_roll") ? KNIGHT_ROLL_PRESENTATION_MS
+        const duration = clip === KNIGHT_DASH_TRACTION_CLIP ? KNIGHT_DASH_TRACTION_PRESENTATION_MS
+          : clip.endsWith("_roll") ? KNIGHT_ROLL_PRESENTATION_MS
           : clip === "silver_jump" ? 430 : 470;
         frame = Math.min(frames - 1, Math.floor((nowMs - state.clipStartedMs) / duration * frames));
       }

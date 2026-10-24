@@ -1,0 +1,36 @@
+name: Graphics 3A original Silver Dash 140ms four-native review (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/knight-sprites.mjs"
+      - "web/online-game.mjs"
+      - "web/assets/knights/review/silver_dash_traction_p0.webp"
+      - "tests/graphics3a-dash-140-authentic-preview.test.mjs"
+      - "scripts/graphics3a_dash_four_native_review.py"
+      - "scripts/graphics3a_dash_native_keys.py"
+      - "docs/art/silver-dash-gameplay-review/**"
+      - ".github/workflows/graphics3a-dash-traction-four-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dash-native-four:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source original Blender SHA and immutable rollback/fallback contracts
+        run: |
+          node --check web/knight-sprites.mjs
+          node --check web/online-game.mjs
+          python3 -m py_compile scripts/graphics3a_dash_native_keys.py scripts/graphics3a_dash_four_native_review.py
+          node --test tests/graphics3a-dash-140-authentic-preview.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/prealpha-silver-knight.test.mjs tests/graphics3a-relit-source-select.test.mjs
+          chromium --version || google-chrome --version
+          chromedriver --version
+      - name: Compile actual authoritative Rust multiplayer server, not a stub
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real four-native-Chrome original Silver Dash trusted Chromium CDP 240ms double-tap and grounded WebP source
+        run: timeout --signal=TERM --kill-after=5s 130s python3 scripts/graphics3a_dash_four_native_review.py

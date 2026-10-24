@@ -120,7 +120,11 @@ const params = new URLSearchParams(window.location.search);
 // A separate explicit knights=1&knightArt=relit previews only authentic
 // source-lit locomotion; the server roster and Combat stay authoritative.
 const knightSprites = params.get("knights") === "1"
-  ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "relit" ? "relit" : "original"})
+  ? createKnightSpriteRenderer({
+    sourceArtVariant: params.get("knightArt") === "relit" ? "relit" : "original",
+    // Separate explicit owner Dash art; normal Pre-Alpha retains Combat fallback.
+    dashArtVariant: params.get("knightDashArt") === "traction" ? "traction" : "none",
+  })
   : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
