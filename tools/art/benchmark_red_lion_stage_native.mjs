@@ -30,7 +30,7 @@ async function wd(b,method,path,data,ms=30000){
   headers:data===undefined?undefined:{"content-type":"application/json"},
   signal:AbortSignal.timeout(ms)});
  const json=await res.json();
- if(!res.ok||json.value?.error)
+ if(!res.ok||(json.value?.error&&json.value?.stacktrace))
   throw new Error(b.name+" "+method+" "+path+" "+JSON.stringify(json).slice(0,700));
  return json.value??json;
 }
@@ -68,14 +68,17 @@ function browserProbe(variant,done){
   const camera=i=>({x:4365+32*Math.sin(i*.13),y:4075+24*Math.cos(i*.17)});
   for(let i=0;i<48;i++)
    if(!art.prepare(camera(i),w,h,z))throw new Error("warm-up refused "+i);
-  const costs=[];
-  for(let i=0;i<120;i++){
+  // Batch-normalized timings reduce the coarse performance.now() timer
+  // resolution of hardened native Chrome/Firefox headless environments.
+  const costs=[],perBatch=12;
+  for(let i=0;i<60;i++){
    const started=performance.now();
-   const frame=art.prepare(camera(i+48),w,h,z);
-   const elapsed=performance.now()-started;
-   if(!frame)throw new Error("frame refused "+i);
-   costs.push(elapsed);
-   if(i%12===0)await new Promise(resolve=>setTimeout(resolve,0));
+   for(let j=0;j<perBatch;j++){
+    const frame=art.prepare(camera(i*perBatch+j+48),w,h,z);
+    if(!frame)throw new Error("frame refused "+i+"."+j);
+   }
+   costs.push((performance.now()-started)/perBatch);
+   if(i%10===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
   const frame=art.prepare({x:4365,y:4075},w,h,z);
   if(!frame)throw new Error("pixel proof frame failed");
@@ -91,9 +94,12 @@ function browserProbe(variant,done){
   const percentile=p=>sorted[Math.ceil(p*sorted.length)-1];
   return {source:variant,p50Ms:percentile(.5),p95Ms:percentile(.95),
    p99Ms:percentile(.99),meanMs:costs.reduce((a,b)=>a+b,0)/costs.length,
-   pixelSha256:hash,frames:costs.length,warmup:48,
+   pixelSha256:hash,frames:costs.length*perBatch,warmup:48,perBatch,
+   timerMethod:"12 successive frames per batch; p50/p95 of batch-mean per-frame stage cost",
    frameScope:"createOriginalRedLionLiveArt.prepare only; no gameplay/actors"};
- })().then(v=>done(v)).catch(e=>done({error:String(e.stack||e)}));
+ })().then(v=>done(v)).catch(e=>done({
+  error:String(e),stack:String(e?.stack||""),name:e?.name||null
+ }));
 }
 const code="("+browserProbe.toString()+")(arguments[0],arguments[arguments.length-1]);";
 try{
@@ -133,8 +139,8 @@ try{
    for(const [index,source] of ["baseline","candidate","candidate","baseline"].entries()){
     const reading=await wd(b,"POST","/session/"+b.id+"/execute/async",
      {script:code,args:[source]},210000);
-    assert.equal(reading.error,undefined,name+" "+source+" "+reading.error);
-    assert.equal(reading.frames,120);
+    assert.equal(reading.error,undefined,name+" "+source+" "+JSON.stringify(reading));
+    assert.equal(reading.frames,720);
     assert.ok(reading.p50Ms>=0&&reading.p95Ms>=reading.p50Ms);
     rows.push({order:index,...reading});
     console.log("GRAPHICS3B_NATIVE_STAGE_AB_SAMPLE "+JSON.stringify({browser:name,order:index,source,p50Ms:reading.p50Ms,p95Ms:reading.p95Ms,pixelSha256:reading.pixelSha256}));
@@ -151,6 +157,9 @@ try{
     candidateP50Ms:average("candidate","p50Ms"),
     originalP95Ms:average("baseline","p95Ms"),
     candidateP95Ms:average("candidate","p95Ms"),trials:rows});
+   // Preserve the genuine first-engine evidence if second engine fails.
+   await writeFile(join(dest,"original-red-lion-world3c-stage-ab.json"),
+    JSON.stringify(results,null,2)+"\n");
   }finally{
    if(b.id)await wd(b,"DELETE","/session/"+b.id).catch(()=>{});
   }
