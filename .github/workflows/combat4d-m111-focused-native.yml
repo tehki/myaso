@@ -23,6 +23,8 @@ jobs:
       MYASO_PVP_SCENARIO: uiheavyguardbreakpunish
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify original production source, scenario and native browser tools
         run: |
           node --test tests/m111-native-heavy-origin.test.mjs

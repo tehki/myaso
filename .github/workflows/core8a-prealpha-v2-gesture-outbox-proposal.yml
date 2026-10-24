@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Check exact source original Combat proposal and new Core outbox
         run: |
           node --check src/network/prealpha-lmb-gesture-proposal.mjs

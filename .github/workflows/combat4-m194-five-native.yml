@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Original M194 source, strict unit gates and native browser prerequisites
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs

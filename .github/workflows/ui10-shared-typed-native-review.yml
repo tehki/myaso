@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify original UI10 and Core8A source isolation
         run: |
           node --check src/browser/prealpha-lmb-dom-gesture-review.mjs

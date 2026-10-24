@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify untouched production and all v2 source regression gates
         run: |
           node --check src/browser/prealpha-lmb-dom-gesture-review.mjs

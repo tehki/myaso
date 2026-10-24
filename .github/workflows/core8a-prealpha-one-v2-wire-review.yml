@@ -27,6 +27,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Reject invalid JS and prove actual Core8A outbox byte compatibility
         run: |
           node --check tests/fixtures/core8a-one-v2-gesture-wire-review.mjs

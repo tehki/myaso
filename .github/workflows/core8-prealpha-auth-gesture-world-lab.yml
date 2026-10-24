@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Rust formatting exact HEAD
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
       - name: Combat4D independent E retirement and same-source LMB replay (original QUIC World)

@@ -25,6 +25,8 @@ jobs:
       MYASO_PVP_SCENARIO: uijumpffasecondary
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Original deterministic distance planner and genuine native prerequisites
         run: |
           node --test tests/m225-ffa-threat-distance.test.mjs

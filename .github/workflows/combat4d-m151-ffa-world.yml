@@ -26,6 +26,8 @@ jobs:
       MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Validate original source and actual Chrome Firefox native drivers
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
