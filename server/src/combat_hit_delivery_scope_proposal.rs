@@ -123,8 +123,8 @@ impl ProposedRecipientHitStream {
                 {
                     continue;
                 }
-                let ordinal = u32::try_from(proposed.len())
-                    .map_err(|_| ScopedHitError::SequenceExhausted)?;
+                let ordinal =
+                    u32::try_from(proposed.len()).map_err(|_| ScopedHitError::SequenceExhausted)?;
                 let sequence = self
                     .next_sequence
                     .checked_add(ordinal)
@@ -169,9 +169,7 @@ impl ProposedRecipientHitStream {
         next_processed: u32,
     ) -> Result<(), ScopedHitError> {
         self.check_owner(current)?;
-        if next_processed < self.acknowledged_next
-            || next_processed > self.next_sequence
-        {
+        if next_processed < self.acknowledged_next || next_processed > self.next_sequence {
             return Err(ScopedHitError::InvalidProcessedCursor);
         }
         while self
@@ -218,17 +216,30 @@ mod tests {
             stream.project_committed_world_tick(
                 binding(),
                 100,
-                &[hit(3, 4, 34, 66), hit(2, 1, 34, 66), hit(4, 5, 46, 54),
-                  hit(1, 2, 34, 66)],
+                &[
+                    hit(3, 4, 34, 66),
+                    hit(2, 1, 34, 66),
+                    hit(4, 5, 46, 54),
+                    hit(1, 2, 34, 66)
+                ],
             ),
             Ok(2)
         );
         let actual = stream.pending_for_current(binding()).unwrap();
         assert_eq!(actual.len(), 2);
-        assert_eq!((actual[0].sequence, actual[0].attacker, actual[0].target), (0, 2, 1));
-        assert_eq!((actual[1].sequence, actual[1].attacker, actual[1].target), (1, 1, 2));
+        assert_eq!(
+            (actual[0].sequence, actual[0].attacker, actual[0].target),
+            (0, 2, 1)
+        );
+        assert_eq!(
+            (actual[1].sequence, actual[1].attacker, actual[1].target),
+            (1, 1, 2)
+        );
         assert_eq!(stream.ack_processed(binding(), 1), Ok(()));
-        assert_eq!(stream.pending_for_current(binding()).unwrap()[0].sequence, 1);
+        assert_eq!(
+            stream.pending_for_current(binding()).unwrap()[0].sequence,
+            1
+        );
         assert_eq!(stream.ack_processed(binding(), 2), Ok(()));
         assert!(stream.pending_for_current(binding()).unwrap().is_empty());
         assert_eq!(stream.next_sequence(), 2);
@@ -244,34 +255,85 @@ mod tests {
         let mut one = current(8);
         let mut other = ProposedRecipientHitStream::from_admitted_binding(second, 8).unwrap();
         let batch = [hit(3, 4, 34, 66), hit(2, 1, 34, 66), hit(3, 2, 46, 54)];
-        assert_eq!(one.project_committed_world_tick(binding(), 88, &batch), Ok(2));
-        assert_eq!(other.project_committed_world_tick(second, 88, &batch), Ok(1));
-        assert_eq!(one.pending_for_current(binding()).unwrap().iter().map(|r| r.sequence).collect::<Vec<_>>(), vec![0, 1]);
+        assert_eq!(
+            one.project_committed_world_tick(binding(), 88, &batch),
+            Ok(2)
+        );
+        assert_eq!(
+            other.project_committed_world_tick(second, 88, &batch),
+            Ok(1)
+        );
+        assert_eq!(
+            one.pending_for_current(binding())
+                .unwrap()
+                .iter()
+                .map(|r| r.sequence)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
         assert_eq!(other.pending_for_current(second).unwrap()[0].sequence, 0);
-        assert_eq!(other.ack_processed(binding(), 1), Err(ScopedHitError::RetiredOrForeignScope));
+        assert_eq!(
+            other.ack_processed(binding(), 1),
+            Err(ScopedHitError::RetiredOrForeignScope)
+        );
     }
 
     #[test]
     fn previous_boot_lease_world_and_actor_incarnation_cannot_deliver_or_ack() {
         let mut stream = current(8);
-        stream.project_committed_world_tick(binding(), 60, &[hit(2, 1, 34, 66)]).unwrap();
+        stream
+            .project_committed_world_tick(binding(), 60, &[hit(2, 1, 34, 66)])
+            .unwrap();
         let foreign = [
-            ServerActorBinding { boot_nonce: 0x8888, ..binding() },
-            ServerActorBinding { lease_epoch: 18, ..binding() },
-            ServerActorBinding { world_instance: 43, ..binding() },
-            ServerActorBinding { incarnation: 8, ..binding() },
-            ServerActorBinding { player_id: 3, ..binding() },
+            ServerActorBinding {
+                boot_nonce: 0x8888,
+                ..binding()
+            },
+            ServerActorBinding {
+                lease_epoch: 18,
+                ..binding()
+            },
+            ServerActorBinding {
+                world_instance: 43,
+                ..binding()
+            },
+            ServerActorBinding {
+                incarnation: 8,
+                ..binding()
+            },
+            ServerActorBinding {
+                player_id: 3,
+                ..binding()
+            },
         ];
         for stale in foreign {
-            assert_eq!(stream.pending_for_current(stale), Err(ScopedHitError::RetiredOrForeignScope));
-            assert_eq!(stream.ack_processed(stale, 1), Err(ScopedHitError::RetiredOrForeignScope));
-            assert_eq!(stream.project_committed_world_tick(stale, 61, &[hit(2, 1, 34, 66)]), Err(ScopedHitError::RetiredOrForeignScope));
+            assert_eq!(
+                stream.pending_for_current(stale),
+                Err(ScopedHitError::RetiredOrForeignScope)
+            );
+            assert_eq!(
+                stream.ack_processed(stale, 1),
+                Err(ScopedHitError::RetiredOrForeignScope)
+            );
+            assert_eq!(
+                stream.project_committed_world_tick(stale, 61, &[hit(2, 1, 34, 66)]),
+                Err(ScopedHitError::RetiredOrForeignScope)
+            );
         }
         assert_eq!(stream.pending_for_current(binding()).unwrap().len(), 1);
         stream.retire();
-        assert_eq!(stream.ack_processed(binding(), 1), Err(ScopedHitError::RetiredOrForeignScope));
-        assert_eq!(stream.pending_for_current(binding()), Err(ScopedHitError::RetiredOrForeignScope));
-        let newborn = ServerActorBinding { incarnation: 8, ..binding() };
+        assert_eq!(
+            stream.ack_processed(binding(), 1),
+            Err(ScopedHitError::RetiredOrForeignScope)
+        );
+        assert_eq!(
+            stream.pending_for_current(binding()),
+            Err(ScopedHitError::RetiredOrForeignScope)
+        );
+        let newborn = ServerActorBinding {
+            incarnation: 8,
+            ..binding()
+        };
         let replacement = ProposedRecipientHitStream::from_admitted_binding(newborn, 8).unwrap();
         assert_eq!(replacement.next_sequence(), 0);
         assert!(replacement.pending_for_current(newborn).unwrap().is_empty());
@@ -280,43 +342,105 @@ mod tests {
     #[test]
     fn repeated_world_tick_invalid_hit_and_future_ack_cannot_credit_twice() {
         let mut stream = current(8);
-        stream.project_committed_world_tick(binding(), 99, &[hit(2, 1, 34, 66)]).unwrap();
-        assert_eq!(stream.ack_processed(binding(), 2), Err(ScopedHitError::InvalidProcessedCursor));
+        stream
+            .project_committed_world_tick(binding(), 99, &[hit(2, 1, 34, 66)])
+            .unwrap();
+        assert_eq!(
+            stream.ack_processed(binding(), 2),
+            Err(ScopedHitError::InvalidProcessedCursor)
+        );
         assert_eq!(stream.ack_processed(binding(), 1), Ok(()));
         assert_eq!(stream.ack_processed(binding(), 1), Ok(())); // authentic duplicate ACK is idempotent
-        assert_eq!(stream.ack_processed(binding(), 0), Err(ScopedHitError::InvalidProcessedCursor));
-        assert_eq!(stream.project_committed_world_tick(binding(), 99, &[hit(2, 1, 34, 66)]), Err(ScopedHitError::NonMonotonicWorldTick));
-        assert_eq!(stream.project_committed_world_tick(binding(), 98, &[hit(2, 1, 34, 66)]), Err(ScopedHitError::NonMonotonicWorldTick));
+        assert_eq!(
+            stream.ack_processed(binding(), 0),
+            Err(ScopedHitError::InvalidProcessedCursor)
+        );
+        assert_eq!(
+            stream.project_committed_world_tick(binding(), 99, &[hit(2, 1, 34, 66)]),
+            Err(ScopedHitError::NonMonotonicWorldTick)
+        );
+        assert_eq!(
+            stream.project_committed_world_tick(binding(), 98, &[hit(2, 1, 34, 66)]),
+            Err(ScopedHitError::NonMonotonicWorldTick)
+        );
         assert_eq!(stream.next_sequence(), 1);
-        assert_eq!(stream.project_committed_world_tick(binding(), 100, &[hit(0, 1, 34, 66)]), Err(ScopedHitError::InvalidWorldHit(HitReceiptError::InvalidActors)));
-        assert_eq!(stream.project_committed_world_tick(binding(), 100, &[hit(2, 1, 34, 66)]), Ok(1));
+        assert_eq!(
+            stream.project_committed_world_tick(binding(), 100, &[hit(0, 1, 34, 66)]),
+            Err(ScopedHitError::InvalidWorldHit(
+                HitReceiptError::InvalidActors
+            ))
+        );
+        assert_eq!(
+            stream.project_committed_world_tick(binding(), 100, &[hit(2, 1, 34, 66)]),
+            Ok(1)
+        );
         assert_eq!(stream.next_sequence(), 2);
     }
 
     #[test]
     fn pending_capacity_loss_is_explicit_gap_never_dropped_credit_or_fake_ack() {
         let mut stream = current(2);
-        assert_eq!(stream.project_committed_world_tick(binding(), 1, &[hit(2, 1, 34, 66), hit(2, 3, 34, 66)]), Ok(2));
-        assert_eq!(stream.project_committed_world_tick(binding(), 2, &[hit(2, 4, 34, 66)]), Err(ScopedHitError::ExplicitGap));
+        assert_eq!(
+            stream.project_committed_world_tick(
+                binding(),
+                1,
+                &[hit(2, 1, 34, 66), hit(2, 3, 34, 66)]
+            ),
+            Ok(2)
+        );
+        assert_eq!(
+            stream.project_committed_world_tick(binding(), 2, &[hit(2, 4, 34, 66)]),
+            Err(ScopedHitError::ExplicitGap)
+        );
         assert!(stream.is_gapped());
         assert_eq!(stream.next_sequence(), 2);
         assert_eq!(stream.acknowledged_next(), 0);
-        assert_eq!(stream.ack_processed(binding(), 2), Err(ScopedHitError::ExplicitGap));
-        assert_eq!(stream.pending_for_current(binding()), Err(ScopedHitError::ExplicitGap));
+        assert_eq!(
+            stream.ack_processed(binding(), 2),
+            Err(ScopedHitError::ExplicitGap)
+        );
+        assert_eq!(
+            stream.pending_for_current(binding()),
+            Err(ScopedHitError::ExplicitGap)
+        );
     }
 
     #[test]
     fn a_scope_cannot_be_granted_without_real_nonzero_server_owned_identity() {
         for bad in [
-            ServerActorBinding { player_id: 0, ..binding() },
-            ServerActorBinding { boot_nonce: 0, ..binding() },
-            ServerActorBinding { lease_epoch: 0, ..binding() },
-            ServerActorBinding { world_instance: 0, ..binding() },
-            ServerActorBinding { incarnation: 0, ..binding() },
+            ServerActorBinding {
+                player_id: 0,
+                ..binding()
+            },
+            ServerActorBinding {
+                boot_nonce: 0,
+                ..binding()
+            },
+            ServerActorBinding {
+                lease_epoch: 0,
+                ..binding()
+            },
+            ServerActorBinding {
+                world_instance: 0,
+                ..binding()
+            },
+            ServerActorBinding {
+                incarnation: 0,
+                ..binding()
+            },
         ] {
-            assert!(matches!(ProposedRecipientHitStream::from_admitted_binding(bad, 2), Err(ScopedHitError::InvalidScope)));
+            assert!(matches!(
+                ProposedRecipientHitStream::from_admitted_binding(bad, 2),
+                Err(ScopedHitError::InvalidScope)
+            ));
         }
-        assert!(matches!(ProposedRecipientHitStream::from_admitted_binding(binding(), 0), Err(ScopedHitError::InvalidScope)));
-        assert!(matches!(ProposedRecipientHitStream::from_admitted_binding(binding(), 65), Err(ScopedHitError::InvalidScope)));
+        assert!(matches!(
+            ProposedRecipientHitStream::from_admitted_binding(binding(), 0),
+            Err(ScopedHitError::InvalidScope)
+        ));
+        assert!(matches!(
+            ProposedRecipientHitStream::from_admitted_binding(binding(), 65),
+            Err(ScopedHitError::InvalidScope)
+        ));
     }
 }
