@@ -16,23 +16,16 @@ use crate::simulation::CombatEvent;
 
 pub const MAX_PER_RECIPIENT_PENDING: usize = 64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ActorIncarnation {
-    pub boot: u128,
-    pub world_generation: u64,
-    pub net_id: u32,
-    pub actor_generation: u64,
-    pub lease_epoch: u64,
-}
+// Reuse the existing original server-authoritative actor lifetime binding.
+// This is a type alias, never an independently minted Core8A principal.
+pub type ActorIncarnation = crate::prealpha_authenticated_gesture::ServerActorBinding;
 
-impl ActorIncarnation {
-    fn valid(self) -> bool {
-        self.boot != 0
-            && self.world_generation != 0
-            && self.net_id != 0
-            && self.actor_generation != 0
-            && self.lease_epoch != 0
-    }
+fn valid_binding(identity: ActorIncarnation) -> bool {
+    identity.boot_nonce != 0
+        && identity.world_instance != 0
+        && identity.player_id != 0
+        && identity.incarnation != 0
+        && identity.lease_epoch != 0
 }
 
 /// Core8C must create this inside the original World lock AT hit commit.
@@ -90,7 +83,7 @@ impl ProposedRecipientHitDelivery {
         token: [u8; 16],
         max_pending: usize,
     ) -> Result<Self, DeliveryError> {
-        if !recipient.valid()
+        if !valid_binding(recipient)
             || token.iter().all(|byte| *byte == 0)
             || !(1..=MAX_PER_RECIPIENT_PENDING).contains(&max_pending)
         {
@@ -154,11 +147,11 @@ impl ProposedRecipientHitDelivery {
         identity: CommittedHitIdentity,
     ) -> Result<Option<HitReceipt>, DeliveryError> {
         self.ready()?;
-        if !identity.attacker.valid()
-            || !identity.victim.valid()
-            || identity.attacker.net_id == identity.victim.net_id
-            || identity.attacker.boot != identity.victim.boot
-            || identity.attacker.world_generation != identity.victim.world_generation
+        if !valid_binding(identity.attacker)
+            || !valid_binding(identity.victim)
+            || identity.attacker.player_id == identity.victim.player_id
+            || identity.attacker.boot_nonce != identity.victim.boot_nonce
+            || identity.attacker.world_instance != identity.victim.world_instance
         {
             return Err(DeliveryError::InvalidWorldIdentity);
         }
@@ -171,7 +164,7 @@ impl ProposedRecipientHitDelivery {
         else {
             return Ok(None);
         };
-        if *attacker != identity.attacker.net_id || *target != identity.victim.net_id {
+        if *attacker != identity.attacker.player_id || *target != identity.victim.player_id {
             return Err(DeliveryError::InvalidWorldIdentity);
         }
         let key = (identity.server_tick, identity.within_tick_ordinal);
@@ -298,11 +291,13 @@ mod tests {
     const TOKEN: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
     fn actor(id: u32, actor_generation: u64, epoch: u64) -> ActorIncarnation {
+        // Construct the existing original server's authoritative binding
+        // type, not a second HIT-only representation of actor lifetime.
         ActorIncarnation {
-            boot: 55,
-            world_generation: 77,
-            net_id: id,
-            actor_generation,
+            boot_nonce: 55,
+            world_instance: 77,
+            player_id: id,
+            incarnation: actor_generation,
             lease_epoch: epoch,
         }
     }
@@ -566,7 +561,7 @@ mod tests {
         );
         let bad = CommittedHitIdentity {
             victim: ActorIncarnation {
-                boot: 99,
+                boot_nonce: 99,
                 ..c.victim
             },
             ..c
