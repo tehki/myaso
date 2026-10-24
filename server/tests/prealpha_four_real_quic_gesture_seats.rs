@@ -1013,7 +1013,31 @@ async fn native_old_quic_session_does_not_own_replacement_lmb_after_close() {
     // Even if old bytes are maliciously replayed over the NEW connection,
     // source0 RELEASE for old ID7 and retired KeyE cannot terminate ID1 or
     // spend source0 sequence2 of this newly admitted session.
-    combat4c_ack(&replacement.connection, 0, 3, 2, 7, 4).await;
+    // The original ordered reducer withholds an ACK for a RELEASE whose
+    // later gesture ID has no preceding admitted PRESS: otherwise a genuine
+    // lost PRESS could never be retried. Crucially it also grants NO World
+    // action or lease-local sequence credit for the old unknown ID7.
+    replacement
+        .connection
+        .send_datagram(typed_event(0, 3, 2, 7))
+        .expect("inject obsolete gesture ID on replacement transport");
+    let old_terminal_acked = timeout(Duration::from_millis(200), async {
+        loop {
+            let packet = replacement
+                .connection
+                .receive_datagram()
+                .await
+                .expect("replacement QUIC remains admitted");
+            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
+                break;
+            }
+        }
+    })
+    .await;
+    assert!(
+        old_terminal_acked.is_err(),
+        "unknown old LMB ID7 must not get a positive, duplicate or rejected ACK"
+    );
     combat4c_ack(&replacement.connection, 1, 3, 2, 7, 4).await;
     combat4c_ack(&replacement.connection, 0, 3, 2, 1, 1).await;
     combat4c_ack(&replacement.connection, 0, 3, 2, 1, 2).await;
