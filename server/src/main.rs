@@ -1355,7 +1355,7 @@ mod tests {
                     let sample_tick = packet_tick - sample_offset;
                     let index = 16 + sample_offset as usize * 6;
                     bytes[index] = sample_offset as u8;
-                    bytes[index + 5] = u8::from(sample_tick == ACTION_TICK) << 2;
+                    bytes[index + 5] = u8::from(sample_tick == ACTION_TICK); // canonical LMB ATTACK bit0
                 }
                 let packet = decode_input_packet(&bytes).expect("valid genuine input wire format");
                 assert_eq!(packet.samples().len(), 3);
