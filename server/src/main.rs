@@ -882,6 +882,27 @@ async fn handle_connection(
                 } else {
                     String::new()
                 };
+                // The original v1 batch coalescer correctly owns locomotion
+                // from the NEWEST accepted sample, even when it is neutral.
+                // Carry only the authenticated selected one-shot light sample
+                // direction separately; otherwise same-datagram RELEASE then
+                // neutral would produce a generic attack despite real W+LMB.
+                let release_motion = if coalesced.as_ref().is_some_and(|(_, intent)| {
+                    intent.attack && !intent.heavy_attack
+                }) {
+                    accepted.iter().rev().find(|sample| {
+                        sample.attack || sample.heavy_attack || sample.dodge
+                            || sample.kick || sample.jump || sample.dash
+                    }).and_then(|sample| {
+                        if sample.attack && !sample.heavy_attack {
+                            Some((sample.move_x, sample.move_y, sample.facing_radians))
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
+                };
                 let (server_tick, m121_world) = {
                     let mut state = game.state.lock().await;
                     let tick = apply_coalesced_input_and_read_tick(
@@ -889,6 +910,7 @@ async fn handle_connection(
                         player_id,
                         coalesced,
                         &mut pending_input_acks,
+                        release_motion,
                     );
                     let probe = if prove_m121 {
                         state.world.fighter(player_id).map(|fighter| {
@@ -1116,9 +1138,10 @@ fn apply_coalesced_input_and_read_tick(
     player_id: u32,
     coalesced: Option<(u32, InputIntent)>,
     pending_input_acks: &mut VecDeque<(u32, u32)>,
+    release_motion: Option<(f32, f32, f32)>,
 ) -> u32 {
     if let Some((client_tick, input)) = coalesced {
-        state.world.set_input(player_id, input);
+        state.world.set_input_with_light_release_motion(player_id, input, release_motion);
         record_pending_input_ack(pending_input_acks, client_tick, state.world.tick);
     }
     state.world.tick
@@ -1528,7 +1551,7 @@ mod tests {
         };
 
         let server_tick =
-            apply_coalesced_input_and_read_tick(&mut state, 1, Some((77, input)), &mut pending);
+            apply_coalesced_input_and_read_tick(&mut state, 1, Some((77, input)), &mut pending, None);
 
         assert_eq!(server_tick, state.world.tick);
         assert_eq!(pending.front().copied(), Some((77, server_tick)));
@@ -1539,7 +1562,7 @@ mod tests {
 
         let pending_len = pending.len();
         assert_eq!(
-            apply_coalesced_input_and_read_tick(&mut state, 1, None, &mut pending),
+            apply_coalesced_input_and_read_tick(&mut state, 1, None, &mut pending, None),
             server_tick
         );
         assert_eq!(pending.len(), pending_len);
