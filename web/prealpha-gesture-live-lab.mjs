@@ -24,12 +24,18 @@ export async function activateLoopbackGestureLab({
   const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
   let failed = false, detached = false, retryTimer = null;
   const removeListeners = [];
+  const upgradeTimers = new Set();
+  let writeBatchPending = false, writeWatchdog = null;
   let gates = null, detachGates = null;
 
   function close(reason = "experimental gesture lease retired") {
     if (detached) return;
     detached = true;
     if (retryTimer !== null) clearInterval(retryTimer);
+    if (writeWatchdog !== null) clearTimeout(writeWatchdog);
+    writeWatchdog = null;
+    for (const timer of upgradeTimers) clearTimeout(timer);
+    upgradeTimers.clear();
     for (const [target,type,listener] of removeListeners) {
       target.removeEventListener(type,listener);
     }
@@ -43,7 +49,9 @@ export async function activateLoopbackGestureLab({
     close(reason || "typed gesture World/ACK rejected");
   }
   function drain(onlyUnsent = false) {
-    if (failed || detached || outbox.snapshot.closed) return;
+    // The one original outbox keeps new edges while the canonical transport
+    // waits for writer readiness. Never consume another retry batch in flight.
+    if (failed || detached || outbox.snapshot.closed || writeBatchPending) return;
     let packets;
     try {
       // First-send priority and maxAttempts are enforced by the original
@@ -54,18 +62,30 @@ export async function activateLoopbackGestureLab({
       fail("bounded gesture sequence/retry state exhausted");
       return;
     }
-    for (const packet of packets) {
-      // One same-session QUIC datagram writer serializes all physical edges.
-      // Never put an edge on latest-wins sampled movement transport.
-      try {
-        void gameClient.sendExperimentalGestureEdge(packet.bytes)
-          .catch(() => fail("typed gesture QUIC delivery failed"));
-      } catch {
-        fail("typed gesture lease no longer current");
-        return;
-      }
+    if (packets.length === 0) return;
+    writeBatchPending = true;
+    // This is a bounded transport stall, not the gameplay 135/320ms clock
+    // and not evidence of admission or a HIT. Retire the original lease on
+    // timeout so an old writer continuation cannot escape after reconnect.
+    writeWatchdog = setTimeout(() => fail("typed gesture writer stalled for 1500ms"),1500);
+    try {
+      const writes = packets.map(packet => {
+        try { return Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes)); }
+        catch (error) { return Promise.reject(error); }
+      });
+      void Promise.all(writes).then(() => {
+        if (writeWatchdog !== null) clearTimeout(writeWatchdog);
+        writeWatchdog = null;
+        writeBatchPending = false;
+        // Physical releases authored while blocked stay in the SAME outbox.
+        // Flush only previously unsent edges; the 170ms timer owns retries.
+        if (!failed && !detached) drain(true);
+      }).catch(() => fail("typed gesture QUIC delivery failed"));
+    } catch {
+      fail("typed gesture lease no longer current");
     }
   }
+
   // W3C may deliver pointerup then mouseup for ONE physical left release,
   // or only mouseup for RMB-held LMB. Only freshly authored sequences should
   // cause an immediate send. Retries remain solely on the existing timer.
@@ -100,12 +120,14 @@ export async function activateLoopbackGestureLab({
       // light and 320ms charge; this timer is merely a hold-intent edge.
       if (lastUpgradeScheduledGestureId === gestureId) return;
       lastUpgradeScheduledGestureId = gestureId;
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        upgradeTimers.delete(timer);
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId
             || gates.lmb.snapshot.gestureId !== gestureId) return;
         if (gates.lmb.approvedHoldUpgrade(pointerId)) drainNewEdges();
       },85);
+      upgradeTimers.add(timer);
     }
     add(canvas,"pointerdown",event => {
       if (event.button !== 0) return;
