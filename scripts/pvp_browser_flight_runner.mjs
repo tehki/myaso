@@ -530,6 +530,8 @@ async function startGameServer() {
         // The server itself still refuses this probe on public binds.
         || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
+        // Original M41 parry World proof: read-only and loopback-only.
+        || scenario === "uiparrytell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
