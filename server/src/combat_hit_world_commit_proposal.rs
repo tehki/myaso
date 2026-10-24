@@ -764,6 +764,9 @@ mod tests {
         );
         assert_eq!(inbox.pending(), 0);
         assert_eq!(inbox.next_sequence(), 0);
-        assert_eq!(world.fighter(2).unwrap().world_incarnation(), victim.incarnation);
+        assert_eq!(
+            world.fighter(2).unwrap().world_incarnation(),
+            victim.incarnation
+        );
     }
 }
