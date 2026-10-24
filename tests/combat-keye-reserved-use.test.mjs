@@ -71,10 +71,20 @@ test("keydown handler really ignores KeyE, including auto-repeat, without consum
     const start=source.indexOf('canvas.addEventListener("keydown", (event) => {');
     const end=source.indexOf("\n});",start);
     assert.ok(start>=0 && end>start, path+" missing original keydown handler");
-    const subscriptions=[];
-    runInNewContext(source.slice(start,end+4), {
+    const subscriptions=[],audioCues=[],combatKeys=[],combatFieldWrites=[];
+    const sandbox={
       canvas:{addEventListener:(kind,handler)=>subscriptions.push([kind,handler])},
+      // Instrument the ACTUAL playable-page keydown handler. Any accidental
+      // regression past KeyE's early return must never trigger heavy audio,
+      // produce attack intent, consume interaction input or arm combat keys.
+      audio:{play:cue=>audioCues.push(cue)},
+      keys:{add:key=>combatKeys.push(key),delete:key=>combatKeys.push("delete:"+key)},
+    };
+    Object.defineProperty(sandbox,"heavyAttackRequested",{
+      get(){return false;},set:value{combatFieldWrites.push(value);},
+      configurable:true,
     });
+    runInNewContext(source.slice(start,end+4),sandbox);
     assert.equal(subscriptions.length,1,path+" must register one handler");
     assert.equal(subscriptions[0][0],"keydown");
     const handler=subscriptions[0][1];
@@ -83,6 +93,9 @@ test("keydown handler really ignores KeyE, including auto-repeat, without consum
       handler({code:"KeyE",repeat,preventDefault(){prevented++;}});
       assert.equal(prevented,0,path+" E stays available for future Use");
     }
+    assert.deepEqual(audioCues,[],path+" E DOWN/repeat cannot play heavy or other combat audio");
+    assert.deepEqual(combatKeys,[],path+" E DOWN/repeat cannot enter combat key state");
+    assert.deepEqual(combatFieldWrites,[],path+" E cannot request LMB heavy");
   }
 });
 
