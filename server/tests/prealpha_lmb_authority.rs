@@ -103,12 +103,21 @@ fn retired_key_e_heavy_bit_cannot_act_or_block_the_next_genuine_lmb_light() {
     let mut hit_count = 0_u32;
     for _ in 0..30 {
         for event in world.step() {
-            if let CombatEvent::Hit { attacker, target, damage, hp } = event {
+            if let CombatEvent::Hit {
+                attacker,
+                target,
+                damage,
+                hp,
+            } = event
+            {
                 assert_eq!((attacker, target, damage, hp), (1, 2, 34, 66));
                 hit_count += 1;
             }
         }
     }
-    assert_eq!(hit_count, 1, "one source0 LMB, at most one original World HIT");
+    assert_eq!(
+        hit_count, 1,
+        "one source0 LMB, at most one original World HIT"
+    );
     assert_eq!(world.fighter(2).unwrap().hp, 66.0);
 }
