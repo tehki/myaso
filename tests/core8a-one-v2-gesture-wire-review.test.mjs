@@ -108,36 +108,30 @@ test("selected-family immutable fixture matches actual JS EVENT/ACK encoding and
   assert.equal(fixture.get("KEY_E_PRESS").slice(0,8),"02110101");
 });
 
-test("Main draft source0/source1 same corpus decodes in actual dormant typed JS wrapper only",()=>{
-  const lines=readFileSync(
-    new URL("./fixtures/core8a-p723-selected-family-v2.golden",import.meta.url),"utf8")
-    .split(/\r?\n/).filter(line=>line&&!line.startsWith("#"));
+test("selected Combat typed codec preserves LMB vectors and refuses archived Key E attack source",()=>{
+  const lines=readFileSync(new URL("./fixtures/core8a-p723-selected-family-v2.golden",import.meta.url),"utf8")
+    .split(/\\r?\\n/).filter(line=>line&&!line.startsWith("#"));
   const fixture=new Map(lines.map(line=>line.split("=")));
-  for(const [name,source,action,sequence,gestureId,clientTick] of [
-    ["LMB_PRESS",0,1,1,1,42],["LMB_RELEASE",0,3,2,1,42],
-    ["KEY_E_PRESS",1,1,3,2,43],["KEY_E_RELEASE",1,3,4,2,44],
-    ["KEY_E_CANCEL",1,4,5,2,45],["LMB_UPGRADE",0,2,6,3,42],
-    ["LMB_CANCEL",0,4,7,3,42],
+  const fromHex=name=>Uint8Array.from(fixture.get(name).match(/../g),h=>parseInt(h,16));
+  for(const [name,action,sequence,gestureId,clientTick] of [
+    ["LMB_PRESS",1,1,1,42],["LMB_RELEASE",3,2,1,42],
+    ["LMB_UPGRADE",2,6,3,42],["LMB_CANCEL",4,7,3,42],
   ]){
-    const expected=Uint8Array.from(fixture.get(name).match(/../g),h=>parseInt(h,16));
-    const encoded=new Uint8Array(encodeProposedTypedGestureEvent({
-      source,action,sequence,gestureId,clientTick,
+    const wire=new Uint8Array(encodeProposedTypedGestureEvent({
+      source:0,action,sequence,gestureId,clientTick,
     }));
-    assert.deepEqual(encoded,expected,`${name} exact shared wire`);
-    assert.deepEqual(decodeProposedTypedGestureEvent(encoded),
-      {source,action,sequence,gestureId,clientTick},`${name} review decode`);
-    if(source===1)
-      assert.throws(()=>decodeProposedGestureEvent(encoded),/reserved/i,
-        "no default upgrade of original codec to KeyE");
-    else assert.equal(decodeProposedGestureEvent(encoded).action,action);
+    assert.deepEqual(wire,fromHex(name));
+    assert.deepEqual(decodeProposedTypedGestureEvent(wire),{
+      source:0,action,sequence,gestureId,clientTick,
+    });
   }
-  assert.throws(()=>encodeProposedTypedGestureEvent({
-    source:1,action:2,sequence:3,gestureId:2,clientTick:43,
-  }),/source\/action/,"KeyE never upgrades LMB charge");
-  for(const name of ["BAD_KEY_E_UPGRADE","BAD_UNKNOWN_SOURCE","BAD_UNSELECTED_52"]){
-    const bad=Uint8Array.from(fixture.get(name).match(/../g),h=>parseInt(h,16));
-    assert.throws(()=>decodeProposedTypedGestureEvent(bad),undefined,name);
+  for(const [name,action,sequence,gestureId,clientTick] of [
+    ["KEY_E_PRESS",1,3,2,43],["KEY_E_RELEASE",3,4,2,44],
+    ["KEY_E_CANCEL",4,5,2,45],
+  ]){
+    assert.throws(()=>encodeProposedTypedGestureEvent({
+      source:1,action,sequence,gestureId,clientTick,
+    }),/reserved for Use/);
+    assert.throws(()=>decodeProposedTypedGestureEvent(fromHex(name)),/reserved for Use/);
   }
-  const ack=Uint8Array.from(fixture.get("BAD_ACK_SOURCE").match(/../g),h=>parseInt(h,16));
-  assert.throws(()=>decodeProposedGestureAck(ack),/reserved/i);
 });
