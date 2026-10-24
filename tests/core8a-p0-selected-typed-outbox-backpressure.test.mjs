@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {connectGameTransport} from "../web/network-transport.mjs";
+import {connectAuthoritativeClient} from "../web/authoritative-client.mjs";
 import {encodeInputPacket, decodeInputPacket} from "../src/network/input-codec.mjs";
 import {
   PROPOSED_GESTURE_VERSION, PROPOSED_GESTURE_SOURCE as SOURCE,
@@ -129,6 +130,133 @@ test("selected dormant 0x11 typed outbox keeps original LMB and KeyE edges when 
     transport?.close();
     if(former===undefined)delete globalThis.WebTransport;
     else globalThis.WebTransport=former;
+  }
+});
+
+
+function pushableReadStream() {
+  const pending=[];
+  const waiting=[];
+  return {
+    reader:{
+      read(){
+        if(pending.length)return Promise.resolve({value:pending.shift(),done:false});
+        return new Promise(resolve=>waiting.push(resolve));
+      },
+      releaseLock(){},
+    },
+    push(bytes){
+      const value=new Uint8Array(bytes);
+      const resolve=waiting.shift();
+      if(resolve)resolve({value,done:false});
+      else pending.push(value);
+    },
+  };
+}
+
+test("actual selected client QUIC lab handshake, typed datagram sender and same-lease ACK callback join ONE outbox",async()=>{
+  const prior=globalThis.WebTransport;
+  const realtime=pushableReadStream();
+  const reliable=pushableReadStream();
+  const writes=[];
+  const hello=[];
+  class OriginalQuicLabHarness {
+    constructor(){
+      this.ready=Promise.resolve();
+      this.closed=Promise.resolve();
+      this.datagrams={
+        writable:{getWriter:()=>({
+          get ready(){return Promise.resolve();},
+          async write(bytes){writes.push(new Uint8Array(bytes));},
+          releaseLock(){},
+        })},
+        readable:{getReader:()=>realtime.reader},
+      };
+    }
+    async createBidirectionalStream(){
+      return {
+        writable:{getWriter:()=>({
+          get ready(){return Promise.resolve();},
+          async write(){},
+          releaseLock(){},
+        })},
+        readable:{getReader:()=>reliable.reader},
+      };
+    }
+    async createUnidirectionalStream(){
+      return {getWriter:()=>({
+        async write(bytes){hello.push(new Uint8Array(bytes));},
+        async close(){
+          // The mock stands in for server-side QUIC admission. The original
+          // Rust server's actual authenticated World checks are NOT executed.
+          reliable.push([4,0,2,0x13,0,0]);
+        },
+        releaseLock(){},
+      })};
+    }
+    close(){}
+  }
+  globalThis.WebTransport=OriginalQuicLabHarness;
+  let client, outbox;
+  const outcomes=[];
+  try{
+    client=await connectAuthoritativeClient({
+      webTransportUrl:"https://127.0.0.1:4433/game",
+      onExperimentalGestureAck(bytes, source){
+        const outcome=outbox.receiveAck(bytes,source);
+        outcomes.push(outcome);
+      },
+    });
+    assert.equal(client.transport.experimentalGestureState,"off");
+    assert.throws(()=>client.sendExperimentalGestureEdge(new Uint8Array(16)),
+      /current server grant/);
+    assert.equal(await client.negotiateExperimentalGestureV2(),true);
+    assert.deepEqual(hello.map(b=>[...b]),[[2,0x10,77,89,65,83,79,49]]);
+    assert.equal(client.transport.experimentalGestureState,"granted");
+
+    // In THIS harness the connection object stands for the private same-QUIC
+    // lease. Production must still bind server-issued actor/boot/incarnation.
+    outbox=new ProposedSharedTypedGestureOutbox({
+      reviewVersion:2,trustedLease:client.transport,maxPending:8,maxAttempts:2,
+    });
+    const p=outbox.begin(SOURCE.LMB,12);
+    const r=outbox.release(SOURCE.LMB,12);
+    const e=outbox.begin(SOURCE.KEY_E,13);
+    const c=outbox.cancel(SOURCE.KEY_E,13);
+    const batch=outbox.nextSendBatch(4);
+    await Promise.all(batch.map(x=>client.sendExperimentalGestureEdge(x.bytes)));
+    assert.deepEqual(
+      writes.map(bytes=>decodeProposedTypedGestureEvent(bytes))
+        .map(x=>[x.source,x.action,x.sequence,x.gestureId]),
+      [
+        [SOURCE.LMB,ACTION.PRESS,1,1],
+        [SOURCE.LMB,ACTION.RELEASE,2,1],
+        [SOURCE.KEY_E,ACTION.PRESS,3,2],
+        [SOURCE.KEY_E,ACTION.CANCEL,4,2],
+      ],
+      "the ORIGINAL selected QUIC sender must preserve typed edge order",
+    );
+    // Same original client router must pass only the GRANTED transport
+    // identity into the existing selected outbox's 0x12 admission handler.
+    for(const item of [c,e,r,p])realtime.push(ack(item));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(outcomes.length,4);
+    assert.deepEqual(outcomes.map(x=>x.sequence),[4,3,2,1]);
+    assert.ok(outcomes.every(x=>x.transportSettled && !x.combatCommitted));
+    assert.equal(outbox.snapshot.pending,0);
+    realtime.push(ack({...p,status:ACK.DUPLICATE}));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(outcomes[4].alreadySettled,true);
+    assert.equal(outcomes[4].combatCommitted,false);
+    outbox.retire();
+    assert.throws(()=>outbox.receiveAck(ack(p),client.transport),/closed/);
+    client.close();
+    assert.throws(()=>client.sendExperimentalGestureEdge(batch[0].bytes),/current server grant/);
+  }finally{
+    outbox?.retire();
+    client?.close();
+    if(prior===undefined)delete globalThis.WebTransport;
+    else globalThis.WebTransport=prior;
   }
 });
 
