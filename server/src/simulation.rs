@@ -2071,7 +2071,9 @@ mod r2_combat_control_tests {
         for _ in 0..24 {
             let events = world.step();
             assert!(
-                !events.iter().any(|event| matches!(event, CombatEvent::Hit { .. })),
+                !events
+                    .iter()
+                    .any(|event| matches!(event, CombatEvent::Hit { .. })),
                 "READY while held must not create an automatic 34HP or 46HP HIT"
             );
         }
@@ -2082,9 +2084,12 @@ mod r2_combat_control_tests {
 
         let mut hits = Vec::new();
         for _ in 0..20 {
-            hits.extend(world.step().into_iter().filter(|event| {
-                matches!(event, CombatEvent::Hit { .. })
-            }));
+            hits.extend(
+                world
+                    .step()
+                    .into_iter()
+                    .filter(|event| matches!(event, CombatEvent::Hit { .. })),
+            );
         }
         assert_eq!(
             hits,
@@ -2130,7 +2135,10 @@ mod r2_combat_control_tests {
         assert!(world.step().is_empty());
         assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
         for _ in 0..16 {
-            assert!(world.step().is_empty(), "LMB CANCEL must never commit phantom HIT");
+            assert!(
+                world.step().is_empty(),
+                "LMB CANCEL must never commit phantom HIT"
+            );
         }
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
         assert_eq!(world.fighter(2).unwrap().hp, 100.0);
