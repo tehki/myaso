@@ -804,6 +804,95 @@ mod tests {
     }
 
     #[test]
+    fn actual_original_world_heavy_parry_never_creates_m147_hit_credit() {
+        // M188's successful defense must be an original World PARRY, not
+        // a fabricated HIT or an ACK promoted into damage delivery.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 272.0, 200.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim = origin.bind_admitted(&world, 2, 102).unwrap();
+        let spectator = origin.bind_admitted(&world, 3, 103).unwrap();
+        let mut recipients = vec![
+            ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(victim, [2; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(spectator, [3; 16], 64).unwrap(),
+        ];
+        // Real original World command state, single authoritative 60Hz step.
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        let mut events = Vec::new();
+        world.step_into(&mut events);
+        assert!(events.is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: 17
+            },
+        ));
+        for _ in 0..20 {
+            world.step_into(&mut events);
+            let tick = world.tick;
+            let captured = origin
+                .capture_committed_hits_from_step(&world, tick, &events)
+                .unwrap();
+            assert!(captured.is_empty(), "held READY cannot mint a HIT");
+            let published =
+                project_world_tick_for_recipients(tick, &captured, &mut recipients).unwrap();
+            assert!(published.iter().all(|(_, receipts)| receipts.is_empty()));
+        }
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::HeavyReady));
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..10 {
+            let previous_tick = world.tick;
+            world.step_into(&mut events);
+            assert_eq!(world.tick, previous_tick + 1);
+            let tick = world.tick;
+            let captured = origin
+                .capture_committed_hits_from_step(&world, tick, &events)
+                .unwrap();
+            assert!(captured.is_empty(), "World PARRY must not yield HIT credit");
+            let published =
+                project_world_tick_for_recipients(tick, &captured, &mut recipients).unwrap();
+            assert!(published.iter().all(|(_, receipts)| receipts.is_empty()));
+            assert!(recipients
+                .iter()
+                .all(|scope| scope.pending() == 0 && scope.next_sequence() == 0));
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Parry {
+                        attacker: 1,
+                        target: 2
+                    }
+                )
+            }) {
+                assert_eq!(world.fighter(1).unwrap().action, Action::Stunned);
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+                assert_eq!(world.fighter(2).unwrap().guard, 100.0);
+                assert_eq!(
+                    project_world_tick_for_recipients(tick, &captured, &mut recipients),
+                    Err(DeliveryError::ReplayedOrReorderedWorldHit),
+                );
+                return;
+            }
+        }
+        panic!("original World must commit genuine heavy PARRY without a HIT");
+    }
+
+    #[test]
     fn stale_original_world_hit_slice_cannot_be_relabelled_as_later_tick() {
         // Only the existing original World may commit HIT. If an adapter
         // releases its tick boundary, old events cannot acquire a newer tick.
