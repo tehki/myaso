@@ -46,8 +46,8 @@ test("M225 is read-only, original M142 strict primary/secondary assertions remai
  const web=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
  const section=runner.slice(runner.indexOf("async function runOnlineUiJumpFfaThreatFlight("),runner.indexOf("async function runOnlineUiJumpFfa",runner.indexOf("async function runOnlineUiJumpFfaThreatFlight(")+10));
  assert.ok(section.includes("planM225ThreatDistanceStaging({"));
- assert.ok(section.includes("pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)"));
- assert.ok(section.includes("pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)"));
+ assert.ok(section.includes("pulseMovementKeyBoundedW3c(left, stage.leftMove.key, stage.leftMove.ms)"));
+ assert.ok(section.includes("pulseMovementKeyBoundedW3c(right, stage.rightMove.key, stage.rightMove.ms)"));
  assert.ok(section.includes('event.count === "2 THREATS"'));
  assert.ok(section.includes("expectedPrimaryId"));
  assert.ok(section.includes("expectedSecondaryId"));
@@ -62,12 +62,18 @@ test("M142 real W3C geometry correction cannot accidentally double-tap dash",()=
  const section=source.slice(start,source.indexOf("\nasync function ",start+25));
  const prior=section.indexOf("if (geometryAttempt === 4) break;");
  const safeGap=section.indexOf("await sleep(300);",prior);
- const left=section.indexOf("pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)",safeGap);
- const right=section.indexOf("pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)",safeGap);
+ const left=section.indexOf("pulseMovementKeyBoundedW3c(left, stage.leftMove.key, stage.leftMove.ms)",safeGap);
+ const right=section.indexOf("pulseMovementKeyBoundedW3c(right, stage.rightMove.key, stage.rightMove.ms)",safeGap);
  assert.ok(prior>=0&&safeGap>prior&&left>safeGap&&right>safeGap);
  const dash=readFileSync(new URL("../src/browser/dash-input.mjs",import.meta.url),"utf8");
  assert.ok(dash.includes("DASH_DOUBLE_TAP_MS = 240;"));
  assert.ok(section.includes("cannot stage genuine ordered attack geometry"));
+ const bounded=source.slice(source.indexOf("async function pulseMovementKeyBoundedW3c("),
+   source.indexOf("async function resolveArenaElement(", source.indexOf("async function pulseMovementKeyBoundedW3c(")));
+ assert.ok(bounded.includes('{ type: "keyDown", value }'));
+ assert.ok(bounded.includes('{ type: "pause", duration: durationMs }'));
+ assert.ok(bounded.includes('{ type: "keyUp", value }'));
+ assert.ok(bounded.includes("durationMs > 250"));
  assert.ok(!section.includes("dispatchEvent("));
 });
 
