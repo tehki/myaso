@@ -1710,7 +1710,10 @@ mod tests {
             let sample = coalesce_accepted_input_batch(&accepted).unwrap();
             assert_eq!(sample.tick, 102);
             assert_eq!(sample.move_y, -release_y);
-            assert!(sample.attack, "one real accepted release survives coalescing");
+            assert!(
+                sample.attack,
+                "one real accepted release survives coalescing"
+            );
             let intent: InputIntent = sample.into();
             let motion = selected_light_release_motion(&accepted, Some(&(sample.tick, intent)));
             assert_eq!(motion, Some((0.0, release_y, 0.0)));
@@ -1764,10 +1767,7 @@ mod tests {
             suppressed_v1.attack = false;
             suppressed_v1.heavy_attack = false;
             assert_eq!(
-                selected_light_release_motion(
-                    &accepted,
-                    Some(&(sample.tick, suppressed_v1)),
-                ),
+                selected_light_release_motion(&accepted, Some(&(sample.tick, suppressed_v1)),),
                 None,
                 "no parallel legacy attack producer while v2 owns Combat"
             );
