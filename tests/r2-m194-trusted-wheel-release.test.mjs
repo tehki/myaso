@@ -115,7 +115,7 @@ test("M194 wheel-first native chronology requires trusted Firefox wheel BEFORE o
   const calls = [];
   let now = 0;
   const flight = dispatchR2ReleaseLedShortBlock({
-    preWheelHeadStartMs: 35, trustedWheelWaitMs: 190,
+    preWheelHeadStartMs: 15, trustedWheelWaitMs: 190,
     now: () => now,
     sleep: ms => {
       calls.push("wait:" + ms);
@@ -141,10 +141,10 @@ test("M194 wheel-first native chronology requires trusted Firefox wheel BEFORE o
   now = 75;
   ack.resolve();
   const receipt = await flight;
-  assert.equal(receipt.wheelHeadStartMs, 35);
-  assert.equal(receipt.postTrustedWheelMs, 35);
-  assert.equal(receipt.attackDownDispatchMs, 50);
-  assert.equal(receipt.attackUpDispatchMs, 57);
+  assert.equal(receipt.wheelHeadStartMs, 15);
+  assert.equal(receipt.postTrustedWheelMs, 15);
+  assert.equal(receipt.attackDownDispatchMs, 30);
+  assert.equal(receipt.attackUpDispatchMs, 37);
   assert.equal(receipt.clickHoldMs, 7);
   assert.ok(receipt.clickHoldMs < COMBAT.heavyAttack.windupMs);
   assert.equal(calls.filter(x => x === "real-chrome-up").length, 1);
@@ -153,7 +153,7 @@ test("M194 wheel-first native chronology requires trusted Firefox wheel BEFORE o
 test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB down", async () => {
   let downs = 0, ups = 0;
   await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
-    preWheelHeadStartMs: 35, trustedWheelWaitMs: 190,
+    preWheelHeadStartMs: 15, trustedWheelWaitMs: 190,
     sendWheel: () => {},
     awaitTrustedWheel: () => new Promise(() => {}),
     sendAttackDown: () => { downs++; },
@@ -174,7 +174,7 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
 
 test("M194 original W3C guard-only scenario alone opts into real wheel-first order", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
-  assert.match(runner, /preWheelHeadStartMs: scenario === "uiguardbreak" \? 35 : 0/);
+  assert.match(runner, /preWheelHeadStartMs: scenario === "uiguardbreak" \? 15 : 0/);
   assert.match(runner, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
