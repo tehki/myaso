@@ -9,6 +9,7 @@ pub mod combat_hit_control_ingress_proposal;
 pub mod combat_hit_control_proposal;
 pub mod combat_hit_delivery_proposal;
 pub mod combat_hit_journal;
+pub mod combat_hit_lease_mint_proposal;
 pub mod combat_hit_receipt;
 pub mod combat_hit_world_commit_proposal;
 pub mod kill_event;
