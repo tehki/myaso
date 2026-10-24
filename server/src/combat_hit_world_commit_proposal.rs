@@ -83,7 +83,9 @@ impl ProposedWorldHitOrigin {
         {
             return Err(OriginError::DuplicateLease);
         }
-        let fighter = world.fighter(net_id).ok_or(OriginError::MissingActor(net_id))?;
+        let fighter = world
+            .fighter(net_id)
+            .ok_or(OriginError::MissingActor(net_id))?;
         if fighter.action == Action::Dead {
             return Err(OriginError::DeadActor(net_id));
         }
@@ -120,7 +122,9 @@ impl ProposedWorldHitOrigin {
             .accepted
             .get(&net_id)
             .ok_or(OriginError::UnadmittedActor(net_id))?;
-        let fighter = world.fighter(net_id).ok_or(OriginError::MissingActor(net_id))?;
+        let fighter = world
+            .fighter(net_id)
+            .ok_or(OriginError::MissingActor(net_id))?;
         if fighter.world_incarnation() != bound.actor_generation {
             return Err(OriginError::StaleActor(net_id));
         }
@@ -140,7 +144,10 @@ impl ProposedWorldHitOrigin {
         world.step_into(&mut events);
         let mut committed_hits = Vec::new();
         for (index, event) in events.iter().enumerate() {
-            if let CombatEvent::Hit { attacker, target, .. } = event {
+            if let CombatEvent::Hit {
+                attacker, target, ..
+            } = event
+            {
                 let within_tick_ordinal =
                     u32::try_from(index).map_err(|_| OriginError::OrdinalExhausted)?;
                 let identity = CommittedHitIdentity {
@@ -239,7 +246,10 @@ mod tests {
         let _ = first_real_hit(&owner, &mut world);
         assert!(world.remove_player(2));
         assert!(world.add_player_at(2, 260.0, 200.0, std::f32::consts::PI));
-        assert_ne!(world.fighter(2).unwrap().world_incarnation(), old.actor_generation);
+        assert_ne!(
+            world.fighter(2).unwrap().world_incarnation(),
+            old.actor_generation
+        );
         assert_eq!(
             owner.bind_admitted(&world, 2, 104),
             Err(OriginError::AlreadyAdmitted(2))
