@@ -170,7 +170,7 @@ impl ProposedWorldHitOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::combat_hit_delivery_proposal::ProposedRecipientHitDelivery;
+    use crate::combat_hit_delivery_proposal::{DeliveryError, ProposedRecipientHitDelivery};
     use crate::simulation::InputIntent;
 
     fn arena() -> World {
@@ -402,4 +402,82 @@ mod tests {
             "delayed old disconnect cannot evict fresh current actor scope"
         );
     }
+
+    #[test]
+    fn two_genuine_world_hits_publish_one_atomic_recipient_batch_without_ghost_ack() {
+        // Same original World multi-target geometry as the existing source
+        // provenance test. This executes real World::step_into, not fabricated
+        // client HITs, and keeps recipient queue publication separate.
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 180.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 255.0, 220.0, std::f32::consts::PI));
+        assert!(world.add_player_at(4, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim2 = origin.bind_admitted(&world, 2, 102).unwrap();
+        let victim3 = origin.bind_admitted(&world, 3, 103).unwrap();
+        let bystander = origin.bind_admitted(&world, 4, 104).unwrap();
+        attack(&mut world);
+        let committed = (0..40)
+            .find_map(|_| {
+                let result = origin.step_and_capture(&mut world).unwrap();
+                (result.committed_hits.len() == 2).then_some(result.committed_hits)
+            })
+            .expect("one real World light must HIT two original actors in the same tick");
+        let original_tick = committed[0].1.server_tick;
+        assert_eq!(committed[1].1.server_tick, original_tick);
+        assert!(committed[0].1.within_tick_ordinal < committed[1].1.within_tick_ordinal);
+
+        let mut delivery = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+        // A forged/stale later victim binding must reject the entire genuine
+        // source batch BEFORE publishing first recipient credit. It cannot
+        // change the already-applied original World damage.
+        let mut malformed = committed.clone();
+        malformed[1].1.victim = attacker;
+        assert_eq!(
+            delivery.project_committed_tick_batch(original_tick, &malformed),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert_eq!(delivery.pending(), 0);
+        assert_eq!(delivery.next_sequence(), 0);
+        assert_eq!(delivery.acknowledged_next(), 0);
+
+        // Correct immutable original batch is published once, local seq0/1
+        // to attacker; each victim only gets its own local seq0, spectator none.
+        let published = delivery
+            .project_committed_tick_batch(original_tick, &committed)
+            .unwrap();
+        assert_eq!(published.len(), 2);
+        assert_eq!((published[0].sequence, published[1].sequence), (0, 1));
+        assert_eq!((published[0].damage, published[1].damage), (34.0, 34.0));
+        let mut v2 = ProposedRecipientHitDelivery::new(victim2, [2; 16], 64).unwrap();
+        let mut v3 = ProposedRecipientHitDelivery::new(victim3, [3; 16], 64).unwrap();
+        let mut spectator = ProposedRecipientHitDelivery::new(bystander, [4; 16], 64).unwrap();
+        assert_eq!(
+            v2.project_committed_tick_batch(original_tick, &committed)
+                .unwrap().iter().map(|r| r.sequence).collect::<Vec<_>>(),
+            vec![0]
+        );
+        assert_eq!(
+            v3.project_committed_tick_batch(original_tick, &committed)
+                .unwrap().iter().map(|r| r.sequence).collect::<Vec<_>>(),
+            vec![0]
+        );
+        assert!(spectator
+            .project_committed_tick_batch(original_tick, &committed)
+            .unwrap().is_empty());
+        assert_eq!(spectator.pending(), 0);
+        assert_eq!(
+            delivery.ack_next(attacker, &[1; 16], 2),
+            Err(DeliveryError::FutureAck),
+            "enqueue under World authority is neither reliable stream write nor app ACK"
+        );
+        assert_eq!(
+            delivery.project_committed_tick_batch(original_tick, &committed),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit),
+            "a delayed second callback must not double-credit a committed World tick"
+        );
+    }
+
 }
