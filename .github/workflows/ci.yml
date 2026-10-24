@@ -193,6 +193,7 @@ jobs:
 
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
+          node --test tests/m188-native-heavy-control.test.mjs tests/m223-server-heavy-windup.test.mjs
           # Three fresh Chrome/Firefox sessions for each real defensive read.
           # Preserve unchanged 100 HP / -64 guard heavy block and parry stun.
           for scenario in uiheavyblock uiheavyparry; do
@@ -436,6 +437,7 @@ jobs:
         env:
           MYASO_PVP_SCENARIO: "uidirectionallight"
         run: |
+          node --test tests/m121-native-geometry-plan.test.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 

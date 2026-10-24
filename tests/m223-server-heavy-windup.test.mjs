@@ -44,12 +44,13 @@ test("M223 rejects truncated stream, partial line and invalid fighter", async ()
   }),/did not observe/);
 });
 
-test("M223 preserves one genuine E and one wheel plus strict combat outcomes",()=>{
+test("M223 preserves one genuine held-LMB release and one wheel plus strict combat outcomes",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const code=source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
     source.indexOf("async function runOnlineUiHeavyBlockFlight("));
   assert.ok(code.includes("awaitM223HeavyWindup({"));
-  assert.ok(code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
+  assert.ok(code.includes('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)'));
+  assert.ok(!code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
   assert.ok(code.includes("scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs)"));
   assert.ok(code.includes("M192_REAL_INGRESS_OUTCOME"));
   assert.ok(code.includes("M223_SERVER_WINDUP_PLAN"));
