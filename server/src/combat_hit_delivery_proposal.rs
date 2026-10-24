@@ -367,7 +367,9 @@ pub fn project_world_tick_for_recipients(
     let mut by_player_id = HashMap::with_capacity(recipients.len());
     for (index, scope) in recipients.iter().enumerate() {
         if !valid_binding(scope.recipient)
-            || by_player_id.insert(scope.recipient.player_id, index).is_some()
+            || by_player_id
+                .insert(scope.recipient.player_id, index)
+                .is_some()
         {
             return Err(DeliveryError::InvalidScope);
         }
