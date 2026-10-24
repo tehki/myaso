@@ -5,7 +5,8 @@
 //! holding the live GameState/World mutex, with no await between checks & hit.
 use crate::prealpha_lmb_gesture_authority::{Command, Disposition, GestureAuthority};
 use crate::prealpha_lmb_gesture_proposal::{
-    decode_typed_event, AckStatus, GestureAck, BYTES, EVENT_TYPE, VERSION,
+    decode_typed_event, AckStatus, GestureAck, GestureAction, GestureSource, BYTES, EVENT_TYPE,
+    VERSION,
 };
 use crate::simulation::{Action, World};
 
@@ -24,6 +25,9 @@ pub struct SessionGestureWorldPath {
     authority: GestureAuthority,
     retired: bool,
     last_gesture_id: Option<u32>,
+    // Physical per-source DOWN survives World Idle or another source's
+    // new combat ownership; no action phase may impersonate physical UP.
+    held_source_id: [Option<u32>; 2],
 }
 
 impl SessionGestureWorldPath {
@@ -52,6 +56,7 @@ impl SessionGestureWorldPath {
             authority: GestureAuthority::new(lease_epoch),
             retired: false,
             last_gesture_id: None,
+            held_source_id: [None, None],
         })
     }
 
@@ -94,6 +99,10 @@ impl SessionGestureWorldPath {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
+        let source_index = match typed.source {
+            GestureSource::Lmb => 0,
+            GestureSource::KeyE => 1,
+        };
         let status = if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
             AckStatus::Stale
@@ -106,6 +115,21 @@ impl SessionGestureWorldPath {
             // retransmit the earlier edge. Never grant World authority here.
             if event.sequence > self.authority.highest_accepted_sequence().saturating_add(1) {
                 return None;
+            }
+            // Reject a fabricated second physical DOWN for the same source,
+            // without consuming the valid matching old RELEASE sequence.
+            // Unknown/old replay remains governed by the original reducer.
+            if event.action == GestureAction::Press
+                && event.sequence > self.authority.highest_accepted_sequence()
+                && self.held_source_id[source_index].is_some()
+                && self.held_source_id[source_index] != Some(event.gesture_id)
+            {
+                return Some(GestureAck {
+                    status: AckStatus::Rejected,
+                    sequence: event.sequence,
+                    gesture_id: event.gesture_id,
+                    server_tick: tick,
+                });
             }
             // An earlier one-hit World action must finish before new PRESS.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
@@ -150,6 +174,19 @@ impl SessionGestureWorldPath {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
                         self.authority = proposed;
+                        match event.action {
+                            GestureAction::Press => {
+                                self.held_source_id[source_index] = Some(event.gesture_id);
+                            }
+                            GestureAction::Release | GestureAction::Cancel
+                                if self.held_source_id[source_index] == Some(event.gesture_id) =>
+                            {
+                                self.held_source_id[source_index] = None;
+                            }
+                            GestureAction::Upgrade
+                            | GestureAction::Release
+                            | GestureAction::Cancel => {}
+                        }
                         AckStatus::Accepted
                     } else {
                         // A failed World action is NOT a received Combat hit,
