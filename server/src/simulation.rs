@@ -244,6 +244,9 @@ pub struct Fighter {
     latest_input: InputIntent,
     pending_attack: bool,
     pending_heavy_attack: bool,
+    // A server-admitted LMB short release carries direction even if an
+    // authenticated neutral input follows before the same 60Hz World tick.
+    pending_charge_light_lateral: Option<f32>,
     pending_dodge: bool,
     pending_kick: bool,
     pending_jump: bool,
@@ -308,6 +311,7 @@ impl Fighter {
             latest_input: InputIntent::default(),
             pending_attack: false,
             pending_heavy_attack: false,
+            pending_charge_light_lateral: None,
             pending_dodge: false,
             pending_kick: false,
             pending_jump: false,
@@ -365,6 +369,15 @@ impl Fighter {
             // An all-zero transition is still cancellation, never a strike.
             self.pending_attack = input.attack;
             self.pending_heavy_attack = input.heavy_attack;
+            // Capture only an explicitly server-received attack-only release,
+            // never an untrusted button hold, focus-loss cancellation, or
+            // later neutral sample. The value expires after ONE World step.
+            self.pending_charge_light_lateral = if input.attack && !input.heavy_attack {
+                let facing = normalize_angle(input.facing_radians);
+                Some(facing.sin() * input.move_x - facing.cos() * input.move_y)
+            } else {
+                None
+            };
         }
         self.pending_attack |= input.attack && !self.latest_input.attack;
         self.pending_heavy_attack |= input.heavy_attack && !self.latest_input.heavy_attack;
@@ -388,6 +401,7 @@ impl Fighter {
     fn clear_pending_actions(&mut self) {
         self.pending_attack = false;
         self.pending_heavy_attack = false;
+        self.pending_charge_light_lateral = None;
         self.pending_dodge = false;
         self.pending_kick = false;
         self.pending_jump = false;
@@ -1113,8 +1127,12 @@ fn begin_requested_action(
                     fighter.set_action(Action::Idle, 0.0);
                 }
             } else {
-                let lateral =
-                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+                // World admission has already selected the attack-only
+                // release. A later neutral input in this same server tick
+                // must not turn its LEFT/RIGHT origin into generic light.
+                let lateral = fighter.pending_charge_light_lateral.unwrap_or_else(|| {
+                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
+                });
                 fighter.begin_light_attack(lateral);
             }
             return;
@@ -1268,7 +1286,11 @@ fn begin_requested_action(
     }
 
     if edges.attack && fighter.action == Action::Idle {
-        let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+        // Covers a complete press/release/neutral captured before the first
+        // World tick, without inventing any attack from a neutral-only input.
+        let lateral = fighter.pending_charge_light_lateral.unwrap_or_else(|| {
+            fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
+        });
         fighter.begin_light_attack(lateral);
         return;
     }
@@ -2171,6 +2193,35 @@ mod r2_combat_control_tests {
                 coalesced.fighter(1).unwrap().action,
                 expected,
                 "the neutral frame cannot trigger a second hit or variant"
+            );
+
+            // An ultra-short genuine click may complete entirely between
+            // server ticks. Preserve the exact admitted release direction.
+            let mut single_tick = World::new(800.0, 600.0);
+            assert!(single_tick.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(single_tick.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(single_tick.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(single_tick.set_input(1, InputIntent::default()));
+            single_tick.step();
+            assert_eq!(
+                single_tick.fighter(1).unwrap().action,
+                expected,
+                "single-server-tick release origin must not disappear"
             );
         }
     }
