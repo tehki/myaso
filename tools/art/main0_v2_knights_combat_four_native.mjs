@@ -290,6 +290,105 @@ try{
  }
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 34 HP light strike against an independent fighter");
+
+ // Combat 4A independent original-game World proof: RMB remains physically
+ // DOWN across one genuine short LMB press/release. W3C may omit the LMB
+ // pointerdown/up entirely; source0 must still reach this original Rust World.
+ // Preserve the preceding authentic 34HP + 46HP assertions without mutation.
+ await waitFor(() => {
+   const lines=readAuthoritativeWorld().split("\n");
+   const after=lines.findIndex(line=>line===lightActive);
+   return after>=0 && lines.slice(after+1).find(line=>
+     /M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
+ },14000);
+ // Re-close the real target's knockback gap with honest W3C gameplay motion;
+ // no player/World state, hit fixture or actor position may be injected.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"key",id:"combat4a-post-light-move",actions:[
+   {type:"keyDown",value:"d"},{type:"pause",duration:140},{type:"keyUp",value:"d"},
+  ]}]
+ });
+ const chordCanvas=await evaluate(attacker,
+  "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.5),focus:document.activeElement===c};");
+ assert(chordCanvas.focus,"original game canvas must own RMB+LMB physical input focus");
+ const chordTraceInstall="if(window.__MYASO_COMBAT4A_RMB_CHORD_TRACE__)return true;\nconst events=[];\nfor(const type of [\"pointerdown\",\"pointerup\",\"mousedown\",\"mouseup\"]){\n  window.addEventListener(type,event=>{\n    if(event.button!==0 && event.button!==2)return;\n    events.push(Object.freeze({type,button:event.button,buttons:event.buttons,\n      trusted:event.isTrusted,onCanvas:event.target?.id===\"arena\",\n      focus:document.activeElement?.id||\"\",at:performance.now()}));\n    if(events.length>16)events.shift();\n  },true);\n}\nwindow.__MYASO_COMBAT4A_RMB_CHORD_TRACE__=()=>events.map(x=>({...x}));\nreturn true;";
+ assert.equal(await evaluate(attacker,chordTraceInstall),true);
+ const chordWorldOffset=readAuthoritativeWorld().length;
+ const chordBefore=await evaluate(attacker,
+  "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+ assert(chordBefore && !chordBefore.closed,"original live QUIC source0 lease required");
+ // One driver action source, genuine mouse down2 -> short down0/up0 with RMB
+ // held throughout, then up2. The 240ms RMB hold MUST NOT issue a tap-kick.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+   actions:[{type:"pointer",id:"combat4a-original-world-physical-chord",
+     parameters:{pointerType:"mouse"},actions:[
+      {type:"pointerMove",origin:"viewport",x:chordCanvas.x,y:chordCanvas.y,duration:0},
+      {type:"pointerDown",button:2},
+      {type:"pause",duration:240},
+      {type:"pointerDown",button:0},
+      {type:"pause",duration:25},
+      {type:"pointerUp",button:0},
+      {type:"pause",duration:40},
+      {type:"pointerUp",button:2},
+     ]}]
+ });
+ const physicalChord=await evaluate(attacker,
+  "return window.__MYASO_COMBAT4A_RMB_CHORD_TRACE__?.()??[];");
+ const nativeChordDowns=physicalChord.filter(e=>
+   e.type==="mousedown" && e.button===0 && (e.buttons&3)===3 && e.trusted && e.onCanvas);
+ const nativeChordUps=physicalChord.filter(e=>
+   e.type==="mouseup" && e.button===0 && (e.buttons&1)===0 && (e.buttons&2)===2 && e.trusted);
+ assert.equal(nativeChordDowns.length,1,
+  "real original-game browser must deliver one trusted RMB-held LMB mousedown");
+ assert.equal(nativeChordUps.length,1,
+  "real original-game browser must deliver one trusted LMB mouseup before RMB up");
+ let chordHit;
+ try {
+   chordHit=await waitFor(()=>{
+    const after=readAuthoritativeWorld().slice(chordWorldOffset).split("\n");
+    return after.find(line=>
+      /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=34 hp=/.test(line));
+   },14000);
+ }catch(error){
+   const browser=await evaluate(attacker,
+    "return {gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,physical:window.__MYASO_COMBAT4A_RMB_CHORD_TRACE__?.()??[]};");
+   const evidence={error:String(error),physicalChord,browser,
+     originalWorldAfterChord:readAuthoritativeWorld().slice(chordWorldOffset).slice(-8000)};
+   await writeFile(join(output,"combat4a-rmb-chord-no-34hp-world.json"),
+     JSON.stringify(evidence,null,2)+"\n");
+   console.error("COMBAT4A_RMB_CHORD_WORLD_HIT_MISSING",JSON.stringify(evidence));
+   throw error;
+ }
+ const chordWorld=readAuthoritativeWorld().slice(chordWorldOffset).split("\n");
+ const chordHits=chordWorld.filter(line=>
+    /M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
+ assert.equal(chordHits.length,1,
+  "one true RMB-held LMB must never issue a second light or phantom heavy hit");
+ assert.equal(chordHits[0],chordHit,"the one genuine World hit must be 34HP");
+ assert(chordWorld.some(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(line)),
+  "original Rust World must admit the RMB-held LMB source0 LightWindup");
+ assert(chordWorld.some(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=2/.test(line)),
+  "original Rust World must activate light from the RMB-held LMB");
+ const chordAfter=await evaluate(attacker,
+  "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+ const oldSource0=chordBefore.acknowledged.filter(e=>e.source===0);
+ const newSource0=chordAfter.acknowledged.filter(e=>e.source===0
+   && !oldSource0.some(old=>old.sequence===e.sequence));
+ assert.equal(newSource0.length,2,
+  "original World must acknowledge exactly one new source0 PRESS+RELEASE");
+ assert.equal(newSource0[0].gestureId,newSource0[1].gestureId);
+ assert.deepEqual(newSource0.map(e=>e.action),[1,3],
+  "actual physical chord must not request upgrade, cancel or double press");
+ console.log("COMBAT4A_ORIGINAL_GAME_RMB_LMB_QUIC_34HP_WORLD_PASS",JSON.stringify({
+   genuineNativeBrowser:attacker.engine,
+   actualOriginalPage:true,actualRustWorld:true,onePhysicalRmbHeldLmb:true,
+   realTrustedDown:nativeChordDowns[0],realTrustedUp:nativeChordUps[0],
+   originalWorldHit:chordHit,source0Edges:newSource0,
+   originalWorldActionEvents:chordWorld.filter(line=>
+     /M201_AUTH_ACTION tick=\d+ fighter=1/.test(line)),
+   independentHumanHosts:false,publicListener:false
+ }));
+
  console.log("MAIN0_ORIGINAL_GAME_PHYSICAL_V2_QUIC_WORLD_ACTIONS",JSON.stringify({
   realChromeOrFirefox:true,originalGamePage:true,serverIssuedQuicActor:1,
   physicalKeyEHoldRelease:true,physicalLMBPointerDown:true,
