@@ -7,7 +7,7 @@ import {createServer as tcp} from "node:net";
 import {readFile} from "node:fs/promises";
 import {resolve} from "node:path";
 import {spawn} from "node:child_process";
-import {GESTURE_ACTION} from "../src/network/prealpha-lmb-gesture-proposal.mjs";
+import {GESTURE_ACTION, PROPOSED_GESTURE_SOURCE as SOURCE} from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const port=()=>new Promise((r,j)=>{
@@ -18,12 +18,13 @@ const html=String.raw`<!doctype html><meta charset="utf-8">
 <canvas id="arena" width="640" height="420" tabindex="0"
 style="display:block;margin:40px;width:500px;height:320px;touch-action:none;border:1px solid black"></canvas>
 <script type="module">
-import {ProposedLmbGestureOutbox} from "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
-import {decodeProposedGestureEvent} from "/src/network/prealpha-lmb-gesture-proposal.mjs";
+import {ProposedSharedTypedGestureOutbox} from "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
+import {decodeProposedTypedGestureEvent} from "/src/network/prealpha-lmb-gesture-proposal.mjs";
 import {createDormantPrealphaLmbDomGate,attachDormantPrealphaLmbDomGate}
  from "/src/browser/prealpha-lmb-dom-gesture-review.mjs";
 const canvas=document.querySelector("#arena"),lease={};
-const outbox=new ProposedLmbGestureOutbox({negotiatedVersion:2,trustedLease:lease});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+const outbox=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
 let chat=false,jump=false;
 const gate=createDormantPrealphaLmbDomGate({
  outbox,getClientTick:()=>123,isCanvasTarget:e=>e.target===canvas,
@@ -31,12 +32,14 @@ const gate=createDormantPrealphaLmbDomGate({
 });
 const trusted=[];
 canvas.addEventListener("pointerdown",e=>trusted.push({type:"down",trusted:e.isTrusted}),true);
-window.addEventListener("pointerup",e=>trusted.push({type:"up",trusted:e.isTrusted}),true);
+window.addEventListener("pointerup",e=>trusted.push({type:"up",trusted:e.isTrusted,button:e.button,buttons:e.buttons}),true);
+canvas.addEventListener("mousedown",e=>trusted.push({type:"mouse-down",trusted:e.isTrusted,button:e.button,buttons:e.buttons}),true);
+window.addEventListener("mouseup",e=>trusted.push({type:"mouse-up",trusted:e.isTrusted,button:e.button,buttons:e.buttons}),true);
 attachDormantPrealphaLmbDomGate(gate,{canvas,windowObj:window,documentObj:document});
 window.ui10={
  ready:true,
  report:()=>({trusted:[...trusted],snapshot:gate.snapshot,
-  edges:outbox.nextSendBatch(8).map(e=>decodeProposedGestureEvent(e.bytes)),
+  edges:outbox.nextSendBatch(8).map(e=>decodeProposedTypedGestureEvent(e.bytes)),
   realServer:false,combatCommit:false}),
  upgrade:()=>gate.approvedHoldUpgrade(gate.snapshot.pointerId),
  blur:()=>gate.blur(),chat:x=>{chat=x;if(x)gate.chatOpened();},
@@ -46,7 +49,8 @@ window.ui10={
 const allowed=new Set([
 "/src/browser/prealpha-lmb-dom-gesture-review.mjs",
 "/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
-"/src/network/prealpha-lmb-gesture-proposal.mjs"
+"/src/network/prealpha-lmb-gesture-proposal.mjs",
+"/src/network/prealpha-shared-source-allocator-proposal.mjs"
 ]);
 const server=http(async(req,res)=>{
  try{
@@ -107,8 +111,23 @@ try{
   assert.deepEqual(tap.edges.map(e=>e.action),
    [GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
   assert.equal(tap.edges[0].gestureId,tap.edges[1].gestureId);
-  assert.equal(tap.trusted.length,2);
+  assert.equal(tap.trusted.filter(e=>e.type==="down"||e.type==="up").length,2);
   assert.ok(tap.trusted.every(e=>e.trusted));
+  // Real W3C mouse chord: RMB first, then left down/up.
+  // Browser can emit no extra pointerdown/up for LMB; one source0 suffices.
+  await nav();
+  await run([move(),{type:"pointerDown",button:2},down,up,{type:"pointerUp",button:2}]);
+  const chord=await evaluate("return ui10.report()");
+  assert.deepEqual(chord.edges.map(e=>[e.source,e.action]),[
+    [SOURCE.LMB,GESTURE_ACTION.PRESS],[SOURCE.LMB,GESTURE_ACTION.RELEASE]
+  ]);
+  assert.equal(chord.edges[0].gestureId,chord.edges[1].gestureId);
+  const nativeDown=chord.trusted.find(e=>e.type==="mouse-down"&&e.button===0&&e.buttons===3);
+  const nativeUp=chord.trusted.find(e=>e.type==="mouse-up"&&e.button===0&&e.buttons===2);
+  assert.ok(nativeDown?.trusted && nativeUp?.trusted,
+    "native RMB-held LMB must produce trusted button0 MouseEvents");
+  assert.ok(chord.trusted.every(e=>e.trusted),"no synthetic source event may qualify");
+
   await nav();
   await run([move(),down]);
   assert.equal(await evaluate("return ui10.upgrade()"),true);
@@ -137,6 +156,7 @@ try{
   assert.equal(cancel.realServer,false);
   console.log("UI10_V2_NATIVE_DOM_REVIEW_PASS",JSON.stringify({
    browser:family,realPointerTrusted:true,shortTap:true,
+   rmbHeldLmbSource0:true,selectedTypedOutbox:true,
    longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
    authenticatedServer:false,combatHits:false,enabledLive:false

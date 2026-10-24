@@ -8,6 +8,9 @@ const isFn = value => typeof value === "function";
 const validMousePointer = e => e && e.pointerType === "mouse"
   && Number.isSafeInteger(e.pointerId) && e.pointerId >= 0;
 const defaultTick = () => 0;
+// Internal physical-owner marker ONLY; never serialized into a gesture packet.
+// Real mouse pointer IDs are nonnegative. RMB-held LMB has only MouseEvents.
+const CHORDED_MOUSE_POINTER_ID = -1;
 
 // The proposed UPGRADE deadline is deliberately NOT a local timer here.
 // Combat4/Core8C must approve server-timed semantics before any runtime hookup.
@@ -45,15 +48,37 @@ export function createDormantPrealphaLmbDomGate({
       return false;
     }
   }
+  function beginPhysicalLmb(pointerId, chorded) {
+    // PointerEvent and MouseEvent routes converge before the SAME source0
+    // outbox. Never create parallel attack producers or duplicate PRESS.
+    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
+    if (!edge) return false;
+    active = {pointerId,gestureId:edge.gestureId,upgraded:false,chorded};
+    return true;
+  }
   function pointerDown(event) {
     if (closed || active || !validMousePointer(event)
       || event.button !== 0 || (event.buttons & 1) === 0
       || isChatFocused() || isJumpAttackChord(event)
       || !isCanvasTarget(event)) return false;
-    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
-    if (!edge) return false;
-    active = {pointerId:event.pointerId,gestureId:edge.gestureId,upgraded:false};
-    return true;
+    return beginPhysicalLmb(event.pointerId,false);
+  }
+  function chordedMouseDown(event) {
+    // W3C pointerdown/up only occur at zero↔nonzero button transitions.
+    // With RMB already down, LMB makes a *genuine* mousedown(button0,
+    // buttons3) but no new pointerdown. Keep source0 on the same outbox.
+    if (closed || active || !event || event.button !== 0
+      || (event.buttons & 3) !== 3 || isChatFocused()
+      || isJumpAttackChord(event) || !isCanvasTarget(event)) return false;
+    return beginPhysicalLmb(CHORDED_MOUSE_POINTER_ID,true);
+  }
+  function mouseUp(event) {
+    if (closed || !active || !event || event.button !== 0
+      || (event.buttons & 1) !== 0) return false;
+    // When RMB is held, normal LMB first may also have no pointerup.
+    // Outside that chord, defer to pointerup's exact pointerId fencing.
+    if (!active.chorded && (event.buttons & 2) === 0) return false;
+    return terminate("release");
   }
   // This is an explicitly invoked REVIEW hook, not a browser timer.
   // Never call on an actual game frame until timing is approved by Combat4.
@@ -74,7 +99,7 @@ export function createDormantPrealphaLmbDomGate({
       || event.pointerId !== active.pointerId)) return false;
     // Release is only from the actual left mouse UP event, even if
     // received on window after the pointer leaves the canvas.
-    if (kind === "release" && event?.button !== 0) return false;
+    if (kind === "release" && event !== undefined && event.button !== 0) return false;
     const edge = submit(tick => kind === "release"
       ? (shared ? outbox.release(0,tick) : outbox.release(tick))
       : (shared ? outbox.cancel(0,tick) : outbox.cancel(tick)));
@@ -83,10 +108,14 @@ export function createDormantPrealphaLmbDomGate({
     return true;
   }
   return Object.freeze({
-    pointerDown,
+    pointerDown, chordedMouseDown, mouseUp,
     pointerUp:event => terminate("release",event),
-    pointerCancel:event => terminate("cancel",event),
-    lostCapture:event => terminate("cancel",event),
+    // A physical mouse pointer cancellation may identify the RMB pointer
+    // rather than our internal chord owner; always fail closed on cancel.
+    pointerCancel:event => active?.chorded && event?.pointerType === "mouse"
+      ? terminate("cancel") : terminate("cancel",event),
+    lostCapture:event => active?.chorded && event?.pointerType === "mouse"
+      ? terminate("cancel") : terminate("cancel",event),
     // Chat Enter and blur can cancel held attack edges, never submit a
     // phantom RELEASE. A reconnect must instead use a fresh outbox lease.
     chatOpened:() => terminate("cancel"),
@@ -116,7 +145,11 @@ export function attachDormantPrealphaLmbDomGate(
     [canvas,"pointerdown",e=>{
       if (gate.pointerDown(e) && e.cancelable) e.preventDefault();
     }],
+    [canvas,"mousedown",e=>{
+      if (gate.chordedMouseDown(e) && e.cancelable) e.preventDefault();
+    }],
     [windowObj,"pointerup",e=>{if(gate.pointerUp(e)&&e.cancelable)e.preventDefault();}],
+    [windowObj,"mouseup",e=>{if(gate.mouseUp(e)&&e.cancelable)e.preventDefault();}],
     [windowObj,"pointercancel",e=>gate.pointerCancel(e)],
     [canvas,"lostpointercapture",e=>gate.lostCapture(e)],
     [windowObj,"blur",()=>gate.blur()],
