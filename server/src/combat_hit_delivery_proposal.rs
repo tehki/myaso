@@ -1042,6 +1042,64 @@ mod tests {
     }
 
     #[test]
+    fn rejoined_same_numeric_actor_gets_fresh_local_cursor_without_old_lease_credit() {
+        // One existing global recipient list, one original World authority.
+        // The same player ID can be reused only with a new server-owned
+        // incarnation/epoch. Old HIT events must never be attributed to it.
+        let mut scopes = vec![scope(1), scope(2), scope(3)];
+        let initial = [(event(2, 1), commit(920, 0, 2, 1))];
+        let original = project_world_tick_for_recipients(920, &initial, &mut scopes).unwrap();
+        assert_eq!(
+            original.iter().map(|(_, receipts)| receipts.len()).collect::<Vec<_>>(),
+            vec![1, 1, 0]
+        );
+        assert_eq!(scopes[1].next_sequence(), 1);
+
+        // Actor 2 disconnects/rejoins. Retire the old bound inbox BEFORE
+        // replacing it; neither an old token nor an old actor ID may acquire
+        // any new published receipt. The victim's prior cursor is independent.
+        let fresh = ProposedRecipientHitDelivery::new(actor(2, 2, 22), [9; 16], 64).unwrap();
+        let mut retired = std::mem::replace(&mut scopes[1], fresh);
+        retired.retire();
+        assert_eq!(
+            retired.mark_written(actor(2, 1, 2), &TOKEN, 0),
+            Err(DeliveryError::ScopeRetired)
+        );
+        assert_eq!(
+            scopes[1].mark_written(actor(2, 1, 2), &TOKEN, 0),
+            Err(DeliveryError::ForeignScope)
+        );
+        assert_eq!(
+            scopes[1].mark_written(actor(2, 2, 22), &TOKEN, 0),
+            Err(DeliveryError::ForeignToken)
+        );
+
+        // A stale committed World HIT with the same numeric attacker ID
+        // fails without changing even the already-valid victim's cursor.
+        let obsolete = [(event(2, 1), commit(921, 0, 2, 1))];
+        assert_eq!(
+            project_world_tick_for_recipients(921, &obsolete, &mut scopes),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert_eq!(scopes[0].next_sequence(), 1);
+        assert_eq!(scopes[1].next_sequence(), 0);
+        assert!(scopes.iter().all(|scope| scope.gap().is_none()));
+
+        // Only the NEW original-World binding may cause an actual receipt
+        // for a fresh tick, starting actor 2's local sequence at zero.
+        let mut live = commit(921, 0, 2, 1);
+        live.attacker = actor(2, 2, 22);
+        let credited =
+            project_world_tick_for_recipients(921, &[(event(2, 1), live)], &mut scopes).unwrap();
+        assert_eq!(credited[0].1[0].sequence, 1);
+        assert_eq!(credited[1].1[0].sequence, 0);
+        assert_eq!((credited[0].1[0].attacker, credited[1].1[0].attacker), (2, 2));
+        assert!(credited[2].1.is_empty());
+        assert_eq!(scopes[0].pending(), 2);
+        assert_eq!(scopes[1].pending(), 1);
+    }
+
+    #[test]
     fn last_of_512_duplicate_player_ids_fail_before_any_publication() {
         // Exercise the last possible duplicate rather than only two scopes:
         // the temporary per-tick index must reject it before any mutable
