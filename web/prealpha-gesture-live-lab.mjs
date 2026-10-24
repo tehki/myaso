@@ -42,13 +42,14 @@ export async function activateLoopbackGestureLab({
     failed = true;
     close(reason || "typed gesture World/ACK rejected");
   }
-  function drain() {
+  function drain(onlyUnsent = false) {
     if (failed || detached || outbox.snapshot.closed) return;
     let packets;
     try {
       // First-send priority and maxAttempts are enforced by the original
       // Core8A queue, not by this original game-page event listener.
-      packets = outbox.nextSendBatch(4);
+      // Physical changes spend only FIRST-send attempts; the fixed 170ms timer owns all retries.
+      packets = outbox.nextSendBatch(4, {onlyUnsent});
     } catch {
       fail("bounded gesture sequence/retry state exhausted");
       return;
@@ -74,7 +75,7 @@ export async function activateLoopbackGestureLab({
     const next = outbox.snapshot.nextSequence;
     if (next === lastFirstSendSequence) return;
     lastFirstSendSequence = next;
-    drain();
+    drain(true);
   }
   function add(target,type,handler) {
     target.addEventListener(type,handler);
