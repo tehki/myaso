@@ -280,8 +280,8 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
     }
 }
 
-/// Actual end-to-end typed KeyE 1 -> original Rust World HeavyActive 10.
-/// No browser, user principal or hit damage is implied by a 0x12 receipt.
+/// Actual TLS-pinned QUIC negative: retired source1 Key E cannot mutate
+/// the original Rust World or commit damage. The 0x12 ACK is NOT a HIT.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn one_native_key_e_source_is_rejected_and_cannot_hit_original_world() {
     let (server, url, digest) = real_server();
@@ -290,13 +290,19 @@ async fn one_native_key_e_source_is_rejected_and_cannot_hit_original_world() {
     combat4c_ack(&seat.connection, 1, 1, 1, 1, 4).await;
     combat4c_ack(&seat.connection, 1, 3, 2, 1, 4).await;
     sleep(Duration::from_millis(430)).await;
-    let lines=server.lines.lock().unwrap().clone();
-    assert!(!lines.iter().any(|l| l.contains("M201_AUTH_ACTION")
-        && l.contains(" fighter=1 from=0 to=9")),
-        "reserved Use key cannot start original World heavy windup");
-    assert!(!lines.iter().any(|l| l.contains("M201_AUTH_HIT")
-        && l.contains(" attacker=1 ")),
-        "reserved Use key cannot commit World damage");
+    let lines = server.lines.lock().unwrap().clone();
+    assert!(
+        !lines
+            .iter()
+            .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9")),
+        "reserved Use key cannot start original World heavy windup"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|l| l.contains("M201_AUTH_HIT") && l.contains(" attacker=1 ")),
+        "reserved Use key cannot commit World damage"
+    );
     println!("KEYE_RESERVED_USE_NO_HEAVY_HIT_QUIC_PASS");
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -308,15 +314,24 @@ async fn retired_key_e_source_does_not_consume_server_actor_sequence() {
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
     let observed = timeout(Duration::from_secs(2), async {
         loop {
-            let lines=server.lines.lock().unwrap().clone();
-            if lines.iter().any(|l| l.contains("M201_AUTH_ACTION")
-                && l.contains(" fighter=1 from=0 to=1")) { break lines; }
+            let lines = server.lines.lock().unwrap().clone();
+            if lines
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1"))
+            {
+                break lines;
+            }
             sleep(Duration::from_millis(5)).await;
         }
-    }).await.expect("real LMB still enters original LightWindup after rejected E");
-    assert!(!observed.iter().any(|l| l.contains("M201_AUTH_ACTION")
-        && l.contains(" fighter=1 from=0 to=9")),
-        "retired Key E must not start a heavy World action");
+    })
+    .await
+    .expect("real LMB still enters original LightWindup after rejected E");
+    assert!(
+        !observed
+            .iter()
+            .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9")),
+        "retired Key E must not start a heavy World action"
+    );
     println!("KEYE_RESERVED_USE_QUIC_SEQUENCE_UNCHANGED_PASS");
 }
 async fn combat4c_ack(conn: &Connection, source: u8, action: u8, seq: u32, id: u32, status: u8) {
@@ -366,12 +381,19 @@ async fn retired_key_e_source_cannot_displace_a_valid_lmb_world_action() {
     combat4c_ack(&seat.connection, 0, 3, 2, 1, 1).await;
     sleep(Duration::from_millis(370)).await;
     let lines = server.lines.lock().unwrap().clone();
-    assert!(!lines.iter().any(|line| line.contains("M201_AUTH_ACTION")
-        && line.contains(" fighter=1 from=0 to=9")),
-        "Key E cannot steal original World HeavyWindup: {lines:?}");
-    assert!(!lines.iter().any(|line| line.contains("M201_AUTH_ACTION")
-        && line.contains(" fighter=1 from=9 to=10")),
-        "Key E cannot commit a heavy attack after LMB release: {lines:?}");
+    assert!(
+        !lines.iter().any(
+            |line| line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=9")
+        ),
+        "Key E cannot steal original World HeavyWindup: {lines:?}"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("M201_AUTH_ACTION")
+                && line.contains(" fighter=1 from=9 to=10")),
+        "Key E cannot commit a heavy attack after LMB release: {lines:?}"
+    );
     println!("KEYE_RESERVED_USE_CANNOT_DISPLACE_LMB_QUIC_PASS");
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
