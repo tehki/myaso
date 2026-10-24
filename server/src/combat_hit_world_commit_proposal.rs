@@ -622,9 +622,9 @@ mod tests {
         assert!(world.add_player_at(4, 700.0, 500.0, std::f32::consts::PI));
         let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
         let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
-        origin.bind_admitted(&world, 2, 102).unwrap();
-        origin.bind_admitted(&world, 3, 103).unwrap();
-        origin.bind_admitted(&world, 4, 104).unwrap();
+        let victim_a = origin.bind_admitted(&world, 2, 102).unwrap();
+        let victim_b = origin.bind_admitted(&world, 3, 103).unwrap();
+        let spectator = origin.bind_admitted(&world, 4, 104).unwrap();
 
         assert_eq!(
             origin.capture_committed_hits_from_step(&world, &[]),
@@ -666,17 +666,33 @@ mod tests {
                     immutable_hits,
                     "read-only recapture cannot reexecute damage"
                 );
-                let mut projected =
-                    ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
-                let published = projected
-                    .project_committed_tick_batch(tick, &immutable_hits)
-                    .unwrap();
-                assert_eq!(published.len(), 2);
-                assert_eq!((published[0].sequence, published[1].sequence), (0, 1));
+                let mut recipients = vec![
+                    ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap(),
+                    ProposedRecipientHitDelivery::new(victim_a, [2; 16], 64).unwrap(),
+                    ProposedRecipientHitDelivery::new(victim_b, [3; 16], 64).unwrap(),
+                    ProposedRecipientHitDelivery::new(spectator, [4; 16], 64).unwrap(),
+                ];
+                let published =
+                    project_world_tick_for_recipients(tick, &immutable_hits, &mut recipients)
+                        .unwrap();
                 assert_eq!(
-                    projected.project_committed_tick_batch(tick, &immutable_hits),
+                    published
+                        .iter()
+                        .map(|(scope, events)| (scope.player_id, events.len()))
+                        .collect::<Vec<_>>(),
+                    vec![(1, 2), (2, 1), (3, 1), (4, 0)]
+                );
+                assert_eq!(
+                    (published[0].1[0].sequence, published[0].1[1].sequence),
+                    (0, 1)
+                );
+                assert_eq!(published[1].1[0].sequence, 0);
+                assert_eq!(published[2].1[0].sequence, 0);
+                assert_eq!(recipients[3].pending(), 0);
+                assert_eq!(
+                    project_world_tick_for_recipients(tick, &immutable_hits, &mut recipients),
                     Err(DeliveryError::ReplayedOrReorderedWorldHit),
-                    "re-reading original events cannot yield second recipient credit"
+                    "re-reading original World events cannot yield second global credit"
                 );
                 assert_eq!(world.tick, tick);
                 assert_eq!(
