@@ -42,13 +42,14 @@ export async function activateLoopbackGestureLab({
     failed = true;
     close(reason || "typed gesture World/ACK rejected");
   }
-  function drain() {
+  function drain(onlyUnsent = false) {
     if (failed || detached || outbox.snapshot.closed) return;
     let packets;
     try {
-      // First-send priority and maxAttempts are enforced by the original
-      // Core8A queue, not by this original game-page event listener.
-      packets = outbox.nextSendBatch(4);
+      // Physical input events flush NEW edges only. Retries are triggered
+      // solely by the bounded 170ms timer; repeated DOM notifications must
+      // never consume the three-attempt budget before an actual server ACK.
+      packets = outbox.nextSendBatch(4, {onlyUnsent});
     } catch {
       fail("bounded gesture sequence/retry state exhausted");
       return;
@@ -80,7 +81,7 @@ export async function activateLoopbackGestureLab({
     });
     detachGates = attachDormantSharedUi10Sources(gates, {canvas, windowObj, documentObj});
     add(canvas,"pointerdown",event => {
-      drain(); // native capture already admitted real mouse pointer DOWN
+      drain(true); // native capture already admitted real mouse pointer DOWN
       if (event.button !== 0 || !gates.lmb.snapshot.active) return;
       const {pointerId,gestureId} = gates.lmb.snapshot;
       // This is only an UPGRADE *intent*. Rust checks <135ms on ITS clock
@@ -89,15 +90,15 @@ export async function activateLoopbackGestureLab({
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId
             || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drain();
+        if (gates.lmb.approvedHoldUpgrade(pointerId)) drain(true);
       },85);
     });
-    add(windowObj,"pointerup",drain);
-    add(windowObj,"pointercancel",drain);
-    add(canvas,"lostpointercapture",drain);
-    add(windowObj,"keydown",drain);
-    add(windowObj,"keyup",drain);
-    add(windowObj,"blur",drain);
+    add(windowObj,"pointerup",() => drain(true));
+    add(windowObj,"pointercancel",() => drain(true));
+    add(canvas,"lostpointercapture",() => drain(true));
+    add(windowObj,"keydown",() => drain(true));
+    add(windowObj,"keyup",() => drain(true));
+    add(windowObj,"blur",() => drain(true));
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
