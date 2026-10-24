@@ -50,7 +50,7 @@ function fakeTransportWithStalledWriter(writes) {
   return {MockWebTransport,resume};
 }
 
-test("selected dormant 0x11 typed outbox keeps original LMB and KeyE edges when v1 latest-wins loses original attack",async()=>{
+test("selected typed outbox preserves LMB but denies Key E Combat events under v1 congestion",async()=>{
   const former=globalThis.WebTransport;
   const writes=[];
   const {MockWebTransport,resume}=fakeTransportWithStalledWriter(writes);
@@ -67,10 +67,9 @@ test("selected dormant 0x11 typed outbox keeps original LMB and KeyE edges when 
     });
     const press=outbox.begin(SOURCE.LMB,1);
     const release=outbox.release(SOURCE.LMB,1);
-    const keyDown=outbox.begin(SOURCE.KEY_E,2);
-    const keyCancel=outbox.cancel(SOURCE.KEY_E,2);
-    assert.deepEqual([press.sequence,release.sequence,keyDown.sequence,keyCancel.sequence],[1,2,3,4]);
-    assert.deepEqual([press.gestureId,release.gestureId,keyDown.gestureId,keyCancel.gestureId],[1,1,2,2]);
+    assert.throws(()=>outbox.begin(SOURCE.KEY_E,2),/Combat permits only/);
+    assert.deepEqual([press.sequence,release.sequence],[1,2]);
+    assert.deepEqual([press.gestureId,release.gestureId],[1,1]);
 
     const samples=[];
     const pendingDatagrams=[];
@@ -100,20 +99,17 @@ test("selected dormant 0x11 typed outbox keeps original LMB and KeyE edges when 
     assert.deepEqual(decoded.map(x=>[x.source,x.action,x.sequence,x.gestureId]),[
       [SOURCE.LMB,ACTION.PRESS,1,1],
       [SOURCE.LMB,ACTION.RELEASE,2,1],
-      [SOURCE.KEY_E,ACTION.PRESS,3,2],
-      [SOURCE.KEY_E,ACTION.CANCEL,4,2],
     ]);
     assert.deepEqual([...first[0].bytes],[2,0x11,1,0,1,0,0,0,1,0,0,0,1,0,0,0]);
-    assert.deepEqual([...first[2].bytes],[2,0x11,1,1,3,0,0,0,2,0,0,0,2,0,0,0]);
     // RETRIES remain byte-exact even after a caller mutates its COPY.
     const preserved=first.map(entry=>[...entry.bytes]);
     first[0].bytes[2]=99;
     const retry=outbox.nextSendBatch(4);
     assert.deepEqual(retry.map(x=>[...x.bytes]),preserved);
-    assert.deepEqual(retry.map(x=>x.attempt),[2,2,2,2]);
+    assert.deepEqual(retry.map(x=>x.attempt),[2,2]);
     assert.throws(()=>outbox.receiveAck(ack(press),Object.freeze({})),/foreign connection/);
     // Authenticated-shape admission ACKs settle transport only, in any order.
-    for(const e of [keyCancel,keyDown,release,press]){
+    for(const e of [release,press]){
       const result=outbox.receiveAck(ack(e),lease);
       assert.equal(result.transportSettled,true);
       assert.equal(result.combatCommitted,false);
@@ -411,7 +407,7 @@ test("one typed queue reserves terminal for a valid LMB while declining concurre
     reviewVersion:2,trustedLease:lease,maxPending:4,maxAttempts:1,
   });
   const p=q.begin(SOURCE.LMB,7);
-  assert.throws(()=>q.begin(SOURCE.KEY_E,7),/terminal capacity/);
+  assert.throws(()=>q.begin(SOURCE.KEY_E,7),/Combat permits only/);
   assert.deepEqual(q.snapshot.activeSources,[SOURCE.LMB]);
   const u=q.upgrade(8),c=q.cancel(SOURCE.LMB,8);
   assert.deepEqual([p.sequence,u.sequence,c.sequence],[1,2,3]);
