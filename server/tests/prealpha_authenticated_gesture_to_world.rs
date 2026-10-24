@@ -402,8 +402,7 @@ fn retired_keye_short_and_long_terminals_never_spend_lmb_cursor_or_hit() {
     for terminal in [GestureAction::Release, GestureAction::Cancel] {
         for hold_ticks in [4, 37] {
             let mut w = arena();
-            let mut p =
-                SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+            let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
             assert_eq!(
                 admit(
                     &mut p,
@@ -482,7 +481,15 @@ fn retired_keye_cross_source_terminal_and_replay_cannot_steal_lmb() {
         (GestureAction::Release, 2),
     ] {
         assert_eq!(
-            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, action, 2, gesture),
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::KeyE,
+                action,
+                2,
+                gesture
+            ),
             AckStatus::Rejected
         );
         assert_eq!(w.fighter(1).unwrap().action, before);
