@@ -45,6 +45,8 @@ const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
 // Keep the real E key depressed across multiple browser/input frames so the
 // authoritative client has a fair opportunity to sample the genuine gesture.
 const heavyKeyPulseMs = 120;
+// Initialized before the top-level native flight dispatcher invokes M110/M111.
+const M110_LMB_HEAVY_HOLD_MS = 450;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
@@ -8897,7 +8899,6 @@ async function runOnlineUiStunOverlayFlight(entries) {
 // The original M110/M111 test must generate a real LMB release-heavy, never
 // resurrect the retired Key E producer. This hold clears browser + server
 // READY320ms; the original World still decides actual damage and guard loss.
-const M110_LMB_HEAVY_HOLD_MS = 450;
 async function performM110NativeHeldLmb(session, elementId, xOffset) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {

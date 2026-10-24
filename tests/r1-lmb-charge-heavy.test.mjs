@@ -179,6 +179,9 @@ test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", (
   assert.ok(start >= 0 && end > start);
   const proof = source.slice(start, end);
   const hold = source.match(/const M110_LMB_HEAVY_HOLD_MS = (\d+);/);
+  const dispatcher = source.indexOf('if (scenario === "uiheavyguardbreakpunish")');
+  assert.ok(source.indexOf("const M110_LMB_HEAVY_HOLD_MS = 450;") < dispatcher,
+    "M110 held-LMB duration must initialize before top-level native scenario execution");
   assert.ok(hold && Number(hold[1]) >= LEFT_HEAVY_CHARGE_MS,
     "M110 genuine physical LMB must remain held through 320ms heavy READY");
   const inputStart = source.indexOf("async function performM110NativeHeldLmb(");
