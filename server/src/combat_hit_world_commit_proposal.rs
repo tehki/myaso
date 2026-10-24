@@ -772,9 +772,8 @@ mod tests {
                 .expect("current under-lock original World event slice");
             // Even the original non-HIT World event must advance each scope's
             // tick fence; there is no phantom app ACK or publishable damage.
-            let delivered =
-                project_world_tick_for_recipients(tick, &actual_hits, &mut recipients)
-                    .expect("current World block/no-HIT tick is valid");
+            let delivered = project_world_tick_for_recipients(tick, &actual_hits, &mut recipients)
+                .expect("current World block/no-HIT tick is valid");
             assert!(delivered.iter().all(|(_, receipts)| receipts.is_empty()));
             assert!(recipients.iter().all(|r| r.pending() == 0));
             assert_eq!(world.fighter(2).unwrap().hp, hp);
