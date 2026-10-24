@@ -214,16 +214,19 @@ let shortBlockUntil = 0;
 let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
+    attackRequested = true;
+    committedLightMove = resolveLightAttackReleaseMovement(
+      captureLightAttackMovement(keys), leftButtonPressMovement);
+    leftButtonPressMovement = null;
+    // Read-only M111 observation stays after the original movement latch.
+    // Original R1 requires that no instrumentation intervene between the
+    // onLight edge and this release-direction capture.
     if (m111InputProbe) {
       m111InputProbe.lightReleases.push({
         epochMs: Date.now(), actionAtRelease: local.action,
       });
       if (m111InputProbe.lightReleases.length > 32) m111InputProbe.lightReleases.shift();
     }
-    attackRequested = true;
-    committedLightMove = resolveLightAttackReleaseMovement(
-      captureLightAttackMovement(keys), leftButtonPressMovement);
-    leftButtonPressMovement = null;
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
