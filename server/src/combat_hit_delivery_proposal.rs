@@ -981,8 +981,18 @@ mod tests {
         assert_eq!(scopes[0].gap(), Some(0), "victim must resync after lost receipt");
         assert_eq!(scopes[2].gap(), Some(0), "second victim must resync too");
         assert!(scopes[3].gap().is_none(), "uninvolved observer keeps current lease");
+        // An unrelated empty tick is safe to close. An affected actor's
+        // next actual World HIT remains blocked until authoritative resync.
+        assert!(project_world_tick_for_recipients(601, &[], &mut scopes)
+            .unwrap()
+            .iter()
+            .all(|(_, receipts)| receipts.is_empty()));
         assert_eq!(
-            project_world_tick_for_recipients(601, &[], &mut scopes),
+            project_world_tick_for_recipients(
+                602,
+                &[(event(1, 2), commit(602, 0, 1, 2))],
+                &mut scopes,
+            ),
             Err(DeliveryError::ScopeGapped)
         );
     }
