@@ -282,6 +282,129 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
   }
 });
 
+test("P0 queued original typed datagrams are retired on disconnect, never flushed or ACKed into the new lease",async()=>{
+  const previous=globalThis.WebTransport;
+  const peers=[];
+  class MockQuicLease {
+    constructor(){
+      this.ready=Promise.resolve();
+      this.closed=Promise.resolve();
+      this.realtime=pushableReadStream();
+      this.reliable=pushableReadStream();
+      this.writes=[];
+      this.hello=[];
+      this.isFirst=peers.length===0;
+      if(this.isFirst) {
+        this.waitForWriter=new Promise(resolve=>{this.releaseWriter=resolve;});
+      } else this.waitForWriter=Promise.resolve();
+      this.datagrams={
+        writable:{getWriter:()=>({
+          get ready(){return peers.find(p=>p===holder).waitForWriter;},
+          async write(bytes){holder.writes.push(new Uint8Array(bytes));},
+          releaseLock(){},
+        })},
+        readable:{getReader:()=>this.realtime.reader},
+      };
+      // The writer must stay owned by the transport that constructed it.
+      const holder=this;
+      peers.push(this);
+    }
+    async createBidirectionalStream(){
+      return {
+        writable:{getWriter:()=>({
+          get ready(){return Promise.resolve();},
+          async write(){},
+          releaseLock(){},
+        })},
+        readable:{getReader:()=>this.reliable.reader},
+      };
+    }
+    async createUnidirectionalStream(){
+      const self=this;
+      return {getWriter:()=>({
+        async write(bytes){self.hello.push(new Uint8Array(bytes));},
+        async close(){self.reliable.push([4,0,2,0x13,0,0]);},
+        releaseLock(){},
+      })};
+    }
+    close(){}
+  }
+  globalThis.WebTransport=MockQuicLease;
+  let oldClient,newClient,oldOutbox,newOutbox;
+  const oldReceipts=[],newReceipts=[];
+  try{
+    oldClient=await connectAuthoritativeClient({
+      webTransportUrl:"https://127.0.0.1:4433/game",
+      onExperimentalGestureAck(bytes,lease){
+        oldReceipts.push(oldOutbox.receiveAck(bytes,lease));
+      },
+    });
+    assert.equal(await oldClient.negotiateExperimentalGestureV2(),true);
+    const oldLease=oldClient.transport;
+    oldOutbox=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:oldLease});
+    const press=oldOutbox.begin(SOURCE.LMB,1);
+    const release=oldOutbox.release(SOURCE.LMB,1);
+    const outgoing=oldOutbox.nextSendBatch(4,{onlyUnsent:true});
+    assert.deepEqual(outgoing.map(x=>x.attempt),[1,1]);
+    // The real transport's datagram writer is STILL blocked: both edges are
+    // only queued in the original connection-owned async write promise chain.
+    const oldDelivery=Promise.allSettled(
+      outgoing.map(x=>oldClient.sendExperimentalGestureEdge(x.bytes)));
+    await Promise.resolve();
+    assert.equal(peers[0].writes.length,0);
+    oldOutbox.retire();
+    oldClient.close();
+    peers[0].releaseWriter();
+    const outcomes=await oldDelivery;
+    assert.ok(outcomes.every(x=>x.status==="rejected"),
+      "old connection writes must fail closed, never complete after retirement");
+    assert.equal(peers[0].writes.length,0,
+      "not one queued gesture may flush after old lease retirement");
+
+    newClient=await connectAuthoritativeClient({
+      webTransportUrl:"https://127.0.0.1:4433/game",
+      onExperimentalGestureAck(bytes,lease){
+        newReceipts.push(newOutbox.receiveAck(bytes,lease));
+      },
+    });
+    assert.equal(await newClient.negotiateExperimentalGestureV2(),true);
+    newOutbox=new ProposedSharedTypedGestureOutbox({
+      reviewVersion:2,trustedLease:newClient.transport,
+    });
+    const fresh=newOutbox.begin(SOURCE.LMB,2);
+    assert.equal(fresh.sequence,press.sequence);
+    assert.equal(fresh.gestureId,press.gestureId);
+    assert.throws(()=>newOutbox.receiveAck(ack(press),oldLease),/foreign connection/);
+    assert.equal(newOutbox.snapshot.pending,1);
+
+    // Late old-connection 0x12 packets cannot be remapped to the fresh actor
+    // merely because the new lease reused the same numeric sequence+gesture.
+    peers[0].realtime.push(ack(press));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(newReceipts.length,0);
+    assert.equal(newOutbox.snapshot.pending,1);
+    assert.equal(oldReceipts.length,0);
+
+    await newClient.sendExperimentalGestureEdge(newOutbox.nextSendBatch(4,{onlyUnsent:true})[0].bytes);
+    assert.equal(peers[1].writes.length,1);
+    peers[1].realtime.push(ack(fresh));
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(newReceipts.length,1);
+    assert.equal(newReceipts[0].combatCommitted,false);
+    assert.equal(newOutbox.snapshot.pending,0);
+    assert.equal(peers[0].writes.length,0);
+    assert.deepEqual(peers[1].hello.map(b=>[...b]),[[2,0x10,77,89,65,83,79,49]]);
+  }finally{
+    peers[0]?.releaseWriter?.();
+    oldOutbox?.retire();
+    newOutbox?.retire();
+    oldClient?.close();
+    newClient?.close();
+    if(previous===undefined)delete globalThis.WebTransport;
+    else globalThis.WebTransport=previous;
+  }
+});
+
 test("one typed queue reserves terminal for a valid LMB while declining concurrent KeyE at cap",()=>{
   const lease=Object.freeze({});
   const q=new ProposedSharedTypedGestureOutbox({
