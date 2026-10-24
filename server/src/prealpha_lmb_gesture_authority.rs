@@ -39,14 +39,12 @@ pub enum Disposition {
 pub enum Command {
     None,
     BeginLightWindup,
-    BeginKeyEHeavy,
     ActivateLight,
     UpgradeHeldHeavy { server_elapsed_ms: u64 },
     HeavyReady,
     ResumeLight { server_elapsed_ms: u64 },
     ReleaseHeavy,
     CancelUnlandedLight,
-    CancelKeyEHeavy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -214,17 +212,9 @@ impl GestureAuthority {
                 self.active_source = Some(source);
                 self.highest_gesture_id = event.gesture_id;
                 self.press_ms = server_ms;
-                self.phase = if source == GestureSource::KeyE {
-                    Phase::HeavyCharging
-                } else {
-                    Phase::LightWindup
-                };
+                self.phase = Phase::LightWindup;
                 self.released = false;
-                if source == GestureSource::KeyE {
-                    Command::BeginKeyEHeavy
-                } else {
-                    Command::BeginLightWindup
-                }
+                Command::BeginLightWindup
             }
             GestureAction::Upgrade
                 if self.active_id == Some(event.gesture_id)
@@ -251,13 +241,6 @@ impl GestureAuthority {
                         self.phase = Phase::HeavyActive;
                         self.released = true;
                         Command::ReleaseHeavy
-                    }
-                    Phase::HeavyCharging if source == GestureSource::KeyE => {
-                        // Standalone KeyE never turns into a free LMB light.
-                        // Undercharged release cancels with no 34/46HP hit.
-                        self.phase = Phase::Cancelled;
-                        self.released = true;
-                        Command::CancelKeyEHeavy
                     }
                     Phase::HeavyCharging => {
                         self.phase = if elapsed >= LIGHT_WINDUP_MS {
@@ -293,11 +276,7 @@ impl GestureAuthority {
                 match self.phase {
                     Phase::HeavyCharging | Phase::HeavyReady => {
                         self.phase = Phase::Cancelled;
-                        if source == GestureSource::KeyE {
-                            Command::CancelKeyEHeavy
-                        } else {
-                            Command::CancelUnlandedLight
-                        }
+                        Command::CancelUnlandedLight
                     }
                     Phase::LightWindup if elapsed < LIGHT_WINDUP_MS => {
                         self.phase = Phase::Cancelled;
