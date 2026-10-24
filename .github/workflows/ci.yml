@@ -404,6 +404,7 @@ jobs:
           MYASO_PVP_SCENARIO: "uiheavyguardbreakpunish"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/combat4a-m111-failed-world-before-browser-throw.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M171 exhausted light/heavy feint commitment

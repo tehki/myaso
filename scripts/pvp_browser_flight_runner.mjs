@@ -9275,6 +9275,25 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     && damageTransition.t >= stunStart.t
     && (!stunEnd || damageTransition.t <= stunEnd.t));
   if (!hitDuringStun) {
+    // Combat 4A read-only original World correlation on an ALREADY rejected
+    // native M111 browser trial. Previously this strict browser failure
+    // threw before Combat 4D could print the server-tick verdict, making
+    // a real post-stun hit look indistinguishable from delayed HUD paint.
+    // Never change the original STUNNED/34HP/release acceptance predicate.
+    const failedOriginalWorld = classifyGuardBreakPunishWorld(m201ServerOutput());
+    console.error("M111_FAILED_BROWSER_WORLD_CHRONOLOGY " + JSON.stringify({
+      world: failedOriginalWorld,
+      browser: {
+        damageAtMs: damageTransition.t,
+        stunnedFromMs: stunStart?.t ?? null,
+        stunnedUntilMs: stunEnd?.t ?? null,
+        browserLateByMs: stunEnd ? damageTransition.t - stunEnd.t : null,
+      },
+      genuinePhysicalLmb: attackerResult.pointers.filter((event) =>
+        event.button === 0 && (event.type === "pointerdown" || event.type === "pointerup")).slice(-4),
+      original30HzSender: attackerResult.m111InputPlane?.submitted?.slice(-28) ?? [],
+      originalLightReleases: attackerResult.m111InputPlane?.lightReleases ?? [],
+    }));
     throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
   }
 
