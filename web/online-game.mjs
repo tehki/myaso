@@ -233,9 +233,12 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
-  leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  // An old pointerUP must not clear a newer active LMB press and its
+  // captured directional input. release() validates original pointerId.
+  if (committed === null) return;
+  leftButtonDown = false;
   leftButtonPressMovement = null;
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
