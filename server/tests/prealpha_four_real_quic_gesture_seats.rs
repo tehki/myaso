@@ -511,9 +511,9 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     // issuing PRESS, so every later action is trace-correlated on one clock.
     timeout(Duration::from_secs(2), async {
         loop {
-            let seen_idle = server.lines.lock().unwrap().iter().any(|l| {
-                l.contains("M201_FLIGHT_ACTOR_BASELINE")
-                    && l.contains(" fighter=1 action=0")
+            let lines = server.lines.lock().unwrap().clone();
+            let seen_idle = lines.iter().any(|l| {
+                l.contains("M201_FLIGHT_ACTOR_BASELINE") && l.contains(" fighter=1 action=0")
             });
             if seen_idle {
                 break;
