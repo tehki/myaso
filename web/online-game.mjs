@@ -151,6 +151,22 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
+// First-party P0 art review only. Read-only input provenance never affects
+// gesture recognition, server input packets, Combat or authoritative outcomes.
+const dashReviewAuditEnabled = acceptanceScenario === "uidashreview"
+  && params.get("knights") === "1"
+  && params.get("knightDashArt") === "traction";
+let dashAuditSendBudget = 0;
+function recordDashReviewIngress(type, fields) {
+  if (!dashReviewAuditEnabled) return;
+  const debug = window.__MYASO_ACCEPTANCE_STATE__ ??= {
+    scenario: acceptanceScenario, ownActionTransitions: [],
+    focusActionTransitions: [], staminaTransitions: [],
+  };
+  debug.dashIngressTrace ??= [];
+  debug.dashIngressTrace.push({ type, epochMs: Date.now(), ...fields });
+  if (debug.dashIngressTrace.length > 32) debug.dashIngressTrace.shift();
+}
 const server = params.get("server");
 const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
@@ -320,11 +336,29 @@ canvas.addEventListener("keydown", (event) => {
   if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
-    if (direction && local.action === COMBAT_ACTION.idle
-      && local.stamina >= COMBAT.dash.staminaCost) {
+    const serverReady = local.action === COMBAT_ACTION.idle
+      && local.stamina >= COMBAT.dash.staminaCost;
+    if (dashReviewAuditEnabled) {
+      dashAuditSendBudget = 8;
+      recordDashReviewIngress("trusted-keydown", {
+        code: event.code, trusted: event.isTrusted,
+        repeated: event.repeat, alreadyPressed: false,
+        gestureRecognized: Boolean(direction), serverReady,
+        localAction: local.action, localStamina: local.stamina,
+        dashRequestQueued: Boolean(direction && serverReady),
+      });
+    }
+    if (direction && serverReady) {
       dashRequested = true; dashMove = direction;
       audio.play("roll");
     }
+  }
+  if (dashReviewAuditEnabled && event.code === "KeyW" && keys.has(event.code)) {
+    recordDashReviewIngress("held-keydown", {
+      code: event.code, trusted: event.isTrusted, repeated: event.repeat,
+      alreadyPressed: true, gestureRecognized: false,
+      localAction: local.action, dashRequestQueued: Boolean(dashRequested),
+    });
   }
   keys.add(event.code);
   if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
@@ -340,7 +374,16 @@ canvas.addEventListener("keydown", (event) => {
   if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
-canvas.addEventListener("keyup", (event) => keys.delete(event.code));
+canvas.addEventListener("keyup", (event) => {
+  if (dashReviewAuditEnabled && event.code === "KeyW") {
+    recordDashReviewIngress("trusted-keyup", {
+      code: event.code, trusted: event.isTrusted,
+      alreadyPressed: keys.has(event.code),
+      dashRequestQueued: Boolean(dashRequested),
+    });
+  }
+  keys.delete(event.code);
+});
 window.addEventListener("blur", releaseInputs);
 // Chat composer focus must release held game inputs, not trap a charge.
 canvas.addEventListener("blur", releaseInputs);
@@ -459,7 +502,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uidashreview", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -808,6 +851,15 @@ function simulatePrediction(stepMs) {
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
       }
+    }
+    if (dashReviewAuditEnabled && (dashAuditSendBudget > 0 || currentInput.dash)) {
+      recordDashReviewIngress("input-send", {
+        outgoingTick, dashSubmitted: Boolean(currentInput.dash),
+        dashRequestQueued: Boolean(dashRequested),
+        movementX: currentInput.moveX, movementY: currentInput.moveY,
+        localAction: local.action, localStamina: local.stamina,
+      });
+      dashAuditSendBudget = Math.max(0, dashAuditSendBudget - 1);
     }
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;

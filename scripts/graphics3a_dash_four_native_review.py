@@ -52,7 +52,7 @@ try:
  for _ in range(30):
   try:urllib.request.urlopen(f"http://127.0.0.1:{drv_port}/status",timeout=2);break
   except Exception:time.sleep(.1)
- page=f"http://127.0.0.1:{siteport}/web/?server={urllib.parse.quote(url,safe='')}&cert={cert}&knights=1&knightArt=relit&knightDashArt=traction&chatC1Preview=1&netstats=1&scenario=uijumpbuffer"
+ page=f"http://127.0.0.1:{siteport}/web/?server={urllib.parse.quote(url,safe='')}&cert={cert}&knights=1&knightArt=relit&knightDashArt=traction&chatC1Preview=1&netstats=1&scenario=uidashreview"
  for i in range(4):
   props={"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"binary":(shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable") or "/usr/bin/chromium"),"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-background-networking","--remote-allow-origins=http://localhost","--window-size=1200,850"]}}}}
   established=request("POST","/session",props,drv_port)
@@ -147,6 +147,9 @@ return a ? {playerNetId:a.playerNetId,serverTick:a.serverTick,
  actions=report.get("actions") or []
  print("DASH_INPUT_TRACE",json.dumps(script(seat,"return {keys:window.__dashKeys,focus:document.activeElement.id,acceptance:window.__MYASO_ACCEPTANCE_STATE__?.inputSubmissions?.slice(-12)};")),flush=True)
  print("DASH_AUTH_TRANSITIONS",json.dumps(report),flush=True)
+ trace=script(seat,"return window.__MYASO_ACCEPTANCE_STATE__?.dashIngressTrace??[];")
+ assert trace and any(e["type"]=="trusted-keydown" for e in trace), "Review-scoped original dash ingress trace absent"
+ print("AUTHENTIC_DASH_INPUT_PROVENANCE",json.dumps(trace,separators=(",",":")),flush=True)
  trusted_keys=script(seat,"return window.__dashKeys;")
  assert [e["type"] for e in trusted_keys]==["keydown","keyup","keydown","keyup"],trusted_keys
  assert all(e["trusted"] and e["code"]=="KeyW" and not e["repeat"] for e in trusted_keys),trusted_keys

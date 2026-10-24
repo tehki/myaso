@@ -7,6 +7,7 @@ on:
       - "web/online-game.mjs"
       - "web/assets/knights/review/silver_dash_traction_p0.webp"
       - "tests/graphics3a-dash-140-authentic-preview.test.mjs"
+      - "tests/graphics3a-dash-native-ingress-provenance.test.mjs"
       - "scripts/graphics3a_dash_four_native_review.py"
       - "scripts/graphics3a_dash_native_keys.py"
       - "scripts/graphics3a_dash_all_facing_source_audit.js"
@@ -28,7 +29,7 @@ jobs:
           node --check web/knight-sprites.mjs
           node --check web/online-game.mjs
           python3 -m py_compile scripts/graphics3a_dash_native_keys.py scripts/graphics3a_dash_four_native_review.py
-          node --test tests/graphics3a-dash-140-authentic-preview.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/prealpha-silver-knight.test.mjs tests/graphics3a-relit-source-select.test.mjs
+          node --test tests/graphics3a-dash-native-ingress-provenance.test.mjs tests/graphics3a-dash-140-authentic-preview.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/prealpha-silver-knight.test.mjs tests/graphics3a-relit-source-select.test.mjs
           chromium --version || google-chrome --version
           chromedriver --version
       - name: Compile actual authoritative Rust multiplayer server, not a stub
