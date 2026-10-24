@@ -509,6 +509,23 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     // Same physical source, same gesture ID, monotonic transport sequences.
     // No client-supplied tick may force World readiness or damage.
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+
+    // The World ACTION trace is sampled once per 60Hz tick. A PRESS and
+    // UPGRADE accepted in the same tick may appear as Idle -> HeavyWindup,
+    // hiding the intermediate real light state. Require an observed genuine
+    // Idle -> LightWindup tick, strictly before the 135ms light becomes active.
+    timeout(Duration::from_millis(90), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|l| {
+                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("actual 60Hz World observed LMB light windup before upgrade");
     combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
 
     timeout(Duration::from_secs(3), async {
