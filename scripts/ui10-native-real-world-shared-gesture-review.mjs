@@ -1,4 +1,4 @@
-// UI10 genuine native W3C LMB+KeyE via ORIGINAL DORMANT UI10 physical DOM origin
+// UI10 native W3C physical LMB and E denial via ORIGINAL DORMANT UI10 DOM origin
 // and ONE Core8A shared typed outbox → real admitted QUIC → original Rust World.
 // Loopback-only nonrelease test. No fake HP, packets or server mutation.
 import assert from "node:assert/strict";
@@ -286,9 +286,8 @@ try {
       receipts:accepted.acks,queue:accepted.snapshot,
     }));
   } else {
-  // One real WebDriver action schedule: physical pointerDOWN is ordered
-  // before KeyE, KeyE down/up occurs DURING the 135ms light windup, then
-  // pointerUP terminates the legitimate original LMB. No dispatchEvent.
+  // Real W3C LMB DOWN, genuine E DOWN/UP, then LMB UP: only TWO source0
+  // Combat packets may be admitted. E is reserved for future Use.
   await wd("POST",base+"/actions",{actions:[{
     type:"pointer",id:"auth-shared-mouse",parameters:{pointerType:"mouse"},
     actions:[
@@ -311,13 +310,13 @@ try {
   const queued=await wd("POST",base+"/execute/async",{
     script:"window.lab.flush(4).then(arguments[0],e=>arguments[0]({error:String(e)}));",args:[],
   });
-  assert.equal(queued,4,"actual UI10 two physical DOM sources must create exactly four typed edges");
+  assert.equal(queued,2,"physical E cannot add any Combat edge to the two LMB edges");
   const lossTest=process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1";
   const ackLossTest=process.env.CORE8A_LAB_DROP_FIRST_ACK === "1";
   assert(!(lossTest && ackLossTest),"loss modes must stay independent");
   if(lossTest) {
     // Actual W3C edges have all been placed on the ONE real sender queue.
-    // Only seq1 was deliberately lost; seq2-4 reached the actual Rust QUIC
+    // Only seq1 was deliberately lost; source0 LMB RELEASE seq2 reached QUIC
     // listener *before* seq1. The server must withhold their ACK and avoid
     // any premature original World action until the missing PRESS returns.
     await pause(140);
@@ -326,13 +325,13 @@ try {
       args:[],
     });
     assert.deepEqual(before.dropped,[{sequence:1,source:0,gestureId:1,attempt:1}]);
-    assert.equal(before.acks.length,0,"future KeyE/LMB cannot be ACKed ahead of lost LMB PRESS");
-    assert.equal(before.snapshot.pending,4,"all four independently sourced W3C edges must remain pending");
+    assert.equal(before.acks.length,0,"valid LMB RELEASE cannot ACK ahead of lost PRESS");
+    assert.equal(before.snapshot.pending,2,"both legitimate LMB edges are pending");
     assert(!output.includes("fighter=1 from=1 to=2"),
       "no original LightActive without the authenticated missing LMB PRESS");
     // Only the real Core8A queue decides which edge is retried. The driver
     // never reconstructs packets or assigns sequence/source/gesture IDs.
-    for(let sequence=1;sequence<=4;sequence++) {
+    for(let sequence=1;sequence<=2;sequence++) {
       const retry=await wd("POST",base+"/execute/async",{
         script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
         args:[],
@@ -358,12 +357,12 @@ try {
         script:"return {acks:window.lab.acks,droppedAcks:window.lab.droppedAcks,snapshot:window.lab.snapshot};",
         args:[],
       });
-      return {...v,ok:v.acks?.length===3&&v.snapshot?.pending===1
+      return {...v,ok:v.acks?.length===1&&v.snapshot?.pending===1
         &&v.droppedAcks?.length===1};
     });
     assert.deepEqual(before.droppedAcks,[{sequence:1,status:1}],
       "must discard ONLY authentic server ACCEPTED for already-admitted seq1");
-    assert.deepEqual(before.acks.map(x=>x.sequence).sort((a,b)=>a-b),[2,3,4]);
+    assert.deepEqual(before.acks.map(x=>x.sequence),[2]);
     const retry=await wd("POST",base+"/execute/async",{
       script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
       args:[],
@@ -383,27 +382,29 @@ try {
       script:"return {acks:window.lab?.acks,events:window.lab?.events,sent:window.lab?.sent,dropped:window.lab?.dropped,droppedAcks:window.lab?.droppedAcks,errors:window.lab?.errors,settlements:window.lab?.settlements,snapshot:window.lab?.snapshot};",
       args:[],
     });
-    return {...x,ok:x.acks?.length===4 && x.snapshot?.pending===0
+    return {...x,ok:x.acks?.length===2 && x.snapshot?.pending===0
       &&x.acks?.every(a=>a.status===(ackLossTest&&a.sequence===1?2:1))
       &&output.includes("M201_AUTH_ACTION")&&output.includes("fighter=1 from=1 to=2")};
   });
   assert.deepEqual(accepted.events.map(x=>x.name),
     ["lmbDown","keyDown","keyUp","lmbUp"]);
   assert.equal(accepted.events[0].id,accepted.events[3].id);
+  assert.equal(accepted.snapshot.nextSequence,3,
+    "E must never spend source0 LMB sequence or gesture IDs");
   assert(accepted.events.every(e=>e.trusted),"all original UI10 DOM edges must be physical W3C events");
   assert(accepted.events.slice(1,3).every(x=>x.trusted),"genuine W3C physical KeyE required");
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===1).map(x=>[x.sequence,x.gestureId,x.source,x.action]),
-    [[1,1,0,1],[2,2,1,1],[3,2,1,3],[4,1,0,3]]);
+    [[1,1,0,1],[2,1,0,3]]);
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===2).map(x=>x.sequence),
-    lossTest?[1,2,3,4]:ackLossTest?[1]:[]);
+    lossTest?[1,2]:ackLossTest?[1]:[]);
   assert.deepEqual(accepted.acks.map(x=>[x.sequence,x.gestureId,x.source,x.status]).sort((a,b)=>a[0]-b[0]),
-    [[1,1,0,ackLossTest?2:1],[2,2,1,1],[3,2,1,1],[4,1,0,1]]);
+    [[1,1,0,ackLossTest?2:1],[2,1,0,1]]);
   assert.deepEqual(accepted.droppedAcks,ackLossTest?[{sequence:1,status:1}]:[]);
   assert(accepted.settlements.every(x=>x.transportSettled&&!x.combatCommitted));
   assert.deepEqual(accepted.snapshot.activeSources,[]);
   assert.equal(accepted.snapshot.closed,false);
   assert(!output.includes("fighter=1 from=9 to=10"),
-    "BUSY KeyE must not create a phantom standalone heavy");
+    "physical E during LMB must never create a phantom standalone heavy");
   assert.equal(output.split("\n").filter(line=>
     line.includes("M201_AUTH_ACTION") &&
     line.includes("fighter=1 from=1 to=2")).length,1,
@@ -411,7 +412,7 @@ try {
   assert.equal(accepted.errors.length,0);
   console.log(lossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_LOSS_REPLAY_PASS":
     ackLossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_ACK_LOSS_DUPLICATE_PASS":
-    "UI10_NATIVE_SHARED_ORIGINS_AUTH_WORLD_PASS",JSON.stringify({
+    "UI10_NATIVE_E_DENIED_SOURCE0_WORLD_PASS",JSON.stringify({
     actualChromeW3C:true,actualQUIC:true,actualCore8AOutbox:true,
     lossTest,ackLossTest,dropped:accepted.dropped,droppedAcks:accepted.droppedAcks,
     events:accepted.events.map(x=>x.name),sent:accepted.sent,acks:accepted.acks,
