@@ -1135,8 +1135,12 @@ fn selected_light_release_motion(
         .iter()
         .rev()
         .find(|sample| {
-            sample.attack || sample.heavy_attack || sample.dodge
-                || sample.kick || sample.jump || sample.dash
+            sample.attack
+                || sample.heavy_attack
+                || sample.dodge
+                || sample.kick
+                || sample.jump
+                || sample.dash
         })
         .and_then(|sample| {
             if sample.attack && !sample.heavy_attack {
@@ -1155,7 +1159,9 @@ fn apply_coalesced_input_and_read_tick(
     release_motion: Option<(f32, f32, f32)>,
 ) -> u32 {
     if let Some((client_tick, input)) = coalesced {
-        state.world.set_input_with_light_release_motion(player_id, input, release_motion);
+        state
+            .world
+            .set_input_with_light_release_motion(player_id, input, release_motion);
         record_pending_input_ack(pending_input_acks, client_tick, state.world.tick);
     }
     state.world.tick
@@ -1564,8 +1570,13 @@ mod tests {
             dash: false,
         };
 
-        let server_tick =
-            apply_coalesced_input_and_read_tick(&mut state, 1, Some((77, input)), &mut pending, None);
+        let server_tick = apply_coalesced_input_and_read_tick(
+            &mut state,
+            1,
+            Some((77, input)),
+            &mut pending,
+            None,
+        );
 
         assert_eq!(server_tick, state.world.tick);
         assert_eq!(pending.front().copied(), Some((77, server_tick)));
