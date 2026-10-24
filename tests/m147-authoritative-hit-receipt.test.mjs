@@ -73,17 +73,36 @@ test("M147 genuine 3-fighter HIT receipt credits only server-named attacker", ()
   assert.throws(() => presentHitReceipt(fixture, 0), /ownId/);
 });
 
-test("M147 ordered presenter rejects duplicates, old receipts, and sequence replay across wrap", () => {
+test("M147 presenter refuses actor swaps and implicit sequence wrap on one unreset lease", () => {
   const presenter = createHitReceiptPresenter();
   const nearWrap = { ...fixture, sequence: 0xffffffff };
   assert.equal(presenter.observe(nearWrap, 2)?.feedback, "hit-confirm");
   assert.equal(presenter.observe(nearWrap, 2), null);
-  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 3), null);
-  assert.equal(presenter.observe(nearWrap, 1), null);
+  assert.throws(() => presenter.observe({ ...fixture, sequence: 0 }, 2), /wrap requires retirement/);
+  assert.throws(() => presenter.observe({ ...fixture, sequence: 1 }, 1), /actor swap/);
+  assert.equal(presenter.observe(nearWrap, 2), null,
+    "rejected actor/replay input cannot move the cursor or change credit");
+
+  // An external authenticated transport must authorize the new incarnation.
+  // The pure reset operation is not itself authentication.
+  presenter.reset();
+  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 1)?.feedback, "damage-taken");
   assert.equal(presenter.observe({ ...fixture, sequence: 1 }, 1)?.feedback, "damage-taken");
-  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 2), null);
-  presenter.reset(); // Only the verified transport can call this on lease rebind.
+  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 1), null);
+  assert.throws(() => presenter.observe({ ...fixture, sequence: 2 }, 2), /actor swap/);
+  presenter.reset();
   assert.equal(presenter.observe(nearWrap, 2)?.feedback, "hit-confirm");
+});
+
+test("M147 spectator-presenter cannot claim an attacker role through later actor-ID substitution", () => {
+  const presenter = createHitReceiptPresenter();
+  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 3), null);
+  assert.throws(() => presenter.observe({ ...fixture, sequence: 1 }, 2), /actor swap/);
+  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 3), null);
+  assert.equal(presenter.observe({ ...fixture, sequence: 1 }, 3), null);
+  assert.throws(() => presenter.observe({ ...fixture, sequence: 2 }, 0), /ownId/);
+  presenter.reset();
+  assert.equal(presenter.observe({ ...fixture, sequence: 0 }, 2)?.feedback, "hit-confirm");
 });
 
 test("M147 spectator HP loss alone is insufficient to synthesize a hit-confirm", () => {
