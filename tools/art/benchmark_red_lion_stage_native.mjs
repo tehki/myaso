@@ -32,7 +32,7 @@ async function wd(b,method,path,data,ms=30000){
  const json=await res.json();
  if(!res.ok||(json.value?.error&&json.value?.stacktrace))
   throw new Error(b.name+" "+method+" "+path+" "+JSON.stringify(json).slice(0,700));
- return json.value??json;
+ return Object.prototype.hasOwnProperty.call(json,"value")?json.value:json;
 }
 async function start(name,port){
  const chrome=name==="chrome";
