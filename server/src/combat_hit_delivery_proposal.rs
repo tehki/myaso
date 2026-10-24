@@ -338,6 +338,80 @@ impl ProposedRecipientHitDelivery {
     }
 }
 
+/// Review-only atomic publication boundary across the EXISTING recipient
+/// scopes for one original World tick. It does not create a second journal,
+/// step World again, authenticate a QUIC principal or send bytes.
+///
+/// The trusted GameState lock owner must provide every original committed
+/// event plus only current server-admitted recipients. No async writer may
+/// observe staged states until the entire call returns Ok. An overflowing
+/// recipient gets an explicit terminal GAP; no other recipient publishes a
+/// partial tick on that error.
+pub fn project_world_tick_for_recipients(
+    server_tick: u32,
+    committed: &[(CombatEvent, CommittedHitIdentity)],
+    recipients: &mut [ProposedRecipientHitDelivery],
+) -> Result<Vec<(ActorIncarnation, Vec<HitReceipt>)>, DeliveryError> {
+    let Some(first) = recipients.first() else {
+        return Err(DeliveryError::InvalidScope);
+    };
+    let boot = first.recipient.boot_nonce;
+    let world = first.recipient.world_instance;
+    for (index, scope) in recipients.iter().enumerate() {
+        if !valid_binding(scope.recipient)
+            || recipients[..index]
+                .iter()
+                .any(|prior| prior.recipient.player_id == scope.recipient.player_id)
+        {
+            return Err(DeliveryError::InvalidScope);
+        }
+        if scope.recipient.boot_nonce != boot || scope.recipient.world_instance != world {
+            return Err(DeliveryError::InvalidWorldIdentity);
+        }
+    }
+    // A reused numeric player ID with a stale incarnation must not silently
+    // miss a newer actor's HIT. This does not itself verify QUIC admission.
+    for (_, identity) in committed {
+        if identity.attacker.boot_nonce != boot
+            || identity.victim.boot_nonce != boot
+            || identity.attacker.world_instance != world
+            || identity.victim.world_instance != world
+            || recipients.iter().any(|scope| {
+                (scope.recipient.player_id == identity.attacker.player_id
+                    && scope.recipient != identity.attacker)
+                    || (scope.recipient.player_id == identity.victim.player_id
+                        && scope.recipient != identity.victim)
+            })
+        {
+            return Err(DeliveryError::InvalidWorldIdentity);
+        }
+    }
+
+    let mut staged = recipients.to_vec();
+    let mut projected = Vec::with_capacity(staged.len());
+    let mut overflows = Vec::new();
+    for (index, scope) in staged.iter_mut().enumerate() {
+        match scope.project_committed_tick_batch(server_tick, committed) {
+            Ok(receipts) => projected.push((scope.recipient, receipts)),
+            Err(DeliveryError::PendingOverflow { first_missing }) => {
+                overflows.push((index, first_missing));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    if let Some((_, first_missing)) = overflows.first().copied() {
+        // Never roll back already committed Combat HP, nor credit any peer
+        // from a partially projected tick. Signal GAP on overloaded scopes.
+        for (index, gap) in overflows {
+            recipients[index].gapped_at = Some(gap);
+        }
+        return Err(DeliveryError::PendingOverflow { first_missing });
+    }
+
+    recipients.clone_from_slice(&staged);
+    Ok(projected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -793,5 +867,107 @@ mod tests {
             Err(DeliveryError::ReplayedOrReorderedWorldHit),
             "late old World ticks cannot be reinserted after a newer batch"
         );
+    }
+
+    #[test]
+    fn all_recipients_reject_invalid_later_victim_before_any_credit() {
+        let mut scopes = vec![scope(1), scope(2), scope(3), scope(4)];
+        let committed = [
+            (event(2, 1), commit(500, 0, 2, 1)),
+            (event(2, 3), commit(500, 1, 2, 3)),
+        ];
+        let mut corrupt = committed.clone();
+        corrupt[1].1.victim = actor(4, 1, 4);
+        assert_eq!(
+            project_world_tick_for_recipients(500, &corrupt, &mut scopes),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert!(scopes
+            .iter()
+            .all(|s| s.pending() == 0 && s.next_sequence() == 0));
+        let published = project_world_tick_for_recipients(500, &committed, &mut scopes).unwrap();
+        assert_eq!(
+            published
+                .iter()
+                .map(|(a, receipts)| (a.player_id, receipts.len()))
+                .collect::<Vec<_>>(),
+            vec![(1, 1), (2, 2), (3, 1), (4, 0)]
+        );
+        assert_eq!(
+            (published[1].1[0].sequence, published[1].1[1].sequence),
+            (0, 1)
+        );
+        assert_eq!((published[1].1[0].target, published[1].1[1].target), (1, 3));
+        assert_eq!(
+            scopes[1].ack_next(actor(2, 1, 2), &TOKEN, 2),
+            Err(DeliveryError::FutureAck),
+            "recipient enqueue is not a successful writer or application ACK"
+        );
+        assert_eq!(
+            project_world_tick_for_recipients(500, &committed, &mut scopes),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(scopes[3].pending(), 0, "bystander never gets credit");
+    }
+
+    #[test]
+    fn all_recipients_overflow_gaps_bottleneck_but_publishes_no_peer() {
+        let bottleneck = ProposedRecipientHitDelivery::new(actor(1, 1, 1), TOKEN, 1).unwrap();
+        let mut scopes = vec![scope(2), bottleneck, scope(3), scope(4)];
+        let committed = [
+            (event(1, 2), commit(600, 0, 1, 2)),
+            (event(1, 3), commit(600, 1, 1, 3)),
+        ];
+        assert_eq!(
+            project_world_tick_for_recipients(600, &committed, &mut scopes),
+            Err(DeliveryError::PendingOverflow { first_missing: 0 })
+        );
+        assert_eq!(scopes[1].gap(), Some(0));
+        assert!(scopes
+            .iter()
+            .all(|s| s.pending() == 0 && s.next_sequence() == 0));
+        assert!(scopes[0].gap().is_none() && scopes[2].gap().is_none());
+        assert_eq!(
+            project_world_tick_for_recipients(601, &[], &mut scopes),
+            Err(DeliveryError::ScopeGapped)
+        );
+    }
+
+    #[test]
+    fn all_recipients_fail_closed_on_reused_id_or_duplicate_scope() {
+        let committed = [(event(2, 1), commit(700, 0, 2, 1))];
+        let old_actor = ProposedRecipientHitDelivery::new(actor(2, 2, 22), TOKEN, 64).unwrap();
+        let mut stale = vec![scope(1), old_actor, scope(3)];
+        assert_eq!(
+            project_world_tick_for_recipients(700, &committed, &mut stale),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert!(stale.iter().all(|s| s.next_sequence() == 0));
+        let mut duplicates = vec![scope(1), scope(1)];
+        assert_eq!(
+            project_world_tick_for_recipients(700, &committed, &mut duplicates),
+            Err(DeliveryError::InvalidScope)
+        );
+        let mut none: Vec<ProposedRecipientHitDelivery> = Vec::new();
+        assert_eq!(
+            project_world_tick_for_recipients(700, &committed, &mut none),
+            Err(DeliveryError::InvalidScope)
+        );
+    }
+
+    #[test]
+    fn all_recipients_retired_later_scope_does_not_commit_first_scope() {
+        let mut scopes = vec![scope(1), scope(2)];
+        scopes[1].retire();
+        assert_eq!(
+            project_world_tick_for_recipients(
+                800,
+                &[(event(1, 2), commit(800, 0, 1, 2))],
+                &mut scopes,
+            ),
+            Err(DeliveryError::ScopeRetired)
+        );
+        assert_eq!(scopes[0].pending(), 0);
+        assert_eq!(scopes[0].next_sequence(), 0);
     }
 }
