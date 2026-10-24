@@ -913,131 +913,88 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
 }
 
 #[test]
-fn future_keye_press_cannot_overtake_lost_lmb_press_across_one_lease_sequence() {
+fn retired_keye_cannot_overtake_missing_lmb_or_spend_lease_sequence() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    // A later valid source1 event arrived first with global seq3.
-    // One outbox must retry missing source0 seq1+2 before granting it.
-    let future = edge(GestureSource::KeyE, GestureAction::Press, 3, 2);
-    assert!(p
-        .accept_under_world_lock(&mut w, LEASE, BOOT, &future)
-        .is_none());
+    // A legacy Key E packet with a FAR-FUTURE sequence is always denied
+    // immediately, before it can claim the monotonic LMB sequence fence.
+    let old_e = edge(GestureSource::KeyE, GestureAction::Press, 3, 2);
+    let denied = p.accept_under_world_lock(&mut w, LEASE, BOOT, &old_e).unwrap();
+    assert_eq!(denied.status, AckStatus::Rejected);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::Lmb,
-            GestureAction::Press,
-            1,
-            1
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::Lmb,
-            GestureAction::Release,
-            2,
-            1
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+    // Replayed invalid source1 cannot revive a key-driven heavy or steal
+    // sequences3/4 from the legitimate next source0 LMB gesture.
+    for (action, seq) in [(GestureAction::Press, 3), (GestureAction::Release, 4)] {
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, action, seq, 2),
+            AckStatus::Rejected
+        );
+    }
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            3,
-            2
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 2),
         AckStatus::Accepted
     );
-    assert!(advance(&mut p, &mut w, 36).is_empty());
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Release,
-            4,
-            2
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
         AckStatus::Accepted
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 20)]);
-    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
+
 #[test]
-fn future_lmb_press_cannot_overtake_missing_keye_press_or_terminal() {
+fn future_lmb_press_waits_for_missing_lmb_terminal_not_retired_keye() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    // Valid future LMB seq3 cannot leapfrog lost LMB seq1/seq2.
     let future = edge(GestureSource::Lmb, GestureAction::Press, 3, 2);
     assert!(p
         .accept_under_world_lock(&mut w, LEASE, BOOT, &future)
         .is_none());
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            1,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert!(advance(&mut p, &mut w, 36).is_empty());
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Release,
-            2,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+
+    // Retired E may not fill the missing sequence gap or cause 46HP.
+    for (action, seq) in [(GestureAction::Press, 1), (GestureAction::Release, 2)] {
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, action, seq, 1),
+            AckStatus::Rejected
+        );
+    }
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::Lmb,
-            GestureAction::Press,
-            3,
-            2
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::Lmb,
-            GestureAction::Release,
-            4,
-            2
-        ),
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
         AckStatus::Accepted
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 20)]);
-    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+    assert_eq!(
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
