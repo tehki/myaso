@@ -477,9 +477,11 @@ pub fn project_world_tick_for_recipients(
                     overflow = Some(first_missing);
                 }
             }
-            Err(error @ (DeliveryError::ScopeRetired
-            | DeliveryError::ScopeGapped
-            | DeliveryError::SequenceExhaustion)) => {
+            Err(
+                error @ (DeliveryError::ScopeRetired
+                | DeliveryError::ScopeGapped
+                | DeliveryError::SequenceExhaustion),
+            ) => {
                 // Original World damage is ALREADY committed. A stale or
                 // exhausted participant cannot veto publication while the
                 // other real attacker/victim scopes silently remain ready.
@@ -1372,7 +1374,11 @@ mod tests {
             Err(DeliveryError::ScopeGapped),
             "the source may not pretend its earlier 34 HP receipt was delivered"
         );
-        assert_eq!(scopes[2].gap(), Some(0), "subsequent affected victim also resyncs");
+        assert_eq!(
+            scopes[2].gap(),
+            Some(0),
+            "subsequent affected victim also resyncs"
+        );
     }
 
     #[test]
