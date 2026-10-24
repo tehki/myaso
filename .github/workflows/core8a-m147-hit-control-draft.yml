@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "server/src/combat_hit_control_proposal.rs"
+      - "server/src/combat_hit_delivery_scope_proposal.rs"
       - "server/src/combat_hit_receipt.rs"
       - "server/src/combat_hit_journal.rs"
       - "server/src/lib.rs"
