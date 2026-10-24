@@ -160,13 +160,15 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
   const reliable=pushableReadStream();
   const writes=[];
   const hello=[];
+  let releaseDatagramReady;
+  const datagramBackpressure=new Promise(resolve=>{releaseDatagramReady=resolve;});
   class OriginalQuicLabHarness {
     constructor(){
       this.ready=Promise.resolve();
       this.closed=Promise.resolve();
       this.datagrams={
         writable:{getWriter:()=>({
-          get ready(){return Promise.resolve();},
+          get ready(){return datagramBackpressure;},
           async write(bytes){writes.push(new Uint8Array(bytes));},
           releaseLock(){},
         })},
@@ -224,9 +226,28 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
     const e=outbox.begin(SOURCE.KEY_E,13);
     const c=outbox.cancel(SOURCE.KEY_E,13);
     const batch=outbox.nextSendBatch(4);
-    await Promise.all(batch.map(x=>client.sendExperimentalGestureEdge(x.bytes)));
+    // The SAME physical QUIC writer is backpressured: ordinary 30Hz
+    // movement remains latest-wins, but the selected typed edges must retain
+    // all four discrete sources in their OWN existing ordered send lane.
+    // No v1 combat action is authored for this negotiated typed session.
+    for(let tick=1;tick<=5;tick++){
+      client.sendInput({tick,moveX:0,moveY:0,facing:0});
+    }
+    const sends=batch.map(x=>client.sendExperimentalGestureEdge(x.bytes));
+    releaseDatagramReady();
+    await Promise.all(sends);
+    await new Promise(resolve=>setImmediate(resolve));
+    const writtenMovement=writes.filter(x=>x[0]===1&&x[1]===1);
+    const writtenTyped=writes.filter(x=>x[0]===2&&x[1]===0x11);
+    assert.equal(writtenMovement.length,1,
+      "v1 continuous movement must remain bounded latest-wins during stall");
     assert.deepEqual(
-      writes.map(bytes=>decodeProposedTypedGestureEvent(bytes))
+      decodeInputPacket(writtenMovement[0]).samples.map(x=>x.tick),[5,4,3],
+      "the movement-only packet must not resurrect stale movement samples");
+    assert.equal(writtenTyped.length,4,
+      "the actual original datagram sender must retain all typed edges");
+    assert.deepEqual(
+      writtenTyped.map(bytes=>decodeProposedTypedGestureEvent(bytes))
         .map(x=>[x.source,x.action,x.sequence,x.gestureId]),
       [
         [SOURCE.LMB,ACTION.PRESS,1,1],
@@ -253,6 +274,7 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
     client.close();
     assert.throws(()=>client.sendExperimentalGestureEdge(batch[0].bytes),/current server grant/);
   }finally{
+    releaseDatagramReady?.();
     outbox?.retire();
     client?.close();
     if(prior===undefined)delete globalThis.WebTransport;
