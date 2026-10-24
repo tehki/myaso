@@ -122,11 +122,26 @@ mod tests {
     fn invalid_actor_fields_and_pending_limits_fail_before_any_lease() {
         let base = actor();
         for bad in [
-            ServerActorBinding { player_id: 0, ..base },
-            ServerActorBinding { boot_nonce: 0, ..base },
-            ServerActorBinding { lease_epoch: 0, ..base },
-            ServerActorBinding { world_instance: 0, ..base },
-            ServerActorBinding { incarnation: 0, ..base },
+            ServerActorBinding {
+                player_id: 0,
+                ..base
+            },
+            ServerActorBinding {
+                boot_nonce: 0,
+                ..base
+            },
+            ServerActorBinding {
+                lease_epoch: 0,
+                ..base
+            },
+            ServerActorBinding {
+                world_instance: 0,
+                ..base
+            },
+            ServerActorBinding {
+                incarnation: 0,
+                ..base
+            },
         ] {
             assert!(matches!(
                 PreparedHitLeaseUnallocated::prepare_review_only(bad, 64),
@@ -146,11 +161,26 @@ mod tests {
         let base = actor();
         let prepared = PreparedHitLeaseUnallocated::prepare_review_only(base, 16).unwrap();
         for foreign in [
-            ServerActorBinding { player_id: 3, ..base },
-            ServerActorBinding { boot_nonce: 84, ..base },
-            ServerActorBinding { lease_epoch: 8, ..base },
-            ServerActorBinding { world_instance: 20, ..base },
-            ServerActorBinding { incarnation: 6, ..base },
+            ServerActorBinding {
+                player_id: 3,
+                ..base
+            },
+            ServerActorBinding {
+                boot_nonce: 84,
+                ..base
+            },
+            ServerActorBinding {
+                lease_epoch: 8,
+                ..base
+            },
+            ServerActorBinding {
+                world_instance: 20,
+                ..base
+            },
+            ServerActorBinding {
+                incarnation: 6,
+                ..base
+            },
         ] {
             assert_eq!(
                 prepared.inspect_for_review_only(foreign),
