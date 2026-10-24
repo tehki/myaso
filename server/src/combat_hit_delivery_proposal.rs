@@ -170,7 +170,11 @@ impl ProposedRecipientHitDelivery {
             return Err(DeliveryError::InvalidWorldIdentity);
         }
         let key = (identity.server_tick, identity.within_tick_ordinal);
-        if self.last_world_hit.is_some_and(|previous| key <= previous) {
+        if self
+            .last_committed_batch_tick
+            .is_some_and(|tick| identity.server_tick <= tick)
+            || self.last_world_hit.is_some_and(|previous| key <= previous)
+        {
             return Err(DeliveryError::ReplayedOrReorderedWorldHit);
         }
         // Validate the actual event BEFORE any receipt gets appended or a
@@ -219,6 +223,9 @@ impl ProposedRecipientHitDelivery {
         if self
             .last_committed_batch_tick
             .is_some_and(|previous| server_tick <= previous)
+            || self
+                .last_world_hit
+                .is_some_and(|(prior_tick, _)| server_tick <= prior_tick)
         {
             return Err(DeliveryError::ReplayedOrReorderedWorldHit);
         }
@@ -652,7 +659,10 @@ mod tests {
         assert_eq!(delivery.acknowledged_next(), 0);
         // The same authoritative tick can be safely retried only if no
         // prior partial batch was published.
-        let valid = [(event(3, 4), commit(100, 0, 3, 4)), (event(2, 1), commit(100, 1, 2, 1))];
+        let valid = [
+            (event(3, 4), commit(100, 0, 3, 4)),
+            (event(2, 1), commit(100, 1, 2, 1)),
+        ];
         let committed = delivery.project_committed_tick_batch(100, &valid).unwrap();
         assert_eq!(committed.len(), 1);
         assert_eq!(committed[0].sequence, 0);
@@ -704,19 +714,41 @@ mod tests {
     }
 
     #[test]
+    fn atomic_and_incremental_publish_modes_cannot_mix_on_one_world_tick() {
+        let mut scoped = scope(2);
+        let batch = [(event(2, 1), commit(100, 0, 2, 1))];
+        scoped.project_committed_tick_batch(100, &batch).unwrap();
+        assert_eq!(
+            scoped.project_hit(&event(2, 1), commit(100, 1, 2, 1)),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        let mut incremental = scope(2);
+        incremental.project_hit(&event(2, 1), commit(200, 0, 2, 1)).unwrap();
+        assert_eq!(
+            incremental.project_committed_tick_batch(200, &[(event(2, 1), commit(200, 1, 2, 1))]),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(incremental.next_sequence(), 1);
+    }
+
+    #[test]
     fn committed_empty_tick_is_fenced_against_delayed_same_tick_credit() {
         let mut delivery = scope(2);
-        assert!(delivery.project_committed_tick_batch(400, &[]).unwrap().is_empty());
+        assert!(delivery
+            .project_committed_tick_batch(400, &[])
+            .unwrap()
+            .is_empty());
         assert_eq!(
             delivery.project_committed_tick_batch(400, &[(event(2, 1), commit(400, 0, 2, 1))]),
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
         );
         assert_eq!(delivery.next_sequence(), 0);
         assert_eq!(
-            delivery.project_committed_tick_batch(401, &[(event(2, 1), commit(401, 0, 2, 1))])
-                .unwrap()[0].sequence,
+            delivery
+                .project_committed_tick_batch(401, &[(event(2, 1), commit(401, 0, 2, 1))])
+                .unwrap()[0]
+                .sequence,
             0
         );
     }
-
 }
