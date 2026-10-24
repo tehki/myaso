@@ -252,7 +252,28 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.ok(h[0].tick>=press.tick&&h[0].index>press.index,"actual same-actor light follows real gesture admission");
    const releases=roundRows().filter(e=>e.fighter===id&&e.eventAction===3&&e.gesture===press.gesture);
    assert.equal(releases.length,1,"one matching canonical physical release per light");
-   assert.ok(!roundRows().some(e=>e.fighter===id&&e.eventAction===2),"native short click cannot request held-heavy upgrade");
+   // A genuine sub-135ms physical Firefox click can cross the early source0
+   // upgrade threshold. Its undercharged release must resume original LIGHT,
+   // not commit HeavyReady, a heavy hit or a second hit.
+   const physical=physicalClicks.find(c=>c.actorId===id)?.edges;
+   assert.equal(physical?.length,2,"one original W3C down/up per short gesture");
+   const heldMs=physical[1].epochMs-physical[0].epochMs;
+   assert.ok(heldMs>=0&&heldMs<COMBAT.attack.windupMs,
+    "short source0 LMB must release before 135ms light windup");
+   const upgrades=roundRows().filter(e=>e.fighter===id&&e.eventAction===2);
+   assert.ok(upgrades.length<=1,"short source0 LMB cannot send duplicate upgrades");
+   if(upgrades.length){
+    const upgrade=upgrades[0];
+    assert.equal(upgrade.gesture,press.gesture,"early upgrade must retain true actor gesture");
+    assert.equal(upgrade.from,1,"early upgrade only originates in admitted LightWindup");
+    assert.equal(upgrade.to,9,"undercharged upgrade enters held windup, not World heavy HIT");
+    assert.ok(upgrade.sequence>press.sequence&&upgrade.sequence<releases[0].sequence,
+     "early upgrade is strictly between original PRESS and matching RELEASE");
+    assert.equal(releases[0].from,9,"undercharged release retires same held windup");
+    assert.equal(releases[0].to,1,"undercharged release must resume original LightWindup");
+   }
+   assert.ok(!actionRows().some(e=>e.index>=offset&&e.fighter===id&&e.to===10),
+    "physical short LMB must never enter HeavyActive");
   }
   const active=actionRows().filter(e=>e.index>=offset&&e.to===2);
   assert.equal(active.length,pairs.length,"all real independent players reach original LightActive exactly once");
