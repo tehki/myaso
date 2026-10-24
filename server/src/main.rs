@@ -861,23 +861,24 @@ async fn handle_connection(
                 // and a World action are four different proofs.
                 let prove_m121 = flight_m121_input_proof && player_id <= 3
                     && packet.samples().iter().any(|sample| {
-                        sample.attack || sample.heavy_attack
+                        sample.attack || sample.heavy_attack || sample.jump
                             || sample.move_x != 0.0 || sample.move_y != 0.0
                     });
                 let m121_accepted = if prove_m121 {
                     accepted.iter().map(|sample| format!(
-                        "{}:{}:{}:{:.2}:{:.2}",
+                        "{}:{}:{}:{:.2}:{:.2}:{}",
                         sample.tick, u8::from(sample.attack),
-                        u8::from(sample.heavy_attack), sample.move_x, sample.move_y
+                        u8::from(sample.heavy_attack), sample.move_x, sample.move_y,
+                        u8::from(sample.jump)
                     )).collect::<Vec<_>>().join(",")
                 } else {
                     String::new()
                 };
                 let m121_coalesced = if prove_m121 {
                     coalesced.as_ref().map(|(tick, input)| format!(
-                        "{tick}:{}:{}:{:.2}:{:.2}",
+                        "{tick}:{}:{}:{:.2}:{:.2}:{}",
                         u8::from(input.attack), u8::from(input.heavy_attack),
-                        input.move_x, input.move_y
+                        input.move_x, input.move_y, u8::from(input.jump)
                     )).unwrap_or_else(|| "none".to_owned())
                 } else {
                     String::new()
@@ -904,10 +905,10 @@ async fn handle_connection(
                         state.world.fighter(player_id).map(|fighter| {
                             let latest = fighter.input();
                             format!(
-                                "{}:{}:{}:{:.2}:{:.2}",
+                                "{}:{}:{}:{:.2}:{:.2}:{}",
                                 fighter.action.wire_code(),
                                 u8::from(latest.attack), u8::from(latest.heavy_attack),
-                                latest.move_x, latest.move_y
+                                latest.move_x, latest.move_y, u8::from(latest.jump)
                             )
                         })
                     } else {

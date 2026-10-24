@@ -873,6 +873,27 @@ function simulatePrediction(stepMs) {
         if (debug.m121SentSamples.length > 96) debug.m121SentSamples.shift();
       }
     }
+    // M144/M145: QA-only original outgoing 30Hz attack/jump observation.
+    // A DOM Space+LMB event is NOT proof the unchanged v1 packet contained
+    // attack+jump; do not synthesize actions or extend any input hold.
+    if ((acceptanceScenario === "uimultirecoveryffa"
+      || acceptanceScenario === "uimultirecoveryspatial") && !reviewedGestureLab) {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.m144SentSamples ??= [];
+        debug.m144SentSamples.push({
+          clientTick: outgoingTick, epochMs: Date.now(),
+          attack: Boolean(currentInput.attack),
+          heavyAttack: Boolean(currentInput.heavyAttack),
+          jump: Boolean(currentInput.jump),
+          moveX: currentInput.moveX, moveY: currentInput.moveY,
+          keySpace: keys.has("Space"),
+          focus: document.activeElement?.id ?? null,
+          predictedAction: local.action,
+        });
+        if (debug.m144SentSamples.length > 96) debug.m144SentSamples.shift();
+      }
+    }
     // M336: read-only, scenario-scoped input-plane provenance. A real DOM
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually

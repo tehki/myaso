@@ -1,0 +1,48 @@
+name: Combat 4D M144/M145 genuine 3-browser v1 input World proof (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "tests/combat4d-m144-v1-sender-world-proof.test.mjs"
+      - ".github/workflows/combat4d-m144-original-world-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-three-party-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: uimultirecoveryffa
+            trial: 1
+          - scenario: uimultirecoveryffa
+            trial: 2
+          - scenario: uimultirecoveryspatial
+            trial: 1
+    env:
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve strict genuine input and unchanged recovery arbitration
+        run: |
+          node --test tests/combat4d-m144-v1-sender-world-proof.test.mjs tests/combat4-m121-authoritative-ingress-proof.test.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build original authoritative Rust 60Hz World
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Original native Chrome Firefox Chrome2 100HP three-stage strict acceptance
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
