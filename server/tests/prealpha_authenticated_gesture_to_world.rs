@@ -245,7 +245,10 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
         attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
         old.advance_under_world_lock(&mut w, LEASE + 1, BOOT);
     }
-    assert!(staged, "actual World movement must restore honest light reach");
+    assert!(
+        staged,
+        "actual World movement must restore honest light reach"
+    );
     assert!(w.set_input(2, InputIntent::default()));
 
     // The victim's physical LMB is held at the instant the original third
