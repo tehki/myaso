@@ -301,6 +301,24 @@ try{
    return after>=0 && lines.slice(after+1).find(line=>
      /M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
  },14000);
+ // Separate legitimate FFA multi-victim cleave from source0 double-strike.
+ // Four genuine browser/actor and 34/46HP gates above are already preserved.
+ // Retire seats #3/#4 through actual W3C WebDriver close; retain original
+ // live Chrome #1 and Firefox #2 on the SAME original Rust World/QUIC host.
+ // The isolated two-player chord must produce exactly ONE actual victim hit.
+ for (const {s} of actors.slice(2)) {
+   await request(s.base,"DELETE","/session/"+s.id);
+ }
+ const isolatedPair=await waitFor(async()=>{
+   const visible=await evaluate(attacker,stats);
+   return visible?.roster.length===2 ? visible.roster : false;
+ },16000);
+ assert.equal(isolatedPair.length,2,
+  "exact same original Rust World must retain only genuine Chrome + Firefox seats");
+ console.log("COMBAT4A_TWO_ACTOR_WORLD_ISOLATION",JSON.stringify({
+   originalFourNativeSeatsPreserved:true,remainingChromeFirefox:isolatedPair,
+   noInjectedWorldState:true
+ }));
  // Re-close the real target's knockback gap with honest W3C gameplay motion;
  // no player/World state, hit fixture or actor position may be injected.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
@@ -362,6 +380,10 @@ try{
  const chordWorld=readAuthoritativeWorld().slice(chordWorldOffset).split("\n");
  const chordHits=chordWorld.filter(line=>
     /M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
+ console.log("COMBAT4A_CHORD_WORLD_REAL_HITS",JSON.stringify({
+  chordHits,worldActionEvents:chordWorld.filter(line=>
+   /M201_AUTH_ACTION tick=\\d+ fighter=1/.test(line)),physicalChord
+ }));
  assert.equal(chordHits.length,1,
   "one true RMB-held LMB must never issue a second light or phantom heavy hit");
  assert.equal(chordHits[0],chordHit,"the one genuine World hit must be 34HP");
