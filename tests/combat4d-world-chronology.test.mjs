@@ -48,6 +48,38 @@ test("negative controls fail closed for incomplete, forged, duplicated and unord
     assert.equal(classifyGuardBreakPunishWorld(bad).status, "INDETERMINATE");
   }
 });
+// Immutable real original native Rust World events: exact #968 focused
+// https://github.com/tehki/myaso/actions/runs/40047686818
+// and protected https://github.com/tehki/myaso/actions/runs/40047686878.
+// Both exits occurred BEFORE 34HP on the same 60Hz tick.
+test("M111 real same-tick stun exit BEFORE original 34HP HIT is AFTER_STUN", () => {
+  for (const [breakTick, exitTick] of [[1623, 1674], [293, 344]]) {
+    const actual = [
+      `M201_AUTH_ACTION tick=${breakTick} fighter=2 from=6 to=7`,
+      `M201_AUTH_BREAK tick=${breakTick} attacker=1 target=2`,
+      `M201_AUTH_ACTION tick=${exitTick} fighter=2 from=7 to=0`,
+      `M201_AUTH_ACTION tick=${exitTick} fighter=1 from=1 to=2`,
+      `M201_AUTH_HIT tick=${exitTick} attacker=1 target=2 damage=34 hp=66`,
+    ].join("\n");
+    const result = classifyGuardBreakPunishWorld(actual);
+    assert.equal(result.status, "AFTER_STUN");
+    assert.equal(result.exitToHitTicks, 0);
+    assert.equal(result.breakTick, breakTick);
+  }
+});
+test("M111 same-tick original HIT BEFORE exit qualifies only with server event order", () => {
+  const within = [
+    "M201_AUTH_ACTION tick=10 fighter=2 from=6 to=7",
+    "M201_AUTH_BREAK tick=10 attacker=1 target=2",
+    "M201_AUTH_ACTION tick=61 fighter=1 from=1 to=2",
+    "M201_AUTH_HIT tick=61 attacker=1 target=2 damage=34 hp=66",
+    "M201_AUTH_ACTION tick=61 fighter=2 from=7 to=0",
+  ].join("\n");
+  const result = classifyGuardBreakPunishWorld(within);
+  assert.equal(result.status, "WITHIN_STUN");
+  assert.equal(result.exitToHitTicks, 0);
+});
+
 test("synthetic parser control recognizes a genuine in-stun tick sequence, not release evidence", () => {
   const control = [
     "M201_AUTH_ACTION tick=10 fighter=2 from=6 to=7",
