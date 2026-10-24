@@ -39,8 +39,9 @@ export class ProposedSharedSourceGestureAllocator {
     if (this.#closed) throw new Error("review lease retired or identifiers exhausted");
   }
   #checkSource(source) {
-    if (source !== SOURCE.LMB && source !== SOURCE.KEY_E)
-      throw new RangeError("unknown typed input source");
+    // Legacy source1 (Key E) is no longer a Combat input.
+    if (source !== SOURCE.LMB)
+      throw new RangeError("Combat permits only the physical LMB gesture source");
   }
   #checkTick(clientTick) {
     if (!validTick(clientTick)) throw new RangeError("diagnostic clientTick must be u32");

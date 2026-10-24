@@ -86,8 +86,7 @@ impl SessionGestureWorldPath {
 
     /// Called synchronously under original GameState/World mutex, not after
     /// unlocking or by a transport ACK handler. Returns real World tick ACK.
-    /// Both LMB0 and independent KeyE1 share the SAME lease monotonic
-    /// sequence, gesture ID fence, replay journal, and World action ownership.
+    /// Only source0 LMB is admitted to Combat. Retired source1 is rejected.
     /// Only an already-negotiated, server-owned current QUIC actor can enter.
     pub fn accept_under_world_lock(
         &mut self,
@@ -99,6 +98,16 @@ impl SessionGestureWorldPath {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
+        // Source1 was historically Key E heavy; owner reserved E for Use.
+        // Reject before actor state, replay journal, or original World mutation.
+        if typed.source == GestureSource::KeyE {
+            return Some(GestureAck {
+                status: AckStatus::Rejected,
+                sequence: event.sequence,
+                gesture_id: event.gesture_id,
+                server_tick: tick,
+            });
+        }
         let source_index = match typed.source {
             GestureSource::Lmb => 0,
             GestureSource::KeyE => 1,
@@ -166,10 +175,7 @@ impl SessionGestureWorldPath {
                         // the authoritative fighter returns to Idle.
                         if event.action
                             == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
-                            && matches!(
-                                decision.command,
-                                Command::BeginLightWindup | Command::BeginKeyEHeavy
-                            )
+                            && matches!(decision.command, Command::BeginLightWindup)
                         {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
@@ -263,4 +269,150 @@ pub fn new_server_boot_nonce() -> anyhow::Result<u128> {
     let nonce = u128::from_le_bytes(bytes);
     anyhow::ensure!(nonce != 0, "refusing zero boot nonce");
     Ok(nonce)
+}
+
+#[cfg(test)]
+mod key_e_actor_rejoin_fence_tests {
+    use super::*;
+
+    fn old_typed_event(source: u8, action: GestureAction, sequence: u32) -> [u8; BYTES] {
+        let mut bytes = [0_u8; BYTES];
+        bytes[0] = VERSION;
+        bytes[1] = EVENT_TYPE;
+        bytes[2] = action as u8;
+        bytes[3] = source;
+        bytes[4..8].copy_from_slice(&sequence.to_le_bytes());
+        bytes[8..12].copy_from_slice(&9_u32.to_le_bytes());
+        bytes
+    }
+
+    #[test]
+    fn retired_key_e_source_cannot_reanimate_rejoined_actor_or_spend_lmb_sequence() {
+        // One ORIGINAL Rust World, the existing server-owned binding and
+        // connection lifetime, and the already-selected gesture reducer.
+        // No persistent Key E Combat source or separate World is created.
+        let mut world = World::new(640.0, 480.0);
+        assert!(world.add_player(1));
+        let boot_nonce = 909_u128;
+        let mut previous =
+            SessionGestureWorldPath::from_admitted_world(&world, 1, 11, boot_nonce).unwrap();
+        let previous_binding = previous.binding();
+        let retired_press = old_typed_event(1, GestureAction::Press, u32::MAX);
+
+        assert_eq!(
+            previous
+                .accept_under_world_lock(&mut world, 11, boot_nonce, &retired_press)
+                .unwrap()
+                .status,
+            AckStatus::Rejected
+        );
+        assert_eq!(previous.authority.highest_accepted_sequence(), 0);
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+
+        // A server-side disconnect/rejoin can reuse the numeric player ID,
+        // but NEVER the authoritative World incarnation or QUIC lease.
+        assert!(world.remove_player(1));
+        assert!(world.add_player(1));
+        let mut current =
+            SessionGestureWorldPath::from_admitted_world(&world, 1, 12, boot_nonce).unwrap();
+        assert_eq!(current.binding().player_id, previous_binding.player_id);
+        assert_ne!(current.binding().incarnation, previous_binding.incarnation);
+        assert_ne!(current.binding().lease_epoch, previous_binding.lease_epoch);
+
+        // Every archived source1 action, including deliberately enormous
+        // sequence numbers, is rejected by BOTH paths before Combat journal
+        // ownership, World action, or fresh-LMB replay state changes.
+        for action in [
+            GestureAction::Press,
+            GestureAction::Upgrade,
+            GestureAction::Release,
+            GestureAction::Cancel,
+        ] {
+            let forged = old_typed_event(1, action, u32::MAX);
+            let previous_result =
+                previous.accept_under_world_lock(&mut world, 11, boot_nonce, &forged);
+            let current_result =
+                current.accept_under_world_lock(&mut world, 12, boot_nonce, &forged);
+            if action == GestureAction::Upgrade {
+                // Legacy source1 UPGRADE is invalid at the existing typed
+                // decoder, before the actor-admission ACK path. No ACK is
+                // generated, and neither connection owns any Combat state.
+                assert_eq!(previous_result, None);
+                assert_eq!(current_result, None);
+            } else {
+                assert_eq!(previous_result.unwrap().status, AckStatus::Rejected);
+                assert_eq!(current_result.unwrap().status, AckStatus::Rejected);
+            }
+        }
+        assert_eq!(previous.authority.highest_accepted_sequence(), 0);
+        assert_eq!(current.authority.highest_accepted_sequence(), 0);
+        assert_eq!(previous.held_source_id, [None, None]);
+        assert_eq!(current.held_source_id, [None, None]);
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+
+        // Even a *valid source0* packet from the OLD actor's lease now fails
+        // incarnation fencing, without stealing the new actor's sequence.
+        let real_lmb = old_typed_event(0, GestureAction::Press, 1);
+        assert_eq!(
+            previous
+                .accept_under_world_lock(&mut world, 11, boot_nonce, &real_lmb)
+                .unwrap()
+                .status,
+            AckStatus::Stale
+        );
+        assert!(previous.retired());
+        assert_eq!(current.authority.highest_accepted_sequence(), 0);
+
+        // The fresh admitted actor still starts at seq1 on the one approved
+        // physical LMB source; Key E has neither stolen nor ended it.
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &real_lmb)
+                .unwrap()
+                .status,
+            AckStatus::Accepted
+        );
+        assert_eq!(current.authority.highest_accepted_sequence(), 1);
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+        // A delayed old-session source1 terminal may arrive AFTER the new
+        // actor owns the first genuine LMB press. It must neither release
+        // that press nor consume source0 sequence 2, even if its claimed
+        // lease-local gesture ID and next sequence match the new actor.
+        let old_e_release = old_typed_event(1, GestureAction::Release, 2);
+        assert_eq!(
+            previous
+                .accept_under_world_lock(&mut world, 11, boot_nonce, &old_e_release)
+                .unwrap()
+                .status,
+            AckStatus::Rejected
+        );
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &old_e_release)
+                .unwrap()
+                .status,
+            AckStatus::Rejected
+        );
+        assert_eq!(current.authority.highest_accepted_sequence(), 1);
+        assert_eq!(current.held_source_id[0], Some(9));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+        let current_lmb_release = old_typed_event(0, GestureAction::Release, 2);
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &current_lmb_release)
+                .unwrap()
+                .status,
+            AckStatus::Accepted
+        );
+        assert_eq!(current.authority.highest_accepted_sequence(), 2);
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &current_lmb_release)
+                .unwrap()
+                .status,
+            AckStatus::Duplicate
+        );
+    }
 }

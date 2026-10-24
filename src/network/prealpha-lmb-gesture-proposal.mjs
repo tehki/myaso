@@ -74,14 +74,13 @@ export function decodeProposedGestureAck(bytes) {
 // Main #723. Existing encode/decodeProposedGestureEvent deliberately remain
 // unchanged and reject byte3=1; the live game does not import this function.
 // Reuse their exact proven byte grammar, not a competing second packet format.
+// Legacy source1 value is kept solely for decoding/rejecting old clients.
+// It is NOT an authorized Combat source; E is reserved for future Use.
 export const PROPOSED_GESTURE_SOURCE = Object.freeze({LMB:0, KEY_E:1});
 function assertTypedSourceAction(source, action) {
-  if (source !== PROPOSED_GESTURE_SOURCE.LMB
-      && source !== PROPOSED_GESTURE_SOURCE.KEY_E)
-    throw new RangeError("unknown reviewed gesture source");
-  if (!isMember(action, GESTURE_ACTION)
-      || (source === PROPOSED_GESTURE_SOURCE.KEY_E
-          && action === GESTURE_ACTION.UPGRADE))
+  if (source !== PROPOSED_GESTURE_SOURCE.LMB)
+    throw new RangeError("Key E is reserved for Use and is not a Combat gesture source");
+  if (!isMember(action, GESTURE_ACTION))
     throw new RangeError("invalid reviewed source/action pair");
 }
 export function encodeProposedTypedGestureEvent({source, action, sequence, gestureId, clientTick = 0}) {

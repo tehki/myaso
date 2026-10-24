@@ -39,14 +39,12 @@ pub enum Disposition {
 pub enum Command {
     None,
     BeginLightWindup,
-    BeginKeyEHeavy,
     ActivateLight,
     UpgradeHeldHeavy { server_elapsed_ms: u64 },
     HeavyReady,
     ResumeLight { server_elapsed_ms: u64 },
     ReleaseHeavy,
     CancelUnlandedLight,
-    CancelKeyEHeavy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,7 +130,8 @@ impl GestureAuthority {
         event: GestureEvent,
         server_ms: u64,
     ) -> Decision {
-        if source == GestureSource::KeyE && event.action == GestureAction::Upgrade {
+        // E is reserved for future Use. Never admit its legacy Combat source.
+        if source == GestureSource::KeyE {
             return Decision::rejected();
         }
         if lease != self.lease_epoch
@@ -213,17 +212,9 @@ impl GestureAuthority {
                 self.active_source = Some(source);
                 self.highest_gesture_id = event.gesture_id;
                 self.press_ms = server_ms;
-                self.phase = if source == GestureSource::KeyE {
-                    Phase::HeavyCharging
-                } else {
-                    Phase::LightWindup
-                };
+                self.phase = Phase::LightWindup;
                 self.released = false;
-                if source == GestureSource::KeyE {
-                    Command::BeginKeyEHeavy
-                } else {
-                    Command::BeginLightWindup
-                }
+                Command::BeginLightWindup
             }
             GestureAction::Upgrade
                 if self.active_id == Some(event.gesture_id)
@@ -250,13 +241,6 @@ impl GestureAuthority {
                         self.phase = Phase::HeavyActive;
                         self.released = true;
                         Command::ReleaseHeavy
-                    }
-                    Phase::HeavyCharging if source == GestureSource::KeyE => {
-                        // Standalone KeyE never turns into a free LMB light.
-                        // Undercharged release cancels with no 34/46HP hit.
-                        self.phase = Phase::Cancelled;
-                        self.released = true;
-                        Command::CancelKeyEHeavy
                     }
                     Phase::HeavyCharging => {
                         self.phase = if elapsed >= LIGHT_WINDUP_MS {
@@ -292,11 +276,7 @@ impl GestureAuthority {
                 match self.phase {
                     Phase::HeavyCharging | Phase::HeavyReady => {
                         self.phase = Phase::Cancelled;
-                        if source == GestureSource::KeyE {
-                            Command::CancelKeyEHeavy
-                        } else {
-                            Command::CancelUnlandedLight
-                        }
+                        Command::CancelUnlandedLight
                     }
                     Phase::LightWindup if elapsed < LIGHT_WINDUP_MS => {
                         self.phase = Phase::Cancelled;
@@ -359,5 +339,30 @@ impl GestureAuthority {
         self.phase = Phase::Idle;
         self.released = false;
         true
+    }
+}
+
+#[cfg(test)]
+mod key_e_reserved_for_use_tests {
+    use super::*;
+    use crate::prealpha_lmb_gesture_proposal::{GestureAction, GestureEvent};
+
+    #[test]
+    fn retired_key_e_source_cannot_open_heavy_or_advance_combat_sequence() {
+        let mut authority = GestureAuthority::new(9);
+        let press = GestureEvent {
+            action: GestureAction::Press,
+            sequence: 1,
+            gesture_id: 1,
+            client_tick: 0,
+        };
+        let rejected = authority.process_typed(9, GestureSource::KeyE, press, 0);
+        assert_eq!(rejected.disposition, Disposition::Rejected);
+        assert_eq!(rejected.command, Command::None);
+        assert_eq!(authority.highest_accepted_sequence(), 0);
+        assert_eq!(authority.phase(), Phase::Idle);
+        let lmb = authority.process_typed(9, GestureSource::Lmb, press, 0);
+        assert_eq!(lmb.disposition, Disposition::Accepted);
+        assert_eq!(lmb.command, Command::BeginLightWindup);
     }
 }

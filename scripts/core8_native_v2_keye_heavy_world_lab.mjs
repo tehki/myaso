@@ -1,5 +1,6 @@
-// Chromium real W3C KeyE keydown/keyup through QUIC to original Rust World.
-// Loopback-only nonrelease test. No fake HP, packets or server mutation.
+// Genuine Chrome W3C KeyE negative + physical LMB positive over one real QUIC lease.
+// Test-only old source1 bytes prove hostile archived KeyE cannot touch original World.
+// Loopback-only NONRELEASE; original World/HP/packet protocol are unchanged.
 import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
 import {createServer} from "node:net";
@@ -66,7 +67,9 @@ function initBrowser(endpoint,pin,callback) {
     lab.send=async (action,source=0)=>{
       const b=new Uint8Array(16),view=new DataView(b.buffer);
       b[0]=2;b[1]=0x11;b[2]=action;b[3]=source;
-      const seq=lab.seq++;
+      // An archived KeyE sender must NEVER spend the legitimate LMB seq1.
+      // Deliberately try the same forged far-future source1 sequence twice.
+      const seq=source===1?77:lab.seq++;
       view.setUint32(4,seq,true);view.setUint32(8,1,true);
       view.setUint32(12,44,true);
       try {await writer.write(b);lab.sent.push({seq,action,source});} catch(e){lab.errors.push(String(e));}
@@ -93,6 +96,8 @@ function initBrowser(endpoint,pin,callback) {
       lab.events.push({name:"up",id:e.pointerId,ms:performance.now()});
       void lab.send(3);
     });
+    // Negative test ONLY: neither real playable page attaches this producer.
+    // Deliberately inject an obsolete raw source1 packet on physical KeyE.
     document.addEventListener("keydown",e=>{
       if(e.code!=="KeyE"||e.repeat)return;
       lab.keys.push({name:"keydown",code:e.code,ms:performance.now()});
@@ -151,50 +156,64 @@ try {
     return {ok:!!witness,witness};
   });
   assert(originalIdle.witness,"actual server 60Hz Idle baseline is required");
-  // Real physical W3C KEY DOWN, not a JS-dispatched event.
+  // Actual trusted W3C KeyE DOWN/UP. This isolated hostile-fixture hook
+  // emits retired source1 BYTES on purpose; real browser Combat does not.
   await wd("POST",base+"/actions",{actions:[{
-    type:"key",id:"native-real-keye",actions:[{type:"keyDown",value:"e"}],
+    type:"key",id:"native-retired-keye",actions:[{type:"keyDown",value:"e"},{type:"keyUp",value:"e"}],
   }]});
-  const pressed=await poll("real KeyE press into authoritative heavy windup",async()=>{
+  const denied=await poll("both archived KeyE packets rejected by original authenticated World",async()=>{
     const x=await wd("POST",base+"/execute/sync",{
-      script:"return {acks:window.lab?.acks,keys:window.lab?.keys,errors:window.lab?.errors};",args:[],
+      script:"return {acks:window.lab?.acks,keys:window.lab?.keys,sent:window.lab?.sent,errors:window.lab?.errors};",args:[],
     });
-    const world=output.split("\n").find(l=>
-      /M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(l)
-    );
-    return {...x,world,ok:x.acks?.some(a=>a.sequence===1&&a.status===1)&&!!world};
+    const rejected=x.acks?.filter(a=>a.sequence===77&&a.status===4)||[];
+    const deniedWorld=output.split("\n").filter(line=>
+      /M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=1/.test(line)&&
+      /status=4 from=0 to=0/.test(line));
+    return {...x,deniedWorld,ok:rejected.length===2&&deniedWorld.length>=2};
   });
-  assert.equal(pressed.keys[0]?.name,"keydown");
-  assert.equal(pressed.keys[0]?.code,"KeyE");
-  await pause(490); // actual 320ms READY threshold entirely server-owned
-  assert.equal(output.includes("fighter=1 from=9 to=10"),false,
-    "held physical KeyE must never auto-enter HeavyActive");
+  assert.deepEqual(denied.keys.map(x=>x.name),["keydown","keyup"]);
+  assert.deepEqual(denied.keys.map(x=>x.code),["KeyE","KeyE"]);
+  assert.deepEqual(denied.sent.map(x=>[x.seq,x.action,x.source]),[[77,1,1],[77,3,1]]);
+  assert.deepEqual(denied.errors,[]);
+  assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=(?:1|9|10)/.test(output),
+    "KeyE alone must never start light/heavy World combat");
+  assert(!/M201_AUTH_HIT tick=\d+ attacker=1/.test(output),
+    "retired E cannot commit original World damage");
 
+  // SAME admitted server lease, REAL physical W3C source0 LMB.
+  // The two rejected source1 packets must not consume its sequence1/2.
   await wd("POST",base+"/actions",{actions:[{
-    type:"key",id:"native-real-keye",actions:[{type:"keyUp",value:"e"}],
+    type:"pointer",id:"native-real-lmb",parameters:{pointerType:"mouse"},
+    actions:[
+      {type:"pointerMove",origin:"viewport",x:120,y:120,duration:0},
+      {type:"pointerDown",button:0},
+      {type:"pause",duration:6},
+      {type:"pointerUp",button:0},
+    ],
   }]});
-  const accepted=await poll("real KeyE release reaches original World HeavyActive",async()=>{
+  const accepted=await poll("physical LMB admitted after rejected old KeyE",async()=>{
     const x=await wd("POST",base+"/execute/sync",{
-      script:"return {acks:window.lab?.acks,keys:window.lab?.keys,sent:window.lab?.sent,errors:window.lab?.errors};",
+      script:"return {acks:window.lab?.acks,keys:window.lab?.keys,events:window.lab?.events,sent:window.lab?.sent,errors:window.lab?.errors};",
       args:[],
     });
-    const world=output.split("\n").find(l=>
-      /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(l)
-    );
-    return {...x,world,ok:x.acks?.some(a=>a.sequence===2&&a.status===1)&&!!world};
+    const realWorld=output.split("\n").find(line=>
+      /M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(line));
+    return {...x,realWorld,ok:x.acks?.some(a=>a.sequence===1&&a.status===1)
+      &&x.acks?.some(a=>a.sequence===2&&a.status===1)&&!!realWorld};
   });
-  assert.deepEqual(accepted.keys.map(x=>x.name),["keydown","keyup"]);
-  assert.deepEqual(accepted.keys.map(x=>x.code),["KeyE","KeyE"]);
-  assert.deepEqual(accepted.sent.map(x=>[x.action,x.source]),[[1,1],[3,1]]);
-  assert.equal(accepted.errors.length,0);
-  assert(accepted.keys[1].ms-accepted.keys[0].ms>=320,
-    "real physical KeyE held through server READY");
-  console.log("CORE8_NATIVE_V2_KEYE_HEAVY_WORLD_PASS",JSON.stringify({
+  assert.deepEqual(accepted.events.map(x=>x.name),["down","up"]);
+  assert.equal(accepted.events[0].id,accepted.events[1].id);
+  assert.deepEqual(accepted.sent.map(x=>[x.seq,x.action,x.source]),
+    [[77,1,1],[77,3,1],[1,1,0],[2,3,0]]);
+  assert.deepEqual(accepted.errors,[]);
+  assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(output),
+    "neither rejected KeyE nor short physical LMB can create HeavyWindup");
+  console.log("CORE8_NATIVE_V2_KEYE_RETIRED_LMB_WORLD_PASS",JSON.stringify({
     realChrome:true,realWebTransport:true,liveAccountAuthentication:false,
-    physicalKeyEHoldMs:accepted.keys[1].ms-accepted.keys[0].ms,
-    acceptedAckWorldTicks:accepted.acks,
-    originalRustWorldPress:pressed.world,
-    originalRustWorldRelease:accepted.world,
+    rejectedLegacyKeyEAcks:denied.acks.filter(a=>a.sequence===77),
+    physicalLmbMs:accepted.events[1].ms-accepted.events[0].ms,
+    acceptedLmbAcks:accepted.acks.filter(a=>a.sequence===1||a.sequence===2),
+    originalRustWorldLight:accepted.realWorld,
   }));
 } catch (error) {
   console.error("CORE8_NATIVE_V2_FAILURE",JSON.stringify({

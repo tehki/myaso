@@ -10,6 +10,8 @@
  * transfers ownership of a fresh binary payload to the transport hot path and
  * avoids the extra browser-side copy for WebTransport datagrams.
  */
+import { decodeProposedTypedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
+
 export async function connectGameTransport({
   webTransportUrl,
   webTransportOptions,
@@ -137,9 +139,17 @@ class WebTransportGameConnection {
       throw new Error("gesture datagram requires current server grant");
     }
     const payload = toUint8Array(bytes);
-    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11) {
-      throw new TypeError("only original typed 16-byte v2 gesture events accepted");
+    // Owner retired source1 Key E from Combat. Reject even handcrafted old
+    // source1 bytes BEFORE they can occupy the one bounded QUIC writer queue.
+    // Rust admission independently rejects them before World mutation.
+    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11
+        || payload[3] !== 0) {
+      throw new TypeError("only source0 LMB typed 16-byte Combat events accepted");
     }
+    // Use the SAME selected 0x11 codec as the current LMB producer/World.
+    // A forged source0 with invalid action, zero sequence or gesture ID must
+    // not consume one of the bounded real QUIC writer slots.
+    decodeProposedTypedGestureEvent(payload);
     // Never let a stalled datagram writer accumulate arbitrarily many
     // outstanding 16-byte gesture events/promises. Overflow is not an ACK,
     // not a skipped RELEASE, and must retire the whole same-QUIC lease.

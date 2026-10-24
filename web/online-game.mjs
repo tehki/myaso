@@ -357,8 +357,10 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  // E is reserved for future Use interaction. Combat never consumes it.
+  if (event.code === "KeyE") return;
   const firstAudioGesture = !audio.isUnlocked();
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
@@ -368,10 +370,6 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (!reviewedGestureLab) {
-    if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  }
-  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
     audio.play("jump");
@@ -380,7 +378,6 @@ canvas.addEventListener("keydown", (event) => {
   }
   // Keyboard input also wins over the one-time audio unlock.
   audio.unlock();
-  if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
 // Key release can occur after focus moves to an in-page control.
@@ -464,7 +461,7 @@ networkClient = await connectAuthoritativeClient({
 });
 
 // Original first-party game-page v2 lab: this is the ONLY experimental
-// source0 LMB/source1 KeyE path on this physical canvas. A denied grant
+// source0 LMB-only Combat gesture path. Key E is reserved for Use. A denied grant
 // closes the connection: there is NEVER a fallback phantom v1 attack.
 if (reviewedGestureLab) {
   try {

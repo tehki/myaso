@@ -54,26 +54,20 @@ test("genuine hold upgrade is an intent before server-controlled READY, terminal
  }finally{lab.close("test");}
 });
 
-test("LMB and KeyE share one monotonic actor connection allocator and release-only KeyE",async()=>{
+test("Key E is reserved for Use, while original LMB stays the only Combat gesture source",async()=>{
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
  try{
   f.win.dispatchEvent(event("keydown",{code:"KeyE",repeat:false}));
-  await pause(10);
-  assert.deepEqual(f.wire.map(e=>[e.source,e.action]),[[1,1]]);
   f.win.dispatchEvent(event("keyup",{code:"KeyE"}));
   await pause(10);
-  assert.ok(f.wire.some(e=>e.source===1&&e.action===3));
+  assert.deepEqual(f.wire,[],"Use has no Combat sender");
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:10,button:0,buttons:1}));
   await pause(10);
   assert.ok(f.wire.some(e=>e.source===0&&e.action===1));
-  const physicalPresses=f.wire.filter(e=>e.action===1);
-  const uniquePressIds=[...new Set(physicalPresses.map(e=>e.sequence))];
-  assert.deepEqual(uniquePressIds,[1,3],
-    "one shared monotonic sequence owner, even when unacknowledged PRESS is retransmitted");
-  assert.ok(physicalPresses.filter(e=>e.sequence===1).every(e=>e.source===1),
-    "every bounded retry preserves the original KeyE source identity");
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:10,button:0,buttons:0}));
   await pause(10);
+  assert.deepEqual([...new Set(f.wire.map(e=>e.source))],[0]);
+  assert.deepEqual([...new Set(f.wire.map(e=>e.sequence))],[1,2]);
  }finally{lab.close("test");}
 });
 
@@ -87,14 +81,14 @@ test("public target or public webpage refuses before any grant or physical event
 
 test("blur/pagehide retires source owner, never sends a phantom RELEASE or reuses old QUIC",async()=>{
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
- f.win.dispatchEvent(event("keydown",{code:"KeyE",repeat:false}));
+ f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:14,button:0,buttons:1}));
  await pause(10);
  f.win.dispatchEvent(event("pagehide",{}));
  await pause(10);
  assert.equal(f.closed,true);
  assert.equal(lab.snapshot.closed,true);
  assert.ok(!f.wire.some(e=>e.action===3),"navigation must not synthesize strike");
- f.win.dispatchEvent(event("keyup",{code:"KeyE"}));
+ f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:14,button:0,buttons:0}));
  await pause(10);
  assert.ok(!f.wire.some(e=>e.action===3),"old lease cannot send terminal after pagehide");
 });
@@ -104,7 +98,7 @@ test("original player-facing online client mutually excludes legacy v1 attack wr
  assert.match(game,/if \(gestureLabRequested && !reviewedGestureLab\)/);
  assert.match(game,/currentInput\.attack = !reviewedGestureLab &&/);
  assert.match(game,/currentInput\.heavyAttack = !reviewedGestureLab &&/);
- assert.match(game,/if \(!reviewedGestureLab\) \{[\s\S]{0,100}if \(event\.code === "KeyE"/);
+ assert.match(game,/if \(event\.code === "KeyE"\) return;/);
  assert.match(game,/onExperimentalGestureAck\(bytes, lease\)/);
  assert.match(game,/await activateLoopbackGestureLab\(/);
  assert.match(game,/if \(reviewedGestureLab\) return; \/\/ v2 capture owns edge/);
