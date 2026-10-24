@@ -68,3 +68,60 @@ test("4A keyup is observed on window after arena focus transfers within the same
     source.indexOf('window.addEventListener("blur"'));
   assert.doesNotMatch(changedHandler, /sendInput|dispatchEvent|currentInput/);
 });
+
+test("4A genuine pointerUP rejects stale pointer ID without erasing the next gesture", () => {
+  const upStart = source.indexOf("function onLeftPointerUp(event) {");
+  const upEnd = source.indexOf('canvas.addEventListener("pointerup", onLeftPointerUp);', upStart);
+  assert.ok(upStart > 0 && upEnd > upStart);
+  let lights = 0;
+  let heavies = 0;
+  let moved = 0;
+  const charge = createLeftButtonCharge({
+    now: () => 10,
+    onLight: () => { lights++; },
+    onHeavy: () => { heavies++; },
+  });
+  const ctx = {
+    leftButtonCharge: charge,
+    leftButtonDown: true,
+    leftButtonPressMovement: { moveX: 1, moveY: -1 },
+    middleBlockHeld: false,
+    audio: { isUnlocked: () => true },
+    updateMouse: () => { moved++; },
+  };
+  runInNewContext(source.slice(upStart, upEnd), ctx);
+  assert.equal(charge.press(37), true);
+  ctx.onLeftPointerUp({ button: 0, pointerId: 36 });
+  assert.equal(charge.isPressed(), true, "wrong-pointer event cannot release current gesture");
+  assert.equal(ctx.leftButtonDown, true);
+  assert.equal(ctx.leftButtonPressMovement.moveX, 1);
+  assert.equal(ctx.leftButtonPressMovement.moveY, -1);
+  assert.equal(lights, 0);
+  assert.equal(heavies, 0);
+  ctx.onLeftPointerUp({ button: 0, pointerId: 37 });
+  assert.equal(charge.isPressed(), false);
+  assert.equal(ctx.leftButtonDown, false);
+  assert.equal(ctx.leftButtonPressMovement, null);
+  assert.equal(lights, 1, "exactly one genuine matching short LMB commits light");
+  assert.equal(heavies, 0);
+  ctx.onLeftPointerUp({ button: 0, pointerId: 37 });
+  assert.equal(lights, 1, "duplicate stale pointerUP cannot commit a second attack");
+  assert.equal(moved, 3);
+});
+
+test("4A attached window keyup handler clears real arena movement after in-tab focus transfer", () => {
+  const fragment = 'window.addEventListener("keyup", (event) => keys.delete(event.code));';
+  assert.ok(source.includes(fragment));
+  const listeners = new Map();
+  const keys = new Set(["KeyD", "Space"]);
+  runInNewContext(fragment, {
+    window: { addEventListener: (type, cb) => listeners.set(type, cb) },
+    keys,
+  });
+  assert.equal(listeners.has("keyup"), true);
+  listeners.get("keyup")({ code: "KeyD" });
+  assert.equal(keys.has("KeyD"), false, "real keyup delivered to window clears movement key");
+  assert.equal(keys.has("Space"), true, "unrelated held Space must remain held");
+  listeners.get("keyup")({ code: "Space" });
+  assert.equal(keys.size, 0);
+});
