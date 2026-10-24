@@ -1383,7 +1383,10 @@ mod tests {
                     if sample.attack {
                         accepted_light_ticks.push(ACTION_TICK);
                     }
-                    assert!(!sample.heavy_attack, "single short LMB must never synthesize a heavy bit");
+                    assert!(
+                        !sample.heavy_attack,
+                        "single short LMB must never synthesize a heavy bit"
+                    );
                     apply_coalesced_input_and_read_tick(
                         &mut state,
                         1,
