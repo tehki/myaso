@@ -264,12 +264,9 @@ mod tests {
         attack(&mut world);
         let mut rejected = None;
         for _ in 0..40 {
-            match owner.step_and_capture(&mut world) {
-                Err(error) => {
-                    rejected = Some(error);
-                    break;
-                }
-                Ok(_) => {}
+            if let Err(error) = owner.step_and_capture(&mut world) {
+                rejected = Some(error);
+                break;
             }
         }
         assert_eq!(rejected, Some(OriginError::StaleActor(2)));
@@ -312,12 +309,9 @@ mod tests {
         attack(&mut world);
         let mut rejected = None;
         for _ in 0..40 {
-            match owner.step_and_capture(&mut world) {
-                Err(error) => {
-                    rejected = Some(error);
-                    break;
-                }
-                Ok(_) => {}
+            if let Err(error) = owner.step_and_capture(&mut world) {
+                rejected = Some(error);
+                break;
             }
         }
         assert_eq!(rejected, Some(OriginError::UnadmittedActor(2)));
