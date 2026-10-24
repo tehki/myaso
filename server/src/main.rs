@@ -1675,6 +1675,106 @@ mod tests {
     }
 
     #[test]
+    fn m121_selected_authenticated_light_direction_survives_reverse_locomotion() {
+        // Review-only regression at the EXISTING v1 accepted-sample -> World
+        // boundary. This does not create another action producer or trust
+        // arbitrary client metadata: release provenance is from accepted
+        // samples, and the newest sample still owns continuous locomotion.
+        for (release_y, expected) in [
+            (-1.0, myaso_server::simulation::Action::AttackLeftWindup),
+            (1.0, myaso_server::simulation::Action::AttackRightWindup),
+        ] {
+            let release = InputSample {
+                tick: 101,
+                move_x: 0.0,
+                move_y: release_y,
+                facing_radians: 0.0,
+                attack: true,
+                heavy_attack: false,
+                dodge: false,
+                block: false,
+                kick: false,
+                run: false,
+                jump: false,
+                dash: false,
+            };
+            // In the same accepted original QUIC datagram the player can
+            // reverse direction before the 60Hz World consumes the release.
+            let reverse = InputSample {
+                tick: 102,
+                move_y: -release_y,
+                attack: false,
+                ..release
+            };
+            let accepted = [release, reverse];
+            let sample = coalesce_accepted_input_batch(&accepted).unwrap();
+            assert_eq!(sample.tick, 102);
+            assert_eq!(sample.move_y, -release_y);
+            assert!(
+                sample.attack,
+                "one real accepted release survives coalescing"
+            );
+            let intent: InputIntent = sample.into();
+            let motion = selected_light_release_motion(&accepted, Some(&(sample.tick, intent)));
+            assert_eq!(motion, Some((0.0, release_y, 0.0)));
+
+            let mut state = GameState::new(0, 0);
+            assert!(state.world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(state.world.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                }
+            ));
+            state.world.step();
+            assert_eq!(
+                state.world.fighter(1).unwrap().action,
+                myaso_server::simulation::Action::HeavyAttackWindup
+            );
+            let mut acks = VecDeque::new();
+            apply_coalesced_input_and_read_tick(
+                &mut state,
+                1,
+                Some((sample.tick, intent)),
+                &mut acks,
+                motion,
+            );
+            // Another accepted non-attack World input before stepping must
+            // change actual movement, NOT alter release direction or add HIT.
+            assert!(state.world.set_input(
+                1,
+                InputIntent {
+                    move_y: -release_y,
+                    ..InputIntent::default()
+                }
+            ));
+            state.world.step();
+            assert_eq!(state.world.fighter(1).unwrap().action, expected);
+            assert_eq!(state.world.fighter(1).unwrap().input().move_y, -release_y);
+            assert_eq!(acks.len(), 1, "one accepted coalesced input, one ACK");
+            state.world.step();
+            assert_eq!(
+                state.world.fighter(1).unwrap().action,
+                expected,
+                "the reverse movement cannot create a second light"
+            );
+
+            // If the already-selected v2 route suppresses the legacy v1
+            // sampled attack bit, release metadata alone cannot re-arm it.
+            let mut suppressed_v1 = intent;
+            suppressed_v1.attack = false;
+            suppressed_v1.heavy_attack = false;
+            assert_eq!(
+                selected_light_release_motion(&accepted, Some(&(sample.tick, suppressed_v1)),),
+                None,
+                "no parallel legacy attack producer while v2 owns Combat"
+            );
+        }
+    }
+
+    #[test]
     fn processed_input_ack_coalesces_safe_ticks_without_starvation() {
         let mut pending = VecDeque::new();
         record_pending_input_ack(&mut pending, 100, 10);
