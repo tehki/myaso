@@ -22,6 +22,9 @@ pub enum OriginError {
     DeadActor(u32),
     UnadmittedActor(u32),
     StaleActor(u32),
+    NoCompletedWorldTick,
+    // The only extra World stepping operation is a test-only fixture.
+    #[cfg(test)]
     TickExhausted,
     OrdinalExhausted,
 }
@@ -35,6 +38,8 @@ pub struct ProposedWorldHitOrigin {
     accepted: BTreeMap<u32, ActorIncarnation>,
 }
 
+// Test-only structure: no second production World stepping interface.
+#[cfg(test)]
 #[derive(Debug)]
 pub struct OriginalWorldTick {
     pub tick: u32,
@@ -131,19 +136,23 @@ impl ProposedWorldHitOrigin {
         Ok(bound)
     }
 
-    /// The caller must hold the same original GameState mutex while invoking
-    /// this method and subsequently handing off the immutable tick evidence.
-    /// The *only* possible HIT input is the actual World.step_into event list;
-    /// callers cannot inject a self-claimed HIT or pick a client tick.
-    pub fn step_and_capture(&self, world: &mut World) -> Result<OriginalWorldTick, OriginError> {
+    /// NONRELEASE read-only extraction from a completed authoritative World tick.
+    /// The existing GameState owner MUST supply the actual immutable events
+    /// returned by its single original World::step_into under the SAME lock.
+    /// This helper never steps or mutates World, and does not authenticate an
+    /// arbitrary caller-supplied event slice by itself. Never expose it as an
+    /// alternate path for clients to claim HIT or damage.
+    pub fn capture_committed_hits_from_step(
+        &self,
+        world: &World,
+        original_events: &[CombatEvent],
+    ) -> Result<Vec<(CombatEvent, CommittedHitIdentity)>, OriginError> {
         self.ensure_world(world)?;
-        if world.tick == u32::MAX {
-            return Err(OriginError::TickExhausted);
+        if world.tick == 0 {
+            return Err(OriginError::NoCompletedWorldTick);
         }
-        let mut events = Vec::new();
-        world.step_into(&mut events);
         let mut committed_hits = Vec::new();
-        for (index, event) in events.iter().enumerate() {
+        for (index, event) in original_events.iter().enumerate() {
             if let CombatEvent::Hit {
                 attacker, target, ..
             } = event
@@ -159,6 +168,21 @@ impl ProposedWorldHitOrigin {
                 committed_hits.push((event.clone(), identity));
             }
         }
+        Ok(committed_hits)
+    }
+
+    /// OFFLINE fixture only: drives the original World once, then delegates
+    /// attribution to the same non-stepping capture used by future integration.
+    /// Production's existing GameState clock MUST NEVER call this step helper.
+    #[cfg(test)]
+    pub fn step_and_capture(&self, world: &mut World) -> Result<OriginalWorldTick, OriginError> {
+        self.ensure_world(world)?;
+        if world.tick == u32::MAX {
+            return Err(OriginError::TickExhausted);
+        }
+        let mut events = Vec::new();
+        world.step_into(&mut events);
+        let committed_hits = self.capture_committed_hits_from_step(world, &events)?;
         Ok(OriginalWorldTick {
             tick: world.tick,
             events,
@@ -580,5 +604,82 @@ mod tests {
             Err(DeliveryError::ReplayedOrReorderedWorldHit),
             "the complete original World tick cannot be recredited"
         );
+    }
+    #[test]
+    fn read_only_original_world_capture_never_steps_or_reapplies_damage() {
+        // Capture real original two-victim HIT events after the ONE World step,
+        // as the existing production 60Hz GameState clock would supply them.
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 180.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 255.0, 220.0, std::f32::consts::PI));
+        assert!(world.add_player_at(4, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        origin.bind_admitted(&world, 2, 102).unwrap();
+        origin.bind_admitted(&world, 3, 103).unwrap();
+        origin.bind_admitted(&world, 4, 104).unwrap();
+
+        assert_eq!(
+            origin.capture_committed_hits_from_step(&world, &[]),
+            Err(OriginError::NoCompletedWorldTick),
+            "an unstepped World cannot invent a committed HIT"
+        );
+
+        attack(&mut world);
+        let mut events = Vec::new();
+        for _ in 0..40 {
+            let before_tick = world.tick;
+            world.step_into(&mut events);
+            assert_eq!(
+                world.tick,
+                before_tick + 1,
+                "only original World step advances"
+            );
+            let hp2 = world.fighter(2).unwrap().hp;
+            let hp3 = world.fighter(3).unwrap().hp;
+            let tick = world.tick;
+            let immutable_hits = origin
+                .capture_committed_hits_from_step(&world, &events)
+                .unwrap();
+            assert_eq!(world.tick, tick, "HIT extraction cannot step World");
+            assert_eq!(world.fighter(2).unwrap().hp, hp2);
+            assert_eq!(world.fighter(3).unwrap().hp, hp3);
+            if immutable_hits.len() == 2 {
+                assert_eq!((hp2, hp3), (66.0, 66.0));
+                assert_eq!(immutable_hits[0].1.server_tick, tick);
+                assert_eq!(immutable_hits[1].1.server_tick, tick);
+                assert!(
+                    immutable_hits[0].1.within_tick_ordinal
+                        < immutable_hits[1].1.within_tick_ordinal
+                );
+                assert_eq!(
+                    origin
+                        .capture_committed_hits_from_step(&world, &events)
+                        .unwrap(),
+                    immutable_hits,
+                    "read-only recapture cannot reexecute damage"
+                );
+                let mut projected =
+                    ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+                let published = projected
+                    .project_committed_tick_batch(tick, &immutable_hits)
+                    .unwrap();
+                assert_eq!(published.len(), 2);
+                assert_eq!((published[0].sequence, published[1].sequence), (0, 1));
+                assert_eq!(
+                    projected.project_committed_tick_batch(tick, &immutable_hits),
+                    Err(DeliveryError::ReplayedOrReorderedWorldHit),
+                    "re-reading original events cannot yield second recipient credit"
+                );
+                assert_eq!(world.tick, tick);
+                assert_eq!(
+                    (world.fighter(2).unwrap().hp, world.fighter(3).unwrap().hp),
+                    (66.0, 66.0)
+                );
+                return;
+            }
+        }
+        panic!("original World did not produce expected two-victim 34 HP HIT");
     }
 }
