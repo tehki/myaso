@@ -23,6 +23,11 @@ export async function activateLoopbackGestureLab({
   const lease = gameClient.transport;
   const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
   let failed = false, detached = false, retryTimer = null;
+  // This is the ONE existing QUIC connection-owned writer, not another
+  // transport queue. An in-flight datagram has NOT yet reached the OS writer;
+  // the 170ms ACK-retry budget may begin only after outstanding writes drain.
+  let queuedWrites = 0, firstWriterQueuedAt = 0;
+  const MAX_WRITER_STALL_MS = 1500; // transport fail-close, never Combat timing
   const removeListeners = [];
   let gates = null, detachGates = null;
 
@@ -42,13 +47,14 @@ export async function activateLoopbackGestureLab({
     failed = true;
     close(reason || "typed gesture World/ACK rejected");
   }
-  function drain() {
+  function drain(onlyUnsent = false) {
     if (failed || detached || outbox.snapshot.closed) return;
     let packets;
     try {
-      // First-send priority and maxAttempts are enforced by the original
-      // Core8A queue, not by this original game-page event listener.
-      packets = outbox.nextSendBatch(4);
+      // Physical input events flush NEW edges only. Retries are triggered
+      // solely by the bounded 170ms timer; repeated DOM notifications must
+      // never consume the three-attempt budget before an actual server ACK.
+      packets = outbox.nextSendBatch(4, {onlyUnsent});
     } catch {
       fail("bounded gesture sequence/retry state exhausted");
       return;
@@ -56,10 +62,21 @@ export async function activateLoopbackGestureLab({
     for (const packet of packets) {
       // One same-session QUIC datagram writer serializes all physical edges.
       // Never put an edge on latest-wins sampled movement transport.
+      if (queuedWrites++ === 0) firstWriterQueuedAt = Date.now();
       try {
-        void gameClient.sendExperimentalGestureEdge(packet.bytes)
-          .catch(() => fail("typed gesture QUIC delivery failed"));
+        void Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes))
+          .then(
+            () => {
+              queuedWrites--;
+              if (queuedWrites === 0) firstWriterQueuedAt = 0;
+            },
+            () => {
+              queuedWrites--;
+              fail("typed gesture QUIC delivery failed");
+            },
+          );
       } catch {
+        queuedWrites--;
         fail("typed gesture lease no longer current");
         return;
       }
@@ -80,7 +97,7 @@ export async function activateLoopbackGestureLab({
     });
     detachGates = attachDormantSharedUi10Sources(gates, {canvas, windowObj, documentObj});
     add(canvas,"pointerdown",event => {
-      drain(); // native capture already admitted real mouse pointer DOWN
+      drain(true); // native capture already admitted real mouse pointer DOWN
       if (event.button !== 0 || !gates.lmb.snapshot.active) return;
       const {pointerId,gestureId} = gates.lmb.snapshot;
       // This is only an UPGRADE *intent*. Rust checks <135ms on ITS clock
@@ -89,19 +106,28 @@ export async function activateLoopbackGestureLab({
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId
             || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drain();
+        if (gates.lmb.approvedHoldUpgrade(pointerId)) drain(true);
       },85);
     });
-    add(windowObj,"pointerup",drain);
-    add(windowObj,"pointercancel",drain);
-    add(canvas,"lostpointercapture",drain);
-    add(windowObj,"keydown",drain);
-    add(windowObj,"keyup",drain);
-    add(windowObj,"blur",drain);
+    add(windowObj,"pointerup",() => drain(true));
+    add(windowObj,"pointercancel",() => drain(true));
+    add(canvas,"lostpointercapture",() => drain(true));
+    add(windowObj,"keydown",() => drain(true));
+    add(windowObj,"keyup",() => drain(true));
+    add(windowObj,"blur",() => drain(true));
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
       if (outbox.snapshot.closed) { fail("typed gesture lease was retired"); return; }
+      // A stalled datagramWriter.ready MUST NOT consume the entire retry
+      // allowance before even the first genuine PRESS/RELEASE has been sent.
+      // Still fail closed on a permanently stuck writer: never silently
+      // strand a physical CANCEL or retry it against another actor lease.
+      if (queuedWrites > 0) {
+        if (Date.now() - firstWriterQueuedAt >= MAX_WRITER_STALL_MS)
+          fail("bounded gesture QUIC writer stall; retire actor lease");
+        return;
+      }
       if (outbox.snapshot.pending > 0) drain();
     },170);
     // Original-page localhost-only diagnostic: read-only physical edge/ACK

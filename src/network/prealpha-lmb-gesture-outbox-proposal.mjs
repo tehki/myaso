@@ -248,13 +248,17 @@ export class ProposedSharedTypedGestureOutbox {
   // Preserve Core8A first-send priority: a legitimate RELEASE cannot be
   // indefinitely hidden behind repeated older PRESS retries in limit=1.
   // Returning a COPY is NOT confirmation that future QUIC sent it.
-  nextSendBatch(limit = 4) {
+  nextSendBatch(limit = 4, {onlyUnsent = false} = {}) {
     this.#requireOpen();
     requireUsable(limit,1,this.#maxPending,"send limit");
+    if (typeof onlyUnsent !== "boolean") throw new TypeError("onlyUnsent must be boolean");
     const pending = [...this.#pending.values()];
     const first = pending.filter(e=>e.attempts===0);
     const retry = pending.filter(e=>e.attempts>0);
-    const selected = [...first,...retry].slice(0,limit)
+    // A genuine physical edge sends each previously unsent byte ONCE.
+    // Retransmission of older unACKed edges is reserved for the fixed retry
+    // interval, never for rapid pointer/key event floods (M156/M33 safety).
+    const selected = (onlyUnsent ? first : [...first,...retry]).slice(0,limit)
       .sort((a,b)=>a.sequence-b.sequence);
     if (selected.some(e=>e.attempts>=this.#maxAttempts)) {
       this.retire();
