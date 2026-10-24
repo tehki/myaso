@@ -167,9 +167,13 @@ fn server_320ms_ready_waits_for_matching_release_real_46hp_only() {
 fn original_world_death_respawn_stales_old_held_lmb_lease() {
     // Use one real Rust World and its committed HIT/Death/Respawn events;
     // never forge HP, a World incarnation, or a replacement actor identity.
+    // Spawn once at real original-World attack geometry: after two actual
+    // 18px light knockbacks, the third source0 34HP strike must still be
+    // within the existing 76px light reach + 18px fighter radius.
+    // Never teleport actors or manufacture HP/HIT/Death during the test.
     let mut w = World::new(800.0, 600.0);
     assert!(w.add_player_at(1, 250.0, 300.0, 0.0));
-    assert!(w.add_player_at(2, 310.0, 300.0, 0.0));
+    assert!(w.add_player_at(2, 290.0, 300.0, 0.0));
     assert!(w.add_player_at(3, 700.0, 500.0, 0.0));
     let mut attacker = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     let mut old = SessionGestureWorldPath::from_admitted_world(&w, 2, LEASE + 1, BOOT).unwrap();
