@@ -836,13 +836,14 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     .await
     .expect("second legitimate LMB independently entered World heavy windup");
 
-    // OLD gesture #1 RELEASE arrives with a fresh transport sequence. It
-    // cannot match current source0 gesture ID #2: reject at actor admission.
-    println!("COMBAT4D_STAGE stale-release");
-    combat4c_ack(&seat.connection, 0, 3, 6, 1, 4).await;
+    // A byte-identical retransmission of the earlier CANCEL is a VALID
+    // delayed network duplicate. Its original seq3/ID1 ACK is DUPLICATE and
+    // must not steal current source0 ID2 or poison its contiguous ACK cursor.
+    println!("COMBAT4D_STAGE duplicate-old-cancel");
+    combat4c_ack(&seat.connection, 0, 4, 3, 1, 2).await;
 
-    // Even after authentic original server-time READY, the new held source0
-    // cannot auto-release merely because a stale source0 terminal arrived.
+    // Even after original server-time READY, replay of that earlier CANCEL
+    // must not auto-release the genuinely held newer source0 gesture.
     sleep(Duration::from_millis(430)).await;
     let before = server.lines.lock().unwrap().clone();
     assert!(
@@ -851,7 +852,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
                 && (line.contains(" fighter=1 from=9 to=10")
                     || line.contains(" fighter=1 from=1 to=2"))
         }),
-        "stale earlier gesture ID cannot produce World heavy or leaked light: {before:?}"
+        "replayed CANCEL cannot produce World heavy or leaked light: {before:?}"
     );
     assert!(
         !before
@@ -864,7 +865,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     // one HeavyActive; a byte-identical replay must ACK DUPLICATE with no
     // second transition or World HIT.
     println!("COMBAT4D_STAGE new-release");
-    combat4c_ack(&seat.connection, 0, 3, 7, 2, 1).await;
+    combat4c_ack(&seat.connection, 0, 3, 6, 2, 1).await;
     timeout(Duration::from_secs(2), async {
         loop {
             let count = server
@@ -885,7 +886,14 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     .await
     .expect("matching new source0 RELEASE committed exactly one World heavy");
     println!("COMBAT4D_STAGE duplicate-release");
-    combat4c_ack(&seat.connection, 0, 3, 7, 2, 2).await;
+    combat4c_ack(&seat.connection, 0, 3, 6, 2, 2).await;
+
+    // A newly fabricated seq7 RELEASE for long-cancelled ID1 is INVALID,
+    // unlike a retransmitted authentic seq3 CANCEL. REJECTED is terminal to
+    // the single Core8A outbox: sender must retire/reconnect, not continue
+    // submitting seq8 on this lease or require the server to accept it.
+    println!("COMBAT4D_STAGE invalid-old-release-terminal");
+    combat4c_ack(&seat.connection, 0, 3, 7, 1, 4).await;
     sleep(Duration::from_millis(75)).await;
     let after = server.lines.lock().unwrap().clone();
     assert_eq!(
