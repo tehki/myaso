@@ -127,7 +127,12 @@ test("both clients receive chorded RMB+LMB mouse events and retain running relea
     assert.match(s, /rightButtonGesture\.isRunning\(\) \|\| runningAttackRequested/, "RMB run is latched through the outgoing attack tick");
     assert.match(s, /leftButtonCharge\.release\(event\.pointerId\)/);
     assert.match(s, /leftButtonCharge\.commitLight\(\)/);
-    assert.match(s, /if \(event\.code === "KeyE" && !event\.repeat\) heavyAttackRequested = true/);
+    assert.match(s, /if \\(event\\.code === "KeyE"\\) return;/,
+      "E is reserved for Use and never reaches Combat input");
+    assert.doesNotMatch(s, /event\\.code === "KeyE"[^\\n]*heavyAttackRequested/);
+    assert.doesNotMatch(s, /event\\.code === "KeyE"[^\\n]*audio\\.play\\("heavy"\\)/);
+    assert.match(s, /onHeavy\\(\\) \\{ heavyAttackRequested = true;/,
+      "physical LMB still owns heavy commit");
     assert.match(s, /function drawLmbChargeTell\(progress\)/);
   }
   const rmb = readFileSync(new URL("../src/browser/right-button-gesture.mjs", import.meta.url), "utf8");
