@@ -160,3 +160,39 @@ test("single loopback sender drains only newly authored typed events; timer reta
       "all source edges use one immediate sequence-gated drain: "+type);
   }
 });
+
+
+test("physical source0 and source1 edges only spend one first-send attempt; 170ms retry owns retransmits",()=>{
+  const lease=Object.freeze({});
+  const q=new ProposedSharedTypedGestureOutbox({
+    reviewVersion:2,trustedLease:lease,maxPending:8,maxAttempts:3,
+  });
+  const first=(edge)=>{
+    const batch=q.nextSendBatch(4,{onlyUnsent:true});
+    assert.deepEqual(batch.map(x=>[x.sequence,x.gestureId,x.attempt]),[
+      [edge.sequence,edge.gestureId,1],
+    ],"each NEW physical edge may write only its own packet, no old retry");
+  };
+  const press=q.begin(SOURCE.LMB,100);first(press);
+  const release=q.release(SOURCE.LMB,100);first(release);
+  const keyDown=q.begin(SOURCE.KEY_E,101);first(keyDown);
+  const keyCancel=q.cancel(SOURCE.KEY_E,101);first(keyCancel);
+  assert.deepEqual(q.nextSendBatch(4,{onlyUnsent:true}),[],
+    "duplicate W3C pointerup/mouseup and keyboard notification must not spend retries");
+  assert.deepEqual(q.nextSendBatch(4,{onlyUnsent:true}),[]);
+  assert.equal(q.snapshot.pending,4);
+  assert.equal(q.snapshot.closed,false);
+  assert.deepEqual(q.nextSendBatch(4).map(x=>x.attempt),[2,2,2,2],
+    "one existing 170ms retry timer drives second attempt");
+  assert.deepEqual(q.nextSendBatch(4).map(x=>x.attempt),[3,3,3,3]);
+  assert.throws(()=>q.nextSendBatch(4),/retransmission attempts exhausted/);
+  assert.equal(q.snapshot.closed,true,"bounded fail-closed retirement stays authoritative");
+
+  const lab=readFileSync(new URL("../web/prealpha-gesture-live-lab.mjs",import.meta.url),"utf8");
+  assert.match(lab,/function drain\(onlyUnsent = false\)/);
+  assert.match(lab,/outbox\.nextSendBatch\(4, \{onlyUnsent\}\)/);
+  assert.match(lab,/lastFirstSendSequence = next;\s*drain\(true\)/,
+    "one physical source sequence drains never-sent edges, not old retries");
+  assert.match(lab,/if \(outbox\.snapshot\.pending > 0\) drain\(\);/,
+    "the original scheduled timer still owns retries");
+});
