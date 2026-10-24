@@ -272,19 +272,23 @@ canvas.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("mouseup", onChordedLeftMouseUp);
 
 window.addEventListener("pointerup", onLeftPointerUp);
+// One left-gesture cancellation path. PointerCancel's button may be -1,
+// and a stale lostpointercapture must not clear a NEW pointer's state.
+function cancelActiveLeftPointer(pointerId) {
+  if (!leftButtonCharge.cancel(pointerId)) return false;
+  leftButtonDown = false;
+  leftButtonPressMovement = null;
+  chordedLeftDown = false;
+  return true;
+}
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) {
-    leftButtonDown = false;
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
-  }
+  cancelActiveLeftPointer(event.pointerId);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
   if (event.pointerId !== undefined && !(event.buttons & 1)) {
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
+    cancelActiveLeftPointer(event.pointerId);
   }
 });
 canvas.addEventListener("wheel", (event) => {
@@ -325,7 +329,9 @@ canvas.addEventListener("keydown", (event) => {
   if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
-canvas.addEventListener("keyup", (event) => keys.delete(event.code));
+// A key pressed on the arena can be released after focus moves to an in-page
+// control. Window receives both canvas-bubbled and newly focused keyup events.
+window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 
