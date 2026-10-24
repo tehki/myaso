@@ -525,10 +525,9 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiheavyguardbreakpunish"
-        // Preserve original Rust 60Hz ACTION/BREAK/HIT diagnostics,
-        // read-only and refused on non-loopback by original server.
-        || scenario === "uiguardbreakpunishffahit"
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
+        || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
@@ -9799,8 +9798,6 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
-          // Reviewed Combat4D #954 native wheel must be attested before
-          // one genuine Chrome down/up. Original World block/parry unchanged.
           preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
