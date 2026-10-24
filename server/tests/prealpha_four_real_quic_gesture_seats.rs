@@ -774,3 +774,103 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     );
     println!("COMBAT4C_NATIVE_LMB_EARLY_UPGRADE_RELEASE_ONLY_QUIC_PASS");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn combat4c_native_held_lmb_cancel_blocks_late_release_and_world_damage() {
+    // One REAL loopback-only, TLS-pinned original QUIC actor/World, selected
+    // 0x11 source0 LMB + 0x12 admission ACK. Not a live public protocol.
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    // Original 60Hz action observer's first row is a baseline rather than
+    // an ACTION transition. Pin Idle0 before the physical source0 DOWN.
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|l| {
+                l.contains("M201_FLIGHT_ACTOR_BASELINE") && l.contains(" fighter=1 action=0")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("real source0 actor observed idle on original Rust World");
+
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+    timeout(Duration::from_millis(90), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("one physical LMB PRESS really began LightWindup1");
+
+    combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=9"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("genuine pre-135ms original World light-to-heavy upgrade");
+
+    // Authoritative CANCEL wins before any deliberate RELEASE, including
+    // cancellation caused by physical pointercancel, blur or actor teardown.
+    combat4c_ack(&seat.connection, 0, 4, 3, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=0"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("physical source0 CANCEL returned original 60Hz World to Idle");
+    combat4c_ack(&seat.connection, 0, 4, 3, 1, 2).await;
+
+    // A delayed old source0 RELEASE may be rejected, but MUST NEVER turn the
+    // cancelled held gesture into a 46HP or 34HP World hit.
+    combat4c_ack(&seat.connection, 0, 3, 4, 1, 4).await;
+    sleep(Duration::from_millis(440)).await;
+    let observed = server.lines.lock().unwrap().clone();
+    assert!(
+        !observed.iter().any(|l| {
+            l.contains("M201_AUTH_ACTION")
+                && (l.contains(" fighter=1 from=9 to=10") || l.contains(" fighter=1 from=1 to=2"))
+        }),
+        "cancelled physical LMB must never activate an original World hit: {observed:?}"
+    );
+    assert!(
+        !observed
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_HIT") && l.contains(" attacker=1 ") }),
+        "admission ACK, CANCEL replay or late RELEASE cannot create HIT"
+    );
+    println!("COMBAT4C_NATIVE_CANCEL_HELD_LMB_NO_PHANTOM_QUIC_PASS");
+}
