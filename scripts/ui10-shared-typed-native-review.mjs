@@ -220,6 +220,26 @@ try{
   ],"only physical LMB UP terminates heavy, never E");
   assert.deepEqual(chargedAndReleased.edges.map(e=>e.sequence),[1,2,3]);
   assert.equal(new Set(chargedAndReleased.edges.map(e=>e.gestureId)).size,1);
+  // With genuine RMB already DOWN, W3C emits mousedown(button0,buttons3)
+  // without a second pointerdown. That path must still use ONE LMB source0
+  // gesture. Physical E during the chord cannot steal or release its owner.
+  await nav();
+  await run([move(),{type:"pointerDown",button:2},{type:"pointerDown",button:0}]);
+  await evaluate("document.querySelector('#arena').focus()");
+  await pressE();
+  const rmbHeld=await evaluate("return ui10.report()");
+  assert.deepEqual(rmbHeld.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS]
+  ],"RMB-first physical LMB must begin once; E cannot add an attack");
+  assert.equal(rmbHeld.snapshot.active,true,"E cannot interrupt RMB-held physical LMB");
+  assert.equal(rmbHeld.keyEdges.length,0);
+  await run([{type:"pointerUp",button:0},{type:"pointerUp",button:2}]);
+  const rmbEnded=await evaluate("return ui10.report()");
+  assert.deepEqual(rmbEnded.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.RELEASE]
+  ],"RMB-first LMB UP alone must terminate the source0 gesture");
+  assert.deepEqual(rmbEnded.edges.map(e=>e.sequence),[1,2]);
+  assert.equal(rmbEnded.edges[0].gestureId,rmbEnded.edges[1].gestureId);
   await nav();
   await evaluate("document.querySelector('#arena').focus();ui10.chat(true)");
   await pressE();
@@ -229,7 +249,8 @@ try{
    longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
    realKeyETrusted:true,keyEReservedForUse:true,keyEHeldBeyond320NoCombat:true,
-   keyECannotStealLmb:true,keyECannotStealUpgradedLmb:true,chatKeyENoCombat:true,
+   keyECannotStealLmb:true,keyECannotStealUpgradedLmb:true,
+   rmbFirstLmbPhysicalEIsolated:true,chatKeyENoCombat:true,
    authenticatedServer:false,combatHits:false,enabledLive:false
   }));
  }
