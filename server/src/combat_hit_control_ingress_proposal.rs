@@ -762,7 +762,11 @@ mod tests {
         let spectator = origin.bind_admitted(&world, 4, 104).unwrap();
         assert!(world.set_input(
             1,
-            InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() }
+            InputIntent {
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
         ));
         let committed = (0..40)
             .find_map(|_| {
@@ -776,10 +780,12 @@ mod tests {
         let mut reader = ProposedHitControlChunkReader::new_review_only(attacker).unwrap();
         let mut out = Vec::new();
         for byte in framed_control(hello()) {
-            reader.feed_review_chunk(&mut ingress, attacker, &[byte], |r| {
-                out.push(r);
-                Ok(())
-            }).unwrap();
+            reader
+                .feed_review_chunk(&mut ingress, attacker, &[byte], |r| {
+                    out.push(r);
+                    Ok(())
+                })
+                .unwrap();
         }
         assert_eq!(out.len(), 1);
         assert!(matches!(out[0], ClientControlResult::ServerGrant(_)));
@@ -787,7 +793,9 @@ mod tests {
         wrong[1].1.victim = attacker;
         assert_eq!(
             ingress.propose_committed_tick_batch(attacker, tick, &wrong),
-            Err(IngressError::InvalidDelivery(DeliveryError::InvalidWorldIdentity))
+            Err(IngressError::InvalidDelivery(
+                DeliveryError::InvalidWorldIdentity
+            ))
         );
         assert_eq!(ingress.cursor(), (0, 0));
         let encoded = ingress
@@ -807,18 +815,27 @@ mod tests {
         ingress.mark_writer_success(attacker, 1).unwrap();
         assert!(matches!(
             ingress.receive_client_control(attacker, &ctl(HitControlOp::ClientAck, 2, TOKEN)),
-            Ok(ClientControlResult::Acknowledged(AckOutcome::Advanced { next: 2 }))
+            Ok(ClientControlResult::Acknowledged(AckOutcome::Advanced {
+                next: 2
+            }))
         ));
         assert_eq!(ingress.cursor(), (2, 2));
         assert_eq!(
             ingress.propose_committed_tick_batch(attacker, tick, &committed),
-            Err(IngressError::InvalidDelivery(DeliveryError::ReplayedOrReorderedWorldHit))
+            Err(IngressError::InvalidDelivery(
+                DeliveryError::ReplayedOrReorderedWorldHit
+            ))
         );
         // The bystander cannot be credited merely because it replicated HP.
-        let mut bystander = ProposedHitControlIngress::for_offline_test(spectator, [7; 16], 64).unwrap();
-        bystander.receive_client_control(spectator, &hello()).unwrap();
-        assert!(bystander.propose_committed_tick_batch(spectator, tick, &committed).unwrap().is_empty());
+        let mut bystander =
+            ProposedHitControlIngress::for_offline_test(spectator, [7; 16], 64).unwrap();
+        bystander
+            .receive_client_control(spectator, &hello())
+            .unwrap();
+        assert!(bystander
+            .propose_committed_tick_batch(spectator, tick, &committed)
+            .unwrap()
+            .is_empty());
         assert_eq!(bystander.cursor(), (0, 0));
     }
-
 }
