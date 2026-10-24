@@ -316,8 +316,7 @@ async fn retired_key_e_source_does_not_consume_server_actor_sequence() {
     timeout(Duration::from_secs(2), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_FLIGHT_ACTOR_BASELINE")
-                    && line.contains(" fighter=1 action=0")
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=1 action=0")
             }) {
                 break;
             }
