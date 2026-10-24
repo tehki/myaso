@@ -37,6 +37,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Rust formatting exact HEAD
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Combat4D independent E retirement and same-source LMB replay (original QUIC World)
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_retired_keye_cannot_steal_or_commit_a_held_lmb_heavy -- --exact --nocapture
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_source_gesture -- --exact --nocapture
       - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
       - name: Combat 4C real World busy-source replay and subsequent attack regression
@@ -55,11 +59,11 @@ jobs:
           google-chrome --version
           chromedriver --version
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_quic_gesture_lab.mjs
-      - name: Genuine Chromium physical KeyE hold and release to original Rust HeavyActive
+      - name: Genuine Chromium physical E never enters Combat; original Rust World stays idle
         run: |
           node --check scripts/core8_native_v2_keye_heavy_world_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_keye_heavy_world_lab.mjs
-      - name: Genuine Chromium native one shared outbox normal LMB0 and busy KeyE1 to original World
+      - name: Genuine Chromium shared outbox source0 LMB to World; E emits no Combat source
         run: |
           node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
@@ -73,7 +77,7 @@ jobs:
           CORE8A_LAB_DROP_FIRST_ACK: "1"
         run: |
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
-      - name: Genuine W3C held standalone KeyE through same shared Core8A outbox strikes ONLY upon UP
+      - name: Genuine W3C held E causes no Combat; same actor accepts source0 LMB afterward
         env:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
         run: |
