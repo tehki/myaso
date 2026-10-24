@@ -516,9 +516,13 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     // Idle -> LightWindup tick, strictly before the 135ms light becomes active.
     timeout(Duration::from_millis(90), async {
         loop {
-            if server.lines.lock().unwrap().iter().any(|l| {
-                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1")
-            }) {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1"))
+            {
                 break;
             }
             sleep(Duration::from_millis(5)).await;
