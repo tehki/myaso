@@ -219,12 +219,11 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
     });
     const p=outbox.begin(SOURCE.LMB,12);
     const r=outbox.release(SOURCE.LMB,12);
-    const e=outbox.begin(SOURCE.KEY_E,13);
-    const c=outbox.cancel(SOURCE.KEY_E,13);
+    assert.throws(()=>outbox.begin(SOURCE.KEY_E,13),/Combat permits only/);
     const batch=outbox.nextSendBatch(4);
     // The SAME physical QUIC writer is backpressured: ordinary 30Hz
-    // movement remains latest-wins, but the selected typed edges must retain
-    // all four discrete sources in their OWN existing ordered send lane.
+    // movement remains latest-wins, but the selected LMB edges must survive
+    // on the ONE existing ordered typed send lane; Key E is not Combat.
     // No v1 combat action is authored for this negotiated typed session.
     for(let tick=1;tick<=5;tick++){
       client.sendInput({tick,moveX:0,moveY:0,facing:0});
@@ -240,7 +239,7 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
     assert.deepEqual(
       decodeInputPacket(writtenMovement[0]).samples.map(x=>x.tick),[5,4,3],
       "the movement-only packet must not resurrect stale movement samples");
-    assert.equal(writtenTyped.length,4,
+    assert.equal(writtenTyped.length,2,
       "the actual original datagram sender must retain all typed edges");
     assert.deepEqual(
       writtenTyped.map(bytes=>decodeProposedTypedGestureEvent(bytes))
@@ -248,23 +247,21 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
       [
         [SOURCE.LMB,ACTION.PRESS,1,1],
         [SOURCE.LMB,ACTION.RELEASE,2,1],
-        [SOURCE.KEY_E,ACTION.PRESS,3,2],
-        [SOURCE.KEY_E,ACTION.CANCEL,4,2],
       ],
       "the ORIGINAL selected QUIC sender must preserve typed edge order",
     );
     // Same original client router must pass only the GRANTED transport
     // identity into the existing selected outbox's 0x12 admission handler.
-    for(const item of [c,e,r,p])realtime.push(ack(item));
+    for(const item of [r,p])realtime.push(ack(item));
     await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(outcomes.length,4);
-    assert.deepEqual(outcomes.map(x=>x.sequence),[4,3,2,1]);
+    assert.equal(outcomes.length,2);
+    assert.deepEqual(outcomes.map(x=>x.sequence),[2,1]);
     assert.ok(outcomes.every(x=>x.transportSettled && !x.combatCommitted));
     assert.equal(outbox.snapshot.pending,0);
     realtime.push(ack({...p,status:ACK.DUPLICATE}));
     await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(outcomes[4].alreadySettled,true);
-    assert.equal(outcomes[4].combatCommitted,false);
+    assert.equal(outcomes[2].alreadySettled,true);
+    assert.equal(outcomes[2].combatCommitted,false);
     outbox.retire();
     assert.throws(()=>outbox.receiveAck(ack(p),client.transport),/closed/);
     client.close();
