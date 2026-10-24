@@ -703,15 +703,14 @@ async fn combat4c_native_held_lmb_cancel_blocks_late_release_and_world_damage() 
     assert!(
         !observed.iter().any(|l| {
             l.contains("M201_AUTH_ACTION")
-                && (l.contains(" fighter=1 from=9 to=10")
-                    || l.contains(" fighter=1 from=1 to=2"))
+                && (l.contains(" fighter=1 from=9 to=10") || l.contains(" fighter=1 from=1 to=2"))
         }),
         "cancelled physical LMB must never activate an original World hit: {observed:?}"
     );
     assert!(
-        !observed.iter().any(|l| {
-            l.contains("M201_AUTH_HIT") && l.contains(" attacker=1 ")
-        }),
+        !observed
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_HIT") && l.contains(" attacker=1 ") }),
         "admission ACK, CANCEL replay or late RELEASE cannot create HIT"
     );
     println!("COMBAT4C_NATIVE_CANCEL_HELD_LMB_NO_PHANTOM_QUIC_PASS");
