@@ -99,7 +99,7 @@ export function createDormantPrealphaLmbDomGate({
       || event.pointerId !== active.pointerId)) return false;
     // Release is only from the actual left mouse UP event, even if
     // received on window after the pointer leaves the canvas.
-    if (kind === "release" && event?.button !== 0) return false;
+    if (kind === "release" && event !== undefined && event.button !== 0) return false;
     const edge = submit(tick => kind === "release"
       ? (shared ? outbox.release(0,tick) : outbox.release(tick))
       : (shared ? outbox.cancel(0,tick) : outbox.cancel(tick)));
