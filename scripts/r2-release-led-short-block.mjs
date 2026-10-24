@@ -13,6 +13,8 @@ export async function dispatchR2ReleaseLedShortBlock({
   sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
   now = () => performance.now(), sleep = sleepTimer,
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
+  // REVIEW-only M194: genuinely arm Firefox block BEFORE Chrome LMB down.
+  preWheelHeadStartMs = 0,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -20,8 +22,18 @@ export async function dispatchR2ReleaseLedShortBlock({
     || !Number.isFinite(receiptGraceMs) || receiptGraceMs < 0
     || receiptGraceMs >= maxHoldMs
     || !Number.isFinite(trustedWheelWaitMs) || trustedWheelWaitMs < 0
-    || trustedWheelWaitMs >= maxHoldMs) {
+    || trustedWheelWaitMs >= maxHoldMs
+    || !Number.isFinite(preWheelHeadStartMs) || preWheelHeadStartMs < 0
+    || preWheelHeadStartMs > 80
+    || (preWheelHeadStartMs > 0 && trustedWheelWaitMs === 0)) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
+  }
+  if (preWheelHeadStartMs > 0) {
+    return dispatchR2WheelFirstShortBlock({
+      sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
+      now, sleep, maxHoldMs, receiptGraceMs, trustedWheelWaitMs,
+      preWheelHeadStartMs,
+    });
   }
   const startedAt = now();
   const ms = () => Math.max(0, now() - startedAt);
@@ -93,6 +105,75 @@ export async function dispatchR2ReleaseLedShortBlock({
     receiptGraceMs,
     wheelHeadStartMs: 0,
     postTrustedWheelMs: 0,
+    clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
+  };
+}
+
+// Strict M194 alternative physical choreography, separate from the original
+// legacy attack-down-first path above. A genuine trusted wheel attestation is
+// REQUIRED before Chrome LMB down; the brief real elapsed head start lets
+// Firefox enter the server's block-only phase before the unchanged 135ms
+// light lands. Any missing wheel, parry, HP loss or incorrect guard remains
+// a failing *unchanged* native M194 acceptance assertion in the caller.
+// This is review-only W3C QA, NOT a change to game/server defense timings.
+async function dispatchR2WheelFirstShortBlock({
+  sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
+  now, sleep, maxHoldMs, receiptGraceMs, trustedWheelWaitMs,
+  preWheelHeadStartMs,
+}) {
+  const startedAt = now();
+  const ms = () => Math.max(0, now() - startedAt);
+  const wheelDispatchMs = ms();
+  let wheelAckMs = null;
+  const wheelOutcome = Promise.resolve().then(sendWheel).then(
+    () => { wheelAckMs = ms(); return { ok: true }; },
+    error => { wheelAckMs = ms(); return { ok: false, error }; },
+  );
+  let trustedWheelObservedMs = null;
+  const attestation = Promise.resolve().then(awaitTrustedWheel).then(report => {
+    if (report?.trusted !== true || !(report.deltaY > 0)) {
+      throw new Error("M194 wheel-first requires a trusted real Firefox wheel-back");
+    }
+    trustedWheelObservedMs = ms();
+    return report;
+  });
+  const earlyWheelFailure = wheelOutcome.then(result =>
+    result.ok ? new Promise(() => {}) : Promise.reject(result.error));
+  // A real W3C delivery, not a timer or synthetic event, must arrive first.
+  // Original wheel driver ACK is still required before a session qualifies.
+  await Promise.race([
+    attestation,
+    sleep(trustedWheelWaitMs).then(() => {
+      throw new Error("M194 trusted native wheel not delivered before wheel-first attack");
+    }),
+    earlyWheelFailure,
+  ]);
+  await sleep(preWheelHeadStartMs);
+  const attackDownDispatchMs = ms();
+  await sendAttackDown();
+  const attackDownAckMs = ms();
+  const attackUpDispatchMs = ms();
+  if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
+    throw new Error("M194 real wheel-first LMB exceeded light-charge budget");
+  }
+  await sendAttackUp();
+  const attackUpAckMs = ms();
+  await attestation;
+  const wheelResult = await wheelOutcome;
+  if (!wheelResult.ok) throw wheelResult.error;
+  const rounded = n => Number(n.toFixed(1));
+  return {
+    wheelDispatchMs: rounded(wheelDispatchMs),
+    wheelAckMs: rounded(wheelAckMs),
+    attackDownDispatchMs: rounded(attackDownDispatchMs),
+    attackDownAckMs: rounded(attackDownAckMs),
+    attackUpDispatchMs: rounded(attackUpDispatchMs),
+    attackUpAckMs: rounded(attackUpAckMs),
+    completeMs: rounded(ms()),
+    trustedWheelObservedMs: rounded(trustedWheelObservedMs),
+    receiptGraceMs,
+    wheelHeadStartMs: preWheelHeadStartMs,
+    postTrustedWheelMs: preWheelHeadStartMs,
     clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
   };
 }

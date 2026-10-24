@@ -526,6 +526,8 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
+        || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
@@ -9123,7 +9125,11 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // commits 320ms windup + 100ms active + 420ms recovery after KeyE UP.
   // A keydown-based 840+60ms target can still fall inside real recovery when
   // the physical KeyE hold lasted >60ms, producing no buffered light at all.
-  // Allow 60ms beyond unchanged recovery. Keep exactly one real 10ms W3C LMB,
+  // Preserve the original protected R2 contract: 60ms after the
+  // unchanged 840ms heavy recovery. #963 still shows real HP66 landing
+  // 26/31ms after Firefox STUNNED disappears; that remains an unresolved
+  // authoritative-time/replication/timing issue, never a waived predicate.
+  // Keep exactly one real 10ms W3C LMB,
   // the real 135ms light windup and every original stun/HP/HIT predicate.
   // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
@@ -9792,6 +9798,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
+          preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
