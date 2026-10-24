@@ -150,7 +150,7 @@ try{
  // True WebDriver key/pointer actions run against a fresh admitted original
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
  if(physicalMode==="held-lmb"){
-  // A separate fresh World preserves the original KeyE+short-LMB acceptance
+  // A separate fresh World preserves the original held-LMB and short-LMB acceptance
   // below. The real game page owns every canonical source0 edge and ACK.
   const attacker=actors[0].s,attackerId=actors[0].actor.id,targetId=actors[1].actor.id;
   const worldStart=readAuthoritativeWorld().length;
@@ -296,7 +296,7 @@ try{
  assert.equal(firstCanvas.focused,true);
  assert.equal(firstCanvas.gestureLab,"1");
  // Combat4 QA-only, original real W3C page: preserve exact error provenance
- // at KeyE PRESS/physical UP/typed ACK. Not a gameplay hook or hit simulator.
+ // for E no-combat denial and LMB physical source0 World admission.
  // Buffer stays in this loopback-native browser and is bounded to 24 entries.
  const keyETraceInstall=String.raw`
  if(window.__MYASO_COMBAT4_KEYE_TRACE__)return true;
@@ -325,26 +325,77 @@ try{
  window.__MYASO_COMBAT4_KEYE_TRACE__=()=>records.map(entry=>({...entry}));
  return true;`;
  assert.equal(await evaluate(attacker,keyETraceInstall),true,"read-only KeyE release and raw protocol error provenance");
+ // Genuine E press/release is now a NEGATIVE Combat check. Keep its
+ // read-only W3C trace; the future Use/Interact system is not activated.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-   actions:[{type:"key",id:"real-original-KeyE",actions:[{type:"keyDown",value:"e"}]}]
+   actions:[{type:"key",id:"real-original-reserved-KeyE",actions:[
+     {type:"keyDown",value:"e"},{type:"keyUp",value:"e"},
+   ]}]
  });
- const pressed=await waitFor(()=>worldAction(0,9),12000);
- await sleeps(460); // source cannot release until genuine matching W3C KeyUP
- assert(!worldAction(9,10),"held native KeyE may READY but never auto-hit");
- await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-   actions:[{type:"key",id:"real-original-KeyE",actions:[{type:"keyUp",value:"e"}]}]
- });
- let heavy;
+ const eTrace=await evaluate(attacker,"return window.__MYASO_COMBAT4_KEYE_TRACE__()");
+ assert.deepEqual(eTrace.filter(e=>e.code==="KeyE").map(e=>e.type),["keydown","keyup"],
+   "true physical E must be seen but MUST NOT be a Combat gesture");
+ assert.ok(eTrace.filter(e=>e.code==="KeyE").every(e=>e.trusted),
+   "owner-reserved E must be checked using real trusted W3C events");
+ assert(!worldAction(0,9)&&!worldAction(0,1),
+   "reserved E must initiate neither heavy nor light World Combat");
+ assert(!readAuthoritativeWorld().split("\n").some(line=>
+   /M201_AUTH_HIT tick=\d+ attacker=1 /.test(line)),
+   "reserved E must never cause World damage");
+
+ // Keep the original four-browser SAME-ACTOR heavy46 THEN light34 strict
+ // checks: heavy now uses physical HELD LMB, never obsolete KeyE.
+ const heavyPointer=await evaluate(attacker,
+   "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();const events=[];for(const type of ['pointerdown','pointerup','pointercancel'])window.addEventListener(type,e=>{if(e.button===0)events.push({type,trusted:e.isTrusted,pointerId:e.pointerId,pointerType:e.pointerType,at:performance.now()})},true);window.__MYASO_MAIN0_LMB_HEAVY_TRACE__=()=>events.map(x=>({...x}));return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
+ assert(heavyPointer.focus,"physical LMB heavy must own the original canvas");
+ let pressed,heavy,heavyReleased=false;
  try {
+   await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+     actions:[{type:"pointer",id:"real-original-lmb-heavy",
+       parameters:{pointerType:"mouse"},actions:[
+       {type:"pointerMove",origin:"viewport",x:heavyPointer.x,y:heavyPointer.y,duration:0},
+       {type:"pointerDown",button:0},
+     ]}]
+   });
+   pressed=await waitFor(()=>worldAction(0,9),12000);
+   await sleeps(460); // World READY320ms must NOT auto-strike while held
+   assert(!worldAction(9,10),"held LMB cannot commit World heavy before release");
+   const heldTrace=await evaluate(attacker,"return window.__MYASO_MAIN0_LMB_HEAVY_TRACE__()");
+   const down=heldTrace.filter(e=>e.type==="pointerdown");
+   assert.equal(down.length,1,"heavy comes from exactly one physical LMB down");
+   assert.equal(heldTrace.filter(e=>e.type==="pointerup"||e.type==="pointercancel").length,0);
+   assert.equal(down[0].trusted,true);
+   assert.equal(down[0].pointerType,"mouse");
+   await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+     actions:[{type:"pointer",id:"real-original-lmb-heavy",
+       parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
+   });
+   heavyReleased=true;
    heavy=await waitFor(()=>worldAction(9,10),12000);
- } catch (error) {
+   const released=await evaluate(attacker,"return window.__MYASO_MAIN0_LMB_HEAVY_TRACE__()");
+   const ups=released.filter(e=>e.type==="pointerup");
+   assert.equal(ups.length,1,"heavy requires one deliberate W3C physical UP");
+   assert.equal(ups[0].trusted,true);
+   assert.equal(ups[0].pointerId,down[0].pointerId,"heavy UP must match LMB DOWN");
+   assert.ok(ups[0].at-down[0].at>320,"heavy was genuinely held beyond World READY320");
+   await waitFor(()=>readAuthoritativeWorld().split("\n").some(line=>
+     /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=46 hp=54/.test(line)),12000);
+   assert.equal(readAuthoritativeWorld().split("\n").filter(line=>
+     /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=46 hp=54/.test(line)).length,1,
+     "original World must commit exactly one 46HP HIT from source0 held LMB");
+ }catch(error){
    const page=await evaluate(attacker,
-     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,physicalKeyEAndProtocolErrors:window.__MYASO_COMBAT4_KEYE_TRACE__?.()??[]};"
+     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,keyE:window.__MYASO_COMBAT4_KEYE_TRACE__?.()??[],physicalLmb:window.__MYASO_MAIN0_LMB_HEAVY_TRACE__?.()??[]};"
    ).catch(e=>({driverError:String(e)}));
    const evidence={error:String(error),browser:page,originalRustWorldTail:readAuthoritativeWorld().slice(-6500)};
-   await writeFile(join(output,"combat4-keye-release-protocol-error.json"),JSON.stringify(evidence,null,2));
-   console.error("MAIN0_ORIGINAL_GAME_HEAVY_RELEASE_DIAGNOSTIC",JSON.stringify(evidence));
+   await writeFile(join(output,"combat4-lmb-heavy-release-protocol-error.json"),JSON.stringify(evidence,null,2));
+   console.error("MAIN0_ORIGINAL_GAME_LMB_HEAVY_RELEASE_DIAGNOSTIC",JSON.stringify(evidence));
    throw error;
+ }finally{
+   if(!heavyReleased)await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+     actions:[{type:"pointer",id:"real-original-lmb-heavy",
+       parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
+   }).catch(()=>{});
  }
  const heavyReturnedIdle=await waitFor(()=>{
    const lines=readAuthoritativeWorld().split("\n");
@@ -427,7 +478,7 @@ try{
   "original Rust World must prove true 34 HP light strike against an independent fighter");
  console.log("MAIN0_ORIGINAL_GAME_PHYSICAL_V2_QUIC_WORLD_ACTIONS",JSON.stringify({
   realChromeOrFirefox:true,originalGamePage:true,serverIssuedQuicActor:1,
-  physicalKeyEHoldRelease:true,physicalLMBPointerDown:true,
+  physicalKeyEReservedForUse:true,physicalLMBHeldHeavyRelease:true,physicalLMBPointerDown:true,
   trustedWorldHeavyPress:pressed,trustedWorldHeavyRelease:heavy,
   trustedWorldLightPress:lightPress,trustedWorldLightActive:lightActive,
   originalWorldCombatHitEvidence:honestWorldHits,
