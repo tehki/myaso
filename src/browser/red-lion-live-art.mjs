@@ -93,10 +93,17 @@ export function createOriginalRedLionLiveArt({
   if(mood!=="day"&&mood!=="dusk")
    throw new RangeError("only original Blender day/dusk sources are supported");
   try{
-   for(const c of [worldSurface,facadeSurface]){c.width=w;c.height=h}
+   // Do not reset/reallocate both full-size Canvas backing stores every RAF
+   // on an unchanged viewport. Still explicitly erase previous camera frames.
+   for(const c of [worldSurface,facadeSurface]){
+    if(c.width!==w)c.width=w;
+    if(c.height!==h)c.height=h;
+   }
    const worldCtx=worldSurface.getContext("2d",{alpha:false});
    const artCtx=facadeSurface.getContext("2d",{alpha:true});
    if(!worldCtx||!artCtx)throw new Error("Original 2D Canvas unavailable");
+   worldCtx.clearRect(0,0,w,h);
+   artCtx.clearRect(0,0,w,h);
    worldCtx.save();
    try{
     applyGameZoom(worldCtx,w,h,z);

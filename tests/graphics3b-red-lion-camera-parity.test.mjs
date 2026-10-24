@@ -13,7 +13,8 @@ function context(){
   save(){calls.push(["save"])},restore(){calls.push(["restore"])},
   translate(x,y){calls.push(["translate",x,y])},
   scale(x,y){calls.push(["scale",x,y])},
-  drawImage(...a){calls.push(["drawImage",...a])}};
+  drawImage(...a){calls.push(["drawImage",...a])},
+  clearRect(...a){calls.push(["clearRect",...a])}};
 }
 function fakeCanvas(){
  const ctx=context();

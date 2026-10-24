@@ -11,11 +11,16 @@ function context(){
  const calls=[];
  const ctx={calls,save(){calls.push("save")},restore(){calls.push("restore")},
   translate(...v){calls.push(["translate",...v])},scale(...v){calls.push(["scale",...v])},
-  drawImage(...v){calls.push(["drawImage",...v])}};
+  drawImage(...v){calls.push(["drawImage",...v])},
+  clearRect(...v){calls.push(["clearRect",...v])}};
  return ctx;
 }
 function canvas(){
- const ctx=context();return {width:0,height:0,getContext:()=>ctx,ctx};
+ const ctx=context(),resets={width:0,height:0};
+ let width=0,height=0;
+ return {get width(){return width},set width(v){resets.width++;width=v},
+  get height(){return height},set height(v){resets.height++;height=v},
+  getContext:()=>ctx,ctx,resets};
 }
 function build({badHash=false,badDecode=false,badDraw=false,failAfter=false}={}){
  const seen=[],canvases=[];
@@ -133,4 +138,29 @@ test("non-optin Combat runtime remains verbatim default, optin requires BOTH wor
  assert.match(src,/if \(redLionFrame && remoteVisibleAboveFacade\)/);
  assert.match(src,/originalRedLionArt.behindFacade/);
  assert.doesNotMatch(src,/sendTryPickup\(|grantSword\(|teleport.*RedLion/i);
+});
+
+test("fixed-size original World/Blender offscreen stages reuse buffers and clear prior camera pixels",async()=>{
+ const h=build();assert.equal(await h.value.load(),true);
+ const first=h.value.prepare({x:4365,y:4075},960,540,.84);
+ const second=h.value.prepare({x:4465,y:4115},960,540,.84);
+ assert.ok(first&&second);
+ assert.strictEqual(second.world,first.world);
+ assert.strictEqual(second.facade,first.facade);
+ for(const c of h.canvases){
+  assert.equal(c.resets.width,1,"unchanged 960px width must not reset Canvas every RAF");
+  assert.equal(c.resets.height,1,"unchanged 540px height must not reset Canvas every RAF");
+  assert.deepEqual(c.ctx.calls.filter(a=>Array.isArray(a)&&a[0]==="clearRect"),
+   [["clearRect",0,0,960,540],["clearRect",0,0,960,540]]);
+ }
+ const changed=h.value.prepare({x:4365,y:4075},1280,720,.84);
+ assert.ok(changed);
+ for(const c of h.canvases){
+  assert.equal(c.resets.width,2,"genuine viewport width change must resize");
+  assert.equal(c.resets.height,2,"genuine viewport height change must resize");
+  assert.deepEqual(c.ctx.calls.filter(a=>Array.isArray(a)&&a[0]==="clearRect").at(-1),
+   ["clearRect",0,0,1280,720]);
+ }
+ // Source immutable; this only optimizes visual Canvas staging.
+ assert.equal(h.value.state().serverAuthorityChanged,false);
 });
