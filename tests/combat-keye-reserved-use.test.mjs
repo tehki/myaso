@@ -141,15 +141,30 @@ test("actual granted QUIC sender refuses handcrafted old source1 BEFORE bounded 
     const valid=new Uint8Array(encodeProposedTypedGestureEvent({
       source:SOURCE.LMB,action:ACTION.PRESS,sequence:1,gestureId:1,clientTick:1,
     }));
-    const forbidden=valid.slice();forbidden[3]=SOURCE.KEY_E;
     const before=lease.pendingGestureEdges;
-    assert.throws(()=>client.sendExperimentalGestureEdge(forbidden),
+    for(const action of [
+      ACTION.PRESS,ACTION.UPGRADE,ACTION.RELEASE,ACTION.CANCEL,
+    ]) {
+      // Manually fabricated obsolete source1 is still legal historical wire
+      // syntax, but must never reach the ONE current Combat writer, even if
+      // it copies an otherwise valid same-lease LMB ID and sequence.
+      const forbidden=valid.slice();
+      forbidden[2]=action;
+      forbidden[3]=SOURCE.KEY_E;
+      assert.throws(()=>client.sendExperimentalGestureEdge(forbidden),
+        /only source0 LMB typed 16-byte Combat events accepted/);
+      assert.equal(lease.pendingGestureEdges,before,
+        "retired E action must not claim any LMB queue capacity");
+      assert.equal(writes,0,
+        "retired E action must not be delivered to current QUIC writer");
+      assert.equal(lease.experimentalGestureState,"granted",
+        "retired E must not retire or replace the current LMB connection");
+    }
+    const unknown=valid.slice();unknown[3]=255;
+    assert.throws(()=>client.sendExperimentalGestureEdge(unknown),
       /only source0 LMB typed 16-byte Combat events accepted/);
     assert.equal(lease.pendingGestureEdges,before,
-      "forged old source1 may not claim writer queue capacity");
-    assert.equal(writes,0);
-    assert.equal(lease.experimentalGestureState,"granted",
-      "invalid E must not consume, retire or replace authentic LMB connection");
+      "unknown forged Combat source must not spend valid queue capacity");
     await client.sendExperimentalGestureEdge(valid);
     assert.equal(writes,1,"original LMB must still transmit over same QUIC writer");
     assert.equal(lease.pendingGestureEdges,0);
