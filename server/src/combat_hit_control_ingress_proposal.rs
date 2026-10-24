@@ -838,4 +838,57 @@ mod tests {
             .is_empty());
         assert_eq!(bystander.cursor(), (0, 0));
     }
+
+    #[test]
+    fn os_prepared_same_actor_lease_grants_only_offline_and_retires_on_rejoin() {
+        use crate::combat_hit_lease_mint_proposal::{PreparedHitLeaseError, PreparedHitLeaseUnallocated};
+        let live = binding(2, 1);
+        let mut prepared = PreparedHitLeaseUnallocated::prepare_review_only(live, 64).unwrap();
+        let (token, cap) = prepared.inspect_for_review_only(live).unwrap();
+        assert_ne!(token, [0; 16]);
+        let mut receiver = ProposedHitControlIngress::for_offline_test(live, token, cap).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(live).unwrap();
+        let mut grant = None;
+        for fragment in framed_control(hello()).chunks(7) {
+            reader
+                .feed_review_chunk(&mut receiver, live, fragment, |event| {
+                    if let ClientControlResult::ServerGrant(bytes) = event {
+                        assert!(grant.replace(bytes).is_none());
+                    } else {
+                        panic!("unexpected HIT control before grant");
+                    }
+                    Ok(())
+                })
+                .unwrap();
+        }
+        let decoded = decode_hit_control(&grant.expect("exactly one offline grant")).unwrap();
+        assert_eq!(decoded.token, token);
+        assert_eq!(decoded.aux, cap as u32);
+        assert_eq!(receiver.cursor(), (0, 0));
+
+        let replacement = ServerActorBinding {
+            incarnation: live.incarnation + 1,
+            ..live
+        };
+        assert_eq!(
+            prepared.inspect_for_review_only(replacement),
+            Err(PreparedHitLeaseError::ForeignActorIncarnation)
+        );
+        // Exact transport owner must retire on a genuine life transition;
+        // merely presenting the same numeric player ID is never enough.
+        assert_eq!(
+            reader.feed_review_chunk(&mut receiver, replacement, &framed_control(hello()), |_| Ok(())),
+            Err(IngressError::ForeignConnection)
+        );
+        assert_eq!(
+            receiver.receive_client_control(live, &hello()),
+            Err(IngressError::Retired)
+        );
+        prepared.retire();
+        assert_eq!(
+            prepared.inspect_for_review_only(live),
+            Err(PreparedHitLeaseError::Retired)
+        );
+    }
+
 }
