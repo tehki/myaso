@@ -236,6 +236,97 @@ impl ProposedHitControlIngress {
     }
 }
 
+/// Review-only bounded incremental decoder for the proposed 32-byte control
+/// protocol. Byte-at-a-time framing survives arbitrarily fragmented or
+/// concatenated reliable reads without assuming one QUIC read is one packet.
+/// This does NOT open a socket, mint a lease, or activate proposed packet 6.
+///
+/// The callback must only enqueue outputs for the authorized, nonblocking
+/// reliable writer; it must not perform writes while holding the World lock.
+pub struct ProposedHitControlChunkReader {
+    binding: ServerActorBinding,
+    frame: [u8; HIT_CONTROL_BYTES + 2],
+    filled: usize,
+    retired: bool,
+}
+
+impl ProposedHitControlChunkReader {
+    pub fn new_review_only(binding: ServerActorBinding) -> Result<Self, IngressError> {
+        if !ProposedHitControlIngress::valid(binding) {
+            return Err(IngressError::InvalidConfiguration);
+        }
+        Ok(Self {
+            binding,
+            frame: [0; HIT_CONTROL_BYTES + 2],
+            filled: 0,
+            retired: false,
+        })
+    }
+
+    fn close(&mut self) {
+        self.retired = true;
+        self.filled = 0;
+        self.frame.fill(0);
+    }
+
+    /// Reject any malformed frame, foreign actor, retired lease or callback
+    /// failure by retiring the entire review connection; never resynchronize
+    /// untrusted bytes after a framing error or carry a partial frame across
+    /// an actor-incarnation change. Memory is exactly one 34-byte frame.
+    pub fn feed_review_chunk(
+        &mut self,
+        ingress: &mut ProposedHitControlIngress,
+        current: ServerActorBinding,
+        chunk: &[u8],
+        mut publish: impl FnMut(ClientControlResult) -> Result<(), IngressError>,
+    ) -> Result<(), IngressError> {
+        if self.retired {
+            return Err(IngressError::Retired);
+        }
+        if current != self.binding {
+            self.close();
+            ingress.retire();
+            return Err(IngressError::ForeignConnection);
+        }
+        if let Err(err) = ingress.check_connection(current) {
+            self.close();
+            ingress.retire();
+            return Err(err);
+        }
+        for &byte in chunk {
+            self.frame[self.filled] = byte;
+            self.filled += 1;
+            if self.filled == 2 {
+                let declared = u16::from_le_bytes([self.frame[0], self.frame[1]]) as usize;
+                if declared != HIT_CONTROL_BYTES {
+                    self.close();
+                    ingress.retire();
+                    return Err(IngressError::InvalidReliableFrame);
+                }
+            }
+            if self.filled == HIT_CONTROL_BYTES + 2 {
+                let completed = self.frame;
+                self.frame.fill(0);
+                self.filled = 0;
+                let response = match ingress.receive_review_frame(current, &completed) {
+                    Ok(response) => response,
+                    Err(err) => {
+                        self.close();
+                        ingress.retire();
+                        return Err(err);
+                    }
+                };
+                if let Err(err) = publish(response) {
+                    self.close();
+                    ingress.retire();
+                    return Err(err);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,6 +391,114 @@ mod tests {
         assert_eq!(decoded.token, TOKEN);
         assert_eq!(decoded.aux, 64);
         gate
+    }
+
+    fn framed_control(control: [u8; HIT_CONTROL_BYTES]) -> [u8; HIT_CONTROL_BYTES + 2] {
+        let mut frame = [0; HIT_CONTROL_BYTES + 2];
+        frame[..2].copy_from_slice(&(HIT_CONTROL_BYTES as u16).to_le_bytes());
+        frame[2..].copy_from_slice(&control);
+        frame
+    }
+
+    #[test]
+    fn chunk_reader_accepts_one_byte_at_a_time_hello_and_complete_grant_once() {
+        let actor = binding(2, 1);
+        let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
+        let frame = framed_control(hello());
+        let mut results = Vec::new();
+        for byte in frame {
+            reader
+                .feed_review_chunk(&mut gate, actor, &[byte], |response| {
+                    results.push(response);
+                    Ok(())
+                })
+                .unwrap();
+        }
+        assert_eq!(results.len(), 1);
+        let ClientControlResult::ServerGrant(grant) = results[0] else {
+            panic!("one server grant expected");
+        };
+        assert_eq!(decode_hit_control(&grant).unwrap().token, TOKEN);
+        assert_eq!(reader.filled, 0);
+    }
+
+    #[test]
+    fn chunk_reader_delivers_concatenated_hello_and_duplicate_ack_in_order() {
+        let actor = binding(2, 1);
+        let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&framed_control(hello()));
+        bytes.extend_from_slice(&framed_control(ctl(HitControlOp::ClientAck, 0, TOKEN)));
+        let mut results = Vec::new();
+        reader
+            .feed_review_chunk(&mut gate, actor, &bytes, |response| {
+                results.push(response);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(matches!(results[0], ClientControlResult::ServerGrant(_)));
+        assert!(matches!(
+            results[1],
+            ClientControlResult::Acknowledged(AckOutcome::Duplicate { next: 0 })
+        ));
+        assert_eq!(reader.filled, 0);
+    }
+
+    #[test]
+    fn chunk_reader_bad_prefix_fails_closed_without_resynchronizing() {
+        let actor = binding(2, 1);
+        let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, actor, &[255, 255], |_| Ok(())),
+            Err(IngressError::InvalidReliableFrame)
+        );
+        assert_eq!(reader.filled, 0);
+        assert!(reader.frame.iter().all(|byte| *byte == 0));
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, actor, &framed_control(hello()), |_| Ok(())),
+            Err(IngressError::Retired)
+        );
+    }
+
+    #[test]
+    fn chunk_reader_cannot_join_partial_frame_across_new_actor_incarnation() {
+        let actor = binding(2, 1);
+        let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
+        let frame = framed_control(hello());
+        reader
+            .feed_review_chunk(&mut gate, actor, &frame[..9], |_| Ok(()))
+            .unwrap();
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, binding(2, 2), &frame[9..], |_| Ok(())),
+            Err(IngressError::ForeignConnection)
+        );
+        assert!(reader.frame.iter().all(|byte| *byte == 0));
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, actor, &frame, |_| Ok(())),
+            Err(IngressError::Retired)
+        );
+    }
+
+    #[test]
+    fn chunk_reader_rejects_callback_failure_and_cannot_repeat_delivery() {
+        let actor = binding(2, 1);
+        let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
+        let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, actor, &framed_control(hello()), |_| Err(
+                IngressError::InvalidReliableFrame
+            ),),
+            Err(IngressError::InvalidReliableFrame)
+        );
+        assert_eq!(
+            reader.feed_review_chunk(&mut gate, actor, &framed_control(hello()), |_| Ok(())),
+            Err(IngressError::Retired)
+        );
     }
 
     #[test]
