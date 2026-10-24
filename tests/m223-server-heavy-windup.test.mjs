@@ -82,6 +82,12 @@ test("M223.1 clamps slow wheel samples without changing server combat windows", 
   assert.deepEqual(planM223WheelDelay({
     targetAfterWindupMs:285, sampledWheelIngressMs:39,
   }), {boundedWheelIngressMs:65,wheelDelayMs:220});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:395, sampledWheelIngressMs:73,
+  }), {boundedWheelIngressMs:73,wheelDelayMs:322});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:395, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:310});
 });
 
 test("M223.1 refuses invalid or unqualified sampled ingress", () => {
