@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "server/src/main.rs"
       - "scripts/pvp_browser_flight_runner.mjs"
       - "tests/combat4-m121-sender-instrumentation.test.mjs"
+      - "tests/combat4-m121-authoritative-ingress-proof.test.mjs"
       - ".github/workflows/combat4d-m121-sender-native.yml"
   workflow_dispatch:
 
@@ -26,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Original sender read-only invariants and native drivers
         run: |
-          node --test tests/combat4-m121-sender-instrumentation.test.mjs
+          node --test tests/combat4-m121-sender-instrumentation.test.mjs tests/combat4-m121-authoritative-ingress-proof.test.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check web/online-game.mjs
           google-chrome --version
