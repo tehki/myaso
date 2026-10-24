@@ -77,17 +77,36 @@ fn held_heavy_ready_reconnect_same_numeric_actor_fences_old_terminal_but_fresh_r
     let old_binding = old.binding();
 
     assert_eq!(
-        admit(&mut old, &mut world, old_lease, boot, GestureAction::Press, 1, 7),
+        admit(
+            &mut old,
+            &mut world,
+            old_lease,
+            boot,
+            GestureAction::Press,
+            1,
+            7
+        ),
         AckStatus::Accepted
     );
     assert!(advance(&mut old, &mut world, old_lease, boot, 4).is_empty());
     assert_eq!(
-        admit(&mut old, &mut world, old_lease, boot, GestureAction::Upgrade, 2, 7),
+        admit(
+            &mut old,
+            &mut world,
+            old_lease,
+            boot,
+            GestureAction::Upgrade,
+            2,
+            7
+        ),
         AckStatus::Accepted
     );
     assert!(advance(&mut old, &mut world, old_lease, boot, 33).is_empty());
-    assert_eq!(world.fighter(2).unwrap().hp, 100.0,
-        "old held READY must not auto-commit 46HP");
+    assert_eq!(
+        world.fighter(2).unwrap().hp,
+        100.0,
+        "old held READY must not auto-commit 46HP"
+    );
 
     // Actual original-World actor retirement and numeric-slot reuse, not a
     // fabricated incarnation bump or a new World implementation.
@@ -100,21 +119,48 @@ fn held_heavy_ready_reconnect_same_numeric_actor_fences_old_terminal_but_fresh_r
     assert_ne!(current.binding().lease_epoch, old_binding.lease_epoch);
 
     assert_eq!(
-        admit(&mut current, &mut world, new_lease, boot, GestureAction::Press, 1, 1),
+        admit(
+            &mut current,
+            &mut world,
+            new_lease,
+            boot,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert!(advance(&mut current, &mut world, new_lease, boot, 4).is_empty());
     assert_eq!(
-        admit(&mut current, &mut world, new_lease, boot, GestureAction::Upgrade, 2, 1),
+        admit(
+            &mut current,
+            &mut world,
+            new_lease,
+            boot,
+            GestureAction::Upgrade,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert!(advance(&mut current, &mut world, new_lease, boot, 33).is_empty());
-    assert_eq!(world.fighter(2).unwrap().hp, 100.0,
-        "new heavy must also wait for deliberate release");
+    assert_eq!(
+        world.fighter(2).unwrap().hp,
+        100.0,
+        "new heavy must also wait for deliberate release"
+    );
 
     // Real old-session bytes cannot release the new actor's READY gesture.
     assert_eq!(
-        admit(&mut old, &mut world, old_lease, boot, GestureAction::Release, 3, 7),
+        admit(
+            &mut old,
+            &mut world,
+            old_lease,
+            boot,
+            GestureAction::Release,
+            3,
+            7
+        ),
         AckStatus::Stale
     );
     assert!(old.retired());
@@ -137,7 +183,15 @@ fn held_heavy_ready_reconnect_same_numeric_actor_fences_old_terminal_but_fresh_r
     assert_eq!(world.fighter(2).unwrap().hp, 100.0);
 
     assert_eq!(
-        admit(&mut current, &mut world, new_lease, boot, GestureAction::Release, 3, 1),
+        admit(
+            &mut current,
+            &mut world,
+            new_lease,
+            boot,
+            GestureAction::Release,
+            3,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
@@ -147,11 +201,27 @@ fn held_heavy_ready_reconnect_same_numeric_actor_fences_old_terminal_but_fresh_r
     );
     assert_eq!(world.fighter(2).unwrap().hp, 54.0);
     assert_eq!(
-        admit(&mut current, &mut world, new_lease, boot, GestureAction::Release, 3, 1),
+        admit(
+            &mut current,
+            &mut world,
+            new_lease,
+            boot,
+            GestureAction::Release,
+            3,
+            1
+        ),
         AckStatus::Duplicate
     );
     assert_eq!(
-        admit(&mut old, &mut world, old_lease, boot, GestureAction::Cancel, 4, 7),
+        admit(
+            &mut old,
+            &mut world,
+            old_lease,
+            boot,
+            GestureAction::Cancel,
+            4,
+            7
+        ),
         AckStatus::Stale
     );
     assert_eq!(world.fighter(2).unwrap().hp, 54.0);
