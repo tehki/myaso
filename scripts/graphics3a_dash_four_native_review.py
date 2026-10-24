@@ -121,7 +121,16 @@ if(!window.__G3A_SHADOW_AUDIT__) {
  for seat in sessions:
   ready=script(seat,"return {dashArt:new URLSearchParams(location.search).get('knightDashArt'),knights:new URLSearchParams(location.search).get('knights'), connected:document.querySelector('[data-local-chat]')?.dataset.connected==='true'};")
   assert ready["dashArt"]=="traction" and ready["knights"]=="1" and ready["connected"],ready
- # Source-authentic trusted W3C double-tap of same directional key within 240ms.
+ # Inspect ALL original authored facing rows and EVERY source frame inside
+ # the real browser WebP decoder, without altering live fighter world state.
+ source_audit=(ROOT/"scripts"/"graphics3a_dash_all_facing_source_audit.js").read_text()
+ eight=request("POST",f"/session/{sessions[0]}/execute/async",
+  {"script":source_audit,"args":[]},drv_port)
+ assert eight and eight.get("ok") and len(eight["facingRows"])==8,eight
+ assert all(row["frames"]==8 and row["distinctFrames"]>=7 and row["minimumOpaquePixels"]>100
+            for row in eight["facingRows"]),eight
+ print("AUTHENTIC_DASH_SOURCE_ALL_EIGHT_FACINGS",json.dumps(eight,separators=(",",":")),flush=True)
+ # Source-authentic trusted double-tap of same directional key within 240ms.
  seat=sessions[1]
  focus=script(seat,"document.querySelector('#arena').focus();return document.activeElement.id;")
  assert focus=="arena",focus

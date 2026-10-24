@@ -9,6 +9,7 @@ on:
       - "tests/graphics3a-dash-140-authentic-preview.test.mjs"
       - "scripts/graphics3a_dash_four_native_review.py"
       - "scripts/graphics3a_dash_native_keys.py"
+      - "scripts/graphics3a_dash_all_facing_source_audit.js"
       - "docs/art/silver-dash-gameplay-review/**"
       - ".github/workflows/graphics3a-dash-traction-four-native-review.yml"
   workflow_dispatch:
