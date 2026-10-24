@@ -256,7 +256,7 @@ pub struct Fighter {
     heavy_attack_input_was_down: bool,
     charging_heavy: bool,
     // Only genuine review-v2 owned action may accept preview commands;
-    // normal v1 KeyE and LMB attacks must never be hijacked by this bridge.
+    // normal v1 LMB attack intents must never be hijacked by this bridge.
     gesture_review_owns_light: bool,
     // Dormant reviewed v2 gesture ownership; no network/runtime callers.
     // Original v1 input release handling is unchanged when this is false.
@@ -742,7 +742,7 @@ impl World {
     /// REVIEW-ONLY bridge for the separately authenticated LMBGesture v2
     /// reducer. There are NO runtime callers and v1 input wire is unchanged.
     /// Core8A/8C must later bind commands to the real player lease and world
-    /// tick, atomically arbitrate KeyE/Space/RMB/roll/parry, and never let a
+    /// tick, arbitrate Space/RMB/roll/parry, and never let a
     /// remote caller directly select a command or an actor.
     pub fn apply_review_only_lmb_gesture_command(
         &mut self,
@@ -773,22 +773,6 @@ impl World {
                     - fighter.facing.cos() * fighter.latest_input.move_y;
                 fighter.begin_light_attack(lateral);
                 fighter.gesture_review_owns_light = true;
-                true
-            }
-            Command::BeginKeyEHeavy
-                if fighter.action == Action::Idle
-                    && !fighter.latest_input.block
-                    && !fighter.latest_input.dodge
-                    && !fighter.latest_input.kick
-                    && !fighter.latest_input.jump
-                    && !fighter.latest_input.dash =>
-            {
-                // Separate KeyE cannot upgrade or inherit an LMB gesture.
-                // READY never auto-hits; matching KeyE RELEASE owns 46HP.
-                fighter.attack_hit_targets.clear();
-                fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
-                fighter.charging_heavy = true;
-                fighter.gesture_review_owns_held_charge = true;
                 true
             }
             Command::UpgradeHeldHeavy { server_elapsed_ms }
@@ -836,17 +820,6 @@ impl World {
             {
                 fighter.attack_hit_targets.clear();
                 fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS);
-                true
-            }
-            Command::CancelKeyEHeavy
-                if fighter.action == Action::HeavyAttackWindup
-                    && !fighter.gesture_review_owns_light
-                    && fighter.gesture_review_owns_held_charge
-                    && fighter.charging_heavy
-                    && fighter.attack_hit_targets.is_empty() =>
-            {
-                fighter.set_action(Action::Idle, 0.0);
-                fighter.clear_pending_actions();
                 true
             }
             Command::CancelUnlandedLight
@@ -1188,8 +1161,7 @@ fn begin_requested_action(
             })
     {
         // Preserve the actual server-observed light windup time. Only a
-        // still-held LMB combo enters READY mode; a standalone KeyE upgrade
-        // retains its existing non-held action semantics.
+        // still-held LMB combo enters READY mode; no keyboard heavy exists.
         let light_elapsed_ms = fighter.action_elapsed_ms;
         let held_lmb = input.attack && input.heavy_attack;
         fighter.attack_hit_targets.clear();
@@ -1297,7 +1269,7 @@ fn begin_requested_action(
     if edges.heavy_attack && fighter.action == Action::Idle {
         // A delayed heavy edge while the SAME LMB remains held must never
         // start a second attack after its original light already recovered.
-        // Preserve an independent standalone KeyE with attack=false.
+        // Legacy heavy bit remains for held-LMB compatibility, not keyboard E.
         if input.attack && fighter.attack_input_was_down {
             return;
         }
