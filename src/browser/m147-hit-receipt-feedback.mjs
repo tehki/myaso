@@ -3,10 +3,6 @@
 // the attacker's identity; never derive hit-confirm from spectator snapshots.
 import { validateHitReceipt } from "../network/m147-hit-receipt-codec.mjs";
 
-function isNewer32(candidate, reference) {
-  return candidate !== reference && ((candidate - reference) >>> 0) < 0x80000000;
-}
-
 export function presentHitReceipt(receipt, ownId) {
   const event = validateHitReceipt(receipt);
   if (!Number.isInteger(ownId) || ownId <= 0 || ownId > 0xffffffff) {
@@ -23,19 +19,33 @@ export function presentHitReceipt(receipt, ownId) {
   return null;
 }
 
-// The transport owner must serialize reliable receipts, validate the current
-// server-issued lease, and reset this presenter ONLY when that verified lease
-// changes. This helper does NOT authenticate packets or guard stale epochs.
+// DORMANT review-only presenter. The authenticated transport owner must bind
+// this to its accepted actor + delivery lease, and call reset() only on a
+// verified new incarnation; neither reset() nor numeric ownId authenticates
+// a connection. Never interpret peer HP changes as attacker credit.
 export function createHitReceiptPresenter() {
   let newest = null;
+  let boundActor = null;
   return {
     observe(receipt, ownId) {
       const event = validateHitReceipt(receipt);
-      if (newest !== null && !isNewer32(event.sequence, newest)) return null;
+      if (!Number.isInteger(ownId) || ownId <= 0 || ownId > 0xffffffff)
+        throw new RangeError("ownId must be a verified, non-zero uint32");
+      if (boundActor !== null && ownId !== boundActor)
+        throw new Error("HIT presenter actor swap requires a verified new lease reset");
+      // The proposed per-recipient HIT inbox must retire at u32 wrap. Do not
+      // let this UI-only projection silently credit seq0 on the same lease.
+      if (newest === 0xffffffff && event.sequence < newest)
+        throw new Error("HIT sequence wrap requires retirement and verified lease reset");
+      if (newest !== null && event.sequence <= newest) return null;
       const result = presentHitReceipt(event, ownId);
+      boundActor = ownId;
       newest = event.sequence;
       return result;
     },
-    reset() { newest = null; },
+    reset() {
+      newest = null;
+      boundActor = null;
+    },
   };
 }
