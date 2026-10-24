@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { classifyGuardBreakPunishWorld } from "../scripts/combat4d-world-chronology.mjs";
 
 // Reproduced, never a passing fixture: exact authoritative ticks from
@@ -55,4 +56,19 @@ test("synthetic parser control recognizes a genuine in-stun tick sequence, not r
     "M201_AUTH_ACTION tick=12 fighter=2 from=7 to=0",
   ].join("\n");
   assert.equal(classifyGuardBreakPunishWorld(control).status, "WITHIN_STUN");
+});
+
+
+test("M111 genuine native scenario must fail closed on original 60Hz World post-stun hits", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function runOnlineUiHeavyGuardBreakPunishFlight(");
+  const end = source.indexOf("\nasync function ", start + 40);
+  assert.ok(start >= 0 && end > start);
+  const body = source.slice(start, end);
+  assert.match(source, /import \{ classifyGuardBreakPunishWorld \} from "\.\/combat4d-world-chronology\.mjs";/);
+  assert.match(body, /classifyGuardBreakPunishWorld\(m201ServerOutput\(\)\)/);
+  assert.match(body, /originalWorld\.status !== "WITHIN_STUN"/);
+  assert.match(body, /const firstClickTargetMs = COMBAT\.heavyAttack\.windupMs\s*\+ COMBAT\.heavyAttack\.activeMs \+ COMBAT\.heavyAttack\.recoveryMs \+ 60/);
+  assert.match(body, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
+  assert.match(body, /hitDuringStun/);
 });
