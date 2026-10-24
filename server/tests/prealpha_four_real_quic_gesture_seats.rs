@@ -514,9 +514,10 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     timeout(Duration::from_secs(3), async {
         loop {
             let lines = server.lines.lock().unwrap().clone();
-            if lines.iter().any(|l| {
-                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=9")
-            }) {
+            if lines
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=9"))
+            {
                 break;
             }
             sleep(Duration::from_millis(10)).await;
@@ -532,8 +533,7 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     assert!(
         !held.iter().any(|l| {
             l.contains("M201_AUTH_ACTION")
-                && (l.contains(" fighter=1 from=9 to=10")
-                    || l.contains(" fighter=1 from=1 to=2"))
+                && (l.contains(" fighter=1 from=9 to=10") || l.contains(" fighter=1 from=1 to=2"))
         }),
         "one upgraded held LMB cannot auto-hit before physical release: {held:?}"
     );
@@ -544,9 +544,13 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     combat4c_ack(&seat.connection, 0, 3, 3, 1, 2).await;
     timeout(Duration::from_secs(3), async {
         loop {
-            if server.lines.lock().unwrap().iter().any(|l| {
-                l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10")
-            }) {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
+            {
                 break;
             }
             sleep(Duration::from_millis(10)).await;
@@ -560,11 +564,14 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
         .iter()
         .filter(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
         .count();
-    assert_eq!(heavy_count, 1, "replayed release cannot produce a second heavy");
+    assert_eq!(
+        heavy_count, 1,
+        "replayed release cannot produce a second heavy"
+    );
     assert!(
-        !final_lines.iter().any(|l| {
-            l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2")
-        }),
+        !final_lines
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2") }),
         "upgraded LMB cannot also produce a 34HP LightActive"
     );
     println!("COMBAT4C_NATIVE_LMB_EARLY_UPGRADE_RELEASE_ONLY_QUIC_PASS");
