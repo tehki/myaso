@@ -8,6 +8,7 @@ import {
 } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 import { ProposedSharedTypedGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
 import { createDormantSharedUi10Sources } from "../src/browser/prealpha-shared-ui10-sources-review.mjs";
+import { connectAuthoritativeClient } from "../web/authoritative-client.mjs";
 
 const read = path => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -82,5 +83,80 @@ test("keydown handler really ignores KeyE, including auto-repeat, without consum
       handler({code:"KeyE",repeat,preventDefault(){prevented++;}});
       assert.equal(prevented,0,path+" E stays available for future Use");
     }
+  }
+});
+
+
+test("actual granted QUIC sender refuses handcrafted old source1 BEFORE bounded writer queue",async()=>{
+  const original=globalThis.WebTransport;
+  let writes=0,firstConnection;
+  const reliable=[];
+  let waiter=null;
+  class MockPinnedQuic {
+    constructor(){
+      firstConnection=this;
+      this.ready=Promise.resolve();
+      this.closed=Promise.resolve();
+      this.datagrams={
+        writable:{getWriter:()=>({
+          ready:Promise.resolve(),
+          async write(){writes++;},
+          releaseLock(){},
+        })},
+        readable:{getReader:()=>({read:()=>new Promise(()=>{}),releaseLock(){}})},
+      };
+    }
+    async createBidirectionalStream(){
+      return {
+        writable:{getWriter:()=>({ready:Promise.resolve(),async write(){},releaseLock(){}})},
+        readable:{getReader:()=>({
+          read:()=>reliable.length?Promise.resolve({value:reliable.shift(),done:false})
+            :new Promise(resolve=>{waiter=resolve;}),
+          releaseLock(){},
+        })},
+      };
+    }
+    async createUnidirectionalStream(){
+      return {getWriter:()=>({
+        async write(){},
+        async close(){
+          const bytes=new Uint8Array([4,0,2,0x13,0,0]);
+          if(waiter){const done=waiter;waiter=null;done({value:bytes,done:false});}
+          else reliable.push(bytes);
+        },
+        releaseLock(){},
+      })};
+    }
+    close(){}
+  }
+  globalThis.WebTransport=MockPinnedQuic;
+  let client;
+  try{
+    client=await connectAuthoritativeClient({
+      webTransportUrl:"https://127.0.0.1:4433/game",
+    });
+    assert.equal(await client.negotiateExperimentalGestureV2(),true);
+    const lease=client.transport;
+    assert.equal(lease.experimentalGestureState,"granted");
+    const valid=new Uint8Array(encodeProposedTypedGestureEvent({
+      source:SOURCE.LMB,action:ACTION.PRESS,sequence:1,gestureId:1,clientTick:1,
+    }));
+    const forbidden=valid.slice();forbidden[3]=SOURCE.KEY_E;
+    const before=lease.pendingGestureEdges;
+    assert.throws(()=>client.sendExperimentalGestureEdge(forbidden),
+      /only source0 LMB typed 16-byte Combat events accepted/);
+    assert.equal(lease.pendingGestureEdges,before,
+      "forged old source1 may not claim writer queue capacity");
+    assert.equal(writes,0);
+    assert.equal(lease.experimentalGestureState,"granted",
+      "invalid E must not consume, retire or replace authentic LMB connection");
+    await client.sendExperimentalGestureEdge(valid);
+    assert.equal(writes,1,"original LMB must still transmit over same QUIC writer");
+    assert.equal(lease.pendingGestureEdges,0);
+    assert.ok(firstConnection,"one existing connection must own sender");
+  }finally{
+    client?.close();
+    if(original===undefined)delete globalThis.WebTransport;
+    else globalThis.WebTransport=original;
   }
 });
