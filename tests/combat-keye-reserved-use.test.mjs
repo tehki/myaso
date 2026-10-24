@@ -182,9 +182,36 @@ test("actual granted QUIC sender refuses handcrafted old source1 BEFORE bounded 
       assert.equal(lease.experimentalGestureState,"granted",
         "malformed source0 must not evict a genuine LMB actor lease");
     }
-    await client.sendExperimentalGestureEdge(valid);
-    assert.equal(writes,1,"original LMB must still transmit over same QUIC writer");
+    // More invalid packets than the entire 64-edge transport ceiling must
+    // neither allocate capacity nor retire the current authenticated-shaped
+    // connection. This covers sustained obsolete E client traffic, not just
+    // a single malformed gesture packet.
+    for(let attempt=0;attempt<192;attempt++){
+      const packet=valid.slice();
+      if(attempt%3===0)packet[3]=SOURCE.KEY_E;
+      else if(attempt%3===1)packet[2]=255;
+      else packet.fill(0,4,8);
+      assert.throws(()=>client.sendExperimentalGestureEdge(packet),
+        /only source0 LMB typed 16-byte Combat events accepted|invalid reviewed source\/action pair|sequence must be/);
+    }
+    assert.equal(lease.pendingGestureEdges,before,
+      "192 rejected packets cannot fill the actual 64-slot QUIC LMB queue");
+    assert.equal(lease.experimentalGestureState,"granted",
+      "a flood of obsolete E events may not kill the legitimate LMB lease");
+    assert.equal(writes,0,"no invalid packet can reach the real writer");
+
+    const upgrade=new Uint8Array(encodeProposedTypedGestureEvent({
+      source:SOURCE.LMB,action:ACTION.UPGRADE,sequence:2,gestureId:1,clientTick:2,
+    }));
+    const release=new Uint8Array(encodeProposedTypedGestureEvent({
+      source:SOURCE.LMB,action:ACTION.RELEASE,sequence:3,gestureId:1,clientTick:3,
+    }));
+    for(const packet of [valid,upgrade,release])
+      await client.sendExperimentalGestureEdge(packet);
+    assert.equal(writes,3,
+      "one unchanged real QUIC writer must transmit the legitimate LMB heavy edge triplet");
     assert.equal(lease.pendingGestureEdges,0);
+    assert.equal(lease.experimentalGestureState,"granted");
     assert.ok(firstConnection,"one existing connection must own sender");
   }finally{
     client?.close();
