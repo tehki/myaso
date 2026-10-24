@@ -10,6 +10,9 @@ test("M121 observer follows exactly original v1 30Hz movement sender without add
   assert.ok(start >= 0 && end > start);
   const originalSender = source.slice(start, end);
   assert.ok(originalSender.indexOf("m121SentSamples.push") < originalSender.indexOf("networkClient.sendInput("));
+  const nativeObserver = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  assert.ok(nativeObserver.includes("m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])"),
+    "the genuine native WebDriver evidence must retain the sender samples instead of discarding them");
   const sent = [];
   const input = { moveX: 1, moveY: 0, attack: false, heavyAttack: false };
   const keySet = new Set(["KeyD"]);
