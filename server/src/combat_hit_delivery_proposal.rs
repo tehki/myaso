@@ -477,6 +477,21 @@ pub fn project_world_tick_for_recipients(
                     overflow = Some(first_missing);
                 }
             }
+            Err(error @ (DeliveryError::ScopeRetired
+            | DeliveryError::ScopeGapped
+            | DeliveryError::SequenceExhaustion)) => {
+                // Original World damage is ALREADY committed. A stale or
+                // exhausted participant cannot veto publication while the
+                // other real attacker/victim scopes silently remain ready.
+                // Publish NO receipts and require resync for ALL affected,
+                // current scopes. Keep previously established GAP cursors.
+                for (peer_index, peer) in recipients.iter_mut().enumerate() {
+                    if touched[peer_index] && !peer.retired && peer.gapped_at.is_none() {
+                        peer.gapped_at = Some(peer.next_sequence);
+                    }
+                }
+                return Err(error);
+            }
             Err(error) => return Err(error),
         }
     }
@@ -1327,6 +1342,55 @@ mod tests {
         assert_eq!(scopes[1].pending(), 1);
         assert!(scopes[2..].iter().all(|s| s.pending() == 64));
         assert!(scopes[2..].iter().all(|s| s.gap().is_none()));
+    }
+
+    #[test]
+    fn retired_hit_participant_forces_live_peers_to_explicit_gap_not_silent_loss() {
+        // The original World HIT has already committed damage when the
+        // recipient projector runs. Never leave a healthy affected peer
+        // falsely ready if the other HIT party has retired mid-publication.
+        let mut scopes = vec![scope(1), scope(2), scope(3)];
+        scopes[1].retire();
+        assert_eq!(
+            project_world_tick_for_recipients(
+                970,
+                &[(event(1, 2), commit(970, 0, 1, 2))],
+                &mut scopes,
+            ),
+            Err(DeliveryError::ScopeRetired)
+        );
+        assert_eq!(scopes[0].gap(), Some(0));
+        assert_eq!(scopes[1].gap(), None, "retired actor stays retired");
+        assert_eq!(scopes[2].gap(), None, "uninvolved spectator remains good");
+        assert!(scopes.iter().all(|scope| scope.pending() == 0));
+        assert_eq!(
+            project_world_tick_for_recipients(
+                971,
+                &[(event(1, 3), commit(971, 0, 1, 3))],
+                &mut scopes,
+            ),
+            Err(DeliveryError::ScopeGapped),
+            "the source may not pretend its earlier 34 HP receipt was delivered"
+        );
+        assert_eq!(scopes[2].gap(), Some(0), "subsequent affected victim also resyncs");
+    }
+
+    #[test]
+    fn previously_gapped_hit_party_fences_other_participant_without_overwriting_gap() {
+        let mut scopes = vec![scope(1), scope(2), scope(4)];
+        scopes[1].gapped_at = Some(7);
+        assert_eq!(
+            project_world_tick_for_recipients(
+                980,
+                &[(event(1, 2), commit(980, 0, 1, 2))],
+                &mut scopes,
+            ),
+            Err(DeliveryError::ScopeGapped)
+        );
+        assert_eq!(scopes[0].gap(), Some(0));
+        assert_eq!(scopes[1].gap(), Some(7), "preserve earlier first missing");
+        assert_eq!(scopes[2].gap(), None);
+        assert!(scopes.iter().all(|scope| scope.next_sequence() == 0));
     }
 
     #[test]
