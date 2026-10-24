@@ -37,6 +37,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Rust formatting exact HEAD
         run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Combat4D independent owner E retirement and same-source LMB replay (original QUIC World)
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_retired_keye_cannot_steal_or_commit_a_held_lmb_heavy -- --exact --nocapture
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_source_gesture -- --exact --nocapture
       - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
       - name: Combat 4C real World busy-source replay and subsequent attack regression

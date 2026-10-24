@@ -628,3 +628,339 @@ async fn combat4c_native_held_lmb_cancel_blocks_late_release_and_world_damage() 
     );
     println!("COMBAT4C_NATIVE_CANCEL_HELD_LMB_NO_PHANTOM_QUIC_PASS");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_source_gesture() {
+    // Independent QA for the selected 0x11/0x12 development-only ingress.
+    // Real pinned loopback QUIC, original World 60Hz; NOT a physical DOM test
+    // and NOT permission to publish this protocol or accept it as release QA.
+    //
+    // The existing cancellation test proves old RELEASE cannot strike when
+    // nothing owns the World. This negative instead has a NEW, valid LMB
+    // charging on the SAME accepted connection when the OLD RELEASE arrives.
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=1 action=0")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("original Rust World actor baseline before typed input");
+
+    // Old gesture #1: admitted real source0 PRESS/UPGRADE/CANCEL, not a HIT.
+    println!("COMBAT4D_STAGE old-press");
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+    timeout(Duration::from_millis(90), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=1")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("first original World light windup observed before upgrade");
+
+    println!("COMBAT4D_STAGE old-upgrade");
+    combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=9")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("first World light-to-held-heavy transition");
+    println!("COMBAT4D_STAGE old-cancel");
+    combat4c_ack(&seat.connection, 0, 4, 3, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=0")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("first World heavy cancelled without a strike");
+
+    // Give original World a full tick to retire source0 gesture #1.
+    sleep(Duration::from_millis(45)).await;
+
+    // Second independent physical-gesture ID #2 on the SAME authenticated
+    // actor/lease. ACKs and World action transitions must be observable twice,
+    // not matched to the first gesture's earlier logs.
+    println!("COMBAT4D_STAGE new-press");
+    combat4c_ack(&seat.connection, 0, 1, 4, 2, 1).await;
+    timeout(Duration::from_millis(90), async {
+        loop {
+            let count = server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| {
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=1")
+                })
+                .count();
+            if count == 2 {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("second independent LMB created a new original World light windup");
+
+    println!("COMBAT4D_STAGE new-upgrade");
+    combat4c_ack(&seat.connection, 0, 2, 5, 2, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let count = server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| {
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=9")
+                })
+                .count();
+            if count == 2 {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("second legitimate LMB independently entered World heavy windup");
+
+    // A byte-identical retransmission of the earlier CANCEL is a VALID
+    // delayed network duplicate. Its original seq3/ID1 ACK is DUPLICATE and
+    // must not steal current source0 ID2 or poison its contiguous ACK cursor.
+    println!("COMBAT4D_STAGE duplicate-old-cancel");
+    combat4c_ack(&seat.connection, 0, 4, 3, 1, 2).await;
+
+    // Even after original server-time READY, replay of that earlier CANCEL
+    // must not auto-release the genuinely held newer source0 gesture.
+    sleep(Duration::from_millis(430)).await;
+    let before = server.lines.lock().unwrap().clone();
+    assert!(
+        !before.iter().any(|line| {
+            line.contains("M201_AUTH_ACTION")
+                && (line.contains(" fighter=1 from=9 to=10")
+                    || line.contains(" fighter=1 from=1 to=2"))
+        }),
+        "replayed CANCEL cannot produce World heavy or leaked light: {before:?}"
+    );
+    assert!(
+        !before
+            .iter()
+            .any(|line| line.contains("M201_AUTH_HIT") && line.contains(" attacker=1 ")),
+        "stale source0 terminal cannot manufacture any original World HIT"
+    );
+
+    // ONLY deliberate release of current source0 gesture ID #2 may commit
+    // one HeavyActive; a byte-identical replay must ACK DUPLICATE with no
+    // second transition or World HIT.
+    println!("COMBAT4D_STAGE new-release");
+    combat4c_ack(&seat.connection, 0, 3, 6, 2, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let count = server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| {
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+                })
+                .count();
+            if count == 1 {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("matching new source0 RELEASE committed exactly one World heavy");
+    println!("COMBAT4D_STAGE duplicate-release");
+    combat4c_ack(&seat.connection, 0, 3, 6, 2, 2).await;
+
+    // A newly fabricated seq7 RELEASE for long-cancelled ID1 is INVALID,
+    // unlike a retransmitted authentic seq3 CANCEL. REJECTED is terminal to
+    // the single Core8A outbox: sender must retire/reconnect, not continue
+    // submitting seq8 on this lease or require the server to accept it.
+    println!("COMBAT4D_STAGE invalid-old-release-terminal");
+    combat4c_ack(&seat.connection, 0, 3, 7, 1, 4).await;
+    sleep(Duration::from_millis(75)).await;
+    let after = server.lines.lock().unwrap().clone();
+    assert_eq!(
+        after
+            .iter()
+            .filter(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+            })
+            .count(),
+        1,
+        "no duplicate World heavy may follow identical replay"
+    );
+    assert!(
+        !after
+            .iter()
+            .any(|line| line.contains("M201_AUTH_HIT") && line.contains(" attacker=1 ")),
+        "this native solo-actor test has no target and cannot invent damage"
+    );
+    println!("COMBAT4D_NATIVE_SAME_SOURCE_OLD_RELEASE_NEW_GESTURE_FENCE_PASS");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn combat4d_retired_keye_cannot_steal_or_commit_a_held_lmb_heavy() {
+    // Owner control contract: source1 is retired, Key E is future Use.
+    // One original authenticated QUIC actor, existing 0x11/0x12 admission,
+    // single original Rust 60Hz World; no human/browser or public v2 claim.
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=1 action=0")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("original World actor idle before source0 physical PRESS");
+
+    println!("COMBAT4D_STAGE lmb-press");
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+    timeout(Duration::from_millis(90), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=1")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("physical LMB enters original World LightWindup1");
+
+    println!("COMBAT4D_STAGE lmb-upgrade");
+    combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=9")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("only source0 LMB legitimately upgrades the original World");
+
+    // Source1 UPGRADE never belonged to the canonical KeyE wire grammar.
+    // The typed decoder drops it BEFORE admission and intentionally sends
+    // no 0x12 ACK. Assert that exact fail-closed decoder boundary, then
+    // inject the malformed datagram against the genuinely held source0.
+    let malformed_keye_upgrade = typed_event(1, 2, 3, 99);
+    assert_eq!(
+        myaso_server::prealpha_lmb_gesture_proposal::decode_typed_event(&malformed_keye_upgrade),
+        Err(myaso_server::prealpha_lmb_gesture_proposal::TypedDecodeError::InvalidSourceAction),
+        "old KeyE UPGRADE is invalid wire, not an admitted rejected event"
+    );
+    println!("COMBAT4D_STAGE invalid-keye-upgrade-no-ack");
+    seat.connection
+        .send_datagram(malformed_keye_upgrade)
+        .expect("send deliberately invalid source1 UPGRADE");
+
+    // Legacy KeyE PRESS/RELEASE/CANCEL ARE valid historical packet shapes.
+    // Each must return a real 0x12 REJECTED, consume no source0 sequence3,
+    // and neither terminate nor replace the legitimately held LMB ID1.
+    for action in [1, 3, 4] {
+        println!("COMBAT4D_STAGE old-keye-action={action}");
+        combat4c_ack(&seat.connection, 1, action, 3, 99, 4).await;
+    }
+    sleep(Duration::from_millis(410)).await;
+    let held = server.lines.lock().unwrap().clone();
+    assert!(
+        !held.iter().any(|line| {
+            line.contains("M201_AUTH_ACTION")
+                && (line.contains(" fighter=1 from=9 to=10")
+                    || line.contains(" fighter=1 from=1 to=2"))
+        }),
+        "retired Key E cannot release, upgrade or auto-HIT a held LMB: {held:?}"
+    );
+    assert!(
+        !held
+            .iter()
+            .any(|line| line.contains("M201_AUTH_HIT") && line.contains(" attacker=1 ")),
+        "forged old source1 packet cannot manufacture an original World HIT"
+    );
+
+    // Rejected source1 seq3 may not steal the contiguous accepted-sequence
+    // cursor. Deliberate source0 RELEASE seq3 alone commits one 46HP action.
+    println!("COMBAT4D_STAGE lmb-release");
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 1).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("valid LMB RELEASE commits one original World heavy");
+    println!("COMBAT4D_STAGE lmb-duplicate-release");
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 2).await;
+    println!("COMBAT4D_STAGE old-keye-after-lmb-complete");
+    combat4c_ack(&seat.connection, 1, 1, 4, 100, 4).await;
+    sleep(Duration::from_millis(100)).await;
+    let after = server.lines.lock().unwrap().clone();
+    assert_eq!(
+        after
+            .iter()
+            .filter(|line| {
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
+            })
+            .count(),
+        1,
+        "one deliberate LMB gesture cannot commit a second heavy"
+    );
+    assert!(
+        !after.iter().any(|line| {
+            line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=2")
+        }),
+        "original one-gesture heavy must not also produce a light"
+    );
+    assert!(
+        !after
+            .iter()
+            .any(|line| line.contains("M201_AUTH_HIT") && line.contains(" attacker=1 ")),
+        "solo-actor QA has no victim: no fabricated source1/LMB damage"
+    );
+    println!("COMBAT4D_RETIRED_KEYE_LMB_ONLY_HEAVY_WORLD_PASS");
+}
