@@ -2037,7 +2037,11 @@ mod r2_combat_control_tests {
             Action::AttackWindup,
             "owner P0: held LMB pointerDOWN starts 135ms light; heavy upgrade must be a later server-owned transition before light contact"
         );
-        assert!(held_pointer_down.fighter(1).unwrap().attack_hit_targets.is_empty());
+        assert!(held_pointer_down
+            .fighter(1)
+            .unwrap()
+            .attack_hit_targets
+            .is_empty());
     }
 
     #[test]
