@@ -429,6 +429,7 @@ try{
  });
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
+ const shortLightWorldStart=readAuthoritativeWorld().length;
  // One physical W3C pointer action tick sequence. Do NOT wait for a
  // server Windup log while the mouse remains held: the original 85ms local
  // UPGRADE-intent hook can correctly request server-held heavy after that.
@@ -441,10 +442,12 @@ try{
     {type:"pointerUp",button:0},
    ]}]
  });
- const lightPress=await waitFor(()=>worldAction(0,1),12000);
+ const lightPress=await waitFor(()=>readAuthoritativeWorld().slice(shortLightWorldStart)
+   .split("\n").find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(line)),12000);
  let lightActive;
  try {
-   lightActive=await waitFor(()=>worldAction(1,2),12000);
+   lightActive=await waitFor(()=>readAuthoritativeWorld().slice(shortLightWorldStart)
+    .split("\n").find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=2/.test(line)),12000);
  } catch(error) {
    const browser=await evaluate(attacker,
     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
@@ -485,6 +488,13 @@ try{
  }
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 34 HP light strike against an independent fighter");
+ assert.equal(honestWorldHits.filter(line=>/damage=46 hp=/.test(line)).length,1,
+   "held source0 LMB can commit only one 46HP original World HIT");
+ assert.equal(honestWorldHits.filter(line=>/damage=34 hp=/.test(line)).length,1,
+   "short source0 LMB can commit only one 34HP original World HIT");
+ assert.ok(honestWorldHits.some(line=>
+   /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=34 hp=20/.test(line)),
+   "genuine light hits the original heavy-damaged target for exactly 34 more HP");
  console.log("MAIN0_ORIGINAL_GAME_PHYSICAL_V2_QUIC_WORLD_ACTIONS",JSON.stringify({
   realChromeOrFirefox:true,originalGamePage:true,serverIssuedQuicActor:1,
   physicalKeyEReservedForUse:true,physicalLMBHeldHeavyRelease:true,physicalLMBPointerDown:true,
