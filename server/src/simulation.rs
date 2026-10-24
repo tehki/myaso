@@ -2161,6 +2161,63 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn m121_real_light_release_preserves_direction_through_same_tick_neutral() {
+        // Native browser / original QUIC proof: held source tick63, W+LMB
+        // release tick66, neutral tick67 all land before the next World step.
+        // The light must use release-time strafe, while actual locomotion
+        // continues using the latest neutral input. No instant fake hit.
+        for (release_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            for hold_stepped in [false, true] {
+                let mut world = World::new(800.0, 600.0);
+                assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+                let hold = InputIntent {
+                    attack: true, heavy_attack: true,
+                    ..InputIntent::default()
+                };
+                assert!(world.set_input(1, hold));
+                if hold_stepped {
+                    world.step();
+                    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+                }
+                assert!(world.set_input(1, InputIntent {
+                    attack: true, move_y: release_y,
+                    ..InputIntent::default()
+                }));
+                assert!(world.set_input(1, InputIntent::default()));
+                world.step();
+                let fighter = world.fighter(1).unwrap();
+                assert_eq!(fighter.action, expected,
+                    "release-time lateral survives newer neutral input");
+                assert_eq!(fighter.input().move_y, 0.0,
+                    "the original latest neutral still owns locomotion");
+                world.step();
+                assert_eq!(world.fighter(1).unwrap().action, expected,
+                    "the same release must not commit a duplicate strike");
+            }
+        }
+    }
+
+    #[test]
+    fn m121_one_shot_direction_is_retained_if_next_input_changes_movement() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        // A genuine short press/release can be observed as a lone attack
+        // frame followed immediately by unrelated movement in the same tick.
+        assert!(world.set_input(1, InputIntent {
+            attack: true, move_y: -1.0, ..InputIntent::default()
+        }));
+        assert!(world.set_input(1, InputIntent {
+            move_y: 1.0, ..InputIntent::default()
+        }));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
+        assert_eq!(world.fighter(1).unwrap().input().move_y, 1.0);
+    }
+
+    #[test]
     fn releasing_after_one_server_charge_tick_commits_exactly_one_light() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 250.0, 300.0, 0.0);
