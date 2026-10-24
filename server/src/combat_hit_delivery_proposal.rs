@@ -652,7 +652,10 @@ mod tests {
         assert_eq!(delivery.acknowledged_next(), 0);
         // The same authoritative tick can be safely retried only if no
         // prior partial batch was published.
-        let valid = [(event(3, 4), commit(100, 0, 3, 4)), (event(2, 1), commit(100, 1, 2, 1))];
+        let valid = [
+            (event(3, 4), commit(100, 0, 3, 4)),
+            (event(2, 1), commit(100, 1, 2, 1)),
+        ];
         let committed = delivery.project_committed_tick_batch(100, &valid).unwrap();
         assert_eq!(committed.len(), 1);
         assert_eq!(committed[0].sequence, 0);
@@ -706,17 +709,21 @@ mod tests {
     #[test]
     fn committed_empty_tick_is_fenced_against_delayed_same_tick_credit() {
         let mut delivery = scope(2);
-        assert!(delivery.project_committed_tick_batch(400, &[]).unwrap().is_empty());
+        assert!(delivery
+            .project_committed_tick_batch(400, &[])
+            .unwrap()
+            .is_empty());
         assert_eq!(
             delivery.project_committed_tick_batch(400, &[(event(2, 1), commit(400, 0, 2, 1))]),
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
         );
         assert_eq!(delivery.next_sequence(), 0);
         assert_eq!(
-            delivery.project_committed_tick_batch(401, &[(event(2, 1), commit(401, 0, 2, 1))])
-                .unwrap()[0].sequence,
+            delivery
+                .project_committed_tick_batch(401, &[(event(2, 1), commit(401, 0, 2, 1))])
+                .unwrap()[0]
+                .sequence,
             0
         );
     }
-
 }
