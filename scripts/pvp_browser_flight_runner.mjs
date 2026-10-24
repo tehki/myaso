@@ -1241,13 +1241,15 @@ async function performHeavyCounterplayWindowWheel(
       targetAfterWindupMs,
       sampledWheelIngressMs: calibration.wheelIngressMs,
     });
-    // Combat4B M188 genuine held-LMB release: the prior parry objective
-    // 405ms entered Block at original World tick687 while heavy impact after
-    // tick689 resolved a normal -64 guard BLOCK, not <=125ms PARRY.
-    // Preserve the World timing, one physical wheel, and all strict HP/guard
-    // predicates. Stage the same wheel 40ms later and require exact-head
-    // Chrome/Firefox proof; this is not a certified gameplay change.
-    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 40 : 0;
+    // Combat4B M188: actual original-World protected CI on e1f2f9a
+    // still BLOCKED a genuine held-LMB heavy at tick619 after Firefox
+    // Block tick611 (8 ticks / 133ms > unchanged 125ms parry window).
+    // The earlier +40ms physical W3C parry offset was insufficient.
+    // Stage the same single genuine wheel a further 40ms later (+80ms total)
+    // and let three new exact-head Chrome/Firefox parry outcomes decide.
+    // Keep all 100HP, zero-guard-loss, World stun and no-fake-hit predicates.
+    // Block staging and original server World/balance remain untouched.
+    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 80 : 0;
     const m223WheelDelayMs = m223Plan.wheelDelayMs + m188HeldLmbParryOffsetMs;
     if (!Number.isSafeInteger(m223WheelDelayMs)
       || m223WheelDelayMs < 0 || m223WheelDelayMs > 450) {
