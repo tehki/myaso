@@ -529,6 +529,7 @@ async function startGameServer() {
         // M111 native-only 60Hz original World ACTION/HIT tick forensic.
         // The server itself still refuses this probe on public binds.
         || scenario === "uiheavyguardbreakpunish"
+        || scenario === "uiparrytell"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
