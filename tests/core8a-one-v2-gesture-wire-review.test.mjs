@@ -24,6 +24,29 @@ test("same-tick two LMB edges exactly preserve already tested Combat4 and Core8A
   assert.equal(decodeProposedGestureEvent(p).action,A.PRESS);
   assert.deepEqual(decodeReviewEvent(u),{source:0,action:3,sequence:2,gestureId:1,clientTick:42});
 });
+
+test("legacy review outbox refuses an ACK for an unsent LMB edge, preserving terminal delivery",()=>{
+  const trustedLease=Object.freeze({});
+  const q=new ProposedLmbGestureOutbox({negotiatedVersion:2,trustedLease});
+  const press=q.begin(42),release=q.release(42);
+  const receipt=edge=>encodeReviewAck({
+    status:K.ACCEPTED,sequence:edge.sequence,gestureId:edge.gestureId,serverTick:50,
+  });
+  const before=q.snapshot;
+  assert.throws(()=>q.receiveAck(receipt(press),trustedLease),/unscheduled/);
+  assert.deepEqual(q.snapshot,before,"unsent PRESS must not be falsely settled");
+  assert.deepEqual(q.nextSendBatch(1).map(edge=>edge.sequence),[press.sequence]);
+  assert.throws(()=>q.receiveAck(receipt(release),trustedLease),/unscheduled/);
+  assert.equal(q.snapshot.pending,2,"unsent RELEASE must not be dropped");
+  const pressAck=q.receiveAck(receipt(press),trustedLease);
+  assert.equal(pressAck.transportSettled,true);
+  assert.equal(pressAck.combatCommitted,false);
+  assert.deepEqual(q.nextSendBatch().map(edge=>edge.sequence),[release.sequence]);
+  const releaseAck=q.receiveAck(receipt(release),trustedLease);
+  assert.equal(releaseAck.transportSettled,true);
+  assert.equal(releaseAck.combatCommitted,false);
+  assert.equal(q.snapshot.pending,0);
+});
 test("typed standalone KeyE never aliases held-LMB UPGRADE or origin",()=>{
   const press=encodeReviewEvent({source:S.KEY_E,action:A.PRESS,sequence:3,gestureId:2,clientTick:43});
   const release=encodeReviewEvent({source:S.KEY_E,action:A.RELEASE,sequence:4,gestureId:2,clientTick:44});
