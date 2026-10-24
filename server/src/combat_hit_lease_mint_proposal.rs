@@ -36,6 +36,19 @@ impl PreparedHitLeaseUnallocated {
         accepted_server_binding: ServerActorBinding,
         max_pending: usize,
     ) -> Result<Self, PreparedHitLeaseError> {
+        Self::prepare_with_entropy(accepted_server_binding, max_pending, |secret| {
+            getrandom::fill(secret).map_err(|_| PreparedHitLeaseError::EntropyUnavailable)
+        })
+    }
+
+    // Private injection seam proves that a failing or all-zero entropy source
+    // never constructs a candidate. Only the OS CSPRNG is used in ordinary
+    // builds; callers cannot override it to select a predictable live token.
+    fn prepare_with_entropy(
+        accepted_server_binding: ServerActorBinding,
+        max_pending: usize,
+        fill_entropy: impl FnOnce(&mut [u8; 16]) -> Result<(), PreparedHitLeaseError>,
+    ) -> Result<Self, PreparedHitLeaseError> {
         if accepted_server_binding.player_id == 0
             || accepted_server_binding.boot_nonce == 0
             || accepted_server_binding.lease_epoch == 0
@@ -49,8 +62,12 @@ impl PreparedHitLeaseUnallocated {
         }
 
         let mut secret = [0_u8; 16];
-        getrandom::fill(&mut secret).map_err(|_| PreparedHitLeaseError::EntropyUnavailable)?;
+        if let Err(error) = fill_entropy(&mut secret) {
+            secret.fill(0);
+            return Err(error);
+        }
         if secret.iter().all(|byte| *byte == 0) {
+            secret.fill(0);
             return Err(PreparedHitLeaseError::EntropyUnavailable);
         }
         Ok(Self {
@@ -116,6 +133,23 @@ mod tests {
         assert_ne!(first_token, second_token);
         assert_eq!(first_cap, 64);
         assert_eq!(second_cap, 64);
+    }
+
+    #[test]
+    fn failed_or_zero_entropy_never_creates_a_candidate() {
+        let error = PreparedHitLeaseUnallocated::prepare_with_entropy(actor(), 64, |secret| {
+            secret.fill(7);
+            Err(PreparedHitLeaseError::EntropyUnavailable)
+        });
+        assert!(matches!(
+            error,
+            Err(PreparedHitLeaseError::EntropyUnavailable)
+        ));
+        let zero = PreparedHitLeaseUnallocated::prepare_with_entropy(actor(), 64, |_| Ok(()));
+        assert!(matches!(
+            zero,
+            Err(PreparedHitLeaseError::EntropyUnavailable)
+        ));
     }
 
     #[test]
