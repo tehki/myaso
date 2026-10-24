@@ -5,6 +5,7 @@ use std::sync::{
 };
 
 // M147 wire and journal helpers are dormant, never registered in live transport.
+pub mod combat_hit_control_ingress_proposal;
 pub mod combat_hit_control_proposal;
 pub mod combat_hit_delivery_proposal;
 pub mod combat_hit_journal;
