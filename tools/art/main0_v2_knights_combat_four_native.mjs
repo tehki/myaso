@@ -157,6 +157,12 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
  },12000);
  async function stagePair(attackerId,targetId){
   const a=actors.find(a=>a.actor.id===attackerId);
+  // W3C key presses go to the currently focused element. The original
+  // gameplay canvas owns WASD; unlike an aimed mouse move it is not focused
+  // automatically by a keyboard action. Preserve genuine native key events.
+  const focused=await evaluate(a.s,"const c=document.querySelector('#arena');if(!c)return false;c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
+  assert.equal(focused,true,"real WASD staging requires original arena keyboard focus");
+  const attempts=[];
   for(let move=0;move<6;move++){
    const p=await proof(a),f=own(p,attackerId),t=own(p,targetId);
    assert(f&&t&&f.action===0&&t.action===0,"only real idle replicas may authorize native staging");
@@ -167,13 +173,20 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
      "actual replica positions, not held duration, establish light reach");
     await sleeps(110);
     const stable=await proof(a),next=own(stable,attackerId),nextTarget=own(stable,targetId);
-    if(stable.serverTick>p.serverTick&&Math.abs(next.x-f.x)<=2&&Math.abs(nextTarget.x-t.x)<=2)return {attackerId,targetId,proof:stable};
+    if(stable.serverTick>p.serverTick&&Math.abs(next.x-f.x)<=2&&Math.abs(nextTarget.x-t.x)<=2)
+     return {attackerId,targetId,proof:stable,attempts};
    }else{
-    await pulse(a,delta>0?"d":"a",Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed))));
+    const key=delta>0?"d":"a",durationMs=Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+    await pulse(a,key,durationMs);
+    await sleeps(310); // allow genuine accepted input to reach the original 60Hz World
+    const after=await proof(a),next=own(after,attackerId);
+    attempts.push({key,durationMs,beforeTick:p.serverTick,afterTick:after.serverTick,
+     beforeX:f.x,afterX:next?.x,targetX:t.x});
+    continue;
    }
    await sleeps(310); // do not accidentally double-tap the original native dash gesture
   }
-  throw Error("real WASD could not establish stable authoritative pair geometry");
+  throw Error("real WASD could not establish stable authoritative pair geometry: "+JSON.stringify({attackerId,targetId,attempts}));
  }
  async function prepareClick(a,targetId){
   const p=await proof(a),f=own(p,a.actor.id),target=own(p,targetId);
