@@ -1,0 +1,41 @@
+name: Combat 4D M121 true v1 movement sender and native World (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "tests/combat4-m121-sender-instrumentation.test.mjs"
+      - ".github/workflows/combat4d-m121-sender-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m121-directional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2]
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original sender read-only invariants and native drivers
+        run: |
+          node --test tests/combat4-m121-sender-instrumentation.test.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile original authoritative Rust World
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict original M121 native Chrome Firefox genuine directional World and HUD
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

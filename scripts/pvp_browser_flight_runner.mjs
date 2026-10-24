@@ -1072,6 +1072,13 @@ async function prepareHeavyCounterplayFlight(
       distanceAfter: distance(ownAfter, targetAfter),
       originalLightReach: COMBAT.attack.reach,
       unchangedCollisionRadius: COMBAT.fighterRadius,
+      // Sender samples are exact original 30Hz sendInput payload fields.
+      // Do not equate a DOM KeyD event with admitted server movement.
+      sampledOriginalV1: (after.acceptance?.m121SentSamples ?? [])
+        .filter((sample) => Number.isFinite(before.acceptance?.m121SentSamples?.at(-1)?.clientTick)
+          ? sample.clientTick >= before.acceptance.m121SentSamples.at(-1).clientTick
+          : true)
+        .slice(-64),
     }));
   } else {
     await pulseMovementKey(attacker, movementKey, movementMs);
@@ -1658,6 +1665,21 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   if (!attackerResult || !defenderResult) {
     throw new Error(`M121 directional light incomplete evidence: ${JSON.stringify(evidence)}`);
   }
+  // This chronology is recorded BEFORE untouched strict HP / LEFT SWEEP
+  // checks, even when genuine attack hits in the wrong directional phase.
+  console.log("M121_ACTUAL_SENDER_WORLD_CHRONOLOGY " + JSON.stringify({
+    attacker: attackerResult.playerNetId,
+    defender: defenderResult.playerNetId,
+    physical: { keys: attackerResult.keyTransitions, pointers: attackerResult.pointers },
+    actualSent: (attackerResult.acceptance?.m121SentSamples ?? [])
+      .filter((sample) => sample.moveX || sample.moveY || sample.attack || sample.heavyAttack)
+      .slice(-64),
+    attackerWorld: attackerResult.acceptance?.ownActionTransitions?.slice(-12) ?? [],
+    defenderWorldView: defenderResult.acceptance?.focusActionTransitions?.slice(-12) ?? [],
+    defenderThreat: defenderResult.threatTransitions.slice(-12),
+    defenderRecovery: defenderResult.recoveryTransitions.slice(-12),
+    hp: { attacker: attackerResult.playerHp, victim: defenderResult.playerHp },
+  }));
 
   const lightDown = attackerResult.pointers.find((event) =>
     event.type === "pointerdown" && event.button === 0);
@@ -14144,6 +14166,10 @@ async function readUiEvidence(session) {
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
+        // Original M121 30Hz v1 input sender trace, copied READ-ONLY from the
+        // real page to the WebDriver observer; no cross-plane inference.
+        m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
+          .slice(-96).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
