@@ -2225,6 +2225,64 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_undercharged_release_retains_original_pointerdown_direction() {
+        // The existing dormant source-tagged bridge starts a directional light
+        // on LMB pointerDOWN. An undercharged upgrade->release must resume
+        // THAT light, even if movement changes before the real release.
+        // No second action classifier, hit owner, client clock, or wire.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        for (direction_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_y: direction_y,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::BeginLightWindup,
+            ));
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+            assert!(world.step().is_empty());
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::UpgradeHeldHeavy {
+                    server_elapsed_ms: SERVER_DT_MS as u64,
+                },
+            ));
+
+            // True neutral/reversed movement belongs to movement simulation,
+            // not to reclassification of an already-authorized light.
+            assert!(world.set_input(1, InputIntent::default()));
+            for _ in 0..4 {
+                assert!(world.step().is_empty());
+            }
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::ResumeLight {
+                    server_elapsed_ms: world.now_ms as u64,
+                },
+            ));
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "undercharged LMB must resume original directional light, not classify latest neutral",
+            );
+            assert!(!world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::ReleaseHeavy,
+            ));
+        }
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
