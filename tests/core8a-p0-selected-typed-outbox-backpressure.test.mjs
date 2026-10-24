@@ -282,6 +282,47 @@ test("actual selected client QUIC lab handshake, typed datagram sender and same-
   }
 });
 
+test("P0 rapid LMB and KeyE physical edges never spend bounded retry attempts before timer",()=>{
+  const lease=Object.freeze({});
+  const q=new ProposedSharedTypedGestureOutbox({
+    reviewVersion:2,trustedLease:lease,maxPending:8,maxAttempts:3,
+  });
+  function firstOnly(source,action,sequence) {
+    const sent=q.nextSendBatch(4,{onlyUnsent:true});
+    assert.deepEqual(sent.map(x=>[x.source,x.action,x.sequence,x.attempt]),[
+      [source,action,sequence,1],
+    ],"physical DOM event must send one NEW edge and zero old retries");
+  }
+  const press=q.begin(SOURCE.LMB,8);
+  firstOnly(SOURCE.LMB,ACTION.PRESS,press.sequence);
+  const release=q.release(SOURCE.LMB,8);
+  firstOnly(SOURCE.LMB,ACTION.RELEASE,release.sequence);
+  const keyPress=q.begin(SOURCE.KEY_E,9);
+  firstOnly(SOURCE.KEY_E,ACTION.PRESS,keyPress.sequence);
+  const keyCancel=q.cancel(SOURCE.KEY_E,9);
+  firstOnly(SOURCE.KEY_E,ACTION.CANCEL,keyCancel.sequence);
+  // Duplicated physical DOM notifications produce neither a new typed packet
+  // nor a retry; congestion cannot instantly exhaust 3 attempts.
+  assert.deepEqual(q.nextSendBatch(4,{onlyUnsent:true}),[]);
+  assert.deepEqual(q.nextSendBatch(4,{onlyUnsent:true}),[]);
+  assert.equal(q.snapshot.pending,4);
+  assert.equal(q.snapshot.closed,false);
+
+  // The one existing periodic retransmission mechanism remains bounded.
+  assert.deepEqual(q.nextSendBatch(4).map(x=>x.attempt),[2,2,2,2]);
+  assert.deepEqual(q.nextSendBatch(4).map(x=>x.attempt),[3,3,3,3]);
+  assert.throws(()=>q.nextSendBatch(4),/retransmission attempts exhausted/);
+  assert.equal(q.snapshot.closed,true);
+
+  // The actual default-OFF game loopback adapter routes newly authored DOM
+  // notifications into ONLY the new-edge path; the 170ms timer owns retries.
+  const ui=readFileSync(new URL("../web/prealpha-gesture-live-lab.mjs",import.meta.url),"utf8");
+  assert.match(ui,/function drain\(onlyUnsent = false\)/);
+  assert.match(ui,/outbox\.nextSendBatch\(4, \{onlyUnsent\}\)/);
+  assert.match(ui,/drain\(true\); \/\/ native capture/);
+  assert.match(ui,/setInterval\(\(\) => \{[\s\S]*?outbox\.snapshot\.pending > 0\) drain\(\);[\s\S]*?\},170\)/);
+});
+
 test("one typed queue reserves terminal for a valid LMB while declining concurrent KeyE at cap",()=>{
   const lease=Object.freeze({});
   const q=new ProposedSharedTypedGestureOutbox({
