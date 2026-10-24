@@ -357,7 +357,16 @@ try{
        {type:"pointerDown",button:0},
      ]}]
    });
-   pressed=await waitFor(()=>worldAction(0,9),12000);
+   // Genuine LMB first enters LightWindup1 and upgrades to HeavyWindup9
+   // UNDER the original World lock. Sampled 60Hz action logs may show 0→1→9,
+   // not legacy KeyE's direct 0→9. Require both real admitted source0 edges.
+   pressed=await waitFor(()=>{
+     const admissions=readAuthoritativeWorld().split("\\n").filter(line=>
+       /M201_AUTH_GESTURE_ACTION tick=\\d+ fighter=1 source=0 gesture=\\d+ sequence=\\d+ eventAction=\\d+ status=1 from=\\d+ to=\\d+/.test(line));
+     const light=admissions.find(line=>/eventAction=1 status=1 from=0 to=1/.test(line));
+     const upgrade=admissions.find(line=>/eventAction=2 status=1 from=1 to=9/.test(line));
+     return light&&upgrade?upgrade:false;
+   },12000);
    await sleeps(460); // World READY320ms must NOT auto-strike while held
    assert(!worldAction(9,10),"held LMB cannot commit World heavy before release");
    const heldTrace=await evaluate(attacker,"return window.__MYASO_MAIN0_LMB_HEAVY_TRACE__()");
