@@ -2167,16 +2167,18 @@ mod r2_combat_control_tests {
                 Action::AttackWindup,
             ),
             (
+                // An unready orphaned heavy-only terminal cannot start E Combat.
                 InputIntent {
                     heavy_attack: true,
                     ..InputIntent::default()
                 },
-                Action::HeavyAttackWindup,
+                Action::Idle,
             ),
             (InputIntent::default(), Action::Idle),
         ] {
             let mut world = World::new(800.0, 600.0);
             assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 315.0, 300.0, std::f32::consts::PI));
             assert!(world.set_input(
                 1,
                 InputIntent {
@@ -2187,12 +2189,18 @@ mod r2_combat_control_tests {
             ));
             // Both WebTransport datagrams arrived before one 60Hz world.step.
             assert!(world.set_input(1, release));
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(
                 world.fighter(1).unwrap().action,
                 expected,
-                "latest release intent must beat pending held bits"
+                "light-only release survives; unready heavy-only or cancel stays inert"
             );
+            if expected == Action::Idle {
+                for _ in 0..24 {
+                    assert!(world.step().is_empty());
+                }
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
         }
     }
 
@@ -2200,7 +2208,8 @@ mod r2_combat_control_tests {
     fn release_edge_survives_following_neutral_sample_before_server_tick() {
         // WebTransport carries redundant samples and multiple distinct 60 Hz
         // client inputs may be consumed before one authoritative world tick.
-        // Hold -> release -> neutral must resolve exactly once, not cancel.
+        // Light-only release survives neutral. An unready heavy-only sample
+        // cannot synthesize standalone keyboard/E heavy from an orphaned bit.
         for (release, expected) in [
             (
                 InputIntent {
@@ -2210,15 +2219,17 @@ mod r2_combat_control_tests {
                 Action::AttackWindup,
             ),
             (
+                // An unready orphaned heavy-only terminal cannot start E Combat.
                 InputIntent {
                     heavy_attack: true,
                     ..InputIntent::default()
                 },
-                Action::HeavyAttackWindup,
+                Action::Idle,
             ),
         ] {
             let mut world = World::new(800.0, 600.0);
-            world.add_player_at(1, 250.0, 300.0, 0.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 315.0, 300.0, std::f32::consts::PI));
             world.set_input(
                 1,
                 InputIntent {
@@ -2229,14 +2240,20 @@ mod r2_combat_control_tests {
             );
             world.set_input(1, release);
             world.set_input(1, InputIntent::default());
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(world.fighter(1).unwrap().action, expected);
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(
                 world.fighter(1).unwrap().action,
                 expected,
-                "the release must not repeat or turn into a cancelled charge"
+                "newer neutral must not repeat a light or arm an unready heavy"
             );
+            if expected == Action::Idle {
+                for _ in 0..24 {
+                    assert!(world.step().is_empty());
+                }
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
         }
     }
 
