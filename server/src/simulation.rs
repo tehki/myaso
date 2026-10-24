@@ -1265,7 +1265,6 @@ fn begin_requested_action(
         return;
     }
 
-
     if edges.attack && fighter.action == Action::Idle {
         let lateral = fighter
             .pending_attack_lateral
