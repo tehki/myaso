@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {connectGameTransport} from "../web/network-transport.mjs";
 import {connectAuthoritativeClient} from "../web/authoritative-client.mjs";
+import {activateLoopbackGestureLab} from "../web/prealpha-gesture-live-lab.mjs";
 import {encodeInputPacket, decodeInputPacket} from "../src/network/input-codec.mjs";
 import {
   PROPOSED_GESTURE_VERSION, PROPOSED_GESTURE_SOURCE as SOURCE,
@@ -402,6 +403,147 @@ test("P0 queued original typed datagrams are retired on disconnect, never flushe
     newClient?.close();
     if(previous===undefined)delete globalThis.WebTransport;
     else globalThis.WebTransport=previous;
+  }
+});
+
+function domEmitter() {
+  const handlers=new Map();
+  return {
+    addEventListener(type,listener){
+      if(!handlers.has(type))handlers.set(type,[]);
+      handlers.get(type).push(listener);
+    },
+    removeEventListener(type,listener){
+      handlers.set(type,(handlers.get(type)||[]).filter(x=>x!==listener));
+    },
+    emit(type,e={}){
+      for(const fn of [...(handlers.get(type)||[])])fn(e);
+    },
+  };
+}
+
+test("Core8A actual loopback page will not retry unflushed QUIC edges; real writer completion permits bounded timer retries",async()=>{
+  const oldInterval=globalThis.setInterval,oldClearInterval=globalThis.clearInterval;
+  const oldNow=Date.now;
+  let clock=10000, timer=null, closedReason=null;
+  const releases=[];
+  const sends=[];
+  globalThis.setInterval=(callback,ms)=>{
+    assert.equal(ms,170);
+    timer=callback;
+    return 42;
+  };
+  globalThis.clearInterval=()=>{timer=null;};
+  Date.now=()=>clock;
+  let lab;
+  try{
+    const canvas=domEmitter();
+    canvas.matches=()=>false;
+    const windowObj=Object.assign(domEmitter(),{location:{hostname:"127.0.0.1"}});
+    const documentObj=Object.assign(domEmitter(),{activeElement:canvas,hidden:false});
+    const lease={webTransportUrl:"https://127.0.0.1:4433/game",experimentalGestureState:"granted"};
+    let sendCount=0;
+    const gameClient={
+      transport:lease,
+      async negotiateExperimentalGestureV2(){return true;},
+      sendExperimentalGestureEdge(bytes){
+        sends.push(decodeProposedTypedGestureEvent(bytes));
+        sendCount++;
+        if(sendCount<=2){
+          return new Promise(resolve=>releases.push(resolve));
+        }
+        return Promise.resolve();
+      },
+      close(reason){
+        closedReason=reason;
+        lease.experimentalGestureState="closed";
+      },
+    };
+    lab=await activateLoopbackGestureLab({
+      gameClient,canvas,windowObj,documentObj,getClientTick:()=>7,
+    });
+    assert.equal(typeof timer,"function");
+    const down={
+      target:canvas,pointerType:"mouse",pointerId:71,button:0,buttons:1,
+      cancelable:true,preventDefault(){},
+    };
+    canvas.emit("pointerdown",down);
+    windowObj.emit("pointerup",{...down,buttons:0});
+    assert.deepEqual(sends.map(x=>x.action),[ACTION.PRESS,ACTION.RELEASE]);
+    assert.equal(lab.outbox.snapshot.pending,2);
+    // Five 170ms retry intervals while BOTH queued sends are stalled must
+    // consume zero retry attempts and must never close this valid gesture.
+    for(let n=0;n<5;n++){
+      clock+=170;
+      timer();
+      assert.equal(sends.length,2);
+      assert.equal(lab.snapshot.closed,false);
+    }
+    releases.forEach(resolve=>resolve());
+    await Promise.resolve();
+    await Promise.resolve();
+
+    clock+=170;timer(); // first proper ACK retransmit after QUIC write
+    assert.deepEqual(sends.map(x=>x.action),[
+      ACTION.PRESS,ACTION.RELEASE,ACTION.PRESS,ACTION.RELEASE,
+    ]);
+    await Promise.resolve();
+    await Promise.resolve();
+    clock+=170;timer();
+    assert.equal(sends.length,6);
+    await Promise.resolve();
+    await Promise.resolve();
+    clock+=170;timer();
+    assert.equal(lab.snapshot.closed,true);
+    assert.match(closedReason,/sequence\/retry state exhausted/);
+    assert.equal(lab.outbox.snapshot.closed,true);
+  }finally{
+    releases.forEach(resolve=>resolve());
+    lab?.close();
+    globalThis.setInterval=oldInterval;
+    globalThis.clearInterval=oldClearInterval;
+    Date.now=oldNow;
+  }
+});
+
+test("Core8A live page fails closed after bounded QUIC writer stall even without first datagram sent",async()=>{
+  const oldInterval=globalThis.setInterval,oldClearInterval=globalThis.clearInterval;
+  const oldNow=Date.now;
+  let clock=20000,timer=null,closedReason=null,release;
+  globalThis.setInterval=(callback,ms)=>{assert.equal(ms,170);timer=callback;return 43;};
+  globalThis.clearInterval=()=>{timer=null;};
+  Date.now=()=>clock;
+  let lab;
+  try{
+    const canvas=domEmitter();canvas.matches=()=>false;
+    const windowObj=Object.assign(domEmitter(),{location:{hostname:"localhost"}});
+    const documentObj=Object.assign(domEmitter(),{activeElement:canvas,hidden:false});
+    const gameClient={
+      transport:{webTransportUrl:"https://127.0.0.1:4433/game",experimentalGestureState:"granted"},
+      async negotiateExperimentalGestureV2(){return true;},
+      sendExperimentalGestureEdge(){return new Promise(resolve=>{release=resolve;});},
+      close(reason){closedReason=reason;},
+    };
+    lab=await activateLoopbackGestureLab({
+      gameClient,canvas,windowObj,documentObj,getClientTick:()=>7,
+    });
+    canvas.emit("pointerdown",{
+      target:canvas,pointerType:"mouse",pointerId:72,
+      button:0,buttons:1,cancelable:true,preventDefault(){},
+    });
+    assert.equal(lab.outbox.snapshot.pending,1);
+    clock+=1400;timer();
+    assert.equal(lab.snapshot.closed,false);
+    clock+=170;timer();
+    assert.equal(lab.snapshot.closed,true);
+    assert.equal(lab.outbox.snapshot.closed,true);
+    assert.match(closedReason,/bounded gesture QUIC writer stall/);
+  }finally{
+    release?.();
+    lab?.close();
+    globalThis.setInterval=oldInterval;
+    globalThis.clearInterval=oldClearInterval;
+    Date.now=oldNow;
   }
 });
 
