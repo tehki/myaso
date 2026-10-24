@@ -1631,10 +1631,15 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
-  // In screen-space coordinates, left of a right-facing fighter is W/up; left
-  // of a left-facing fighter is S/down.
-  const strafeKey = attackRight ? "w" : "s";
-  const strafeCode = attackRight ? "KeyW" : "KeyS";
+  // Test-only explicit opposite-side branch: default original protected M121
+  // remains LEFT. Facing right: W=>LEFT and S=>RIGHT; facing left: reverse.
+  const side = process.env.MYASO_M121_SIDE === "right" ? "right" : "left";
+  const expectedThreatPhases = side === "right"
+    ? ["RIGHT WINDUP", "RIGHT SWEEP"] : ["LEFT WINDUP", "LEFT SWEEP"];
+  const strafeKey = side === "right"
+    ? (attackRight ? "s" : "w") : (attackRight ? "w" : "s");
+  const strafeCode = side === "right"
+    ? (attackRight ? "KeyS" : "KeyW") : (attackRight ? "KeyW" : "KeyS");
   const attackOffset = attackRight ? 200 : -200;
 
   await performArenaDirectionalLight(attacker, attackerElementId, strafeKey, attackOffset);
@@ -1650,7 +1655,7 @@ async function runOnlineUiDirectionalLightFlight(entries) {
       && attackerResult?.opponentHp === 66
       && defenderResult?.playerHp === 66;
     const sideThreat = defenderResult?.threatTransitions.some((entry) =>
-      entry.visible && (entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"));
+      entry.visible && expectedThreatPhases.includes(entry.phase));
     const recovery = defenderResult?.recoveryTransitions.some((entry) =>
       entry.visible
       && entry.state === "directional-attack-recovery"
@@ -1711,19 +1716,20 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     || !defenderResult.events.includes("Hit taken - 34 HP.")) {
     throw new Error(`M121 directional light damage feedback was incomplete: ${JSON.stringify(evidence)}`);
   }
-  const leftThreat = defenderResult.threatTransitions.some((entry) =>
-    entry.visible && (entry.phase === "LEFT WINDUP" || entry.phase === "LEFT SWEEP"));
+  const directionalThreat = defenderResult.threatTransitions.some((entry) =>
+    entry.visible && expectedThreatPhases.includes(entry.phase));
   const sweepRecovery = defenderResult.recoveryTransitions.some((entry) =>
     entry.visible && entry.state === "directional-attack-recovery"
       && entry.label === "PUNISH" && entry.detail === "Sweep recovery");
-  if (!leftThreat || !sweepRecovery) {
-    throw new Error(`M121 left-sweep readability was incomplete: ${JSON.stringify(defenderResult)}`);
+  if (!directionalThreat || !sweepRecovery) {
+    throw new Error(`M121 ${side}-sweep readability was incomplete: ${JSON.stringify(defenderResult)}`);
   }
+  const expectedCommitment = side === "right" ? "Right sweep" : "Left sweep";
   if (!attackerResult.events.some((text) =>
-    text.startsWith("Left sweep committed")
-    || text.startsWith("Left sweep active")
-    || text.startsWith("Left sweep recovery"))) {
-    throw new Error(`M121 attacker never rendered left-sweep commitment: ${JSON.stringify(attackerResult.events)}`);
+    text.startsWith(expectedCommitment + " committed")
+    || text.startsWith(expectedCommitment + " active")
+    || text.startsWith(expectedCommitment + " recovery"))) {
+    throw new Error(`M121 attacker never rendered ${side}-sweep commitment: ${JSON.stringify(attackerResult.events)}`);
   }
   return evidence;
 }
