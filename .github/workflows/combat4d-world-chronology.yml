@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/combat4d-world-chronology.mjs'
+      - 'scripts/pvp_browser_flight_runner.mjs'
       - 'tests/combat4d-world-chronology.test.mjs'
       - '.github/workflows/combat4d-world-chronology.yml'
   workflow_dispatch:
