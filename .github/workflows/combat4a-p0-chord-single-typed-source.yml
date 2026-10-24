@@ -1,0 +1,32 @@
+name: Combat 4A P0 one typed source0 RMB-held native-event-shape regression (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "tests/combat4a-p0-rmb-chord-single-source0.test.mjs"
+      - ".github/workflows/combat4a-p0-chord-single-typed-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-source0-physical-edge-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Freeze selected original 0x11 outbox and capture path
+        run: |
+          node --check src/browser/prealpha-lmb-dom-gesture-review.mjs
+          node --check web/prealpha-gesture-live-lab.mjs
+          node --check tests/combat4a-p0-rmb-chord-single-source0.test.mjs
+          node --test tests/combat4a-p0-rmb-chord-single-source0.test.mjs
+          node --test tests/core8a-p0-selected-typed-outbox-backpressure.test.mjs
