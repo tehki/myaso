@@ -2145,6 +2145,86 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_review_undercharged_release_preserves_one_light_without_heavy() {
+        // Existing dormant typed-gesture -> original World bridge only.
+        // An early release after genuine server-owned upgrade must resume the
+        // ORIGINAL 135ms light clock, not create a free new windup or 46HP.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert!(world.step().is_empty());
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: SERVER_DT_MS as u64,
+            },
+        ));
+        for _ in 0..5 {
+            assert!(
+                world.step().is_empty(),
+                "charging before READY cannot land light or heavy"
+            );
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.fighter(1).unwrap().action_elapsed_ms < HEAVY_ATTACK_WINDUP_MS);
+        assert!(
+            !world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy),
+            "no client-claimed undercharged heavy release can authorize 46HP"
+        );
+
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::ResumeLight {
+                server_elapsed_ms: world.now_ms as u64,
+            },
+        ));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(
+            world.fighter(1).unwrap().action_elapsed_ms >= 90.0,
+            "undercharged release must preserve elapsed original light windup"
+        );
+
+        let mut hits = Vec::new();
+        for _ in 0..35 {
+            hits.extend(
+                world
+                    .step()
+                    .into_iter()
+                    .filter(|event| matches!(event, CombatEvent::Hit { .. })),
+            );
+        }
+        assert_eq!(
+            hits,
+            vec![CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage: 34,
+                hp: 66,
+            }],
+            "one undercharged LMB gesture creates one 34HP World light, not two strikes"
+        );
+        assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+        assert!(
+            !world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy),
+            "no heavy may be armed after the original light commits"
+        );
+        assert!(
+            !world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::UpgradeHeldHeavy {
+                    server_elapsed_ms: world.now_ms as u64,
+                },
+            ),
+            "already-landed light must never upgrade into a second HIT"
+        );
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
