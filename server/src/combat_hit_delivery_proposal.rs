@@ -739,7 +739,10 @@ mod tests {
         // Empty authoritative tick is still an irrevocable publication
         // boundary. A second legacy per-event call cannot add a HIT later.
         let mut after_empty = scope(2);
-        assert!(after_empty.project_committed_tick_batch(100, &[]).unwrap().is_empty());
+        assert!(after_empty
+            .project_committed_tick_batch(100, &[])
+            .unwrap()
+            .is_empty());
         assert_eq!(
             after_empty.project_hit(&event(2, 1), commit(100, 0, 2, 1)),
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
@@ -771,7 +774,13 @@ mod tests {
                 .project_committed_tick_batch(200, &[(event(2, 1), commit(200, 1, 2, 1))]),
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
         );
-        assert_eq!((after_incremental.pending(), after_incremental.next_sequence()), (1, 1));
+        assert_eq!(
+            (
+                after_incremental.pending(),
+                after_incremental.next_sequence()
+            ),
+            (1, 1)
+        );
         assert_eq!(
             after_incremental
                 .project_committed_tick_batch(201, &[(event(2, 1), commit(201, 0, 2, 1))])
