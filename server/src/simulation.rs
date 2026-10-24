@@ -353,16 +353,13 @@ impl Fighter {
         self.latest_input
     }
 
-    fn latch_action_edges(
-        &mut self,
-        input: InputIntent,
-        release_motion: Option<(f32, f32, f32)>,
-    ) {
+    fn latch_action_edges(&mut self, input: InputIntent, release_motion: Option<(f32, f32, f32)>) {
         // Preserve only the actual original v1 directional light-release
         // provenance. A subsequent neutral packet in this same World tick
         // must not turn genuine W+LMB LEFT SWEEP into generic light. Do not
         // modify locomotion, facing, action timing or packet admission.
-        if input.attack && !input.heavy_attack
+        if input.attack
+            && !input.heavy_attack
             && (!self.latest_input.attack || self.latest_input.heavy_attack)
         {
             // Original QUIC batch coalescing keeps latest neutral movement,
@@ -373,8 +370,7 @@ impl Fighter {
                 .filter(|(x, y, angle)| x.is_finite() && y.is_finite() && angle.is_finite())
                 .unwrap_or((input.move_x, input.move_y, input.facing_radians));
             let facing = normalize_angle(facing);
-            self.pending_attack_lateral =
-                Some(facing.sin() * move_x - facing.cos() * move_y);
+            self.pending_attack_lateral = Some(facing.sin() * move_x - facing.cos() * move_y);
         }
         // A completed LMB charge sends ONE of the release modes below. When
         // press and release arrive between two server ticks, pending edges
@@ -1090,9 +1086,9 @@ fn begin_requested_action(
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = false;
             fighter.buffered_light_attack = true;
-            fighter.buffered_attack_lateral = fighter.pending_attack_lateral
-                .unwrap_or(fighter.facing.sin() * input.move_x
-                    - fighter.facing.cos() * input.move_y);
+            fighter.buffered_attack_lateral = fighter.pending_attack_lateral.unwrap_or(
+                fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y,
+            );
         }
         return;
     }
@@ -1156,7 +1152,7 @@ fn begin_requested_action(
                 }
             } else {
                 let lateral = fighter.pending_attack_lateral.unwrap_or(
-                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
+                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y,
                 );
                 fighter.begin_light_attack(lateral);
             }
@@ -1311,9 +1307,9 @@ fn begin_requested_action(
     }
 
     if edges.attack && fighter.action == Action::Idle {
-        let lateral = fighter.pending_attack_lateral.unwrap_or(
-            fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
-        );
+        let lateral = fighter
+            .pending_attack_lateral
+            .unwrap_or(fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y);
         fighter.begin_light_attack(lateral);
         return;
     }
@@ -2199,7 +2195,8 @@ mod r2_combat_control_tests {
                 let mut world = World::new(800.0, 600.0);
                 assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
                 let hold = InputIntent {
-                    attack: true, heavy_attack: true,
+                    attack: true,
+                    heavy_attack: true,
                     ..InputIntent::default()
                 };
                 assert!(world.set_input(1, hold));
@@ -2207,20 +2204,32 @@ mod r2_combat_control_tests {
                     world.step();
                     assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
                 }
-                assert!(world.set_input(1, InputIntent {
-                    attack: true, move_y: release_y,
-                    ..InputIntent::default()
-                }));
+                assert!(world.set_input(
+                    1,
+                    InputIntent {
+                        attack: true,
+                        move_y: release_y,
+                        ..InputIntent::default()
+                    }
+                ));
                 assert!(world.set_input(1, InputIntent::default()));
                 world.step();
                 let fighter = world.fighter(1).unwrap();
-                assert_eq!(fighter.action, expected,
-                    "release-time lateral survives newer neutral input");
-                assert_eq!(fighter.input().move_y, 0.0,
-                    "the original latest neutral still owns locomotion");
+                assert_eq!(
+                    fighter.action, expected,
+                    "release-time lateral survives newer neutral input"
+                );
+                assert_eq!(
+                    fighter.input().move_y,
+                    0.0,
+                    "the original latest neutral still owns locomotion"
+                );
                 world.step();
-                assert_eq!(world.fighter(1).unwrap().action, expected,
-                    "the same release must not commit a duplicate strike");
+                assert_eq!(
+                    world.fighter(1).unwrap().action,
+                    expected,
+                    "the same release must not commit a duplicate strike"
+                );
             }
         }
     }
@@ -2231,12 +2240,21 @@ mod r2_combat_control_tests {
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
         // A genuine short press/release can be observed as a lone attack
         // frame followed immediately by unrelated movement in the same tick.
-        assert!(world.set_input(1, InputIntent {
-            attack: true, move_y: -1.0, ..InputIntent::default()
-        }));
-        assert!(world.set_input(1, InputIntent {
-            move_y: 1.0, ..InputIntent::default()
-        }));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                move_y: -1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: 1.0,
+                ..InputIntent::default()
+            }
+        ));
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
         assert_eq!(world.fighter(1).unwrap().input().move_y, 1.0);
