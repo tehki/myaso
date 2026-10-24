@@ -243,6 +243,9 @@ pub struct Fighter {
     pub recently_interacted_with: Option<u32>,
     latest_input: InputIntent,
     pending_attack: bool,
+    // Direction belongs to the one-shot light release, not a later neutral
+    // movement frame arriving before the next authoritative 60Hz World step.
+    pending_attack_lateral: Option<f32>,
     pending_heavy_attack: bool,
     pending_dodge: bool,
     pending_kick: bool,
@@ -307,6 +310,7 @@ impl Fighter {
             recently_interacted_with: None,
             latest_input: InputIntent::default(),
             pending_attack: false,
+            pending_attack_lateral: None,
             pending_heavy_attack: false,
             pending_dodge: false,
             pending_kick: false,
@@ -350,6 +354,17 @@ impl Fighter {
     }
 
     fn latch_action_edges(&mut self, input: InputIntent) {
+        // Preserve only the actual original v1 directional light-release
+        // provenance. A subsequent neutral packet in this same World tick
+        // must not turn genuine W+LMB LEFT SWEEP into generic light. Do not
+        // modify locomotion, facing, action timing or packet admission.
+        if input.attack && !input.heavy_attack
+            && (!self.latest_input.attack || self.latest_input.heavy_attack)
+        {
+            let facing = normalize_angle(input.facing_radians);
+            self.pending_attack_lateral =
+                Some(facing.sin() * input.move_x - facing.cos() * input.move_y);
+        }
         // A completed LMB charge sends ONE of the release modes below. When
         // press and release arrive between two server ticks, pending edges
         // must not OR the prior dual-bit HOLD back into this newer input.
@@ -387,6 +402,7 @@ impl Fighter {
 
     fn clear_pending_actions(&mut self) {
         self.pending_attack = false;
+        self.pending_attack_lateral = None;
         self.pending_heavy_attack = false;
         self.pending_dodge = false;
         self.pending_kick = false;
@@ -1049,8 +1065,9 @@ fn begin_requested_action(
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = false;
             fighter.buffered_light_attack = true;
-            fighter.buffered_attack_lateral =
-                fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+            fighter.buffered_attack_lateral = fighter.pending_attack_lateral
+                .unwrap_or(fighter.facing.sin() * input.move_x
+                    - fighter.facing.cos() * input.move_y);
         }
         return;
     }
@@ -1113,8 +1130,9 @@ fn begin_requested_action(
                     fighter.set_action(Action::Idle, 0.0);
                 }
             } else {
-                let lateral =
-                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+                let lateral = fighter.pending_attack_lateral.unwrap_or(
+                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
+                );
                 fighter.begin_light_attack(lateral);
             }
             return;
@@ -1268,7 +1286,9 @@ fn begin_requested_action(
     }
 
     if edges.attack && fighter.action == Action::Idle {
-        let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+        let lateral = fighter.pending_attack_lateral.unwrap_or(
+            fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y
+        );
         fighter.begin_light_attack(lateral);
         return;
     }
