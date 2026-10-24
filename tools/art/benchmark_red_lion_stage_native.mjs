@@ -101,7 +101,12 @@ function browserProbe(variant,done){
   error:String(e),stack:String(e?.stack||""),name:e?.name||null
  }));
 }
-const code="("+browserProbe.toString()+")(arguments[0],arguments[arguments.length-1]);";
+// Firefox W3C injected functions execute in an isolated SpiderMonkey realm.
+// Running native source-load code in that realm produces cross-compartment
+// ArrayBuffers rejected by the original secure instanceof ArrayBuffer check.
+// Inject a first-party module element and only READ its result via WebDriver.
+const inject=`window.__graphics3bStageAB=null;const s=document.createElement("script");s.type="module";s.textContent=arguments[0];document.head.appendChild(s);return true;`;
+const readResult="return window.__graphics3bStageAB??null;";
 try{
  await mkdir(dest,{recursive:true});
  server=createServer(async(req,res)=>{
@@ -137,8 +142,17 @@ try{
    await wd(b,"POST","/session/"+b.id+"/url",{url:page},60000);
    const rows=[];
    for(const [index,source] of ["baseline","candidate","candidate","baseline"].entries()){
-    const reading=await wd(b,"POST","/session/"+b.id+"/execute/async",
-     {script:code,args:[source]},210000);
+    const firstPartyModule=`(${browserProbe.toString()})(${JSON.stringify(source)},v=>{window.__graphics3bStageAB=v});`;
+    await wd(b,"POST","/session/"+b.id+"/execute/sync",
+     {script:inject,args:[firstPartyModule]},30000);
+    let reading=null;
+    for(let poll=0;poll<600;poll++){
+     reading=await wd(b,"POST","/session/"+b.id+"/execute/sync",
+      {script:readResult,args:[]},15000);
+     if(reading!==null)break;
+     await sleep(100);
+    }
+    assert.ok(reading,name+" "+source+" native module did not report");
     assert.equal(reading.error,undefined,name+" "+source+" "+JSON.stringify(reading));
     assert.equal(reading.frames,720);
     assert.ok(reading.p50Ms>=0&&reading.p95Ms>=reading.p50Ms);
