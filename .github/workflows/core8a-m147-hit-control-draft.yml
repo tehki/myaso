@@ -7,6 +7,7 @@ on:
       - "server/src/combat_hit_receipt.rs"
       - "server/src/combat_hit_journal.rs"
       - "server/src/combat_hit_delivery_proposal.rs"
+      - "server/src/combat_hit_world_commit_proposal.rs"
       - "server/src/lib.rs"
       - "src/network/m147-hit-control-proposal.mjs"
       - "src/network/m147-hit-receipt-codec.mjs"
@@ -43,6 +44,8 @@ jobs:
         run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit
       - name: Server-owned recipient-incarnation contiguous projection and ACK safety
         run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_delivery_proposal
+      - name: Core8C source-derived World HIT and canonical bound actor incarnation
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_world_commit_proposal
       - name: Original Rust formatting unchanged
         run: cargo fmt --all --manifest-path server/Cargo.toml -- --check
       - name: Strict Rust Clippy (no live feature flags)
