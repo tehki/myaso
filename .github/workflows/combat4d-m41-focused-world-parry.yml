@@ -1,0 +1,41 @@
+name: Combat 4D M41 real wheel parry World and raster pixels (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "web/online-game.mjs"
+      - "server/src/simulation.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/combat4d-m41-focused-world-parry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m41-parry-raster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYASO_PVP_SCENARIO: uiparrytell
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check genuine Chrome Firefox and unchanged original input
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Preinstall pinned 1.89 and compile original Rust World before genuine W3C runs
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: M41 first real Firefox wheel Chrome parry and remote-only canvas raster
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: M41 second real Firefox wheel Chrome parry and remote-only canvas raster
+        if: always()
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
