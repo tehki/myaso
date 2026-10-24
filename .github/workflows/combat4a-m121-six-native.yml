@@ -1,0 +1,53 @@
+name: Combat 4A M121 six genuine directional source-to-World trials (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "tests/combat4a-m121-unchanged-sender-provenance.test.mjs"
+      - ".github/workflows/combat4a-m121-six-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-unchanged-native-world-flights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        native-host: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+    steps:
+      - name: Checkout immutable PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fail-closed original source/protocol invariant
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/combat4a-m121-unchanged-sender-provenance.test.mjs
+          chromedriver --version
+          geckodriver --version
+          google-chrome --version
+          firefox --version
+      - name: Precompile unchanged original Rust authoritative World
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          test -x server/target/debug/myaso-server
+      - name: Genuine W3C original Chrome Firefox World left/right directional flight A
+        run: |
+          echo "M121 true native independent host ${{ matrix.native-host }}/3, original flight A/2"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: Genuine W3C original Chrome Firefox World left/right directional flight B
+        run: |
+          echo "M121 true native independent host ${{ matrix.native-host }}/3, original flight B/2"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
