@@ -43,11 +43,13 @@ jobs:
           cargo test --locked --manifest-path server/Cargo.toml m121_ -- --nocapture
           cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
           test -x server/target/debug/myaso-server
-      - name: Real native Chrome Firefox original-game M121 LEFT and RIGHT A
+      - name: Genuine original Chrome Firefox LEFT SWEEP and 34HP World
         run: |
-          echo "independent CI host ${{ matrix.independent-host }}/3, original flight A/2"
+          echo "independent CI host ${{ matrix.independent-host }}/3, native LEFT sweep"
           timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
-      - name: Real native Chrome Firefox original-game M121 LEFT and RIGHT B
+      - name: Genuine original Chrome Firefox RIGHT SWEEP and 34HP World
+        env:
+          MYASO_M121_SIDE: right
         run: |
-          echo "independent CI host ${{ matrix.independent-host }}/3, original flight B/2"
+          echo "independent CI host ${{ matrix.independent-host }}/3, native RIGHT sweep"
           timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
