@@ -774,3 +774,54 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     );
     println!("COMBAT4C_NATIVE_LMB_EARLY_UPGRADE_RELEASE_ONLY_QUIC_PASS");
 }
+
+
+// Core8A P0: exact original pinned QUIC actor, no alternate session/action
+// engine. One bounded outbox must be able to retry a real RELEASE which
+// arrived ahead of its PRESS, without getting a fatal REJECTED ACK that
+// permanently retires the authenticated source0 lease.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn core8a_native_reordered_release_waits_for_original_press_then_retries() {
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    // Simulate real datagram loss/reorder: the current original actor receives
+    // source0 RELEASE seq2 while its real PRESS seq1 has not yet been admitted.
+    // A fatal REJECTED/ACCEPTED ACK here would drop or miscredit the action.
+    seat.connection
+        .send_datagram(typed_event(0, 3, 2, 1))
+        .expect("real same-lease reordered original v2 RELEASE");
+    let premature = timeout(Duration::from_millis(125), async {
+        loop {
+            let bytes = seat.connection.receive_datagram().await.expect("same native QUIC");
+            if bytes.len() == 16 && bytes[0] == 2 && bytes[1] == 0x12 {
+                break bytes;
+            }
+        }
+    })
+    .await;
+    assert!(
+        premature.is_err(),
+        "no original Rust server 0x12 ACK for RELEASE before missing PRESS: {premature:?}"
+    );
+
+    // Now the authentic original same-actor PRESS arrives and can start the
+    // one original LightWindup. No client tick can claim server-time damage.
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+
+    // Replay the EXACT withheld source0 RELEASE seq2/id1. It must be ACKed
+    // only now. Duplicate byte-for-byte resend gets DUPLICATE, no second hit.
+    combat4c_ack(&seat.connection, 0, 3, 2, 1, 1).await;
+    combat4c_ack(&seat.connection, 0, 3, 2, 1, 2).await;
+
+    let observed = server.lines.lock().unwrap().clone();
+    assert!(
+        observed.iter().any(|line| {
+            line.contains("M201_AUTH_GESTURE_ACTION")
+                && line.contains("fighter=1")
+                && line.contains("sequence=1")
+        }),
+        "the actual first original server-accepted PRESS must be traceable: {observed:?}"
+    );
+    println!("CORE8A_NATIVE_REORDERED_EDGE_ACK_FENCE_PASS");
+}
