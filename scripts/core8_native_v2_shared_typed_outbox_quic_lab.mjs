@@ -1,5 +1,5 @@
-// Chromium native W3C LMB+KeyE through ONE actual Core8A shared typed outbox,
-// on real admitted QUIC into the original Rust World.
+// Native W3C LMB-only Combat plus genuine physical KeyE NEGATIVE through ONE
+// original Core8A shared typed outbox and admitted QUIC to the Rust World.
 // Loopback-only nonrelease test. No fake HP, packets or server mutation.
 import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
@@ -137,12 +137,12 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
     document.addEventListener("keydown",e=>{
       if(e.code!=="KeyE"||e.repeat)return;
       lab.events.push({name:"keyDown",ms:performance.now(),trusted:e.isTrusted});
-      lab.offer("down",1);
+      // E is future Use only: observe real W3C E, emit NO Combat outbox edge.
     });
     document.addEventListener("keyup",e=>{
       if(e.code!=="KeyE")return;
       lab.events.push({name:"keyUp",ms:performance.now(),trusted:e.isTrusted});
-      lab.offer("up",1);
+      // No source1 terminal, allocation, retry, ACK or World action.
     });
     Object.defineProperty(lab,"snapshot",{get:()=>q.snapshot});
     window.lab=lab;
@@ -208,70 +208,76 @@ try {
   assert(originalIdle.witness,"actual server 60Hz Idle baseline is required");
   const heldKeyE = process.env.CORE8A_LAB_STANDALONE_KEYE_HELD === "1";
   if(heldKeyE) {
-    assert(!process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS ||
-      process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS !== "1",
-      "independent held KeyE case cannot share dropped-LMB mode");
-    assert(process.env.CORE8A_LAB_DROP_FIRST_ACK !== "1",
-      "independent held KeyE case cannot share dropped-ACK mode");
+    assert(process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS !== "1" &&
+      process.env.CORE8A_LAB_DROP_FIRST_ACK !== "1",
+      "standalone E retirement evidence must not mask dropped source0 packets");
+    // Native physical KeyE may be observed, but has NO Combat producer.
     await wd("POST",base+"/actions",{actions:[{
-      type:"key",id:"core8a-actual-keye-held",actions:[{type:"keyDown",value:"e"}],
+      type:"key",id:"core8a-native-retired-keye",actions:[{type:"keyDown",value:"e"}],
     }]});
-    const press=await poll("real original World KeyE heavy windup from shared outbox",async()=>{
-      const x=await wd("POST",base+"/execute/sync",{
-        script:"return {acks:window.lab?.acks,sent:window.lab?.sent,events:window.lab?.events,errors:window.lab?.errors,snapshot:window.lab?.snapshot};",
-        args:[],
-      });
-      const windup=output.split("\n").find(l=>
-        /M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(l));
-      return {...x,windup,ok:!!windup&&x.acks?.length===1&&x.acks[0].status===1};
-    });
-    assert.deepEqual(press.sent.map(e=>[e.source,e.action,e.sequence,e.gestureId,e.attempt]),
-      [[1,1,1,1,1]]);
-    assert.equal(press.snapshot.pending,0);
-    await pause(490); // physical KeyE remains DOWN for 320ms server READY
-    assert(!output.includes("fighter=1 from=9 to=10"),
-      "RELEASE-only policy: held KeyE must NEVER auto-strike at 320ms");
+    await pause(490); // Even beyond the server READY320ms, E cannot charge.
     await wd("POST",base+"/actions",{actions:[{
-      type:"key",id:"core8a-actual-keye-held",actions:[{type:"keyUp",value:"e"}],
+      type:"key",id:"core8a-native-retired-keye",actions:[{type:"keyUp",value:"e"}],
     }]});
-    const accepted=await poll("real original World heavy ONLY after physical KeyE UP",async()=>{
-      const x=await wd("POST",base+"/execute/sync",{
-        script:"return {acks:window.lab?.acks,sent:window.lab?.sent,events:window.lab?.events,errors:window.lab?.errors,snapshot:window.lab?.snapshot,settlements:window.lab?.settlements};",
-        args:[],
-      });
-      const active=output.split("\n").find(l=>
-        /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(l));
-      return {...x,active,ok:!!active&&x.acks?.length===2
-        &&x.acks[1].sequence===2&&x.acks[1].status===1};
+    const denied=await wd("POST",base+"/execute/sync",{
+      script:"return {acks:window.lab.acks,sent:window.lab.sent,events:window.lab.events,errors:window.lab.errors,snapshot:window.lab.snapshot};",
+      args:[],
     });
-    assert.deepEqual(accepted.events.map(e=>e.name),["keyDown","keyUp"]);
-    assert(accepted.events.every(e=>e.trusted),"both actual KeyE edges must be trusted native W3C events");
-    assert(accepted.events[1].ms-accepted.events[0].ms>=320,
-      "physical key held until the 320ms original server READY threshold");
-    assert.deepEqual(accepted.sent.map(e=>[e.source,e.action,e.sequence,e.gestureId,e.attempt]),
-      [[1,1,1,1,1],[1,3,2,1,1]]);
+    assert.deepEqual(denied.events.map(e=>e.name),["keyDown","keyUp"]);
+    assert(denied.events.every(e=>e.trusted),"actual physical W3C E events required");
+    assert(denied.events[1].ms-denied.events[0].ms>=320,
+      "real E held longer than READY320ms still cannot start Combat");
+    assert.deepEqual(denied.sent,[],"retired KeyE cannot reserve or send source1 Combat");
+    assert.deepEqual(denied.acks,[],"retired KeyE produces no Combat transport ACK");
+    assert.deepEqual(denied.errors,[]);
+    assert.equal(denied.snapshot.nextSequence,1);
+    assert.equal(denied.snapshot.nextGestureId,1);
+    assert.equal(denied.snapshot.pending,0);
+    assert.equal(denied.snapshot.closed,false);
+    assert.deepEqual(denied.snapshot.activeSources,[]);
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=(?:1|9|10)/.test(output),
+      "physical E cannot mutate original Rust World Combat state");
+    assert(!/M201_AUTH_HIT tick=\d+ attacker=1/.test(output),
+      "physical E cannot commit a HIT");
+
+    // Positive same-lease LMB proof: E did not steal seq1 or kill outbox.
+    await wd("POST",base+"/actions",{actions:[{
+      type:"pointer",id:"core8a-native-real-lmb",parameters:{pointerType:"mouse"},
+      actions:[
+        {type:"pointerMove",origin:"viewport",x:120,y:120,duration:0},
+        {type:"pointerDown",button:0},
+        {type:"pause",duration:6},
+        {type:"pointerUp",button:0},
+      ],
+    }]});
+    const accepted=await poll("physical LMB still reaches original World after held E",async()=>{
+      const x=await wd("POST",base+"/execute/sync",{
+        script:"return {acks:window.lab.acks,sent:window.lab.sent,events:window.lab.events,errors:window.lab.errors,snapshot:window.lab.snapshot};",args:[],
+      });
+      const world=output.split("\n").find(line=>
+        /M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(line));
+      return {...x,world,ok:x.acks?.length===2&&x.acks.every(a=>a.status===1)&&
+        x.snapshot?.pending===0&&!!world};
+    });
+    assert.deepEqual(accepted.events.map(e=>e.name),["keyDown","keyUp","lmbDown","lmbUp"]);
+    assert.equal(accepted.events[2].id,accepted.events[3].id);
+    assert.deepEqual(accepted.sent.map(e=>[e.sequence,e.gestureId,e.source,e.action]),
+      [[1,1,0,1],[2,1,0,3]]);
     assert.deepEqual(accepted.acks.map(e=>[e.sequence,e.gestureId,e.source,e.status]),
-      [[1,1,1,1],[2,1,1,1]]);
-    assert(accepted.acks.every(e=>e.tick>0),"genuine original World tick in every server ACK");
-    assert(accepted.settlements.every(e=>e.transportSettled&&!e.combatCommitted),
-      "ACKs are never a server-authorized HIT");
-    assert.equal(accepted.snapshot.pending,0);
+      [[1,1,0,1],[2,1,0,1]]);
+    assert.deepEqual(accepted.errors,[]);
     assert.equal(accepted.snapshot.closed,false);
     assert.deepEqual(accepted.snapshot.activeSources,[]);
-    assert.equal(output.split("\n").filter(l=>
-      /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(l)).length,1,
-      "one matching physical KeyE RELEASE must commit exactly one real heavy");
-    assert.equal(accepted.errors.length,0);
-    console.log("CORE8_NATIVE_SHARED_OUTBOX_KEYE_RELEASE_ONLY_PASS",JSON.stringify({
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(output),
+      "held E and short LMB cannot start HeavyWindup");
+    console.log("CORE8_NATIVE_SHARED_OUTBOX_KEYE_RETIRED_PASS",JSON.stringify({
       originalWorld:true,pinnedQUIC:true,oneCore8AOutbox:true,
-      physicalHeldMs:accepted.events[1].ms-accepted.events[0].ms,
-      press:press.windup,release:accepted.active,
-      receipts:accepted.acks,queue:accepted.snapshot,
+      physicalHeldEms:denied.events[1].ms-denied.events[0].ms,
+      source0Only:accepted.sent,acks:accepted.acks,world:accepted.world,
     }));
   } else {
-  // One real WebDriver action schedule: physical pointerDOWN is ordered
-  // before KeyE, KeyE down/up occurs DURING the 135ms light windup, then
-  // pointerUP terminates the legitimate original LMB. No dispatchEvent.
+  // One native W3C schedule: physical source0 LMB remains the ONLY Combat edge.
+  // Trusted KeyE down/up DURING light windup must leave queue and World untouched.
   await wd("POST",base+"/actions",{actions:[{
     type:"pointer",id:"auth-shared-mouse",parameters:{pointerType:"mouse"},
     actions:[
@@ -296,22 +302,22 @@ try {
   assert(!(lossTest && ackLossTest),"loss modes must stay independent");
   if(lossTest) {
     // Actual W3C edges have all been placed on the ONE real sender queue.
-    // Only seq1 was deliberately lost; seq2-4 reached the actual Rust QUIC
-    // listener *before* seq1. The server must withhold their ACK and avoid
-    // any premature original World action until the missing PRESS returns.
+    // Only seq1 was deliberately lost; seq2 genuine LMB RELEASE reached the
+    // actual Rust QUIC listener first. The server must await the missing PRESS
+    // before accepting source0 terminal or running the original World attack.
     await pause(140);
     const before=await wd("POST",base+"/execute/sync",{
       script:"return {acks:window.lab.acks, sent:window.lab.sent, dropped:window.lab.dropped, snapshot:window.lab.snapshot};",
       args:[],
     });
     assert.deepEqual(before.dropped,[{sequence:1,source:0,gestureId:1,attempt:1}]);
-    assert.equal(before.acks.length,0,"future KeyE/LMB cannot be ACKed ahead of lost LMB PRESS");
-    assert.equal(before.snapshot.pending,4,"all four independently sourced W3C edges must remain pending");
+    assert.equal(before.acks.length,0,"source0 RELEASE cannot be ACKed ahead of lost LMB PRESS");
+    assert.equal(before.snapshot.pending,2,"only two real source0 LMB edges remain pending");
     assert(!output.includes("fighter=1 from=1 to=2"),
       "no original LightActive without the authenticated missing LMB PRESS");
     // Only the real Core8A queue decides which edge is retried. The driver
     // never reconstructs packets or assigns sequence/source/gesture IDs.
-    for(let sequence=1;sequence<=4;sequence++) {
+    for(let sequence=1;sequence<=2;sequence++) {
       const retry=await wd("POST",base+"/execute/async",{
         script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
         args:[],
@@ -337,12 +343,12 @@ try {
         script:"return {acks:window.lab.acks,droppedAcks:window.lab.droppedAcks,snapshot:window.lab.snapshot};",
         args:[],
       });
-      return {...v,ok:v.acks?.length===3&&v.snapshot?.pending===1
+      return {...v,ok:v.acks?.length===1&&v.snapshot?.pending===1
         &&v.droppedAcks?.length===1};
     });
     assert.deepEqual(before.droppedAcks,[{sequence:1,status:1}],
       "must discard ONLY authentic server ACCEPTED for already-admitted seq1");
-    assert.deepEqual(before.acks.map(x=>x.sequence).sort((a,b)=>a-b),[2,3,4]);
+    assert.deepEqual(before.acks.map(x=>x.sequence).sort((a,b)=>a-b),[2]);
     const retry=await wd("POST",base+"/execute/async",{
       script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
       args:[],
@@ -362,7 +368,7 @@ try {
       script:"return {acks:window.lab?.acks,events:window.lab?.events,sent:window.lab?.sent,dropped:window.lab?.dropped,droppedAcks:window.lab?.droppedAcks,errors:window.lab?.errors,settlements:window.lab?.settlements,snapshot:window.lab?.snapshot};",
       args:[],
     });
-    return {...x,ok:x.acks?.length===4 && x.snapshot?.pending===0
+    return {...x,ok:x.acks?.length===2 && x.snapshot?.pending===0
       &&x.acks?.every(a=>a.status===(ackLossTest&&a.sequence===1?2:1))
       &&output.includes("M201_AUTH_ACTION")&&output.includes("fighter=1 from=1 to=2")};
   });
@@ -371,12 +377,18 @@ try {
   assert.equal(accepted.events[0].id,accepted.events[3].id);
   assert(accepted.events.slice(1,3).every(x=>x.trusted),"genuine W3C physical KeyE required");
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===1).map(x=>[x.sequence,x.gestureId,x.source,x.action]),
-    [[1,1,0,1],[2,2,1,1],[3,2,1,3],[4,1,0,3]]);
+    [[1,1,0,1],[2,1,0,3]]);
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===2).map(x=>x.sequence),
-    lossTest?[1,2,3,4]:ackLossTest?[1]:[]);
+    lossTest?[1,2]:ackLossTest?[1]:[]);
   assert.deepEqual(accepted.acks.map(x=>[x.sequence,x.gestureId,x.source,x.status]).sort((a,b)=>a[0]-b[0]),
-    [[1,1,0,ackLossTest?2:1],[2,2,1,1],[3,2,1,1],[4,1,0,1]]);
+    [[1,1,0,ackLossTest?2:1],[2,1,0,1]]);
   assert.deepEqual(accepted.droppedAcks,ackLossTest?[{sequence:1,status:1}]:[]);
+  assert.equal(accepted.sent.some(edge=>edge.source!==0),false,
+    "physical E cannot become a Combat source or consume outbox ordering");
+  assert(accepted.acks.every(ack=>ack.source===0),
+    "retired E must never receive a Combat ACK");
+  assert.equal(accepted.snapshot.nextSequence,3);
+  assert.equal(accepted.snapshot.nextGestureId,2);
   assert(accepted.settlements.every(x=>x.transportSettled&&!x.combatCommitted));
   assert.deepEqual(accepted.snapshot.activeSources,[]);
   assert.equal(accepted.snapshot.closed,false);
