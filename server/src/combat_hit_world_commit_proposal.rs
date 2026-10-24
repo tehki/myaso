@@ -371,4 +371,35 @@ mod tests {
         assert_eq!(v3.next_sequence(), 1);
         assert_eq!(s.next_sequence(), 0);
     }
+
+    #[test]
+    fn actual_existing_core8_gesture_admission_and_hit_scope_share_identical_binding() {
+        use crate::prealpha_authenticated_gesture::SessionGestureWorldPath;
+
+        let mut world = arena();
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let original = SessionGestureWorldPath::from_admitted_world(&world, 2, 102, 91)
+            .expect("real Core8 source1 gesture actor must be admitted");
+        let hit_scope = origin.bind_admitted(&world, 2, 102).unwrap();
+        assert_eq!(hit_scope, original.binding());
+        // The originally returned actor/lease isn't authority over a new
+        // occupant with an identical numeric player ID.
+        assert!(world.remove_player(2));
+        assert!(world.add_player_at(2, 260.0, 200.0, std::f32::consts::PI));
+        let replacement = SessionGestureWorldPath::from_admitted_world(&world, 2, 104, 91)
+            .expect("different authenticated lease on fresh original World actor");
+        assert_ne!(replacement.binding(), original.binding());
+        assert_eq!(
+            origin.bind_admitted(&world, 2, 104),
+            Err(OriginError::AlreadyAdmitted(2))
+        );
+        origin.retire_exact(original.binding()).unwrap();
+        let new_hit_scope = origin.bind_admitted(&world, 2, 104).unwrap();
+        assert_eq!(new_hit_scope, replacement.binding());
+        assert_eq!(
+            origin.retire_exact(original.binding()),
+            Err(OriginError::StaleActor(2)),
+            "delayed old disconnect cannot evict fresh current actor scope"
+        );
+    }
 }
