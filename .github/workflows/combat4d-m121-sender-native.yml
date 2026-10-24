@@ -5,6 +5,7 @@ on:
     paths:
       - "web/online-game.mjs"
       - "server/src/main.rs"
+      - "server/src/simulation.rs"
       - "scripts/pvp_browser_flight_runner.mjs"
       - "tests/combat4-m121-sender-instrumentation.test.mjs"
       - "tests/combat4-m121-authoritative-ingress-proof.test.mjs"
@@ -35,9 +36,10 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
-      - name: Compile original authoritative Rust World
+      - name: Regression-test authoritative M121 release direction before native flight
         run: |
           rustup toolchain install 1.89.0 --profile minimal
+          cargo test --locked --manifest-path server/Cargo.toml m121_ -- --nocapture
           cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Strict original M121 native Chrome Firefox genuine directional World and HUD
         run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
