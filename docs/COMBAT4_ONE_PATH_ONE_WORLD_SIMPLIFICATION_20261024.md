@@ -1,8 +1,8 @@
 # Combat 4 — One Path, One World (P0 simplification contract)
 
-**Date:** 2026-10-24  
-**Tracking:** [#1011](https://github.com/tehki/myaso/issues/1011), [Pre-Alpha #695](https://github.com/tehki/myaso/issues/695), [Combat P0 #696](https://github.com/tehki/myaso/issues/696), [gesture protocol #723](https://github.com/tehki/myaso/issues/723), [Core #405](https://github.com/tehki/myaso/issues/405)  
-**Starting point:** protected `main` `6fa59b649112c272bcbc018b4a32bf963f9a5bba`  
+**Date:** 2026-10-24
+**Tracking:** [#1011](https://github.com/tehki/myaso/issues/1011), [Pre-Alpha #695](https://github.com/tehki/myaso/issues/695), [Combat P0 #696](https://github.com/tehki/myaso/issues/696), [gesture protocol #723](https://github.com/tehki/myaso/issues/723), [Core #405](https://github.com/tehki/myaso/issues/405)
+**Starting point:** protected `main` `6fa59b649112c272bcbc018b4a32bf963f9a5bba`
 **Status:** DRAFT, review-only. This document does not change gameplay, protocol, CI, release scope, or production behavior.
 
 ## Problem to solve
