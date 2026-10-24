@@ -5,6 +5,7 @@ import {
   HIT_CONTROL_OP as OP, HIT_CONTROL_BYTES, HIT_CONTROL_TYPE_PROPOSAL as TYPE,
 } from "../src/network/m147-hit-control-proposal.mjs";
 import {encodeHitReceipt} from "../src/network/m147-hit-receipt-codec.mjs";
+import {createHitReceiptPresenter} from "../src/browser/m147-hit-receipt-feedback.mjs";
 
 const lease = Uint8Array.from({length:16}, (_,i)=>i+1);
 const grant = () => encodeProposedHitControl({op:OP.SERVER_GRANT,token:lease,aux:64});
@@ -137,4 +138,70 @@ test("callback failure refuses to ACK or advance; no same-lease wrap credit",()=
   shouldFail=false;
   assert.equal(gate.receipt(hit(0),transport).kind,"delivered");
   assert.deepEqual(delivered,[0]);
+});
+
+
+test("verified transport inbox presents only its bound actor: attacker once, victim once, spectator never", () => {
+  // Offline integration of the actual proposed same-lease inbox + the
+  // actor-scoped Combat4C presenter; transport identity is caller-injected.
+  // This is NOT a running or approved WebTransport HIT service.
+  const attackerTransport = {}, victimTransport = {}, spectatorTransport = {};
+  const attackerPresenter = createHitReceiptPresenter();
+  const victimPresenter = createHitReceiptPresenter();
+  const spectatorPresenter = createHitReceiptPresenter();
+  const attackerFeedback = [], victimFeedback = [], spectatorFeedback = [];
+
+  const attackerInbox = createProposedHitInbox({
+    trustedTransport: attackerTransport, actorId: 2,
+    onAttackerHit: receipt => attackerFeedback.push(attackerPresenter.observe(receipt, 2)),
+    onDamageTaken: () => assert.fail("attacker received unowned victim credit"),
+  });
+  const victimInbox = createProposedHitInbox({
+    trustedTransport: victimTransport, actorId: 1,
+    onAttackerHit: () => assert.fail("victim received unowned attacker credit"),
+    onDamageTaken: receipt => victimFeedback.push(victimPresenter.observe(receipt, 1)),
+  });
+  const spectatorInbox = createProposedHitInbox({
+    trustedTransport: spectatorTransport, actorId: 3,
+    onAttackerHit: receipt => spectatorFeedback.push(spectatorPresenter.observe(receipt, 3)),
+  });
+  for (const [inbox, transport] of [
+    [attackerInbox, attackerTransport],
+    [victimInbox, victimTransport],
+    [spectatorInbox, spectatorTransport],
+  ]) {
+    assert.equal(inbox.acceptControl(grant(), transport).kind, "granted");
+  }
+
+  // These two wire fixtures represent a future server-approved per-recipient
+  // contiguous projection: unrelated global World HITs must not consume a
+  // recipient seq. A raw global-journal seq would be invalid here.
+  const first = hit(0, 2, 1), second = hit(1, 2, 1, 34, 32);
+  for (const [inbox, transport] of [
+    [attackerInbox, attackerTransport], [victimInbox, victimTransport],
+  ]) {
+    assert.deepEqual(
+      [inbox.receipt(first, transport).kind, inbox.receipt(first, transport).kind,
+        inbox.receipt(second, transport).kind],
+      ["delivered", "duplicate", "delivered"]);
+    assert.equal(inbox.state.expected, 2);
+  }
+
+  assert.deepEqual(attackerFeedback.map(e => e?.feedback), ["hit-confirm", "hit-confirm"]);
+  assert.deepEqual(victimFeedback.map(e => e?.feedback), ["damage-taken", "damage-taken"]);
+  assert.throws(() => spectatorInbox.receipt(first, spectatorTransport), /unowned HIT/);
+  assert.deepEqual(spectatorFeedback, []);
+  assert.equal(spectatorInbox.state.expected, 0);
+
+  // A stale async callback cannot turn an existing presenter into another
+  // actor on the same lease, even if a forged numeric actor is supplied.
+  assert.throws(() => attackerPresenter.observe({
+    sequence: 2, serverTick: 103, attacker: 2, target: 1, damage: 34, targetHp: 0,
+  }, 3), /actor swap/);
+  assert.equal(attackerInbox.state.expected, 2);
+  attackerInbox.retire();
+  assert.throws(() => attackerInbox.receipt(hit(2), attackerTransport), /grant/);
+  // A presenter reset alone is pure state; it does NOT authenticate a lease.
+  attackerPresenter.reset();
+  assert.throws(() => attackerInbox.acceptControl(grant(), attackerTransport), /retired/);
 });
