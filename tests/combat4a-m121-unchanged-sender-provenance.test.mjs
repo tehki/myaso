@@ -15,8 +15,9 @@ test("M121 real original 30Hz KeyW+LMB accepts read-only direction evidence", ()
   const readonly = originalSender.slice(captureStart, captureEnd);
   for (const evidence of [
     'const m121DirectionTrace = acceptanceScenario === "uidirectionallight"',
-    'm121DirectionTrace && keys.has("KeyW")',
+    'm121DirectionTrace && (keys.has("KeyW") || keys.has("KeyD"))',
     "keyWHeldAtSample: keys.has(\"KeyW\")",
+    "keyDHeldAtSample: keys.has(\"KeyD\")",
     "lmbHeldAtSample: Boolean(leftButtonDown)",
     "leftChargingAtSample: leftButtonCharge.isCharging()",
     "pendingLightReleaseAtSample: Boolean(attackRequested)",
@@ -27,7 +28,7 @@ test("M121 real original 30Hz KeyW+LMB accepts read-only direction evidence", ()
     "pressMoveY: leftButtonPressMovement?.moveY ?? null",
     "committedLightMoveY: committedLightMove?.moveY ?? null",
     "observedServerTick: networkClient.latestServerTick",
-    "if (debug.inputSubmissions.length > 32)",
+    "if (debug.inputSubmissions.length > (m121DirectionTrace ? 96 : 32))",
   ]) assert.ok(readonly.includes(evidence), `missing read-only M121 provenance: ${evidence}`);
   assert.doesNotMatch(readonly, /currentInput\.[A-Za-z]+\s*=(?!=)/,
     "never mutate the original sampled v1 input to pass M121");
