@@ -228,7 +228,7 @@ fn cancelled_heavy_ready_and_late_upgrade_cannot_hit_original_target_twice() {
 }
 
 #[test]
-fn legacy_v1_lmb_and_key_e_actions_cannot_be_modified_by_review_v2_commands() {
+fn legacy_v1_lmb_and_retired_key_e_bits_cannot_be_modified_by_review_v2_commands() {
     use myaso_server::simulation::InputIntent;
     let mut legacy_light = World::new(800.0, 600.0);
     legacy_light.add_player_at(1, 250.0, 300.0, 0.0);
@@ -265,11 +265,16 @@ fn legacy_v1_lmb_and_key_e_actions_cannot_be_modified_by_review_v2_commands() {
             ..InputIntent::default()
         },
     );
-    key_e.step();
-    assert_eq!(key_e.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    // The obsolete keyboard-heavy-only v1 bit is now inert. Retired E
+    // cannot invent a World heavy or borrow the typed LMB review owner.
+    assert!(key_e.step().is_empty());
+    assert_eq!(key_e.fighter(1).unwrap().action, Action::Idle);
     assert!(!key_e.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
     assert!(!key_e.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
-    assert_eq!(key_e.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    for _ in 0..24 {
+        assert!(key_e.step().is_empty());
+    }
+    assert_eq!(key_e.fighter(1).unwrap().action, Action::Idle);
 }
 #[test]
 fn non_owner_cannot_press_against_active_block_or_force_ready_with_elapsed_claim() {
