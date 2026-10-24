@@ -170,7 +170,11 @@ impl ProposedRecipientHitDelivery {
             return Err(DeliveryError::InvalidWorldIdentity);
         }
         let key = (identity.server_tick, identity.within_tick_ordinal);
-        if self.last_world_hit.is_some_and(|previous| key <= previous) {
+        if self
+            .last_committed_batch_tick
+            .is_some_and(|tick| identity.server_tick <= tick)
+            || self.last_world_hit.is_some_and(|previous| key <= previous)
+        {
             return Err(DeliveryError::ReplayedOrReorderedWorldHit);
         }
         // Validate the actual event BEFORE any receipt gets appended or a
@@ -219,6 +223,9 @@ impl ProposedRecipientHitDelivery {
         if self
             .last_committed_batch_tick
             .is_some_and(|previous| server_tick <= previous)
+            || self
+                .last_world_hit
+                .is_some_and(|(prior_tick, _)| server_tick <= prior_tick)
         {
             return Err(DeliveryError::ReplayedOrReorderedWorldHit);
         }
@@ -724,6 +731,67 @@ mod tests {
                 .unwrap()[0]
                 .sequence,
             0
+        );
+    }
+
+    #[test]
+    fn batch_and_incremental_publication_cannot_recredit_same_world_tick() {
+        // Empty authoritative tick is still an irrevocable publication
+        // boundary. A second legacy per-event call cannot add a HIT later.
+        let mut after_empty = scope(2);
+        assert!(after_empty
+            .project_committed_tick_batch(100, &[])
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            after_empty.project_hit(&event(2, 1), commit(100, 0, 2, 1)),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!((after_empty.pending(), after_empty.next_sequence()), (0, 0));
+        assert_eq!(
+            after_empty
+                .project_committed_tick_batch(101, &[(event(2, 1), commit(101, 0, 2, 1))])
+                .unwrap()[0]
+                .sequence,
+            0,
+            "a subsequent genuinely later World tick still works"
+        );
+        assert_eq!(
+            after_empty.project_hit(&event(2, 1), commit(101, 1, 2, 1)),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!((after_empty.pending(), after_empty.next_sequence()), (1, 1));
+
+        // The reverse path is equally fenced: a previously appended
+        // incremental HIT cannot be followed by an atomic batch of that tick.
+        let mut after_incremental = scope(2);
+        assert!(after_incremental
+            .project_hit(&event(2, 1), commit(200, 0, 2, 1))
+            .unwrap()
+            .is_some());
+        assert_eq!(
+            after_incremental
+                .project_committed_tick_batch(200, &[(event(2, 1), commit(200, 1, 2, 1))]),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(
+            (
+                after_incremental.pending(),
+                after_incremental.next_sequence()
+            ),
+            (1, 1)
+        );
+        assert_eq!(
+            after_incremental
+                .project_committed_tick_batch(201, &[(event(2, 1), commit(201, 0, 2, 1))])
+                .unwrap()[0]
+                .sequence,
+            1
+        );
+        assert_eq!(
+            after_incremental.project_hit(&event(2, 1), commit(200, 2, 2, 1)),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit),
+            "late old World ticks cannot be reinserted after a newer batch"
         );
     }
 }
