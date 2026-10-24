@@ -919,17 +919,35 @@ fn retired_keye_cannot_overtake_missing_lmb_or_spend_lease_sequence() {
     // A legacy Key E packet with a FAR-FUTURE sequence is always denied
     // immediately, before it can claim the monotonic LMB sequence fence.
     let old_e = edge(GestureSource::KeyE, GestureAction::Press, 3, 2);
-    let denied = p.accept_under_world_lock(&mut w, LEASE, BOOT, &old_e).unwrap();
+    let denied = p
+        .accept_under_world_lock(&mut w, LEASE, BOOT, &old_e)
+        .unwrap();
     assert_eq!(denied.status, AckStatus::Rejected);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 100.0);
 
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
@@ -944,11 +962,27 @@ fn retired_keye_cannot_overtake_missing_lmb_or_spend_lease_sequence() {
         );
     }
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
@@ -977,22 +1011,54 @@ fn future_lmb_press_waits_for_missing_lmb_terminal_not_retired_keye() {
     assert_eq!(w.fighter(2).unwrap().hp, 100.0);
 
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 1, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
 
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 4, 2),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            2
+        ),
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
