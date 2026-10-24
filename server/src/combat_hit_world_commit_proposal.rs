@@ -456,17 +456,24 @@ mod tests {
         let mut spectator = ProposedRecipientHitDelivery::new(bystander, [4; 16], 64).unwrap();
         assert_eq!(
             v2.project_committed_tick_batch(original_tick, &committed)
-                .unwrap().iter().map(|r| r.sequence).collect::<Vec<_>>(),
+                .unwrap()
+                .iter()
+                .map(|r| r.sequence)
+                .collect::<Vec<_>>(),
             vec![0]
         );
         assert_eq!(
             v3.project_committed_tick_batch(original_tick, &committed)
-                .unwrap().iter().map(|r| r.sequence).collect::<Vec<_>>(),
+                .unwrap()
+                .iter()
+                .map(|r| r.sequence)
+                .collect::<Vec<_>>(),
             vec![0]
         );
         assert!(spectator
             .project_committed_tick_batch(original_tick, &committed)
-            .unwrap().is_empty());
+            .unwrap()
+            .is_empty());
         assert_eq!(spectator.pending(), 0);
         assert_eq!(
             delivery.ack_next(attacker, &[1; 16], 2),
@@ -479,5 +486,4 @@ mod tests {
             "a delayed second callback must not double-credit a committed World tick"
         );
     }
-
 }
