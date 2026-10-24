@@ -40,10 +40,12 @@ jobs:
     env:
       MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
       MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
-      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.sha }}
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

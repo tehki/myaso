@@ -18,8 +18,12 @@ jobs:
   two-real-three-browser-ffa-world:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [uiguardbreakpunishffa, uiguardbreakpunishffahit]
     env:
-      MYASO_PVP_SCENARIO: uiguardbreakpunishffa
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate original source and actual Chrome Firefox native drivers

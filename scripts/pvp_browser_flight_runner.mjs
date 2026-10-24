@@ -9848,6 +9848,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: wheelFirstGuardOnly ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
+          // One real pre-aimed down/pause/up transaction. Waiting for a
+          // separate DOWN ACK inflated the physical hold52ms on e7ce01df
+          // and put the genuine HIT after block expiry. Actual DOM epochs
+          // below, wheel ACK and all guard/HP/parry gates remain required.
+          sendAttackClick: wheelFirstGuardOnly
+            ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),

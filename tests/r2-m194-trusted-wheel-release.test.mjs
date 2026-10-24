@@ -183,3 +183,73 @@ test("M194 and actual M151/M152 guard-only scenarios retain strict real wheel-fi
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.attack.guardDamage, 38);
 });
+
+test("M194 compound click starts once after trusted wheel and awaits both original command ACKs", async () => {
+  const trusted=deferred(),wheelAck=deferred(),clickAck=deferred(),ceiling=deferred();
+  let now=0,clicks=0,split=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,now:()=>now,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(now+=ms),
+    sendWheel:()=>wheelAck.promise,awaitTrustedWheel:()=>trusted.promise,
+    sendAttackDown:()=>{split++;},sendAttackUp:()=>{split++;},
+    sendAttackClick:()=>{clicks++;return clickAck.promise;},
+  });
+  await tick();assert.equal(clicks,0);
+  now=20;trusted.resolve({trusted:true,deltaY:120});await tick();
+  assert.equal(clicks,1);assert.equal(split,0);
+  now=147;clickAck.resolve();await tick();
+  assert.equal(await Promise.race([flight.then(()=>"done"),tick().then(()=>"pending")]),"pending");
+  now=180;wheelAck.resolve();
+  const result=await flight;
+  assert.equal(result.attackClickDispatchMs,35);assert.equal(result.attackClickAckMs,147);
+  assert.equal(result.wheelAckMs,180);assert.equal(result.trustedWheelObservedMs,20);
+  for(const key of ["attackDownDispatchMs","attackDownAckMs","attackUpDispatchMs","attackUpAckMs","clickHoldMs"])
+    assert.equal(result[key],null,"compound command ACK cannot fabricate physical edge timing");
+  assert.equal(result.postTrustedWheelMs,15);
+});
+
+test("M194 compound click ACK remains mandatory even after wheel ACK", async()=>{
+  const clickAck=deferred(),ceiling=deferred();let clicks=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(),
+    sendWheel:()=>{},awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+    sendAttackClick:()=>{clicks++;return clickAck.promise;},
+  });
+  await tick();assert.equal(clicks,1);
+  assert.equal(await Promise.race([flight.then(()=>"done"),tick().then(()=>"pending")]),"pending");
+  clickAck.resolve();await flight;
+});
+
+test("M194 absent or untrusted wheel admits no compound click and legacy cannot opt in", async()=>{
+  for(const report of [null,{trusted:false,deltaY:120},{trusted:true,deltaY:-120}]){
+    let clicks=0;
+    await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+      preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+      sleep:ms=>ms===190&&report===null?Promise.resolve():new Promise(()=>{}),
+      sendWheel:()=>{},awaitTrustedWheel:()=>report===null?new Promise(()=>{}):report,
+      sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+      sendAttackClick:()=>{clicks++;},
+    }),/wheel/);
+    assert.equal(clicks,0);
+  }
+  await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    sendAttackDown:()=>{},sendAttackUp:()=>{},sendWheel:()=>{},awaitTrustedWheel:()=>{},sendAttackClick:()=>{},
+  }),TypeError);
+});
+
+test("M194 compound failure waits for wheel ACK and preserves both original errors", async()=>{
+  const wheelAck=deferred(),ceiling=deferred(),clickError=Error("native compound click failed"),wheelError=Error("native wheel failed");
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(),
+    sendWheel:()=>wheelAck.promise,awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+    sendAttackClick:()=>{throw clickError;},
+  });
+  await tick();
+  assert.equal(await Promise.race([flight.then(()=>"done",()=>"failed"),tick().then(()=>"pending")]),"pending");
+  const rejected=assert.rejects(flight,error=>error instanceof AggregateError&&error.errors[0]===clickError&&error.errors[1]===wheelError);
+  wheelAck.reject(wheelError);await rejected;
+});

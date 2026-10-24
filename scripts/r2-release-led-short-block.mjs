@@ -10,7 +10,7 @@
 import { setTimeout as sleepTimer } from "node:timers/promises";
 
 export async function dispatchR2ReleaseLedShortBlock({
-  sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
+  sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, sendAttackClick,
   now = () => performance.now(), sleep = sleepTimer,
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
   // REVIEW-only M194: genuinely arm Firefox block BEFORE Chrome LMB down.
@@ -25,12 +25,14 @@ export async function dispatchR2ReleaseLedShortBlock({
     || trustedWheelWaitMs >= maxHoldMs
     || !Number.isFinite(preWheelHeadStartMs) || preWheelHeadStartMs < 0
     || preWheelHeadStartMs > 80
+    || (sendAttackClick !== undefined && typeof sendAttackClick !== "function")
+    || (sendAttackClick !== undefined && preWheelHeadStartMs === 0)
     || (preWheelHeadStartMs > 0 && trustedWheelWaitMs === 0)) {
     throw new TypeError("R2 guard-break requires bounded genuine W3C held-release and attestation");
   }
   if (preWheelHeadStartMs > 0) {
     return dispatchR2WheelFirstShortBlock({
-      sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
+      sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, sendAttackClick,
       now, sleep, maxHoldMs, receiptGraceMs, trustedWheelWaitMs,
       preWheelHeadStartMs,
     });
@@ -117,7 +119,7 @@ export async function dispatchR2ReleaseLedShortBlock({
 // a failing *unchanged* native M194 acceptance assertion in the caller.
 // This is review-only W3C QA, NOT a change to game/server defense timings.
 async function dispatchR2WheelFirstShortBlock({
-  sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp,
+  sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, sendAttackClick,
   now, sleep, maxHoldMs, receiptGraceMs, trustedWheelWaitMs,
   preWheelHeadStartMs,
 }) {
@@ -149,6 +151,30 @@ async function dispatchR2WheelFirstShortBlock({
     earlyWheelFailure,
   ]);
   await sleep(preWheelHeadStartMs);
+  if (sendAttackClick) {
+    // One genuine W3C down/pause/up command removes the down-ACK barrier.
+    // Its command timing is NOT a physical down/up timestamp or hold length:
+    // the caller still verifies actual trusted browser edges and World block.
+    const attackClickDispatchMs = ms();
+    let attackClickAckMs = null;
+    const clickOutcome = Promise.resolve().then(sendAttackClick).then(
+      () => { attackClickAckMs = ms(); return { ok: true }; },
+      error => { attackClickAckMs = ms(); return { ok: false, error }; },
+    );
+    const [clickResult, wheelResult] = await Promise.all([clickOutcome, wheelOutcome]);
+    const errors = [clickResult, wheelResult].filter(result => !result.ok).map(result => result.error);
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, "M194 genuine compound click and wheel W3C commands failed");
+    const rounded = n => Number(n.toFixed(1));
+    return {
+      wheelDispatchMs: rounded(wheelDispatchMs), wheelAckMs: rounded(wheelAckMs),
+      attackClickDispatchMs: rounded(attackClickDispatchMs), attackClickAckMs: rounded(attackClickAckMs),
+      attackDownDispatchMs: null, attackDownAckMs: null,
+      attackUpDispatchMs: null, attackUpAckMs: null, clickHoldMs: null,
+      completeMs: rounded(ms()), trustedWheelObservedMs: rounded(trustedWheelObservedMs),
+      receiptGraceMs, wheelHeadStartMs: preWheelHeadStartMs, postTrustedWheelMs: preWheelHeadStartMs,
+    };
+  }
   const attackDownDispatchMs = ms();
   await sendAttackDown();
   const attackDownAckMs = ms();
