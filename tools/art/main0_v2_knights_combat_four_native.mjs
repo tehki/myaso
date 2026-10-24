@@ -49,11 +49,11 @@ async function startW3C(engine,index){
  return s;
 }
 async function evaluate(s,source){return (await request(s.base,"POST","/session/"+s.id+"/execute/sync",{script:source,args:[]})).value}
-async function startOriginalRust(){
+async function startOriginalRust(maxPlayers=4){
  const bin=join(root,"server","target","debug","myaso-server");
  const build=spawnSync("cargo",["build",...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
- const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_FLIGHT_ACTION_PROOF:"1"},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:String(maxPlayers),MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_FLIGHT_ACTION_PROOF:"1"},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
  child.stdout.on("data",d=>buffer+=d.toString());
  child.stderr.on("data",d=>err+=d.toString());
@@ -291,38 +291,51 @@ try{
  assert.ok(honestWorldHits.some(line=>/damage=34(?:\\.0+)? hp=/.test(line)),
   "original Rust World must prove true 34 HP light strike against an independent fighter");
 
- // Combat 4A independent original-game World proof: RMB remains physically
- // DOWN across one genuine short LMB press/release. W3C may omit the LMB
- // pointerdown/up entirely; source0 must still reach this original Rust World.
- // Preserve the preceding authentic 34HP + 46HP assertions without mutation.
- await waitFor(() => {
-   const lines=readAuthoritativeWorld().split("\n");
-   const after=lines.findIndex(line=>line===lightActive);
-   return after>=0 && lines.slice(after+1).find(line=>
-     /M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
- },14000);
- // Separate legitimate FFA multi-victim cleave from source0 double-strike.
- // Four genuine browser/actor and 34/46HP gates above are already preserved.
- // Retire seats #3/#4 through actual W3C WebDriver close; retain original
- // live Chrome #1 and Firefox #2 on the SAME original Rust World/QUIC host.
- // The isolated two-player chord must produce exactly ONE actual victim hit.
- for (const {s} of actors.slice(2)) {
-   await request(s.base,"DELETE","/session/"+s.id);
+ // Combat 4A independent true two-actor original World proof:
+ // First preserve ALL preceding four OS browser / relit Silver Knights /
+ // actual same-server QUIC World 46HP KeyE and 34HP standalone LMB gates.
+ // FFA light swings can strike multiple valid victims; never mistake this
+ // for duplicate source0 events. Now use a fresh ORIGINAL Rust World with a
+ // real two-seat limit, not synthetic positions, ACK-as-hit or mocked actors.
+ const chordHost=await startOriginalRust(2);
+ const readChordWorld=chordHost.readAuthoritativeWorld;
+ const trueChordSeats=actors.slice(0,2);
+ for (const [seat,{s}] of trueChordSeats.entries()) {
+   const url=new URL(host+"/web/index.html");
+   url.searchParams.set("server",chordHost.url);
+   url.searchParams.set("cert",chordHost.cert);
+   url.searchParams.set("knights","1");
+   url.searchParams.set("knightArt","relit");
+   url.searchParams.set("gestureLab","1");
+   await request(s.base,"POST","/session/"+s.id+"/url",{url:url.toString()},45000);
+   const joined=await waitFor(async()=>{
+     const status=await evaluate(s,
+       "return document.querySelector('#event-text')?.textContent||'';");
+     const match=status.match(/Online - player #(\d+) - server tick (\d+)/);
+     return match?{id:Number(match[1]),tick:Number(match[2])}:false;
+   },18000);
+   assert.equal(joined.id,seat+1,
+     "fresh original Rust World must independently admit Chrome1 and Firefox2");
  }
  const isolatedPair=await waitFor(async()=>{
-   const visible=await evaluate(attacker,stats);
-   return visible?.roster.length===2 ? visible.roster : false;
+   const list=await evaluate(attacker,
+     "return [...document.querySelectorAll('#scoreboard-list li')].map(li=>li.textContent?.trim()||'');");
+   return list?.length===2?list:false;
  },16000);
  assert.equal(isolatedPair.length,2,
-  "exact same original Rust World must retain only genuine Chrome + Firefox seats");
- console.log("COMBAT4A_TWO_ACTOR_WORLD_ISOLATION",JSON.stringify({
-   originalFourNativeSeatsPreserved:true,remainingChromeFirefox:isolatedPair,
-   noInjectedWorldState:true
+  "fresh original Rust World must render exactly two live real-browser fighters");
+ const chordBaseline=await waitFor(()=>readChordWorld().split("\n").find(line=>
+   /M201_FLIGHT_ACTOR_BASELINE tick=\d+ fighter=1 action=0/.test(line)),12000);
+ assert(chordBaseline,"fresh original two-human World has trusted Idle actor1 baseline");
+ console.log("COMBAT4A_TRUE_ORIGINAL_TWO_ACTOR_WORLD",JSON.stringify({
+   originalFourSeatNativeEvidencePreserved:true,
+   freshIndependentRustWorld:true,genuineChromeFirefox:isolatedPair,
+   noInjectedPlayerState:true
  }));
- // Re-close the real target's knockback gap with honest W3C gameplay motion;
- // no player/World state, hit fixture or actor position may be injected.
+ // Original fighter1/fighter2 spawn 96px apart: physically move 140ms toward
+ // the real target so 34HP short-light reach is genuine, not a fake hit.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-  actions:[{type:"key",id:"combat4a-post-light-move",actions:[
+  actions:[{type:"key",id:"combat4a-original-new-two-seat-move",actions:[
    {type:"keyDown",value:"d"},{type:"pause",duration:140},{type:"keyUp",value:"d"},
   ]}]
  });
@@ -331,7 +344,7 @@ try{
  assert(chordCanvas.focus,"original game canvas must own RMB+LMB physical input focus");
  const chordTraceInstall="if(window.__MYASO_COMBAT4A_RMB_CHORD_TRACE__)return true;\nconst events=[];\nfor(const type of [\"pointerdown\",\"pointerup\",\"mousedown\",\"mouseup\"]){\n  window.addEventListener(type,event=>{\n    if(event.button!==0 && event.button!==2)return;\n    events.push(Object.freeze({type,button:event.button,buttons:event.buttons,\n      trusted:event.isTrusted,onCanvas:event.target?.id===\"arena\",\n      focus:document.activeElement?.id||\"\",at:performance.now()}));\n    if(events.length>16)events.shift();\n  },true);\n}\nwindow.__MYASO_COMBAT4A_RMB_CHORD_TRACE__=()=>events.map(x=>({...x}));\nreturn true;";
  assert.equal(await evaluate(attacker,chordTraceInstall),true);
- const chordWorldOffset=readAuthoritativeWorld().length;
+ const chordWorldOffset=readChordWorld().length;
  const chordBefore=await evaluate(attacker,
   "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
  assert(chordBefore && !chordBefore.closed,"original live QUIC source0 lease required");
@@ -363,7 +376,7 @@ try{
  let chordHit;
  try {
    chordHit=await waitFor(()=>{
-    const after=readAuthoritativeWorld().slice(chordWorldOffset).split("\n");
+    const after=readChordWorld().slice(chordWorldOffset).split("\n");
     return after.find(line=>
       /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=34 hp=/.test(line));
    },14000);
@@ -371,13 +384,13 @@ try{
    const browser=await evaluate(attacker,
     "return {gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,physical:window.__MYASO_COMBAT4A_RMB_CHORD_TRACE__?.()??[]};");
    const evidence={error:String(error),physicalChord,browser,
-     originalWorldAfterChord:readAuthoritativeWorld().slice(chordWorldOffset).slice(-8000)};
+     originalWorldAfterChord:readChordWorld().slice(chordWorldOffset).slice(-8000)};
    await writeFile(join(output,"combat4a-rmb-chord-no-34hp-world.json"),
      JSON.stringify(evidence,null,2)+"\n");
    console.error("COMBAT4A_RMB_CHORD_WORLD_HIT_MISSING",JSON.stringify(evidence));
    throw error;
  }
- const chordWorld=readAuthoritativeWorld().slice(chordWorldOffset).split("\n");
+ const chordWorld=readChordWorld().slice(chordWorldOffset).split("\n");
  const chordHits=chordWorld.filter(line=>
     /M201_AUTH_HIT tick=\d+ attacker=1 target=\d+ damage=(34|46) hp=/.test(line));
  console.log("COMBAT4A_CHORD_WORLD_REAL_HITS",JSON.stringify({
