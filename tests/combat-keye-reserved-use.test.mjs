@@ -81,7 +81,7 @@ test("keydown handler really ignores KeyE, including auto-repeat, without consum
       keys:{add:key=>combatKeys.push(key),delete:key=>combatKeys.push("delete:"+key)},
     };
     Object.defineProperty(sandbox,"heavyAttackRequested",{
-      get(){return false;},set:value{combatFieldWrites.push(value);},
+      get(){return false;},set(value){combatFieldWrites.push(value);},
       configurable:true,
     });
     runInNewContext(source.slice(start,end+4),sandbox);
