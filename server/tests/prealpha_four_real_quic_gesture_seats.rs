@@ -742,6 +742,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     .expect("original Rust World actor baseline before typed input");
 
     // Old gesture #1: admitted real source0 PRESS/UPGRADE/CANCEL, not a HIT.
+    println!("COMBAT4D_STAGE old-press");
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
     timeout(Duration::from_millis(90), async {
         loop {
@@ -756,6 +757,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     .await
     .expect("first original World light windup observed before upgrade");
 
+    println!("COMBAT4D_STAGE old-upgrade");
     combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
     timeout(Duration::from_secs(2), async {
         loop {
@@ -769,6 +771,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     })
     .await
     .expect("first World light-to-held-heavy transition");
+    println!("COMBAT4D_STAGE old-cancel");
     combat4c_ack(&seat.connection, 0, 4, 3, 1, 1).await;
     timeout(Duration::from_secs(2), async {
         loop {
@@ -789,6 +792,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     // Second independent physical-gesture ID #2 on the SAME authenticated
     // actor/lease. ACKs and World action transitions must be observable twice,
     // not matched to the first gesture's earlier logs.
+    println!("COMBAT4D_STAGE new-press");
     combat4c_ack(&seat.connection, 0, 1, 4, 2, 1).await;
     timeout(Duration::from_millis(90), async {
         loop {
@@ -810,6 +814,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     .await
     .expect("second independent LMB created a new original World light windup");
 
+    println!("COMBAT4D_STAGE new-upgrade");
     combat4c_ack(&seat.connection, 0, 2, 5, 2, 1).await;
     timeout(Duration::from_secs(2), async {
         loop {
@@ -833,6 +838,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
 
     // OLD gesture #1 RELEASE arrives with a fresh transport sequence. It
     // cannot match current source0 gesture ID #2: reject at actor admission.
+    println!("COMBAT4D_STAGE stale-release");
     combat4c_ack(&seat.connection, 0, 3, 6, 1, 4).await;
 
     // Even after authentic original server-time READY, the new held source0
@@ -857,6 +863,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     // ONLY deliberate release of current source0 gesture ID #2 may commit
     // one HeavyActive; a byte-identical replay must ACK DUPLICATE with no
     // second transition or World HIT.
+    println!("COMBAT4D_STAGE new-release");
     combat4c_ack(&seat.connection, 0, 3, 7, 2, 1).await;
     timeout(Duration::from_secs(2), async {
         loop {
@@ -877,6 +884,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     })
     .await
     .expect("matching new source0 RELEASE committed exactly one World heavy");
+    println!("COMBAT4D_STAGE duplicate-release");
     combat4c_ack(&seat.connection, 0, 3, 7, 2, 2).await;
     sleep(Duration::from_millis(75)).await;
     let after = server.lines.lock().unwrap().clone();
