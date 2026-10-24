@@ -179,15 +179,25 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
     for (gesture, expected_hp) in [(1, 66), (2, 32)] {
         assert_eq!(
             admit(
-                &mut attacker, &mut w, LEASE, GestureSource::Lmb,
-                GestureAction::Press, 2 * gesture - 1, gesture,
+                &mut attacker,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                2 * gesture - 1,
+                gesture,
             ),
             AckStatus::Accepted
         );
         assert_eq!(
             admit(
-                &mut attacker, &mut w, LEASE, GestureSource::Lmb,
-                GestureAction::Release, 2 * gesture, gesture,
+                &mut attacker,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2 * gesture,
+                gesture,
             ),
             AckStatus::Accepted
         );
@@ -195,8 +205,12 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
         for _ in 0..55 {
             for event in w.step() {
                 if let CombatEvent::Hit {
-                    attacker: 1, target: 2, damage: 34, hp,
-                } = event {
+                    attacker: 1,
+                    target: 2,
+                    damage: 34,
+                    hp,
+                } = event
+                {
                     assert_eq!(hp, expected_hp);
                     hit_count += 1;
                 }
@@ -212,22 +226,37 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
     // attack commits real death. This in-flight gesture must lose authority.
     assert_eq!(
         admit(
-            &mut old, &mut w, LEASE + 1, GestureSource::Lmb,
-            GestureAction::Press, 1, 7,
+            &mut old,
+            &mut w,
+            LEASE + 1,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            7,
         ),
         AckStatus::Accepted
     );
     assert_eq!(
         admit(
-            &mut attacker, &mut w, LEASE, GestureSource::Lmb,
-            GestureAction::Press, 5, 3,
+            &mut attacker,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            5,
+            3,
         ),
         AckStatus::Accepted
     );
     assert_eq!(
         admit(
-            &mut attacker, &mut w, LEASE, GestureSource::Lmb,
-            GestureAction::Release, 6, 3,
+            &mut attacker,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            6,
+            3,
         ),
         AckStatus::Accepted
     );
@@ -236,23 +265,36 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
         for event in w.step() {
             match event {
                 CombatEvent::Hit {
-                    attacker: 1, target: 2, damage: 34, hp: 0,
+                    attacker: 1,
+                    target: 2,
+                    damage: 34,
+                    hp: 0,
                 } => fatal_hits += 1,
-                CombatEvent::Death { fighter: 2, killer: 1 } => deaths += 1,
+                CombatEvent::Death {
+                    fighter: 2,
+                    killer: 1,
+                } => deaths += 1,
                 _ => {}
             }
         }
         attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
         old.advance_under_world_lock(&mut w, LEASE + 1, BOOT);
-        if deaths != 0 { break; }
+        if deaths != 0 {
+            break;
+        }
     }
     assert_eq!((fatal_hits, deaths), (1, 1));
     assert_eq!(w.fighter(2).unwrap().action, Action::Dead);
     assert!(old.retired());
     assert_eq!(
         admit(
-            &mut old, &mut w, LEASE + 1, GestureSource::Lmb,
-            GestureAction::Release, 2, 7,
+            &mut old,
+            &mut w,
+            LEASE + 1,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            7,
         ),
         AckStatus::Stale
     );
@@ -267,11 +309,12 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
             }
         }
         attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
-        if respawns != 0 { break; }
+        if respawns != 0 {
+            break;
+        }
     }
     assert_eq!(respawns, 1);
-    let mut fresh =
-        SessionGestureWorldPath::from_admitted_world(&w, 2, LEASE + 2, BOOT).unwrap();
+    let mut fresh = SessionGestureWorldPath::from_admitted_world(&w, 2, LEASE + 2, BOOT).unwrap();
     assert_eq!(fresh.binding().player_id, original.player_id);
     assert_ne!(fresh.binding().incarnation, original.incarnation);
     assert_ne!(fresh.binding().lease_epoch, original.lease_epoch);
@@ -280,13 +323,16 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
         let old_lmb = edge(GestureSource::Lmb, action, 2, 7);
         assert_eq!(
             old.accept_under_world_lock(&mut w, LEASE + 1, BOOT, &old_lmb)
-                .unwrap().status,
+                .unwrap()
+                .status,
             AckStatus::Stale
         );
         let old_keye = edge(GestureSource::KeyE, action, 1, 7);
         assert_eq!(
-            fresh.accept_under_world_lock(&mut w, LEASE + 2, BOOT, &old_keye)
-                .unwrap().status,
+            fresh
+                .accept_under_world_lock(&mut w, LEASE + 2, BOOT, &old_keye)
+                .unwrap()
+                .status,
             AckStatus::Rejected
         );
     }
@@ -295,22 +341,37 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
     // The current admitted incarnation gets its OWN source0 sequence 1/2.
     assert_eq!(
         admit(
-            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
-            GestureAction::Press, 1, 1,
+            &mut fresh,
+            &mut w,
+            LEASE + 2,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1,
         ),
         AckStatus::Accepted
     );
     assert_eq!(
         admit(
-            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
-            GestureAction::Release, 2, 1,
+            &mut fresh,
+            &mut w,
+            LEASE + 2,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1,
         ),
         AckStatus::Accepted
     );
     assert_eq!(
         admit(
-            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
-            GestureAction::Release, 2, 1,
+            &mut fresh,
+            &mut w,
+            LEASE + 2,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1,
         ),
         AckStatus::Duplicate
     );
