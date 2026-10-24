@@ -1048,18 +1048,17 @@ mod tests {
         // or after the last disconnect. Do not require a fake actor identity
         // to project a tick with no original committed HIT events.
         let mut none = Vec::<ProposedRecipientHitDelivery>::new();
-        assert_eq!(project_world_tick_for_recipients(0, &[], &mut none), Ok(vec![]));
+        assert_eq!(
+            project_world_tick_for_recipients(0, &[], &mut none),
+            Ok(vec![])
+        );
         assert_eq!(
             project_world_tick_for_recipients(1, &[], &mut none),
             Ok(vec![])
         );
         assert!(none.is_empty());
         assert_eq!(
-            project_world_tick_for_recipients(
-                2,
-                &[(event(2, 1), commit(2, 0, 2, 1))],
-                &mut none,
-            ),
+            project_world_tick_for_recipients(2, &[(event(2, 1), commit(2, 0, 2, 1))], &mut none),
             Err(DeliveryError::InvalidScope),
             "never invent HIT ownership with no authenticated recipients"
         );
