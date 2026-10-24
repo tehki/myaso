@@ -44,6 +44,10 @@ jobs:
           geckodriver --version
           rustc --version
           cargo --version
+      - name: Prebuild original locked Rust server before native 30-second endpoint gate
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server --quiet
+          test -x server/target/debug/myaso-server
       - name: Actual original three-browser M156 short LMB vs World hit and native sender trace
         run: |
           echo "M156 independent real original Chrome/Firefox/Chrome World trial ${{ matrix.trial }}/3"
