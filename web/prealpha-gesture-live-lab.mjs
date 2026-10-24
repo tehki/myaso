@@ -65,6 +65,17 @@ export async function activateLoopbackGestureLab({
       }
     }
   }
+  // W3C may deliver pointerup then mouseup for ONE physical left release,
+  // or only mouseup for RMB-held LMB. Only freshly authored sequences should
+  // cause an immediate send. Retries remain solely on the existing timer.
+  let lastFirstSendSequence = outbox.snapshot.nextSequence;
+  function drainNewEdges() {
+    if (failed || detached) return;
+    const next = outbox.snapshot.nextSequence;
+    if (next === lastFirstSendSequence) return;
+    lastFirstSendSequence = next;
+    drain();
+  }
   function add(target,type,handler) {
     target.addEventListener(type,handler);
     removeListeners.push([target,type,handler]);
@@ -92,26 +103,26 @@ export async function activateLoopbackGestureLab({
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId
             || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drain();
+        if (gates.lmb.approvedHoldUpgrade(pointerId)) drainNewEdges();
       },85);
     }
     add(canvas,"pointerdown",event => {
       if (event.button !== 0) return;
-      drain(); // original capture already admitted the real physical edge
+      drainNewEdges(); // original capture already admitted the real physical edge
       scheduleSource0Upgrade();
     });
     add(canvas,"mousedown",event => {
       if (event.button !== 0 || (event.buttons & 2) === 0) return;
-      drain(); // no pointerdown occurs for LMB while RMB is already held
+      drainNewEdges(); // no pointerdown occurs for LMB while RMB is already held
       scheduleSource0Upgrade();
     });
-    add(windowObj,"pointerup",drain);
-    add(windowObj,"mouseup",drain);
-    add(windowObj,"pointercancel",drain);
-    add(canvas,"lostpointercapture",drain);
-    add(windowObj,"keydown",drain);
-    add(windowObj,"keyup",drain);
-    add(windowObj,"blur",drain);
+    add(windowObj,"pointerup",drainNewEdges);
+    add(windowObj,"mouseup",drainNewEdges);
+    add(windowObj,"pointercancel",drainNewEdges);
+    add(canvas,"lostpointercapture",drainNewEdges);
+    add(windowObj,"keydown",drainNewEdges);
+    add(windowObj,"keyup",drainNewEdges);
+    add(windowObj,"blur",drainNewEdges);
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
