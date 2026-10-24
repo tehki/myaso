@@ -322,4 +322,47 @@ mod tests {
         }
         assert_eq!(rejected, Some(OriginError::UnadmittedActor(2)));
     }
+
+    #[test]
+    fn original_one_light_swing_commits_two_same_tick_hits_with_distinct_ordinals() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 180.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 255.0, 220.0, std::f32::consts::PI));
+        assert!(world.add_player_at(4, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim2 = origin.bind_admitted(&world, 2, 102).unwrap();
+        let victim3 = origin.bind_admitted(&world, 3, 103).unwrap();
+        let bystander = origin.bind_admitted(&world, 4, 104).unwrap();
+        attack(&mut world);
+        let hits = (0..40)
+            .find_map(|_| {
+                let step = origin.step_and_capture(&mut world).unwrap();
+                (step.committed_hits.len() == 2).then_some(step.committed_hits)
+            })
+            .expect("one original World LightActive must strike two in-arc distinct actors");
+        assert_eq!(hits[0].1.server_tick, hits[1].1.server_tick);
+        assert!(hits[0].1.within_tick_ordinal < hits[1].1.within_tick_ordinal);
+        assert_eq!(hits[0].0, CombatEvent::Hit {
+            attacker: 1, target: 2, damage: 34, hp: 66,
+        });
+        assert_eq!(hits[1].0, CombatEvent::Hit {
+            attacker: 1, target: 3, damage: 34, hp: 66,
+        });
+        let mut a = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+        let mut v2 = ProposedRecipientHitDelivery::new(victim2, [2; 16], 64).unwrap();
+        let mut v3 = ProposedRecipientHitDelivery::new(victim3, [3; 16], 64).unwrap();
+        let mut s = ProposedRecipientHitDelivery::new(bystander, [4; 16], 64).unwrap();
+        for (event, identity) in &hits {
+            a.project_hit(event, *identity).unwrap();
+            v2.project_hit(event, *identity).unwrap();
+            v3.project_hit(event, *identity).unwrap();
+            assert_eq!(s.project_hit(event, *identity), Ok(None));
+        }
+        assert_eq!(a.next_sequence(), 2);
+        assert_eq!(v2.next_sequence(), 1);
+        assert_eq!(v3.next_sequence(), 1);
+        assert_eq!(s.next_sequence(), 0);
+    }
 }
