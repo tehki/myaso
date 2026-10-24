@@ -12,6 +12,7 @@ on:
       - "server/tests/combat4c_busy_cross_source_world.rs"
       - "server/tests/combat4c_release_only_source_ownership.rs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
+      - "server/tests/core8b_same_id_held_heavy_reconnect.rs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "scripts/core8_native_v2_quic_gesture_lab.mjs"
       - "scripts/core8_native_v2_keye_heavy_world_lab.mjs"
@@ -51,6 +52,8 @@ jobs:
         run: cargo test --locked --manifest-path server/Cargo.toml --test combat4c_release_only_source_ownership -- --nocapture
       - name: Fresh-process OS CSPRNG boot nonce and server World auth gate
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_boot_nonce_authority -- --nocapture
+      - name: Core8B same-ID held-heavy reincarnation stale-terminal original World
+        run: cargo test --locked --manifest-path server/Cargo.toml --test core8b_same_id_held_heavy_reconnect -- --nocapture
       - name: Real original Rust QUIC 4 distinct admitted seats + fifth denied and World light
         run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats -- --nocapture
       - name: Server binary real QUIC transport integration compiles
