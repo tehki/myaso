@@ -1,0 +1,41 @@
+name: Graphics3B P1 original Red Lion stage A/B native benchmark
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/red-lion-live-art.mjs"
+      - "tools/art/benchmark_red_lion_stage_native.mjs"
+      - ".github/workflows/graphics3b-p1-a232-native-stage-ab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-stage-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Fetch pinned original 3B stage object, without importing any main-branch changes
+        run: git fetch --quiet --no-tags --filter=blob:none --depth=1 origin da5664b015bb1f76b1c60482b5009a6fd5fb7487
+      - name: Check exact source and native drivers
+        run: |
+          node --check tools/art/benchmark_red_lion_stage_native.mjs
+          node --check src/browser/red-lion-live-art.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Measure browser-native original versus reuse A/B/B/A with pixel identity
+        run: timeout --signal=TERM --kill-after=5s 500s node tools/art/benchmark_red_lion_stage_native.mjs
+      - name: Preserve raw per-engine frame-time evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-p1-original-blender-world-stage-ab
+          path: graphics3b-a232-stage-ab-evidence/*
+          if-no-files-found: ignore
+          retention-days: 7
