@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { COMBAT } from "../src/combat/model.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "../scripts/m223-server-heavy-windup.mjs";
 
 test("M223 accepts only fresh native server windup of intended fighter", async () => {
@@ -100,9 +101,17 @@ test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict 
     source.indexOf("async function runOnlineUiHeavyParryFlight("));
   const parry=source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
     source.indexOf("async function runOnlineUi",source.indexOf("async function runOnlineUiHeavyParryFlight(")+20));
-  // Authentic M107 block previously expired 2-4 server ticks before heavy hit.
-  // Move the dispatch target without changing original guard / parry windows.
-  assert.ok(block.includes("attackOffset, blockOffset, 255,"));
+  // Exact original World failure at 94797f19: block start704 / expiry719 /
+  // heavy HIT724. A 110ms later physical wheel targets guard-only, not parry,
+  // without altering either server timer or World damage assertions.
+  const worldTickMs = 1000 / 60;
+  const oldLeadMs = (724 - 704) * worldTickMs;
+  const predictedBlockTick = 704 + Math.round((365 - 255) / worldTickMs);
+  const newLeadMs = (724 - predictedBlockTick) * worldTickMs;
+  assert.ok(oldLeadMs > COMBAT.block.shortBlockMs);
+  assert.ok(newLeadMs > COMBAT.block.parryWindowMs);
+  assert.ok(newLeadMs < COMBAT.block.shortBlockMs);
+  assert.ok(block.includes("attackOffset, blockOffset, 365,"));
   assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
   // Short-reach active lunge: authoritative block tick 605, hit tick 615
   // proves 285ms is ~167ms before contact; aim genuine parry wheel later.
