@@ -14166,6 +14166,10 @@ async function readUiEvidence(session) {
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
+        // Original M121 30Hz v1 input sender trace, copied READ-ONLY from the
+        // real page to the WebDriver observer; no cross-plane inference.
+        m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
+          .slice(-96).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
