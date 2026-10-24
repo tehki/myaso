@@ -338,7 +338,6 @@ impl ProposedRecipientHitDelivery {
     }
 }
 
-
 /// Review-only atomic publication boundary across the EXISTING recipient
 /// scopes for one original World tick. It does not create a second journal,
 /// step World again, authenticate a QUIC principal or send bytes.
@@ -883,7 +882,9 @@ mod tests {
             project_world_tick_for_recipients(500, &corrupt, &mut scopes),
             Err(DeliveryError::InvalidWorldIdentity)
         );
-        assert!(scopes.iter().all(|s| s.pending() == 0 && s.next_sequence() == 0));
+        assert!(scopes
+            .iter()
+            .all(|s| s.pending() == 0 && s.next_sequence() == 0));
         let published = project_world_tick_for_recipients(500, &committed, &mut scopes).unwrap();
         assert_eq!(
             published
@@ -892,7 +893,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1), (2, 2), (3, 1), (4, 0)]
         );
-        assert_eq!((published[1].1[0].sequence, published[1].1[1].sequence), (0, 1));
+        assert_eq!(
+            (published[1].1[0].sequence, published[1].1[1].sequence),
+            (0, 1)
+        );
         assert_eq!((published[1].1[0].target, published[1].1[1].target), (1, 3));
         assert_eq!(
             scopes[1].ack_next(actor(2, 1, 2), &TOKEN, 2),
@@ -919,7 +923,9 @@ mod tests {
             Err(DeliveryError::PendingOverflow { first_missing: 0 })
         );
         assert_eq!(scopes[1].gap(), Some(0));
-        assert!(scopes.iter().all(|s| s.pending() == 0 && s.next_sequence() == 0));
+        assert!(scopes
+            .iter()
+            .all(|s| s.pending() == 0 && s.next_sequence() == 0));
         assert!(scopes[0].gap().is_none() && scopes[2].gap().is_none());
         assert_eq!(
             project_world_tick_for_recipients(601, &[], &mut scopes),
@@ -964,5 +970,4 @@ mod tests {
         assert_eq!(scopes[0].pending(), 0);
         assert_eq!(scopes[0].next_sequence(), 0);
     }
-
 }
