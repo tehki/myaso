@@ -1,0 +1,53 @@
+name: Combat 4A M121 authoritative-coalescer six native World flights (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/combat4a-m121-auth-coalesced-six-native.yml"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "web/online-game.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-genuine-original-world-flights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        independent-host: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+    steps:
+      - name: Checkout immutable candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Original Rust server and genuine WebDriver prerequisites
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/combat4-m121-authoritative-ingress-proof.test.mjs tests/combat4-m121-sender-instrumentation.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Validate authenticated v1 coalescer and original directional World invariants
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo test --locked --manifest-path server/Cargo.toml m121_ -- --nocapture
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          test -x server/target/debug/myaso-server
+      - name: Real native Chrome Firefox original-game M121 LEFT and RIGHT A
+        run: |
+          echo "independent CI host ${{ matrix.independent-host }}/3, original flight A/2"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: Real native Chrome Firefox original-game M121 LEFT and RIGHT B
+        run: |
+          echo "independent CI host ${{ matrix.independent-host }}/3, original flight B/2"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
