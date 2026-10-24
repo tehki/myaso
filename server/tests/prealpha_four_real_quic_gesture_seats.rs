@@ -731,8 +731,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     timeout(Duration::from_secs(2), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_FLIGHT_ACTOR_BASELINE")
-                    && line.contains(" fighter=1 action=0")
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=1 action=0")
             }) {
                 break;
             }
@@ -747,8 +746,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     timeout(Duration::from_millis(90), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_AUTH_ACTION")
-                    && line.contains(" fighter=1 from=0 to=1")
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=1")
             }) {
                 break;
             }
@@ -762,8 +760,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     timeout(Duration::from_secs(2), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_AUTH_ACTION")
-                    && line.contains(" fighter=1 from=1 to=9")
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=9")
             }) {
                 break;
             }
@@ -776,8 +773,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
     timeout(Duration::from_secs(2), async {
         loop {
             if server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_AUTH_ACTION")
-                    && line.contains(" fighter=1 from=9 to=0")
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=0")
             }) {
                 break;
             }
@@ -802,8 +798,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
                 .unwrap()
                 .iter()
                 .filter(|line| {
-                    line.contains("M201_AUTH_ACTION")
-                        && line.contains(" fighter=1 from=0 to=1")
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=1")
                 })
                 .count();
             if count == 2 {
@@ -824,8 +819,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
                 .unwrap()
                 .iter()
                 .filter(|line| {
-                    line.contains("M201_AUTH_ACTION")
-                        && line.contains(" fighter=1 from=1 to=9")
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=1 to=9")
                 })
                 .count();
             if count == 2 {
@@ -872,8 +866,7 @@ async fn combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_sour
                 .unwrap()
                 .iter()
                 .filter(|line| {
-                    line.contains("M201_AUTH_ACTION")
-                        && line.contains(" fighter=1 from=9 to=10")
+                    line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
                 })
                 .count();
             if count == 1 {
