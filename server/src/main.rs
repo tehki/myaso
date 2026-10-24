@@ -1583,6 +1583,86 @@ mod tests {
     }
 
     #[test]
+    fn m121_authenticated_v1_coalesced_release_keeps_attack_direction_not_movement() {
+        // Real native M121: within one authenticated datagram the light-only
+        // W+LMB release was sample93; newest sample94 was neutral. Preserve
+        // sample94's movement while selecting the release's LEFT SWEEP.
+        let release = InputSample {
+            tick: 93,
+            move_x: 0.0,
+            move_y: -1.0,
+            facing_radians: 0.0,
+            attack: true,
+            heavy_attack: false,
+            dodge: false,
+            block: false,
+            kick: false,
+            run: false,
+            jump: false,
+            dash: false,
+        };
+        let neutral = InputSample {
+            tick: 94,
+            move_y: 0.0,
+            attack: false,
+            ..release
+        };
+        let accepted = [release, neutral];
+        let coalesced = coalesce_accepted_input_batch(&accepted)
+            .expect("authenticated original release+neutral batch");
+        assert_eq!(coalesced.tick, 94);
+        assert_eq!(coalesced.move_y, 0.0);
+        assert!(coalesced.attack);
+        assert!(!coalesced.heavy_attack);
+        let intent: InputIntent = coalesced.into();
+        let motion = selected_light_release_motion(&accepted, Some(&(coalesced.tick, intent)));
+        assert_eq!(motion, Some((0.0, -1.0, 0.0)));
+
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(state.world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        state.world.step();
+        assert_eq!(state.world.fighter(1).unwrap().action.wire_code(), 9);
+        let mut pending = VecDeque::new();
+        apply_coalesced_input_and_read_tick(
+            &mut state,
+            1,
+            Some((coalesced.tick, intent)),
+            &mut pending,
+            motion,
+        );
+        // The original following neutral packet can precede the World step,
+        // but it cannot change the already-authenticated release direction.
+        state.world.set_input(1, InputIntent::default());
+        state.world.step();
+        assert_eq!(state.world.fighter(1).unwrap().action.wire_code(), 24);
+        assert_eq!(state.world.fighter(1).unwrap().input().move_y, 0.0);
+        state.world.step();
+        assert_eq!(state.world.fighter(1).unwrap().action.wire_code(), 24);
+        assert_eq!(pending.len(), 1);
+
+        let independent_keye = InputSample {
+            tick: 95,
+            attack: false,
+            heavy_attack: true,
+            ..neutral
+        };
+        let keye: InputIntent = independent_keye.into();
+        assert_eq!(
+            selected_light_release_motion(&[independent_keye], Some(&(95, keye))),
+            None,
+            "a standalone KeyE heavy is never a light-release lateral"
+        );
+    }
+
+    #[test]
     fn processed_input_ack_coalesces_safe_ticks_without_starvation() {
         let mut pending = VecDeque::new();
         record_pending_input_ack(&mut pending, 100, 10);
