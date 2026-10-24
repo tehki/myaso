@@ -867,7 +867,7 @@ function simulatePrediction(stepMs) {
         // rather than inferring left sweep from HUD/physical key timestamps.
         const m121DirectionTrace = acceptanceScenario === "uidirectionallight";
         if (currentInput.attack || currentInput.jump || currentInput.heavyAttack
-          || (m121DirectionTrace && keys.has("KeyW"))) {
+          || (m121DirectionTrace && (keys.has("KeyW") || keys.has("KeyD")))) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
@@ -876,6 +876,7 @@ function simulatePrediction(stepMs) {
             heavyAttack: Boolean(currentInput.heavyAttack),
             ...(m121DirectionTrace ? {
               keyWHeldAtSample: keys.has("KeyW"),
+              keyDHeldAtSample: keys.has("KeyD"),
               lmbHeldAtSample: Boolean(leftButtonDown),
               leftChargingAtSample: leftButtonCharge.isCharging(),
               pendingLightReleaseAtSample: Boolean(attackRequested),
@@ -888,7 +889,7 @@ function simulatePrediction(stepMs) {
               observedServerTick: networkClient.latestServerTick,
             } : {}),
           });
-          if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+          if (debug.inputSubmissions.length > (m121DirectionTrace ? 96 : 32)) debug.inputSubmissions.shift();
         }
       }
     }
