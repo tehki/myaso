@@ -1072,6 +1072,58 @@ mod tests {
     }
 
     #[test]
+    fn idle_tick_stale_later_scope_cannot_advance_earlier_actor_fences() {
+        // Validation must complete across the entire current actor snapshot
+        // before any earlier scope advances its replay fence. No HIT exists.
+        let mut scopes = vec![scope(1), scope(2), scope(3)];
+        assert!(scopes[2].project_committed_tick_batch(950, &[]).is_ok());
+        assert_eq!(scopes[0].last_committed_batch_tick, None);
+        assert_eq!(scopes[1].last_committed_batch_tick, None);
+        assert_eq!(
+            project_world_tick_for_recipients(950, &[], &mut scopes),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(scopes[0].last_committed_batch_tick, None);
+        assert_eq!(scopes[1].last_committed_batch_tick, None);
+        assert_eq!(scopes[2].last_committed_batch_tick, Some(950));
+
+        assert_eq!(
+            project_world_tick_for_recipients(951, &[], &mut scopes)
+                .unwrap()
+                .iter()
+                .filter(|(_, receipts)| !receipts.is_empty())
+                .count(),
+            0
+        );
+        assert!(scopes
+            .iter()
+            .all(|scope| scope.last_committed_batch_tick == Some(951)));
+    }
+
+    #[test]
+    fn idle_tick_still_validates_actor_uniqueness_and_world_scope() {
+        // The idle fast path must not become a weaker identity gate.
+        let mut duplicated = vec![scope(1), scope(2), scope(1)];
+        assert_eq!(
+            project_world_tick_for_recipients(960, &[], &mut duplicated),
+            Err(DeliveryError::InvalidScope)
+        );
+        assert!(duplicated
+            .iter()
+            .all(|scope| scope.last_committed_batch_tick.is_none()));
+
+        let mut foreign = vec![scope(1), scope(2)];
+        foreign[1].recipient.world_instance = 88;
+        assert_eq!(
+            project_world_tick_for_recipients(960, &[], &mut foreign),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert!(foreign
+            .iter()
+            .all(|scope| scope.last_committed_batch_tick.is_none()));
+    }
+
+    #[test]
     fn idle_world_tick_preserves_retired_and_gap_scopes_but_fences_replay() {
         // No actor receives HIT credit on an idle World tick; unaffected
         // authenticated actors must still close the tick against stale HIT
