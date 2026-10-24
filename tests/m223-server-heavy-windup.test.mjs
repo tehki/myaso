@@ -95,6 +95,32 @@ test("M223.1 refuses invalid or unqualified sampled ingress", () => {
   }),TypeError);
 });
 
+test("Combat4B M188 physical held-LMB parry preserves one bounded wheel and strict defense predicates", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const helper = source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
+    source.indexOf("async function runOnlineUiHeavyBlockFlight("));
+  // A real original World event trace at 1fa6f494 proved 405ms native parry
+  // resulted in BLOCK (64 guard), not PARRY. The World timers stay unchanged;
+  // qualify the additional physical wheel timing on exact-head native CI.
+  assert.match(helper, /m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" \? 40 : 0/);
+  assert.match(helper, /m223WheelDelayMs = m223Plan\.wheelDelayMs \+ m188HeldLmbParryOffsetMs/);
+  assert.match(helper, /m223WheelDelayMs < 0 \|\| m223WheelDelayMs > 450/);
+  assert.match(helper, /performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
+  assert.match(helper, /scrollArenaWheel\(defender, defenderElementId, 120, m223WheelDelayMs\)/);
+  const block = source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
+    source.indexOf("async function runOnlineUiHeavyParryFlight("));
+  const parry = source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
+    source.indexOf("async function runOnlineUi", source.indexOf("async function runOnlineUiHeavyParryFlight(") + 20));
+  assert.match(block, /attackOffset, blockOffset, 365,/);
+  assert.match(block, /defenderResult\.playerHp === 100/);
+  assert.match(block, /defenderGuardInWindow/);
+  assert.match(parry, /attackOffset, blockOffset, 405,/);
+  assert.match(parry, /defenderResult\.playerHp === 100/);
+  assert.match(parry, /defenderResult\.playerGuard === 100/);
+  assert.match(parry, /feedbackTransitions\.includes\("parried"\)/);
+  assert.match(parry, /feedbackTransitions\.includes\("parry-success"\)/);
+});
+
 test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict outcome checks", () => {
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const block=source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
