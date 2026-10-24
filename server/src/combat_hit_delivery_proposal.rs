@@ -1056,7 +1056,10 @@ mod tests {
         let initial = [(event(2, 1), commit(920, 0, 2, 1))];
         let original = project_world_tick_for_recipients(920, &initial, &mut scopes).unwrap();
         assert_eq!(
-            original.iter().map(|(_, receipts)| receipts.len()).collect::<Vec<_>>(),
+            original
+                .iter()
+                .map(|(_, receipts)| receipts.len())
+                .collect::<Vec<_>>(),
             vec![1, 1, 0]
         );
         assert_eq!(scopes[1].next_sequence(), 1);
@@ -1099,7 +1102,10 @@ mod tests {
             project_world_tick_for_recipients(921, &[(event(2, 1), live)], &mut scopes).unwrap();
         assert_eq!(credited[0].1[0].sequence, 1);
         assert_eq!(credited[1].1[0].sequence, 0);
-        assert_eq!((credited[0].1[0].attacker, credited[1].1[0].attacker), (2, 2));
+        assert_eq!(
+            (credited[0].1[0].attacker, credited[1].1[0].attacker),
+            (2, 2)
+        );
         assert!(credited[2].1.is_empty());
         assert_eq!(scopes[0].pending(), 2);
         assert_eq!(scopes[1].pending(), 1);
