@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import {
   PROPOSED_GESTURE_SOURCE as SOURCE, GESTURE_ACTION as ACTION,
   encodeProposedTypedGestureEvent, decodeProposedTypedGestureEvent,
@@ -60,4 +61,26 @@ test("Rust original World admission rejects retired source1 before Combat state 
   const authority=read("../server/src/prealpha_lmb_gesture_authority.rs");
   assert.match(authority,/if source == GestureSource::KeyE \{\s*return Decision::rejected\(\)/);
   assert.doesNotMatch(authority,/Command::BeginKeyEHeavy/);
+});
+
+// Exercise the actual installed handlers without constructing fake Combat events.
+test("keydown handler really ignores KeyE, including auto-repeat, without consuming it", () => {
+  for (const path of ["../web/game.mjs", "../web/online-game.mjs"]) {
+    const source=read(path);
+    const start=source.indexOf('canvas.addEventListener("keydown", (event) => {');
+    const end=source.indexOf("\n});",start);
+    assert.ok(start>=0 && end>start, path+" missing original keydown handler");
+    const subscriptions=[];
+    runInNewContext(source.slice(start,end+4), {
+      canvas:{addEventListener:(kind,handler)=>subscriptions.push([kind,handler])},
+    });
+    assert.equal(subscriptions.length,1,path+" must register one handler");
+    assert.equal(subscriptions[0][0],"keydown");
+    const handler=subscriptions[0][1];
+    for(const repeat of [false,true]) {
+      let prevented=0;
+      handler({code:"KeyE",repeat,preventDefault(){prevented++;}});
+      assert.equal(prevented,0,path+" E stays available for future Use");
+    }
+  }
 });
