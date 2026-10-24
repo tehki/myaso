@@ -1,0 +1,53 @@
+name: Combat 4A M144/M145 authentic sampled chord World diagnostics (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/combat4a-m144-sampled-world-native.yml"
+      - "web/online-game.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "tests/combat4a-m144-original-input-world-failure.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authentic-three-browser-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: uimultirecoveryffa
+            trial: 1
+          - scenario: uimultirecoveryffa
+            trial: 2
+          - scenario: uimultirecoveryspatial
+            trial: 1
+    env:
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - name: Checkout actual PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Validate read-only sampled input and strict original focus gate
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/combat4a-m144-original-input-world-failure.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build unchanged original Rust authoritative World
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          test -x server/target/debug/myaso-server
+      - name: Run strict unchanged three-browser native M144/M145 and emit true failed sender evidence
+        run: |
+          echo "M144/M145 scenario=${{ matrix.scenario }} independent=${{ matrix.trial }}"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

@@ -11552,6 +11552,31 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     throw new Error(`${milestone} incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
 
+  // Combat4A: print actual input frames and original actor/World state even
+  // when the unchanged strict focus ordering fails. UI observed Space+LMB
+  // is not a trusted 30Hz packet nor a verified server-action transition.
+  console.log("M144_4A_ORIGINAL_INPUT_WORLD_BEFORE_STRICT_FOCUS " + JSON.stringify({
+    scenario: expectedScenario,
+    roles: { jumpId, observerId, lightId },
+    physical: {
+      jumpKeys: jumpState.keyTransitions,
+      jumpPointers: jumpState.pointers,
+      lightPointers: lightState.pointers,
+    },
+    actualSubmitted: {
+      jump: jumpState.acceptance?.m144SentSamples ?? [],
+      light: lightState.acceptance?.m144SentSamples ?? [],
+    },
+    originalWorld: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => line.startsWith("M201_AUTH_ACTION ")
+        && (line.includes(` fighter=${jumpId} `) || line.includes(` fighter=${lightId} `)))
+      .slice(-64),
+    actions: {
+      jump: jumpState.acceptance?.ownActionTransitions ?? [],
+      light: lightState.acceptance?.ownActionTransitions ?? [],
+    },
+    observerFocus: observerState.focusTransitions.slice(observerFocusOffset),
+  }));
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const recoveryTransitions = observerState.recoveryTransitions.slice(observerRecoveryOffset);
   const lightPunishIndex = focusTransitions.findIndex((entry) => entry.label === `PUNISH TARGET #${lightId}`);
@@ -14187,6 +14212,8 @@ async function readUiEvidence(session) {
         // Original M121 30Hz v1 input sender trace, copied READ-ONLY from the
         // real page to the WebDriver observer; no cross-plane inference.
         m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
+          .slice(-96).map((entry) => ({ ...entry })),
+        m144SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m144SentSamples ?? [])
           .slice(-96).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
