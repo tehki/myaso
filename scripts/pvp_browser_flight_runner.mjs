@@ -1,4 +1,3 @@
-import { legacyM111HeavyOrigin } from "./m111-native-heavy-origin.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -8895,6 +8894,26 @@ async function runOnlineUiStunOverlayFlight(entries) {
   return evidence;
 }
 
+// The original M110/M111 test must generate a real LMB release-heavy, never
+// resurrect the retired Key E producer. This hold clears browser + server
+// READY320ms; the original World still decides actual damage and guard loss.
+const M110_LMB_HEAVY_HOLD_MS = 450;
+async function performM110NativeHeldLmb(session, elementId, xOffset) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer", id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: M110_LMB_HEAVY_HOLD_MS },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
 async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false, onAcceptedLiveBreak = null } = {}) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
@@ -8915,13 +8934,13 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
   const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
     entry.visible && entry.phase === "HEAVY WINDUP").length;
   const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
-    // Start genuine E and schedule two genuine wheel-back pulses inside one
-    // browser-owned action sequence. The first lands at 70 ms and the second at
-    // 170 ms. Their unchanged 240 ms short-block windows overlap by 140 ms, so
-    // scheduler jitter cannot create a false fresh Block/parry edge before the
-    // ~320 ms heavy impact.
-    const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100);
+    // Genuine physical LMB is held beyond 320ms READY and deliberately released.
+    // Retain TWO genuine wheel-back events and their original 240ms short-block
+    // windows. Place the second early enough to age past the 125ms parry phase
+    // before the release-led heavy impact, while the guard window remains live.
+    // The original World, not these W3C ACKs, decides all HIT/guard outcomes.
+    const heavyPulse = performM110NativeHeldLmb(attacker, attackerElementId, attackOffset);
+    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 220, 100);
     let observed = false;
     try {
       const deadline = Date.now() + 420;
@@ -9002,8 +9021,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
       throw new Error(`M110 first heavy accidentally resolved as parry: ${JSON.stringify(firstEvidence)}`);
     }
 
-    // First evidence is sampled around 390 ms after E; finish the unchanged
-    // 840 ms heavy commitment before the second genuine heavy request.
+    // Await original heavy active/recovery after the physical LMB release;
+    // never reissue during the single server-owned charged gesture.
     await sleep(500);
     await Promise.all([
       aimArena(attacker, attackerElementId, attackOffset),
@@ -9058,14 +9077,21 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
-        // Legacy KeyE requests heavy on actual DOWN; UP only clears the key.
-        // The negotiated experimental release-led source1 is a separate path.
-        // Require both genuine native edges, but do not add the120ms hold to
-        // the original840+60ms recovery floor by using the wrong origin.
+        // Anchor punish timing to a *real* native LMB pointerDOWN, not a
+        // retired Key E event, a WebDriver ACK or an invented server HIT.
         if (returnTiming) {
-          const origin = legacyM111HeavyOrigin(attackerState.keyTransitions ?? [], attemptIssuedAt);
-          secondHeavyIssuedAt = origin.downEpochMs;
-          console.log("M111_NATIVE_HEAVY_ORIGIN " + JSON.stringify(origin));
+          const downs = (attackerState.pointers ?? []).filter((event) =>
+            event.type === "pointerdown" && event.button === 0
+            && Number.isFinite(event.epochMs)
+            && event.epochMs >= attemptIssuedAt - 100);
+          if (downs.length !== 1) {
+            throw new Error("M111 requires exactly one newly trusted physical LMB DOWN: "
+              + JSON.stringify({ attemptIssuedAt, downs }));
+          }
+          secondHeavyIssuedAt = downs[0].epochMs;
+          console.log("M111_NATIVE_HEAVY_ORIGIN " + JSON.stringify({
+            downEpochMs: secondHeavyIssuedAt, physicalSource: "LMB",
+          }));
         }
         finalEvidence = states;
         break;
@@ -9131,11 +9157,19 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
   if (!attackerResult || !defenderResult) {
     throw new Error(`M110 heavy guard break incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
-  assertHeavyControlDelivered(attackerResult, movementCode, "M110 heavy guard break");
-  const heavyDowns = attackerResult.keys.filter((entry) => entry === "keydown:KeyE").length;
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`)
+    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
+    throw new Error("M110 actual movement keys not observed: " + JSON.stringify(attackerResult.keys));
+  }
+  const heavyDowns = attackerResult.pointers.filter((event) =>
+    event.type === "pointerdown" && event.button === 0).length;
+  const heavyUps = attackerResult.pointers.filter((event) =>
+    event.type === "pointerup" && event.button === 0).length;
+  const retiredKeyE = attackerResult.keys.some((key) => key.includes("KeyE"));
   const authoritativeCommits = heavyCommitCount(attackerResult);
   const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
-  if (heavyDowns < 2 || authoritativeCommits !== 2 || blockWheels.length < 2) {
+  if (retiredKeyE || heavyDowns !== 2 || heavyUps !== 2
+    || authoritativeCommits !== 2 || blockWheels.length < 2) {
     throw new Error(`M110 did not prove two real heavies into timed wheel-back blocks: ${JSON.stringify(evidence)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
@@ -9181,15 +9215,15 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   let genuineNativePunish = null;
   const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, {
     returnTiming: true,
-    onAcceptedLiveBreak: (trustedSecondKeyEDownEpoch) => {
-      if (genuineNativePunish || !Number.isFinite(trustedSecondKeyEDownEpoch)) {
-        throw new Error("M111 must issue exactly one genuine legacy KeyE-down-led W3C punish");
+    onAcceptedLiveBreak: (trustedSecondLmbDownEpoch) => {
+      if (genuineNativePunish || !Number.isFinite(trustedSecondLmbDownEpoch)) {
+        throw new Error("M111 requires exactly one native held-LMB heavy before W3C punish");
       }
-      // Preserve ORIGINAL protected +60ms after 840ms recovery; only initiate
-      // WebDriver command earlier, as soon as true live guard-break is seen.
-      const secondHeavyIssuedAt = trustedSecondKeyEDownEpoch;
+      // Physical held LMB remains READY until real release; recovery starts
+      // afterwards. Keep the full World recovery and original 60ms margin.
+      const secondHeavyIssuedAt = trustedSecondLmbDownEpoch;
       const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-      const firstClickTargetMs = COMBAT.heavyAttack.windupMs
+      const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS
         + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
       const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
       genuineNativePunish = performArenaAttackBurst(attacker, 1, initialPauseMs, 0)
