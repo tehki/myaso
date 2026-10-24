@@ -4,6 +4,10 @@ use std::sync::{
     Arc,
 };
 
+// M147 wire and journal helpers are dormant, never registered in live transport.
+pub mod combat_hit_control_proposal;
+pub mod combat_hit_journal;
+pub mod combat_hit_receipt;
 pub mod kill_event;
 // P0 review-only authority reducer and codec; no runtime ingress or v1 changes.
 pub mod prealpha_lmb_gesture_authority;
