@@ -23,6 +23,7 @@ import {decodeProposedTypedGestureEvent} from "/src/network/prealpha-lmb-gesture
 import {createDormantPrealphaLmbDomGate,attachDormantPrealphaLmbDomGate}
  from "/src/browser/prealpha-lmb-dom-gesture-review.mjs";
 const canvas=document.querySelector("#arena"),lease={};
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
 const outbox=new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
 let chat=false,jump=false;
 const gate=createDormantPrealphaLmbDomGate({
