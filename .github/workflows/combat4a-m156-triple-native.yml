@@ -1,0 +1,54 @@
+name: Combat 4A M156 three real W3C source-to-World trials (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "src/browser/left-button-charge.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "tests/r1-m156-knockdown-light-latency.test.mjs"
+      - "tests/r1-m237-m156-short-click-early-commit.test.mjs"
+      - ".github/workflows/combat4a-m156-triple-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-short-lmb-third-party:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uirollknockdownffahit
+      MYASO_COMBAT4A_M156_DIAGNOSTIC_TRIAL: ${{ matrix.trial }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate unchanged M156 strict sources and native browser prerequisites
+        run: |
+          node --check web/online-game.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/r1-m156-knockdown-light-latency.test.mjs tests/r1-m237-m156-short-click-early-commit.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          rustc --version
+          cargo --version
+      - name: Actual original three-browser M156 short LMB vs World hit and native sender trace
+        run: |
+          echo "M156 independent real original Chrome/Firefox/Chrome World trial ${{ matrix.trial }}/3"
+          # The genuine first-party test throws on missing one real 34HP HIT,
+          # premature recovery, a stale lease, or a substituted sample.
+          # Read-only inputSubmissions from the upstream Core8 #975 M156
+          # scenario are preserved verbatim in the native failure log.
+          node scripts/pvp_browser_flight_runner.mjs
