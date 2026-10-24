@@ -1013,7 +1013,8 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
 async function prepareHeavyCounterplayFlight(
   entries,
   label,
-  { attackerName = "chrome", defenderName = "firefox", movementMs = 180 } = {},
+  { attackerName = "chrome", defenderName = "firefox", movementMs = 180,
+    nativeBoundedApproach = false } = {},
 ) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -1038,7 +1039,11 @@ async function prepareHeavyCounterplayFlight(
   const attackerElementId = await resolveArenaElement(attacker, `${label} attacker`);
   const defenderElementId = await resolveArenaElement(defender, `${label} defender`);
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, movementKey, movementMs);
+  if (nativeBoundedApproach) {
+    await pulseMovementKeyBoundedW3c(attacker, movementKey, movementMs);
+  } else {
+    await pulseMovementKey(attacker, movementKey, movementMs);
+  }
   await Promise.all([
     aimArena(attacker, attackerElementId, attackOffset),
     aimArena(defender, defenderElementId, blockOffset),
@@ -1578,7 +1583,8 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M121 directional light",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150,
+      nativeBoundedApproach: true },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
@@ -9833,7 +9839,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
-          preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
+          preWheelHeadStartMs: scenario === "uiguardbreak" ? 15 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
@@ -12015,6 +12021,26 @@ async function pulseMovementKey(session, value, durationMs) {
   await setMovementKey(session, value, true);
   await sleep(durationMs);
   await setMovementKey(session, value, false);
+}
+
+// M121: one genuine W3C keyboard transaction avoids a 150ms held
+// approach accidentally lasting ~700ms due to two separate driver roundtrips.
+// Original server geometry, HP and authoritative hit requirements unchanged.
+async function pulseMovementKeyBoundedW3c(session, value, durationMs) {
+  if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 250) {
+    throw new RangeError("M121 bounded native approach outside staging budget");
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value },
+        { type: "pause", duration: durationMs },
+        { type: "keyUp", value },
+      ],
+    }],
+  });
 }
 
 async function resolveArenaElement(session, label) {
