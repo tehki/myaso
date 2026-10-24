@@ -17,12 +17,7 @@ use myaso_server::simulation::{Action, CombatEvent, InputIntent, World};
 fn p0_genuine_lmb_hold_intent_begins_light_windup_before_pointerup() {
     let mut world = World::new(800.0, 600.0);
     assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
-    assert!(world.add_player_at(
-        2,
-        290.0,
-        260.0,
-        std::f32::consts::PI,
-    ));
+    assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI,));
 
     // This is the original v1 charge bit pattern emitted on physical LMB
     // DOWN. No release packet or client clock has been supplied.
@@ -48,7 +43,9 @@ fn p0_genuine_lmb_hold_intent_begins_light_windup_before_pointerup() {
         "135ms windup cannot instantly deal light or heavy damage",
     );
     assert!(
-        events.iter().all(|event| !matches!(event, CombatEvent::Hit { .. })),
+        events
+            .iter()
+            .all(|event| !matches!(event, CombatEvent::Hit { .. })),
         "no committed World HIT may occur on the initial 60Hz windup tick",
     );
 }
@@ -72,7 +69,9 @@ fn p0_standalone_keye_still_has_its_own_server_heavy_origin() {
         "KeyE must remain a distinct server-owned heavy gesture, not LMB",
     );
     assert!(
-        events.iter().all(|event| !matches!(event, CombatEvent::Hit { .. })),
+        events
+            .iter()
+            .all(|event| !matches!(event, CombatEvent::Hit { .. })),
         "standalone KeyE windup cannot commit immediate damage",
     );
 }
