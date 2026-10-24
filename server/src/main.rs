@@ -4,6 +4,7 @@ use myaso_server::{
     kill_event::{encode_kill_event, KillEventPacket},
     prealpha_authenticated_gesture::{is_v2_event, new_server_boot_nonce, SessionGestureWorldPath},
     prealpha_lmb_gesture_proposal::encode_ack,
+    prealpha_lmb_gesture_proposal::{decode_typed_event, GestureAck, TypedGestureEvent},
     reliable::{try_enqueue_reliable, ReliableQueueError},
     simulation::{CombatEvent, InputIntent, World},
     snapshot::{ReplicationFrame, SnapshotSession},
@@ -382,6 +383,7 @@ async fn main() -> Result<()> {
                 player_id,
                 lease_epoch,
                 v2_lab,
+                flight_action_proof,
                 Arc::clone(&game),
             )
             .await;
@@ -490,6 +492,27 @@ async fn load_identity(bind: SocketAddr) -> Result<Identity> {
 // emits actions on every authoritative simulation tick (60 Hz), unlike the
 // 50ms replicated snapshots, which can miss an 80ms attack-active phase.
 // No extra messages are sent to the gameplay clients or network protocol.
+// The original loopback action-proof flag also fences this admission-level
+// diagnostic. It reads real before/after World states and an actual typed ACK;
+// it is not a simulation tick, gameplay receipt or inferred active/HIT edge.
+fn m201_gesture_action_proof_line(
+    tick: u32,
+    fighter: u32,
+    event: TypedGestureEvent,
+    ack: GestureAck,
+    from: u8,
+    to: u8,
+) -> String {
+    format!(
+        "M201_AUTH_GESTURE_ACTION tick={tick} fighter={fighter} source={} gesture={} sequence={} eventAction={} status={} from={from} to={to}",
+        event.source as u8,
+        event.event.gesture_id,
+        event.event.sequence,
+        event.event.action as u8,
+        ack.status as u8,
+    )
+}
+
 fn m201_flight_proof_lines(
     world: &World,
     events: &[CombatEvent],
@@ -587,6 +610,7 @@ async fn handle_connection(
     player_id: u32,
     lease_epoch: u64,
     v2_lab: bool,
+    flight_action_proof: bool,
     game: Arc<SharedGame>,
 ) -> Result<()> {
     let stable_id = connection.stable_id();
@@ -712,17 +736,43 @@ async fn handle_connection(
                 if is_v2_event(datagram.as_ref()) {
                     if !v2_enabled { continue; }
                     // No await inside real World admission/Combat application.
+                    let mut admission_proof = None;
                     let ack = {
                         let mut state = game.state.lock().await;
                         let boot_nonce = state.boot_nonce;
                         state.gesture_sessions.remove(&lease_epoch).and_then(|mut path| {
+                            // Tick-sampled action proof can miss two genuine
+                            // transitions admitted between simulation ticks.
+                            // Capture only actual state around the unchanged
+                            // admission call, on this same original World lock.
+                            let before = if flight_action_proof {
+                                decode_typed_event(datagram.as_ref()).ok().and_then(|event| {
+                                    state.world.fighter(player_id)
+                                        .map(|fighter| (event, fighter.action.wire_code()))
+                                })
+                            } else {
+                                None
+                            };
                             let ack = path.accept_under_world_lock(
                                 &mut state.world, lease_epoch, boot_nonce, datagram.as_ref()
                             );
+                            if let (Some((event, from)), Some(receipt)) = (before, ack) {
+                                if let Some(fighter) = state.world.fighter(player_id) {
+                                    admission_proof = Some(m201_gesture_action_proof_line(
+                                        state.world.tick, player_id, event, receipt,
+                                        from, fighter.action.wire_code()
+                                    ));
+                                }
+                            }
                             state.gesture_sessions.insert(lease_epoch, path);
                             ack
                         })
                     };
+                    // Formatting captured real state under the World lock;
+                    // stdout I/O never holds that lock or steps simulation.
+                    if let Some(line) = admission_proof {
+                        println!("{line}");
+                    }
                     if let Some(ack) = ack {
                         connection.send_datagram(encode_ack(ack).map_err(|e| anyhow::anyhow!("v2 ACK encoding: {e:?}"))?)
                             .context("send v2 event processed ACK")?;
@@ -1042,6 +1092,55 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gesture_action_proof_keeps_actual_same_tick_admission_edges_distinct() {
+        use myaso_server::prealpha_lmb_gesture_proposal::{
+            AckStatus, GestureAction, GestureEvent, GestureSource,
+        };
+        let event = TypedGestureEvent {
+            source: GestureSource::Lmb,
+            event: GestureEvent {
+                action: GestureAction::Press,
+                sequence: 1,
+                gesture_id: 7,
+                client_tick: u32::MAX,
+            },
+        };
+        let ack = GestureAck {
+            status: AckStatus::Accepted,
+            sequence: 1,
+            gesture_id: 7,
+            server_tick: 1359,
+        };
+        assert_eq!(
+            m201_gesture_action_proof_line(1359, 1, event, ack, 0, 1),
+            "M201_AUTH_GESTURE_ACTION tick=1359 fighter=1 source=0 gesture=7 sequence=1 eventAction=1 status=1 from=0 to=1"
+        );
+        let upgraded = TypedGestureEvent {
+            event: GestureEvent {
+                action: GestureAction::Upgrade,
+                sequence: 2,
+                ..event.event
+            },
+            ..event
+        };
+        let upgrade_ack = GestureAck { sequence: 2, ..ack };
+        assert_eq!(
+            m201_gesture_action_proof_line(1359, 1, upgraded, upgrade_ack, 1, 9),
+            "M201_AUTH_GESTURE_ACTION tick=1359 fighter=1 source=0 gesture=7 sequence=2 eventAction=2 status=1 from=1 to=9"
+        );
+        // A replay/failed admission must preserve its real unchanged state;
+        // formatting must never manufacture the previously observed edge.
+        let duplicate = GestureAck {
+            status: AckStatus::Duplicate,
+            ..upgrade_ack
+        };
+        assert!(
+            m201_gesture_action_proof_line(1359, 1, upgraded, duplicate, 9, 9)
+                .ends_with("eventAction=2 status=2 from=9 to=9")
+        );
+    }
 
     fn action_sample(tick: u32, heavy_attack: bool) -> InputSample {
         InputSample {

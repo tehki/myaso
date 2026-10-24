@@ -531,3 +531,246 @@ async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
     .await
     .expect("survivors attack; only matching current KeyE release can strike");
 }
+
+async fn combat4c_ack(conn: &Connection, source: u8, action: u8, seq: u32, id: u32, status: u8) {
+    conn.send_datagram(typed_event(source, action, seq, id))
+        .expect("real same-connection v2 event");
+    let packet = timeout(WAIT, async {
+        loop {
+            let packet = conn
+                .receive_datagram()
+                .await
+                .expect("same live authenticated QUIC connection");
+            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
+                break packet;
+            }
+        }
+    })
+    .await
+    .expect("bounded real 0x12 ACK");
+    assert_eq!(
+        &packet[0..4],
+        &[2, 0x12, status, 0],
+        "physical source terminal and real World ACK status must agree"
+    );
+    assert_eq!(
+        u32::from_le_bytes(packet[4..8].try_into().unwrap()),
+        seq,
+        "ACK sequence must correlate to one shared ordered lease"
+    );
+    assert_eq!(
+        u32::from_le_bytes(packet[8..12].try_into().unwrap()),
+        id,
+        "ACK gesture ID cannot be substituted"
+    );
+    assert!(
+        u32::from_le_bytes(packet[12..16].try_into().unwrap()) > 0,
+        "actual World-owned tick required"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_keye_world() {
+    // One REAL pinned original Rust WebTransport/QUIC session with two typed
+    // physical sources. This is not two human browsers or an authenticated
+    // user account. The v2 test server is loopback-only and default-OFF.
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    // First source0 LMB is held (no UP). The original Rust World automatically
+    // performs its ONE legal 135ms light and finishes full recovery.
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let original = server.lines.lock().unwrap().clone();
+            if original
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=3 to=0"))
+            {
+                assert!(
+                    original.iter().any(|l| {
+                        l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2")
+                    }),
+                    "first original World light must genuinely reach Active"
+                );
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("original World first light completed recovery while LMB physically held");
+
+    // Source1 KeyE is a DIFFERENT real physical press, now the new original
+    // World owner. Server 320ms charge must stay READY with no auto-hit.
+    combat4c_ack(&seat.connection, 1, 1, 2, 2, 1).await;
+    timeout(Duration::from_secs(4), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("genuine independently held source1 original World HeavyWindup");
+
+    // Original source0 finger finally lifts AFTER the source1 World takeover.
+    // It must receive ACCEPTED no-combat, not REJECTED (fatal to shared queue).
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 1).await;
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 2).await;
+
+    // Wait beyond the original 320ms READY boundary; the old LMB RELEASE
+    // MUST NOT release the newer KeyE or create a phantom heavy.
+    sleep(Duration::from_millis(425)).await;
+    let before = server.lines.lock().unwrap().clone();
+    assert!(
+        !before
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10") }),
+        "stale-but-authentic LMB release cannot commit newer held KeyE"
+    );
+
+    // Only true source1 UP seq4/id2 can enter original World HeavyActive.
+    combat4c_ack(&seat.connection, 1, 3, 4, 2, 1).await;
+    timeout(Duration::from_secs(4), async {
+        loop {
+            let actions = server.lines.lock().unwrap().clone();
+            let count = actions
+                .iter()
+                .filter(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
+                .count();
+            if count >= 1 {
+                assert_eq!(count, 1, "one released KeyE World heavy, no double-commit");
+                break;
+            }
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("matching source1 physical release genuinely commits 46HP World heavy");
+    println!("COMBAT4C_NATIVE_DISPLACED_LMB_KEYE_RELEASE_ONLY_QUIC_PASS");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() {
+    // One actual pinned WebTransport/QUIC lease, source0 LMB, original 60Hz
+    // Rust World. This is NOT a browser/human WAN admission test.
+    let (server, url, digest) = real_server();
+    let seat = admitted_seat(&url, &digest).await;
+
+    // The original M201 observer emits its FIRST actor observation as a
+    // baseline, not an ACTION transition. Wait for actual server Idle0 before
+    // issuing PRESS, so every later action is trace-correlated on one clock.
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            let seen_idle = lines.iter().any(|l| {
+                l.contains("M201_FLIGHT_ACTOR_BASELINE") && l.contains(" fighter=1 action=0")
+            });
+            if seen_idle {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("real QUIC actor1 was observed Idle on original 60Hz World");
+
+    // Same physical source, same gesture ID, monotonic transport sequences.
+    // No client-supplied tick may force World readiness or damage.
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+
+    // The World ACTION trace is sampled once per 60Hz tick. A PRESS and
+    // UPGRADE accepted in the same tick may appear as Idle -> HeavyWindup,
+    // hiding the intermediate real light state. Require an observed genuine
+    // Idle -> LightWindup tick, strictly before the 135ms light becomes active.
+    timeout(Duration::from_millis(90), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("actual 60Hz World observed LMB light windup before upgrade");
+    combat4c_ack(&seat.connection, 0, 2, 2, 1, 1).await;
+
+    timeout(Duration::from_secs(3), async {
+        loop {
+            let lines = server.lines.lock().unwrap().clone();
+            if lines
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=9"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("original World upgraded real LMB light windup to held heavy");
+
+    // Past the legitimate 320ms READY threshold there must be neither
+    // auto-heavy nor the abandoned 135ms light from the same gesture.
+    sleep(Duration::from_millis(410)).await;
+    let held = server.lines.lock().unwrap().clone();
+    assert!(
+        !held.iter().any(|l| {
+            l.contains("M201_AUTH_ACTION")
+                && (l.contains(" fighter=1 from=9 to=10") || l.contains(" fighter=1 from=1 to=2"))
+        }),
+        "one upgraded held LMB cannot auto-hit before physical release: {held:?}"
+    );
+
+    // Only the matching real source0 UP commits the heavy. Byte-identical
+    // datagram replay must ACK DUPLICATE and must not commit another hit.
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 1).await;
+    combat4c_ack(&seat.connection, 0, 3, 3, 1, 2).await;
+    timeout(Duration::from_secs(3), async {
+        loop {
+            if server
+                .lines
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
+            {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("matching physical source0 release triggers original World HeavyActive");
+    sleep(Duration::from_millis(100)).await;
+    let final_lines = server.lines.lock().unwrap().clone();
+    let heavy_count = final_lines
+        .iter()
+        .filter(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
+        .count();
+    assert_eq!(
+        heavy_count, 1,
+        "replayed release cannot produce a second heavy"
+    );
+    assert!(
+        !final_lines
+            .iter()
+            .any(|l| { l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2") }),
+        "upgraded LMB cannot also produce a 34HP LightActive"
+    );
+    println!("COMBAT4C_NATIVE_LMB_EARLY_UPGRADE_RELEASE_ONLY_QUIC_PASS");
+}
