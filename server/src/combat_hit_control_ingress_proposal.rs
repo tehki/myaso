@@ -393,7 +393,6 @@ mod tests {
         gate
     }
 
-
     fn framed_control(control: [u8; HIT_CONTROL_BYTES]) -> [u8; HIT_CONTROL_BYTES + 2] {
         let mut frame = [0; HIT_CONTROL_BYTES + 2];
         frame[..2].copy_from_slice(&(HIT_CONTROL_BYTES as u16).to_le_bytes());
@@ -491,12 +490,9 @@ mod tests {
         let mut gate = ProposedHitControlIngress::for_offline_test(actor, TOKEN, 64).unwrap();
         let mut reader = ProposedHitControlChunkReader::new_review_only(actor).unwrap();
         assert_eq!(
-            reader.feed_review_chunk(
-                &mut gate,
-                actor,
-                &framed_control(hello()),
-                |_| Err(IngressError::InvalidReliableFrame),
-            ),
+            reader.feed_review_chunk(&mut gate, actor, &framed_control(hello()), |_| Err(
+                IngressError::InvalidReliableFrame
+            ),),
             Err(IngressError::InvalidReliableFrame)
         );
         assert_eq!(
