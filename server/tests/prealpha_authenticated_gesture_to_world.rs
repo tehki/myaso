@@ -164,6 +164,159 @@ fn server_320ms_ready_waits_for_matching_release_real_46hp_only() {
     assert_eq!(w.fighter(2).unwrap().hp, 54.0);
 }
 #[test]
+fn original_world_death_respawn_stales_old_held_lmb_lease() {
+    // Use one real Rust World and its committed HIT/Death/Respawn events;
+    // never forge HP, a World incarnation, or a replacement actor identity.
+    let mut w = World::new(800.0, 600.0);
+    assert!(w.add_player_at(1, 250.0, 300.0, 0.0));
+    assert!(w.add_player_at(2, 310.0, 300.0, 0.0));
+    assert!(w.add_player_at(3, 700.0, 500.0, 0.0));
+    let mut attacker = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    let mut old = SessionGestureWorldPath::from_admitted_world(&w, 2, LEASE + 1, BOOT).unwrap();
+    let original = old.binding();
+
+    // Two real physical source0 gestures, each one genuine 34 HP World hit.
+    for (gesture, expected_hp) in [(1, 66), (2, 32)] {
+        assert_eq!(
+            admit(
+                &mut attacker, &mut w, LEASE, GestureSource::Lmb,
+                GestureAction::Press, 2 * gesture - 1, gesture,
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut attacker, &mut w, LEASE, GestureSource::Lmb,
+                GestureAction::Release, 2 * gesture, gesture,
+            ),
+            AckStatus::Accepted
+        );
+        let mut hit_count = 0;
+        for _ in 0..55 {
+            for event in w.step() {
+                if let CombatEvent::Hit {
+                    attacker: 1, target: 2, damage: 34, hp,
+                } = event {
+                    assert_eq!(hp, expected_hp);
+                    hit_count += 1;
+                }
+            }
+            attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
+            old.advance_under_world_lock(&mut w, LEASE + 1, BOOT);
+        }
+        assert_eq!(hit_count, 1);
+        assert_eq!(w.fighter(2).unwrap().hp, f32::from(expected_hp));
+    }
+
+    // The victim's physical LMB is held at the instant the original third
+    // attack commits real death. This in-flight gesture must lose authority.
+    assert_eq!(
+        admit(
+            &mut old, &mut w, LEASE + 1, GestureSource::Lmb,
+            GestureAction::Press, 1, 7,
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut attacker, &mut w, LEASE, GestureSource::Lmb,
+            GestureAction::Press, 5, 3,
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut attacker, &mut w, LEASE, GestureSource::Lmb,
+            GestureAction::Release, 6, 3,
+        ),
+        AckStatus::Accepted
+    );
+    let (mut fatal_hits, mut deaths) = (0, 0);
+    for _ in 0..55 {
+        for event in w.step() {
+            match event {
+                CombatEvent::Hit {
+                    attacker: 1, target: 2, damage: 34, hp: 0,
+                } => fatal_hits += 1,
+                CombatEvent::Death { fighter: 2, killer: 1 } => deaths += 1,
+                _ => {}
+            }
+        }
+        attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
+        old.advance_under_world_lock(&mut w, LEASE + 1, BOOT);
+        if deaths != 0 { break; }
+    }
+    assert_eq!((fatal_hits, deaths), (1, 1));
+    assert_eq!(w.fighter(2).unwrap().action, Action::Dead);
+    assert!(old.retired());
+    assert_eq!(
+        admit(
+            &mut old, &mut w, LEASE + 1, GestureSource::Lmb,
+            GestureAction::Release, 2, 7,
+        ),
+        AckStatus::Stale
+    );
+
+    // Original World respawn increments the incarnation; it is not a
+    // client-supplied reset or a fabricated fresh actor.
+    let mut respawns = 0;
+    for _ in 0..110 {
+        for event in w.step() {
+            if matches!(event, CombatEvent::Respawn { fighter: 2 }) {
+                respawns += 1;
+            }
+        }
+        attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
+        if respawns != 0 { break; }
+    }
+    assert_eq!(respawns, 1);
+    let mut fresh =
+        SessionGestureWorldPath::from_admitted_world(&w, 2, LEASE + 2, BOOT).unwrap();
+    assert_eq!(fresh.binding().player_id, original.player_id);
+    assert_ne!(fresh.binding().incarnation, original.incarnation);
+    assert_ne!(fresh.binding().lease_epoch, original.lease_epoch);
+
+    for action in [GestureAction::Release, GestureAction::Cancel] {
+        let old_lmb = edge(GestureSource::Lmb, action, 2, 7);
+        assert_eq!(
+            old.accept_under_world_lock(&mut w, LEASE + 1, BOOT, &old_lmb)
+                .unwrap().status,
+            AckStatus::Stale
+        );
+        let old_keye = edge(GestureSource::KeyE, action, 1, 7);
+        assert_eq!(
+            fresh.accept_under_world_lock(&mut w, LEASE + 2, BOOT, &old_keye)
+                .unwrap().status,
+            AckStatus::Rejected
+        );
+    }
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(w.fighter(2).unwrap().action, Action::Idle);
+    // The current admitted incarnation gets its OWN source0 sequence 1/2.
+    assert_eq!(
+        admit(
+            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
+            GestureAction::Press, 1, 1,
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
+            GestureAction::Release, 2, 1,
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut fresh, &mut w, LEASE + 2, GestureSource::Lmb,
+            GestureAction::Release, 2, 1,
+        ),
+        AckStatus::Duplicate
+    );
+}
+
+#[test]
 fn failed_new_actor_ownership_cannot_steal_prior_press_or_release() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
