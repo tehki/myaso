@@ -1041,7 +1041,38 @@ async function prepareHeavyCounterplayFlight(
   const defenderElementId = await resolveArenaElement(defender, `${label} defender`);
   await Promise.all(entries.map(centerArenaInViewport));
   if (nativeBoundedApproach) {
+    // M121 independent read-only forensic. Observe original accepted world
+    // positions and actual W3C keydown/up durations around ONE unchanged
+    // native keyboard transaction, before any combat click is sent.
+    const before = await readUiEvidence(attacker);
     await pulseMovementKeyBoundedW3c(attacker, movementKey, movementMs);
+    const after = await readUiEvidence(attacker);
+    const preActors = before.acceptance?.fighters ?? [];
+    const postActors = after.acceptance?.fighters ?? [];
+    const ownBefore = preActors.find((entry) => entry.netId === attackerReady.playerNetId);
+    const targetBefore = preActors.find((entry) => entry.netId === defenderReady.playerNetId);
+    const ownAfter = postActors.find((entry) => entry.netId === attackerReady.playerNetId);
+    const targetAfter = postActors.find((entry) => entry.netId === defenderReady.playerNetId);
+    const distance = (a, b) => a && b
+      ? Math.hypot(b.x - a.x, b.y - a.y) : null;
+    const keyEvents = after.keyTransitions.filter((event) => event.code === movementCode);
+    const keyDown = keyEvents.filter((event) => event.type === "keydown").at(-1);
+    const keyUp = keyEvents.filter((event) => event.type === "keyup").at(-1);
+    console.log("M121_NATIVE_APPROACH_WORLD " + JSON.stringify({
+      attackerId: attackerReady.playerNetId,
+      targetId: defenderReady.playerNetId,
+      movementKey: movementCode,
+      requestedHoldMs: movementMs,
+      observedHoldMs: keyDown && keyUp ? keyUp.t - keyDown.t : null,
+      originalKeyEvents: keyEvents.slice(-4),
+      serverTickBefore: before.acceptance?.serverTick ?? null,
+      serverTickAfter: after.acceptance?.serverTick ?? null,
+      ownBefore, targetBefore, ownAfter, targetAfter,
+      distanceBefore: distance(ownBefore, targetBefore),
+      distanceAfter: distance(ownAfter, targetAfter),
+      originalLightReach: COMBAT.attack.reach,
+      unchangedCollisionRadius: COMBAT.fighterRadius,
+    }));
   } else {
     await pulseMovementKey(attacker, movementKey, movementMs);
   }
