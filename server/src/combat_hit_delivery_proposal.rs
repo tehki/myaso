@@ -391,6 +391,35 @@ pub fn project_world_tick_for_recipients(
         }
     }
 
+    // Most 60Hz World ticks have no committed HIT. Validate the same
+    // authenticated actor snapshot and replay fence, then close just the
+    // existing scope cursors without allocating touched/staged HIT queues.
+    // Two passes preserve atomicity if any later scope is stale/replayed.
+    if committed.is_empty() {
+        for scope in recipients.iter() {
+            if scope.retired || scope.gapped_at.is_some() {
+                continue;
+            }
+            if scope
+                .last_committed_batch_tick
+                .is_some_and(|tick| server_tick <= tick)
+                || scope
+                    .last_world_hit
+                    .is_some_and(|(tick, _)| server_tick <= tick)
+            {
+                return Err(DeliveryError::ReplayedOrReorderedWorldHit);
+            }
+        }
+        let mut projected = Vec::with_capacity(recipients.len());
+        for scope in recipients.iter_mut() {
+            if !scope.retired && scope.gapped_at.is_none() {
+                scope.last_committed_batch_tick = Some(server_tick);
+            }
+            projected.push((scope.recipient, Vec::new()));
+        }
+        return Ok(projected);
+    }
+
     // A participant must be represented by EXACTLY its current server actor
     // lifetime. No absent or old same-number lease can silently miss a HIT.
     let mut touched = vec![false; recipients.len()];
@@ -1040,6 +1069,45 @@ mod tests {
             project_world_tick_for_recipients(700, &committed, &mut none),
             Err(DeliveryError::InvalidScope)
         );
+    }
+
+    #[test]
+    fn idle_world_tick_preserves_retired_and_gap_scopes_but_fences_replay() {
+        // No actor receives HIT credit on an idle World tick; unaffected
+        // authenticated actors must still close the tick against stale HIT
+        // callbacks without cloning existing inboxes.
+        let mut scopes = vec![scope(1), scope(2), scope(3)];
+        scopes[1].retire();
+        scopes[2].gapped_at = Some(0);
+        assert_eq!(
+            project_world_tick_for_recipients(940, &[], &mut scopes)
+                .unwrap()
+                .iter()
+                .map(|(_, receipts)| receipts.len())
+                .collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+        assert_eq!(scopes[0].last_committed_batch_tick, Some(940));
+        assert_eq!(scopes[1].last_committed_batch_tick, None);
+        assert_eq!(scopes[2].last_committed_batch_tick, None);
+        assert_eq!(scopes[1].pending(), 0);
+        assert_eq!(scopes[2].gap(), Some(0));
+        assert_eq!(
+            project_world_tick_for_recipients(940, &[], &mut scopes),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(scopes[0].last_committed_batch_tick, Some(940));
+        assert_eq!(
+            project_world_tick_for_recipients(941, &[], &mut scopes)
+                .unwrap()
+                .iter()
+                .filter(|(_, receipts)| !receipts.is_empty())
+                .count(),
+            0
+        );
+        assert_eq!(scopes[0].last_committed_batch_tick, Some(941));
+        assert_eq!(scopes[1].last_committed_batch_tick, None);
+        assert_eq!(scopes[2].gap(), Some(0));
     }
 
     #[test]
