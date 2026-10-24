@@ -329,20 +329,20 @@ mod key_e_actor_rejoin_fence_tests {
             GestureAction::Cancel,
         ] {
             let forged = old_typed_event(1, action, u32::MAX);
-            assert_eq!(
-                previous
-                    .accept_under_world_lock(&mut world, 11, boot_nonce, &forged)
-                    .unwrap()
-                    .status,
-                AckStatus::Rejected
-            );
-            assert_eq!(
-                current
-                    .accept_under_world_lock(&mut world, 12, boot_nonce, &forged)
-                    .unwrap()
-                    .status,
-                AckStatus::Rejected
-            );
+            let previous_result =
+                previous.accept_under_world_lock(&mut world, 11, boot_nonce, &forged);
+            let current_result =
+                current.accept_under_world_lock(&mut world, 12, boot_nonce, &forged);
+            if action == GestureAction::Upgrade {
+                // Legacy source1 UPGRADE is invalid at the existing typed
+                // decoder, before the actor-admission ACK path. No ACK is
+                // generated, and neither connection owns any Combat state.
+                assert_eq!(previous_result, None);
+                assert_eq!(current_result, None);
+            } else {
+                assert_eq!(previous_result.unwrap().status, AckStatus::Rejected);
+                assert_eq!(current_result.unwrap().status, AckStatus::Rejected);
+            }
         }
         assert_eq!(previous.authority.highest_accepted_sequence(), 0);
         assert_eq!(current.authority.highest_accepted_sequence(), 0);
