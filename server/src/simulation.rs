@@ -2245,10 +2245,7 @@ mod r2_combat_control_tests {
                     ..InputIntent::default()
                 }
             ));
-            assert!(world.apply_review_only_lmb_gesture_command(
-                1,
-                Command::BeginLightWindup,
-            ));
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup,));
             assert_eq!(world.fighter(1).unwrap().action, expected);
             assert!(world.step().is_empty());
             assert!(world.apply_review_only_lmb_gesture_command(
@@ -2275,10 +2272,7 @@ mod r2_combat_control_tests {
                 expected,
                 "undercharged LMB must resume original directional light, not classify latest neutral",
             );
-            assert!(!world.apply_review_only_lmb_gesture_command(
-                1,
-                Command::ReleaseHeavy,
-            ));
+            assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy,));
         }
     }
 
