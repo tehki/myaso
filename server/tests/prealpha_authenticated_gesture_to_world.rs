@@ -1130,3 +1130,75 @@ fn future_lmb_press_waits_for_missing_lmb_terminal_not_retired_keye() {
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
     assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
+
+#[test]
+fn same_world_tick_press_and_upgrade_preserve_real_intermediate_windup_without_auto_hit() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    let original_tick = w.tick;
+    let original_ms = w.now_ms;
+    let press = edge(GestureSource::Lmb, GestureAction::Press, 1, 1);
+    let press_ack = p
+        .accept_under_world_lock(&mut w, LEASE, BOOT, &press)
+        .unwrap();
+    assert_eq!(press_ack.status, AckStatus::Accepted);
+    assert_eq!(press_ack.sequence, 1);
+    assert_eq!(press_ack.gesture_id, 1);
+    assert_eq!(press_ack.server_tick, original_tick);
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(w.tick, original_tick);
+    assert_eq!(w.now_ms, original_ms);
+
+    // Real QUIC edges can be admitted between the same two World ticks.
+    // Do not step or inject an action to make the intermediate state visible.
+    let upgrade = edge(GestureSource::Lmb, GestureAction::Upgrade, 2, 1);
+    let upgrade_ack = p
+        .accept_under_world_lock(&mut w, LEASE, BOOT, &upgrade)
+        .unwrap();
+    assert_eq!(upgrade_ack.status, AckStatus::Accepted);
+    assert_eq!(upgrade_ack.sequence, 2);
+    assert_eq!(upgrade_ack.gesture_id, press_ack.gesture_id);
+    assert_eq!(upgrade_ack.server_tick, press_ack.server_tick);
+    assert_eq!(w.tick, original_tick);
+    assert_eq!(w.now_ms, original_ms);
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
+    // Past genuine server READY320, both Active phases remain forbidden
+    // while this same authenticated physical gesture is still held.
+    for _ in 0..40 {
+        assert!(advance(&mut p, &mut w, 1).is_empty());
+        assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    }
+    assert!(w.now_ms - original_ms > 320.0);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackActive);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Duplicate
+    );
+    assert!(advance(&mut p, &mut w, 55).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+}

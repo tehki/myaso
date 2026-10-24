@@ -236,3 +236,31 @@ test("completed writes without authenticated ACK still exhaust the original boun
   assert.equal(f.wire.length,6,"retry exhaustion never invents a fourth attempt");
  }finally{lab.close("test");}
 });
+
+test("loopback geometry proof copies only actual replicas and never infers actors or missing vitals",async()=>{
+ const f=createFixture();
+ const original={netId:4,x:123,y:456,action:19,hp:66,guard:62,stamina:28,secret:"not exposed"};
+ f.gameClient.state=new Map([[4,original],[999,{x:7,y:8}]]);
+ f.gameClient.playerNetId=4;
+ f.gameClient.latestServerTick=1359;
+ const lab=await activateLoopbackGestureLab(f.options);
+ try{
+  const first=f.win.__MYASO_LOCAL_GESTURE_PROOF__();
+  assert.equal(first.ownPlayerNetId,4);
+  assert.equal(first.serverTick,1359);
+  assert.deepEqual(first.replicatedFighters[0],{netId:4,x:123,y:456,action:19,hp:66,guard:62,stamina:28});
+  assert.equal(first.replicatedFighters[1].netId,undefined,"Map key never invents an actor identity");
+  assert.equal(first.replicatedFighters[1].hp,undefined,"missing replicated HP never becomes guessed full health");
+  assert.equal(first.replicatedFighters[0].secret,undefined);
+  assert.throws(()=>{first.replicatedFighters[0].x=900;},TypeError);
+  assert.throws(()=>first.replicatedFighters.push({netId:5}),TypeError);
+  assert.equal(original.x,123,"proof cannot mutate real replica state");
+  original.x=124;
+  f.gameClient.latestServerTick=1360;
+  const second=f.win.__MYASO_LOCAL_GESTURE_PROOF__();
+  assert.equal(first.replicatedFighters[0].x,123,"old proof remains a detached snapshot");
+  assert.equal(second.replicatedFighters[0].x,124);
+  assert.equal(second.serverTick,1360);
+  assert.equal(f.wire.length,0,"reading geometry never submits input");
+ }finally{lab.close("test");}
+});

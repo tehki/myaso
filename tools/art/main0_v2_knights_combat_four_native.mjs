@@ -8,11 +8,12 @@ import {createHash} from "node:crypto";
 import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
+import {COMBAT} from "../../src/combat/model.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
-assert.ok(["original","held-lmb"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","four-combat-lifecycle"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -109,6 +110,216 @@ knightsFlag:new URLSearchParams(location.search).get("knights"),knightArt:new UR
 roster:[...document.querySelectorAll("#scoreboard-list li")].map(li=>li.textContent?.trim()||""),
 status:document.querySelector("#event-text")?.textContent||"",innerWidth:innerWidth,innerHeight:innerHeight,
 canvasWidth:document.querySelector("#arena")?.width,canvasHeight:document.querySelector("#arena")?.height};`;
+async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld}){
+ const start=readAuthoritativeWorld().length;
+ const lines=()=>readAuthoritativeWorld().slice(start).split("\n");
+ const actionRows=()=>lines().flatMap((line,index)=>{
+  const m=line.match(/^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)\s*$/);
+  return m?[{line,index,tick:+m[1],fighter:+m[2],from:+m[3],to:+m[4]}]:[];
+ });
+ const admissionRows=()=>lines().flatMap((line,index)=>{
+  const m=line.match(/^M201_AUTH_GESTURE_ACTION tick=(\d+) fighter=(\d+) source=(\d+) gesture=(\d+) sequence=(\d+) eventAction=(\d+) status=(\d+) from=(\d+) to=(\d+)\s*$/);
+  return m?[{line,index,tick:+m[1],fighter:+m[2],source:+m[3],gesture:+m[4],sequence:+m[5],eventAction:+m[6],status:+m[7],from:+m[8],to:+m[9]}]:[];
+ });
+ const hitRows=()=>lines().flatMap((line,index)=>{
+  const m=line.match(/^M201_AUTH_HIT tick=(\d+) attacker=(\d+) target=(\d+) damage=(\d+) hp=(\d+)\s*$/);
+  return m?[{line,index,tick:+m[1],attacker:+m[2],target:+m[3],damage:+m[4],hp:+m[5]}]:[];
+ });
+ const proof=a=>evaluate(a.s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+ const readAll=async()=>Promise.all(actors.map(async a=>({actorId:a.actor.id,browser:a.s.engine,
+  ...await evaluate(a.s,String.raw`return {proof:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null,ownHud:{
+   hp:Number(document.querySelector('#player-hp-value')?.textContent),
+   guard:Number(document.querySelector('#player-guard-value')?.textContent),
+   stamina:Number(document.querySelector('#player-stamina-value')?.textContent),
+   roster:[...document.querySelectorAll('#scoreboard-list li')].map(li=>li.textContent||'')}};`)})));
+ const own=(p,id)=>p?.replicatedFighters?.find(f=>f.netId===id);
+ const pulse=(a,key,ms)=>request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+  actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
+ });
+ const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
+ const waitReplicas=()=>waitFor(async()=>{
+  const replicas=await readAll();
+  return replicas.every(r=>r.proof?.ownPlayerNetId===r.actorId&&r.proof.failed===false&&r.proof.closed===false&&r.proof.replicatedFighters?.length===4
+   &&r.ownHud.hp===expectedHp.get(r.actorId)&&r.ownHud.guard===100&&r.ownHud.stamina===100&&r.ownHud.roster.length===4
+   &&r.proof.replicatedFighters.every(f=>expectedHp.has(f.netId)&&f.hp===expectedHp.get(f.netId)&&f.guard===100&&f.stamina===100))?replicas:false;
+ },12000);
+ async function stagePair(attackerId,targetId){
+  const a=actors.find(a=>a.actor.id===attackerId);
+  for(let move=0;move<6;move++){
+   const p=await proof(a),f=own(p,attackerId),t=own(p,targetId);
+   assert(f&&t&&f.action===0&&t.action===0,"only real idle replicas may authorize native staging");
+   assert.ok(Math.abs(f.y-t.y)<=8,"native pair must share actual horizontal lane");
+   const desired=COMBAT.attack.reach-4,delta=t.x-f.x-desired;
+   if(Math.abs(delta)<=5){
+    assert.ok(t.x-f.x>COMBAT.fighterRadius*2&&t.x-f.x<COMBAT.attack.reach+COMBAT.fighterRadius-10,
+     "actual replica positions, not held duration, establish light reach");
+    await sleeps(110);
+    const stable=await proof(a),next=own(stable,attackerId),nextTarget=own(stable,targetId);
+    if(stable.serverTick>p.serverTick&&Math.abs(next.x-f.x)<=2&&Math.abs(nextTarget.x-t.x)<=2)return {attackerId,targetId,proof:stable};
+   }else{
+    await pulse(a,delta>0?"d":"a",Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed))));
+   }
+   await sleeps(310); // do not accidentally double-tap the original native dash gesture
+  }
+  throw Error("real WASD could not establish stable authoritative pair geometry");
+ }
+ async function prepareClick(a,targetId){
+  const p=await proof(a),f=own(p,a.actor.id),target=own(p,targetId);
+  assert(f&&target&&f.action===0&&target.action===0,"all native click preparation requires actual recovered idle fighters");
+  const before=await evaluate(a.s,"return window.__MYASO_FOUR_PHYSICAL_LMB__?.length??0;");
+  const xy=await evaluate(a.s,"const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:b.left+b.width/2,y:b.top+b.height/2,scaleX:b.width/c.width,scaleY:b.height/c.height};");
+  const angle=Math.atan2(target.y-f.y,target.x-f.x);
+  await request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+   actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
+    {type:"pointerMove",origin:"viewport",x:Math.round(xy.x+Math.cos(angle)*190*xy.scaleX),y:Math.round(xy.y+Math.sin(angle)*190*xy.scaleY),duration:0},
+   ]}]
+  });
+  return {a,targetId,before};
+ }
+ function dispatchPreparedClick({a}){
+  // Critical simultaneous phase: no browser reads, aim moves or down-ACK
+  // barriers between dispatching these genuine native button sequences.
+  return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+   actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
+    {type:"pointerDown",button:0},{type:"pause",duration:25},{type:"pointerUp",button:0},
+   ]}]
+  });
+ }
+ async function collectPreparedClick({a,targetId,before}){
+  const edges=await evaluate(a.s,"return window.__MYASO_FOUR_PHYSICAL_LMB__?.map(e=>({...e}))??[];");
+  const delivered=edges.slice(before);
+  assert.equal(delivered.length,2,"exactly one actual native physical down/up per round");
+  assert.equal(delivered[0].type,"pointerdown");assert.equal(delivered[1].type,"pointerup");
+  assert.ok(delivered.every(e=>e.trusted&&e.pointerType==="mouse"),"all four fighters use genuine trusted native mouse events");
+  assert.equal(delivered[0].pointerId,delivered[1].pointerId);
+  return {actorId:a.actor.id,targetId,edges:delivered};
+ }
+ async function click(a,targetId){
+  const prepared=await prepareClick(a,targetId);
+  await dispatchPreparedClick(prepared);
+  return collectPreparedClick(prepared);
+ }
+ async function round(pairs){
+  // Every true pointerMove ACK and eligibility read finishes for ALL actors
+  // before any native PRESS is dispatched. Preserve the strict concurrent
+  // World-admission-before-first-active requirement below without read jitter.
+  const prepared=await Promise.all(pairs.map(([id,target])=>prepareClick(actors.find(a=>a.actor.id===id),target)));
+  const beforeLines=lines(),offset=beforeLines.length-(beforeLines.at(-1)===""?1:0);
+  await Promise.all(prepared.map(dispatchPreparedClick));
+  const physicalClicks=await Promise.all(prepared.map(collectPreparedClick));
+  const roundRows=()=>admissionRows().filter(e=>e.index>=offset&&e.source===0&&e.status===1);
+  const presses=await waitFor(()=>{
+   const found=pairs.map(([id])=>roundRows().filter(e=>e.fighter===id&&e.eventAction===1&&e.from===0&&e.to===1));
+   return found.every(x=>x.length===1)?found.map(x=>x[0]):false;
+  },5000);
+  const hits=await waitFor(()=>{
+   const found=hitRows().filter(h=>h.index>=offset);
+   return found.length>=pairs.length?found:false;
+  },5000);
+  assert.equal(hits.length,pairs.length,"exactly one real World contact per independent gesture");
+  for(const [id,target] of pairs){
+   const h=hits.filter(h=>h.attacker===id&&h.target===target);
+   assert.equal(h.length,1,"real light hits only its paired independent fighter once");
+   assert.equal(h[0].damage,34,"physical short LMB cannot silently become heavy");
+   expectedHp.set(target,Math.max(0,expectedHp.get(target)-h[0].damage));
+   assert.equal(h[0].hp,expectedHp.get(target),"World HP derives exactly from original hit damage");
+   const press=presses.find(p=>p.fighter===id);
+   assert.ok(h[0].tick>=press.tick&&h[0].index>press.index,"actual same-actor light follows real gesture admission");
+   const releases=roundRows().filter(e=>e.fighter===id&&e.eventAction===3&&e.gesture===press.gesture);
+   assert.equal(releases.length,1,"one matching canonical physical release per light");
+   assert.ok(!roundRows().some(e=>e.fighter===id&&e.eventAction===2),"native short click cannot request held-heavy upgrade");
+  }
+  const active=actionRows().filter(e=>e.index>=offset&&e.to===2);
+  assert.equal(active.length,pairs.length,"all real independent players reach original LightActive exactly once");
+  if(pairs.length===4){
+   assert.ok(Math.max(...presses.map(p=>p.tick))-Math.min(...presses.map(p=>p.tick))<COMBAT.attack.windupMs*60/1000,
+    "all four native PRESS admissions overlap before first light windup can finish");
+   assert.ok(Math.max(...presses.map(p=>p.index))<Math.min(...active.map(p=>p.index)),"all four real PRESSes precede first active strike");
+  }
+  await waitFor(async()=>{
+   const p=await proof(actors[0]);
+   return pairs.every(([id])=>own(p,id)?.action===0);
+  },5000);
+  assert.equal(hitRows().filter(h=>h.index>=offset).length,pairs.length,"completed recoveries cannot produce double hits");
+  return {physicalClicks,presses,hits,active,admissions:roundRows()};
+ }
+ const rounds=[],staging=[];
+ try{
+  await waitReplicas();
+  await Promise.all(actors.map(a=>evaluate(a.s,String.raw`
+   const edges=[];window.__MYASO_FOUR_PHYSICAL_LMB__=edges;
+   for(const type of ['pointerdown','pointerup'])window.addEventListener(type,e=>{
+    if(e.button===0){edges.push({type,trusted:e.isTrusted,pointerType:e.pointerType,pointerId:e.pointerId,epochMs:Date.now()});
+     if(edges.length>64)edges.shift();}
+   },true);return true;`)));
+  staging.push(await stagePair(1,2),await stagePair(3,4));
+  rounds.push(await round([[1,2],[2,1],[3,4],[4,3]]));
+  const afterJoint=await waitReplicas();
+  for(let lethal=0;lethal<2;lethal++){
+   staging.push(await stagePair(1,2));
+   rounds.push(await round([[1,2]]));
+   if(lethal===0)await waitReplicas();
+  }
+  const death=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.to===8),5000);
+  const respawn=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.from===8&&e.to===0&&e.index>death.index),6000);
+  expectedHp.set(2,100);
+  const afterRespawn=await waitReplicas();
+  const old=actors.find(a=>a.actor.id===2);
+  // The original native page still owns the pre-death negotiated lease.
+  // A genuine post-respawn click must fail closed, never acquire authority
+  // from the player's returned HP or silently grant a new actor incarnation.
+  const beforeStaleProof=await proof(old),staleLines=lines();
+  assert.equal(beforeStaleProof.failed,false,"native death-fence failure must follow the new physical stale click");
+  assert.equal(beforeStaleProof.closed,false,"the real pre-death page remains connected before stale click");
+  const staleOffset=staleLines.length-(staleLines.at(-1)===""?1:0);
+  const stalePhysical=await click(old,1);
+  const staleProof=await waitFor(async()=>{
+   const p=await proof(old);
+   return p?.failed===true&&p.closed===true?p:false;
+  },5000);
+  const oldSequences=new Set((beforeStaleProof.acknowledged??[]).map(r=>r.sequence));
+  const staleReceipts=(staleProof.acknowledged??[]).filter(r=>!oldSequences.has(r.sequence));
+  assert.ok(staleReceipts.every(r=>r.status!==1),"dead-generation physical gesture cannot receive accepted authority");
+  await sleeps(COMBAT.attack.windupMs+COMBAT.attack.activeMs+COMBAT.attack.recoveryMs+150);
+  const staleActions=actionRows().filter(e=>e.index>=staleOffset&&e.fighter===2);
+  const staleHits=hitRows().filter(e=>e.index>=staleOffset&&e.attacker===2);
+  const staleAdmissions=admissionRows().filter(e=>e.index>=staleOffset&&e.fighter===2);
+  assert.ok(!staleActions.some(e=>e.to===1||e.to===2||e.to===9||e.to===10),"real old-generation click cannot start any light or heavy World attack");
+  assert.equal(staleHits.length,0,"real retired native actor cannot damage another player");
+  assert.ok(!staleAdmissions.some(e=>e.status===1),"old-generation source edge never gains accepted World admission");
+  const deathFence={before:beforeStaleProof,physical:stalePhysical,after:staleProof,receipts:staleReceipts,
+   originalWorldAfterPhysicalClick:lines().slice(staleOffset),staleActions,staleHits,staleAdmissions};
+  await request(old.s.base,"DELETE","/session/"+old.s.id);
+  actors.splice(actors.indexOf(old),1);
+  await waitFor(async()=>{const all=await readAll();return all.every(r=>r.proof.replicatedFighters.length===3&&!own(r.proof,2));},12000);
+  const s=await startW3C(old.s.engine,4),u=new URL(host+"/web/index.html");
+  for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",gestureLab:"1"}))u.searchParams.set(k,v);
+  await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
+  const joined=await waitFor(async()=>{const p=await evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");return p?.ownPlayerNetId===5&&p.transportState==="granted"?p:false;},16000);
+  assert.equal(joined.ownPlayerNetId,5,"fresh native QUIC connection owns new server actor and lease");
+  const fresh={s,actor:{id:5}},survivors=actors.map(a=>a.actor.id);actors.push(fresh);
+  expectedHp.delete(2);expectedHp.set(5,100);
+  const afterRejoin=await waitReplicas(),before=own(await proof(fresh),5);
+  await pulse(fresh,"d",180);
+  const moved=await waitFor(async()=>{
+   const all=await readAll();
+   return all.every(r=>{const f=own(r.proof,5);return f&&f.x>before.x+8&&!own(r.proof,2);})?all:false;
+  },10000);
+  const retiredAfter=actionRows().filter(e=>e.fighter===2&&e.index>respawn.index);
+  assert.ok(!retiredAfter.some(e=>e.to===1||e.to===2||e.to===9||e.to===10),"retired old actor emits no further World combat action");
+  const evidence={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",mode:physicalMode,
+   fourRealNativeActiveFighters:true,staging,rounds,afterJoint,death,respawn,afterRespawn,deathFence,afterRejoin,moved,
+   freshActorId:5,survivors,oldActorId:2,oldNativeSessionDeleted:true,
+   forgedOldGenerationAttempted:false,genuineNativeOldGenerationClickRejected:true,
+   publicListener:false,independentPhysicalHumanHosts:false,originalWorld:lines()};
+  await writeFile(join(output,"combat4-four-native-combat-lifecycle-world.json"),JSON.stringify(evidence,null,2)+"\n");
+  console.log("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_WORLD_PASS",JSON.stringify(evidence));
+ }catch(error){
+  const evidence={error:String(error),rounds,staging,replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
+  await writeFile(join(output,"combat4-four-native-combat-lifecycle-failure.json"),JSON.stringify(evidence,null,2)+"\n");
+  console.error("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_FAILURE",JSON.stringify(evidence));throw error;
+ }
+}
 await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert,readAuthoritativeWorld}=await startOriginalRust(),host=await startStatic();
@@ -149,7 +360,9 @@ try{
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
  // True WebDriver key/pointer actions run against a fresh admitted original
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
- if(physicalMode==="held-lmb"){
+ if(physicalMode==="four-combat-lifecycle"){
+  await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
+ }else if(physicalMode==="held-lmb"){
   // A separate fresh World preserves the original held-LMB and short-LMB acceptance
   // below. The real game page owns every canonical source0 edge and ACK.
   const attacker=actors[0].s,attackerId=actors[0].actor.id,targetId=actors[1].actor.id;

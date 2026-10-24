@@ -37,6 +37,9 @@ jobs:
           - acceptance: held-lmb-firefox
             mode: held-lmb
             browsers: firefox,chrome,chrome,chrome
+          - acceptance: four-combat-lifecycle
+            mode: four-combat-lifecycle
+            browsers: chrome,firefox,chrome,firefox
     env:
       MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
       MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}

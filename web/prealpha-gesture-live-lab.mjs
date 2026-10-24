@@ -161,6 +161,15 @@ export async function activateLoopbackGestureLab({
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
       acknowledged:receipts.map(x=>({...x})),
+      // Actual replicated fields only: no prediction, inferred damage,
+      // allocation or gameplay writes. Each read returns detached snapshots.
+      ownPlayerNetId:gameClient.playerNetId,
+      serverTick:gameClient.latestServerTick,
+      replicatedFighters:Object.freeze(gameClient.state instanceof Map
+        ? [...gameClient.state.values()].map(fighter=>Object.freeze({
+          netId:fighter.netId,x:fighter.x,y:fighter.y,action:fighter.action,
+          hp:fighter.hp,guard:fighter.guard,stamina:fighter.stamina,
+        })) : []),
     });
     Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
       configurable:true,value:proof,
