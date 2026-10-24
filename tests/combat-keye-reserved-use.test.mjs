@@ -165,6 +165,23 @@ test("actual granted QUIC sender refuses handcrafted old source1 BEFORE bounded 
       /only source0 LMB typed 16-byte Combat events accepted/);
     assert.equal(lease.pendingGestureEdges,before,
       "unknown forged Combat source must not spend valid queue capacity");
+    // Preserve only ONE selected event decoder, even for forged source0.
+    // Packet-shaped bad actions/IDs must not starve physical LMB RELEASE
+    // behind the 64-pending-edge QUIC ceiling.
+    const invalidPackets = [
+      [()=>{const b=valid.slice();b[2]=0;return b;}, /invalid reviewed source\/action pair/],
+      [()=>{const b=valid.slice();b[2]=255;return b;}, /invalid reviewed source\/action pair/],
+      [()=>{const b=valid.slice();b.fill(0,4,8);return b;}, /sequence must be/],
+      [()=>{const b=valid.slice();b.fill(0,8,12);return b;}, /gestureId must be/],
+    ];
+    for(const [produce,error] of invalidPackets){
+      assert.throws(()=>client.sendExperimentalGestureEdge(produce()),error);
+      assert.equal(lease.pendingGestureEdges,before,
+        "malformed source0 may not occupy a legitimate LMB writer slot");
+      assert.equal(writes,0);
+      assert.equal(lease.experimentalGestureState,"granted",
+        "malformed source0 must not evict a genuine LMB actor lease");
+    }
     await client.sendExperimentalGestureEdge(valid);
     assert.equal(writes,1,"original LMB must still transmit over same QUIC writer");
     assert.equal(lease.pendingGestureEdges,0);
