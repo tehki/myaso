@@ -2285,6 +2285,61 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_cancelled_upgrade_cannot_leak_direction_or_late_hit() {
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
+        assert!(world.step().is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: SERVER_DT_MS as u64,
+            },
+        ));
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert!(!world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::ResumeLight {
+                server_elapsed_ms: world.now_ms as u64,
+            },
+        ));
+        assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+        for _ in 0..24 {
+            assert!(world.step().is_empty(), "cancelled LMB must not deal late damage");
+        }
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        // Only a NEW accepted gesture can establish a new attack origin.
+        // The cancelled leftward origin must not leak into a fresh right.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: 1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::AttackRightWindup,
+            "new opposite-side gesture must not inherit cancelled left direction"
+        );
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
