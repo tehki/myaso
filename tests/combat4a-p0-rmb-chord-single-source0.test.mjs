@@ -193,10 +193,10 @@ test("physical LMB alone first-sends each edge once; retired Key E cannot spend 
   assert.equal(q.snapshot.closed,true,"bounded terminal failure remains fail-closed");
 
   const lab=readFileSync(new URL("../web/prealpha-gesture-live-lab.mjs",import.meta.url),"utf8");
-  assert.match(lab,/function drain\\(onlyUnsent = false\\)/);
-  assert.match(lab,/outbox\\.nextSendBatch\\(4, \\{onlyUnsent\\}\\)/);
-  assert.match(lab,/lastFirstSendSequence = next;\\s*drain\\(true\\)/,
+  assert.match(lab,/function drain\(onlyUnsent = false\)/);
+  assert.match(lab,/outbox\.nextSendBatch\(4, \{onlyUnsent\}\)/);
+  assert.match(lab,/lastFirstSendSequence = next;\s*drain\(true\)/,
     "genuine LMB sequence drains only never-sent edges");
-  assert.match(lab,/if \\(outbox\\.snapshot\\.pending > 0\\) drain\\(\\);/,
+  assert.match(lab,/if \(outbox\.snapshot\.pending > 0\) drain\(\);/,
     "the existing timed retry remains the sole resend owner");
 });
