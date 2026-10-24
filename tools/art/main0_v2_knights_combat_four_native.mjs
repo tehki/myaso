@@ -133,9 +133,21 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    stamina:Number(document.querySelector('#player-stamina-value')?.textContent),
    roster:[...document.querySelectorAll('#scoreboard-list li')].map(li=>li.textContent||'')}};`)})));
  const own=(p,id)=>p?.replicatedFighters?.find(f=>f.netId===id);
- const pulse=(a,key,ms)=>request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
-  actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
- });
+ const pulse=async(a,key,ms)=>{
+  // The original game listens for WASD keydown on #arena, NOT window.
+  // Focusing the real canvas is required for genuine W3C keyboard events
+  // to reach the existing game input owner. No synthetic event is emitted.
+  const arenaFocused=await evaluate(a.s,String.raw`
+   const c=document.querySelector('#arena');
+   if(!c)return false;
+   c.scrollIntoView({block:'center'});
+   c.focus();
+   return document.activeElement===c;`);
+  assert.equal(arenaFocused,true,"native WASD staging requires original arena keyboard focus");
+  return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+   actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
+  });
+ };
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
   const replicas=await readAll();
