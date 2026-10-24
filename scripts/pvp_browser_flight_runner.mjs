@@ -540,7 +540,9 @@ async function startGameServer() {
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
       // Dedicated M121 original-v1 ingress evidence is never enabled for
       // v2 or other production paths; the Rust server rejects nonloopback.
-      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" ? "1" : "0",
+      MYASO_FLIGHT_M121_INPUT_PROOF: (scenario === "uidirectionallight"
+        || scenario === "uimultirecoveryffa"
+        || scenario === "uimultirecoveryspatial") ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -11546,6 +11548,29 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     throw new Error(`${milestone} incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
 
+  // Read-only original native physical/30Hz sender/QUIC/World/HUD chronology.
+  // Print BEFORE original strict 3-stage focus + 100HP + genuine input gates.
+  console.log("M144_ORIGINAL_AUTHENTIC_INGRESS " + JSON.stringify({
+    scenario: expectedScenario,
+    physical: {
+      jump: { keys: jumpState.keyTransitions, pointers: jumpState.pointers },
+      light: { pointers: lightState.pointers },
+    },
+    sent: {
+      jump: (jumpState.acceptance?.m144SentSamples ?? []).slice(-96),
+      light: (lightState.acceptance?.m144SentSamples ?? []).slice(-96),
+    },
+    worldActions: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => /^M201_AUTH_ACTION /.test(line)
+        && (line.includes(` fighter=${jumpId} `) || line.includes(` fighter=${lightId} `)))
+      .slice(-72),
+    receivedV1: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => /^M121_V1_SERVER_INPUT /.test(line)
+        && (line.includes(` actor=${jumpId} `) || line.includes(` actor=${lightId} `)))
+      .slice(-96),
+    focus: observerState.focusTransitions.slice(observerFocusOffset),
+    own: { jump: jumpState.acceptance?.ownActionTransitions, light: lightState.acceptance?.ownActionTransitions },
+  }));
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const recoveryTransitions = observerState.recoveryTransitions.slice(observerRecoveryOffset);
   const lightPunishIndex = focusTransitions.findIndex((entry) => entry.label === `PUNISH TARGET #${lightId}`);
@@ -14181,6 +14206,8 @@ async function readUiEvidence(session) {
         // Original M121 30Hz v1 input sender trace, copied READ-ONLY from the
         // real page to the WebDriver observer; no cross-plane inference.
         m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
+          .slice(-96).map((entry) => ({ ...entry })),
+        m144SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m144SentSamples ?? [])
           .slice(-96).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
