@@ -159,6 +159,14 @@ try{
    const m=line.match(/^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)\s*$/);
    return m&&Number(m[2])===attackerId?[{line,tick:Number(m[1]),from:Number(m[3]),to:Number(m[4])}]:[];
   });
+  // Exact under-lock mutations prove transient PRESS/UPGRADE even if both
+  // arrive before the next 60Hz sampled action print. Never infer 0->1->9
+  // from a sampled 0->9 or from transport ACKs alone.
+  const admissions=()=>worldLines().flatMap((line,index)=>{
+   const m=line.match(/^M201_AUTH_GESTURE_ACTION tick=(\d+) fighter=(\d+) source=(\d+) gesture=(\d+) sequence=(\d+) eventAction=(\d+) status=(\d+) from=(\d+) to=(\d+)\s*$/);
+   return m&&Number(m[2])===attackerId?[{line,index,tick:Number(m[1]),fighter:Number(m[2]),source:Number(m[3]),
+    gesture:Number(m[4]),sequence:Number(m[5]),eventAction:Number(m[6]),status:Number(m[7]),from:Number(m[8]),to:Number(m[9])}]:[];
+  });
   const hits=()=>worldLines().filter(line=>new RegExp("^M201_AUTH_HIT tick=\\d+ attacker="+attackerId+" target=\\d+ damage=").test(line));
   const pointer=await evaluate(attacker,String.raw`
    const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();
@@ -181,9 +189,14 @@ try{
     ]}]
    });
    const upgrade=await waitFor(()=>{
-    const a=actions(),light=a.find(e=>e.from===0&&e.to===1),heavy=a.find(e=>e.from===1&&e.to===9);
+    const a=admissions().filter(e=>e.source===0&&e.status===1);
+    const light=a.find(e=>e.eventAction===1&&e.from===0&&e.to===1);
+    const heavy=a.find(e=>e.eventAction===2&&e.from===1&&e.to===9);
     return light&&heavy?{light,heavy}:false;
    },5000);
+   assert.ok(upgrade.heavy.index>upgrade.light.index,"actual under-lock PRESS mutation precedes UPGRADE, including same-tick delivery");
+   assert.equal(upgrade.heavy.gesture,upgrade.light.gesture,"actual PRESS and UPGRADE own one gesture");
+   assert.ok(upgrade.heavy.sequence>upgrade.light.sequence,"actual UPGRADE sequence follows physical PRESS");
    assert.ok(upgrade.heavy.tick>=upgrade.light.tick,"World upgrade follows original light windup");
    assert.ok((upgrade.heavy.tick-upgrade.light.tick)*1000/60<135,
     "genuine held LMB must upgrade in original World BEFORE 135ms light active deadline");
@@ -209,8 +222,11 @@ try{
    assert.equal(up.type,"pointerup");assert.equal(up.trusted,true);
    assert.equal(up.pointerId,down.pointerId,"matching physical pointer owns release");
    assert.ok(up.at-down.at>320,"actual physical LMB hold exceeds server heavy READY duration");
-   assert.equal(actions().filter(e=>e.to===1).length,1,"exactly one World light windup");
-   assert.equal(actions().filter(e=>e.from===1&&e.to===9).length,1,"exactly one actual World light-to-heavy upgrade");
+   const admitted=admissions().filter(e=>e.source===0&&e.status===1);
+   assert.equal(admitted.filter(e=>e.eventAction===1&&e.from===0&&e.to===1).length,1,
+    "exactly one actual under-lock World light windup, independent of sampled observations");
+   assert.equal(admitted.filter(e=>e.eventAction===2&&e.from===1&&e.to===9).length,1,
+    "exactly one actual under-lock World light-to-heavy upgrade, independent of sampled observations");
    assert.equal(actions().filter(e=>e.to===2).length,0,"upgraded hold cannot produce a double light active");
    assert.equal(actions().filter(e=>e.to===10).length,1,"physical release commits heavy exactly once");
    assert.equal(hits().length,1,"exactly one World HIT from physical held LMB");
@@ -224,6 +240,16 @@ try{
    assert.equal(new Set(accepted.map(r=>r.gestureId)).size,1,"PRESS/UPGRADE/RELEASE ACKs own the same actual source0 gesture");
    for(const action of [1,2,3])assert.equal(accepted.filter(r=>r.action===action).length,1,"one accepted ACK per physical gesture edge");
    const releaseReceipt=accepted.find(r=>r.action===3);
+   const worldRelease=admitted.filter(e=>e.eventAction===3&&e.from===9&&e.to===10);
+   assert.equal(worldRelease.length,1,"matching physical release mutates actual World HeavyWindup to HeavyActive exactly once");
+   assert.equal(worldRelease[0].gesture,upgrade.light.gesture);
+   assert.ok(worldRelease[0].index>upgrade.heavy.index,"World release follows actual upgrade mutation");
+   assert.ok(heavyActive.tick>=worldRelease[0].tick,"sampled HeavyActive follows actual release mutation");
+   for(const receipt of accepted){
+    const mutation=admitted.filter(e=>e.eventAction===receipt.action&&e.sequence===receipt.sequence&&e.gesture===receipt.gestureId);
+    assert.equal(mutation.length,1,"each accepted source0 receipt correlates to one actual World-lock admission");
+    assert.equal(receipt.serverTick,mutation[0].tick,"accepted ACK server tick matches the exact World-lock admission");
+   }
    assert.ok(heavyActive.tick>=releaseReceipt.serverTick,
     "World HeavyActive cannot precede server admission of matching genuine physical UP");
    // Read each independent client's existing authoritative own HUD. These
@@ -241,7 +267,7 @@ try{
    assert.equal(replicas.length,4,"all four original independent replicas confirm exact victim HP and preserved guard/stamina");
    const evidence={mode:physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",
     attackerBrowser:attacker.engine,attackerId,targetId,physical:released.events,canonicalSource0Receipts:accepted,
-    originalWorldUpgrade:upgrade,originalWorldHeavyActive:heavyActive,originalWorldActions:actions(),originalWorldHits:hits(),
+    originalWorldUpgrade:upgrade,originalWorldGestureAdmissions:admissions(),originalWorldHeavyActive:heavyActive,originalWorldActions:actions(),originalWorldHits:hits(),
     replicas,originalGamePage:true,actualRustWorld:true,publicListener:false,independentPhysicalHumanHosts:false};
    await writeFile(join(output,"combat4-physical-held-lmb-upgrade-world.json"),JSON.stringify(evidence,null,2)+"\n");
    console.log("COMBAT4_PHYSICAL_HELD_LMB_UPGRADE_WORLD_PASS",JSON.stringify(evidence));

@@ -9841,17 +9841,13 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // that WAIT, but require the actual event to precede Chrome release
         // (read-only epoch evidence below), and require the wheel W3C ACK.
         // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
+        // Guard-only scenarios require the real trusted wheel before input.
+        // One genuine pre-aimed down/pause/up transaction removes a separate
+        // DOWN ACK barrier (52ms physical hold on e7ce01df). Actual DOM edges,
+        // wheel ACK and all guard/HP/parry gates below remain mandatory.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
-          // M194 main-push #39453669647: the actual trusted Firefox wheel
-          // arrived after the fixed 100ms Chrome release on attempt 5/5.
-          // Require trusted native wheel BEFORE release for M194 only, with
-          // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: wheelFirstGuardOnly ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          // One real pre-aimed down/pause/up transaction. Waiting for a
-          // separate DOWN ACK inflated the physical hold52ms on e7ce01df
-          // and put the genuine HIT after block expiry. Actual DOM epochs
-          // below, wheel ACK and all guard/HP/parry gates remain required.
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
