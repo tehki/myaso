@@ -91,6 +91,37 @@ test("authoritative opponent HP loss emits hit-confirm feedback", () => {
   assert.match(event.text, /Opponent hit/);
 });
 
+test("M147 FFA cannot mint attacker credit from a bystander's snapshot HP observation", () => {
+  // Protected true three-browser M147: #2's real light damages #1 for 34HP,
+  // yet the old HP-only tracker reports hit-confirm on idle spectator #3.
+  // These snapshots deliberately contain NO original World attacker identity.
+  const initial = new Map([
+    [1, fighter(1)], [2, fighter(2)], [3, fighter(3)],
+  ]);
+  const after = new Map([
+    [1, fighter(1, 66)], [2, fighter(2)], [3, fighter(3)],
+  ]);
+
+  const victim = createCombatReadabilityTracker();
+  victim.observe(initial, 1);
+  assert.equal(victim.observe(after, 1)?.feedback, "damage-taken",
+    "World HP remains authoritative for the victim's own damage");
+
+  for (const netId of [2, 3]) {
+    const observer = createCombatReadabilityTracker();
+    observer.observe(initial, netId);
+    const notification = observer.observe(after, netId);
+    assert.notEqual(notification?.feedback, "hit-confirm",
+      "an HP delta alone cannot prove which FFA player owns the HIT");
+  }
+  const visual = createRemoteDamageTracker();
+  visual.observe(initial, 3, 100);
+  visual.observe(after, 3, 116);
+  assert.equal(visual.visible(1, 116), true,
+    "spectators still see the true target's neutral damage tell");
+  assert.equal(visual.visible(2, 116), false);
+});
+
 test("remote authoritative HP loss owns a bounded spatial damage tell", () => {
   const tracker = createRemoteDamageTracker({ durationMs: 320 });
   const initial = new Map([
