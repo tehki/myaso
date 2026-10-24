@@ -723,7 +723,9 @@ mod tests {
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
         );
         let mut incremental = scope(2);
-        incremental.project_hit(&event(2, 1), commit(200, 0, 2, 1)).unwrap();
+        incremental
+            .project_hit(&event(2, 1), commit(200, 0, 2, 1))
+            .unwrap();
         assert_eq!(
             incremental.project_committed_tick_batch(200, &[(event(2, 1), commit(200, 1, 2, 1))]),
             Err(DeliveryError::ReplayedOrReorderedWorldHit)
