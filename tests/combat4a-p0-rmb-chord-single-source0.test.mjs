@@ -3,6 +3,8 @@
 // Chrome/Firefox run, authenticated QUIC admission, or original World HIT.
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {runInNewContext} from "node:vm";
 import {
   createDormantPrealphaLmbDomGate, attachDormantPrealphaLmbDomGate,
 } from "../src/browser/prealpha-lmb-dom-gesture-review.mjs";
@@ -124,4 +126,37 @@ test("no RMB: duplicate MouseEvent does not bypass exact-pointer native LMB iden
   assert.equal(x.gate.pointerUp(x.event({button:0,buttons:0,pointerId:34})),false);
   assert.equal(x.gate.pointerUp(x.event({button:0,buttons:0,pointerId:33})),true);
   assert.deepEqual(x.bytes(),[edge(ACTION.PRESS,1),edge(ACTION.RELEASE,2)]);
+});
+
+test("single loopback sender drains only newly authored typed events; timer retains real retries",()=>{
+  const lab=readFileSync(new URL("../web/prealpha-gesture-live-lab.mjs",import.meta.url),"utf8");
+  const start=lab.indexOf("  let lastFirstSendSequence = outbox.snapshot.nextSequence;");
+  const end=lab.indexOf("  function add(target,type,handler) {",start);
+  assert.ok(start>0 && end>start,"one edge-deduplicating drain route exists");
+  let seq=1, calls=0;
+  const ctx={
+    outbox:{snapshot:{get nextSequence(){return seq;}}},
+    failed:false,detached:false,
+    drain(){calls++;},
+  };
+  runInNewContext(lab.slice(start,end),ctx);
+  assert.equal(typeof ctx.drainNewEdges,"function");
+  ctx.drainNewEdges();
+  assert.equal(calls,0,"normal events without an authored edge must not drain");
+  seq=2;ctx.drainNewEdges();
+  assert.equal(calls,1,"new PRESS drains exactly once");
+  ctx.drainNewEdges();ctx.drainNewEdges();
+  assert.equal(calls,1,"pointerdown+mousedown must not exhaust retry attempts");
+  seq=3;ctx.drainNewEdges();
+  assert.equal(calls,2,"real RELEASE drains exactly once");
+  ctx.drainNewEdges();
+  assert.equal(calls,2,"pointerup+mouseup must not exhaust retry attempts");
+  ctx.detached=true;seq=4;ctx.drainNewEdges();
+  assert.equal(calls,2,"retired session must never send");
+  assert.match(lab,/if \(outbox\.snapshot\.pending > 0\) drain\(\);/,
+    "genuine unacknowledged typed events retain the one bounded retry timer");
+  for(const type of ["pointerup","mouseup","pointercancel","keydown","keyup","blur"]){
+    assert.ok(lab.includes('add(windowObj,"'+type+'",drainNewEdges);'),
+      "all source edges use one immediate sequence-gated drain: "+type);
+  }
 });
