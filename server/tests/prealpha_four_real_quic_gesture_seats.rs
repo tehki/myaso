@@ -506,6 +506,24 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     let (server, url, digest) = real_server();
     let seat = admitted_seat(&url, &digest).await;
 
+    // The original M201 observer emits its FIRST actor observation as a
+    // baseline, not an ACTION transition. Wait for actual server Idle0 before
+    // issuing PRESS, so every later action is trace-correlated on one clock.
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let seen_idle = server.lines.lock().unwrap().iter().any(|l| {
+                l.contains("M201_FLIGHT_ACTOR_BASELINE")
+                    && l.contains(" fighter=1 action=0")
+            });
+            if seen_idle {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("real QUIC actor1 was observed Idle on original 60Hz World");
+
     // Same physical source, same gesture ID, monotonic transport sequences.
     // No client-supplied tick may force World readiness or damage.
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
