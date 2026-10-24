@@ -527,8 +527,8 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uidirectionallight"
-        || scenario === "uiguardbreakpunishffahit"
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uidirectionallight"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
         || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
