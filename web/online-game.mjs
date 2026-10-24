@@ -275,9 +275,11 @@ function onLeftPointerUp(event) {
   }
   if (event.button !== 0) return;
   if (reviewedGestureLab) return; // v2 capture owns physical terminal
-  leftButtonDown = false;
   updateMouse(event);
   const committed = leftButtonCharge.release(event.pointerId);
+  // Only the matching physical pointer may retire the current gesture.
+  if (committed === null) return;
+  leftButtonDown = false;
   leftButtonPressMovement = null;
   if (m111InputProbe && committed) {
     m111InputProbe.physicalTerminals.push({
@@ -321,20 +323,24 @@ canvas.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("mouseup", onChordedLeftMouseUp);
 
 window.addEventListener("pointerup", onLeftPointerUp);
+// One pointer-owned cancellation path; pointercancel may report button=-1.
+// Never clear a newer LMB gesture for stale pointer capture loss.
+function cancelActiveLeftPointer(pointerId) {
+  if (reviewedGestureLab) return false; // selected v2 gate owns its own input
+  if (!leftButtonCharge.cancel(pointerId)) return false;
+  leftButtonDown = false;
+  leftButtonPressMovement = null;
+  chordedLeftDown = false;
+  return true;
+}
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) {
-    if (reviewedGestureLab) return;
-    leftButtonDown = false;
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
-  }
+  cancelActiveLeftPointer(event.pointerId);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (!reviewedGestureLab && event.pointerId !== undefined && !(event.buttons & 1)) {
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
+  if (event.pointerId !== undefined && !(event.buttons & 1)) {
+    cancelActiveLeftPointer(event.pointerId);
   }
 });
 canvas.addEventListener("wheel", (event) => {
@@ -377,7 +383,9 @@ canvas.addEventListener("keydown", (event) => {
   if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
-canvas.addEventListener("keyup", (event) => keys.delete(event.code));
+// Key release can occur after focus moves to an in-page control.
+// Canvas keydown remains focus scoped; window observes real bubbling keyup.
+window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
 // Chat composer focus must release held game inputs, not trap a charge.
 canvas.addEventListener("blur", releaseInputs);
