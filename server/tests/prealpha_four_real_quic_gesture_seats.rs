@@ -972,3 +972,80 @@ async fn combat4d_retired_keye_cannot_steal_or_commit_a_held_lmb_heavy() {
     );
     println!("COMBAT4D_RETIRED_KEYE_LMB_ONLY_HEAVY_WORLD_PASS");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn native_old_quic_session_does_not_own_replacement_lmb_after_close() {
+    // The original server allocates distinct actors and lease epochs for TWO
+    // independently TLS-pinned live QUIC sockets. Never let old datagrams
+    // reserve a replacement's authenticated source0 gesture sequence.
+    let (server, url, digest) = real_server();
+    let old = admitted_seat(&url, &digest).await;
+    combat4c_ack(&old.connection, 0, 1, 1, 7, 1).await;
+    // The old actor is genuinely still holding physical source0 when QUIC
+    // closes; do not synthesize a release or ask the World to fake a death.
+    old.connection
+        .close(wtransport::VarInt::from_u32(0), b"core8b replaced actor");
+    assert!(
+        old.connection
+            .send_datagram(typed_event(0, 3, 2, 7))
+            .is_err(),
+        "retired socket cannot send another old-session release"
+    );
+
+    // The server assigns a new actor ID and lease on a fresh QUIC handshake,
+    // not via a client-supplied player ID or reused old capability.
+    let replacement = admitted_seat(&url, &digest).await;
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let baseline = server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_FLIGHT_ACTOR_BASELINE")
+                    && line.contains(" fighter=2 action=0")
+            });
+            if baseline {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("new server-admitted actor2 has an original World Idle baseline");
+
+    combat4c_ack(&replacement.connection, 0, 1, 1, 1, 1).await;
+    // Even if old bytes are maliciously replayed over the NEW connection,
+    // source0 RELEASE for old ID7 and retired KeyE cannot terminate ID1 or
+    // spend source0 sequence2 of this newly admitted session.
+    combat4c_ack(&replacement.connection, 0, 3, 2, 7, 4).await;
+    combat4c_ack(&replacement.connection, 1, 3, 2, 7, 4).await;
+    combat4c_ack(&replacement.connection, 0, 3, 2, 1, 1).await;
+    combat4c_ack(&replacement.connection, 0, 3, 2, 1, 2).await;
+
+    timeout(Duration::from_secs(2), async {
+        loop {
+            let found = server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_AUTH_ACTION")
+                    && line.contains(" fighter=2 from=0 to=1")
+            });
+            if found {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("fresh QUIC actor source0 press reached the ONE original World");
+    let lines = server.lines.lock().unwrap().clone();
+    assert!(
+        !lines.iter().any(|line| {
+            line.contains("M201_AUTH_ACTION")
+                && line.contains(" fighter=2 from=0 to=9")
+        }),
+        "obsolete E or old socket cannot start a heavy windup for actor2"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("M201_AUTH_HIT") && line.contains(" attacker=2 ")),
+        "retired source packets cannot fabricate a World HIT"
+    );
+    println!("CORE8B_OLD_REAL_QUIC_SESSION_NEW_LEASE_SOURCE0_FENCE_PASS");
+}
