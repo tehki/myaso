@@ -41,6 +41,12 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      - name: Validate Graphics 3 P0 source Silver and no-architecture boundary
+        run: |
+          node --check web/knight-sprites.mjs
+          node --check tests/graphics3b-prealpha-zero-architecture.test.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-knights-release-gate.test.mjs tests/graphics3b-prealpha-zero-architecture.test.mjs
+
       - name: Validate combat JavaScript
         run: |
           node --version
@@ -1057,12 +1063,6 @@ jobs:
           node --check web/game.mjs
           node --check web/online-game.mjs
           node --test tests/r1-lmb-charge-heavy.test.mjs tests/r1-light-release-movement.test.mjs tests/browser-runtime.test.mjs
-
-      - name: Validate Graphics 3 P0 source Silver and no-architecture boundary
-        run: |
-          node --check web/knight-sprites.mjs
-          node --check tests/graphics3b-prealpha-zero-architecture.test.mjs
-          node --test tests/prealpha-silver-knight.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-knights-release-gate.test.mjs tests/graphics3b-prealpha-zero-architecture.test.mjs
 
       - name: Validate R0 multiplayer alpha entrypoint and deployment safety
         run: |
