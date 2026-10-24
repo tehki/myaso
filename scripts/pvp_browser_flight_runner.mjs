@@ -22,6 +22,7 @@ import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evide
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
+import { classifyGuardBreakPunishWorld } from "./combat4d-world-chronology.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
@@ -9243,6 +9244,24 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     && (!stunEnd || damageTransition.t <= stunEnd.t));
   if (!hitDuringStun) {
     throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
+  }
+
+  // Never count client HUD damage as a real punish if original Rust World
+  // delivered the same 34HP after victim Stunned7 -> Idle0. Combat4D's
+  // independent exact server tick classifier is fail-closed; leave ALL
+  // existing browser STUNNED/HP/pointer/W3C predicates unchanged.
+  // Wait only for passive original loopback M201 stun-exit log if the hit
+  // landed legitimately BEFORE exit; no extra inputs or simulation writes.
+  const worldDeadline = Date.now() + 950;
+  let originalWorld = { status: "INDETERMINATE", reason: "waiting for original World exit" };
+  while (Date.now() < worldDeadline) {
+    originalWorld = classifyGuardBreakPunishWorld(m201ServerOutput());
+    if (originalWorld.status !== "INDETERMINATE") break;
+    await sleep(15);
+  }
+  console.log("M111_ORIGINAL_WORLD_STUN_PROOF " + JSON.stringify(originalWorld));
+  if (originalWorld.status !== "WITHIN_STUN") {
+    throw new Error("M111 real original World 34HP was not inside server STUNNED: " + JSON.stringify(originalWorld));
   }
 
   const lightThreatsAfter = defenderResult.threatTransitions.filter((entry) =>
