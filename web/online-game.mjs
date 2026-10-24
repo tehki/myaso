@@ -855,7 +855,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uirollknockdownffahit") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
@@ -867,6 +867,12 @@ function simulatePrediction(stepMs) {
             attack: Boolean(currentInput.attack),
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
+            // Read-only source of the actual 30 Hz outgoing v1 decision.
+            // M156's physical 5ms click may cross a held-LMB sample.
+            leftChargingAtSample: leftButtonCharge.isCharging(),
+            pendingLightReleaseAtSample: Boolean(attackRequested),
+            pendingHeavyReleaseAtSample: Boolean(heavyAttackRequested),
+            lmbPointerHeldAtSample: Boolean(leftButtonDown),
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }

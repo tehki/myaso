@@ -29,3 +29,22 @@ test("M237 real M156 light releases in 5ms after authentic victim knockdown", ()
   assert.ok(w3c.includes('{ type: "pointerUp", button: 0 }'));
   assert.ok(!w3c.includes("dispatchEvent("));
 });
+
+test("M156 records sampled v1 LMB attack/heavy origin without changing the outgoing command", () => {
+  const src = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  const a = src.indexOf("function simulatePrediction(stepMs) {");
+  const b = src.indexOf("\nfunction ", a + 30);
+  assert.ok(a > 0 && b > a);
+  const s = src.slice(a, b);
+  assert.ok(s.includes('acceptanceScenario === "uirollknockdownffahit"'));
+  assert.ok(s.includes('heavyAttack: Boolean(currentInput.heavyAttack)'));
+  assert.ok(s.includes('attack: Boolean(currentInput.attack)'));
+  assert.ok(s.includes("leftChargingAtSample: leftButtonCharge.isCharging()"));
+  assert.ok(s.includes("pendingLightReleaseAtSample: Boolean(attackRequested)"));
+  assert.ok(s.includes("pendingHeavyReleaseAtSample: Boolean(heavyAttackRequested)"));
+  assert.ok(s.includes("lmbPointerHeldAtSample: Boolean(leftButtonDown)"));
+  assert.ok(s.includes("debug.inputSubmissions.length > 32"));
+  const telemetry = s.slice(s.indexOf('if (acceptanceScenario === "uimultirecoveryspatial"'));
+  const within = telemetry.slice(0, telemetry.indexOf("if (m111InputProbe)"));
+  assert.doesNotMatch(within, /currentInput\.[A-Za-z]+\s*=/);
+});
