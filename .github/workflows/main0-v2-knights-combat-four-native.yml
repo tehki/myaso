@@ -7,6 +7,9 @@ on:
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
+      # Actor ABA, World replacement, death/respawn and FFA reset source tests
+      # must trigger the unmodified first-party four-real-browser Combat gate.
+      - "server/tests/prealpha_authenticated_gesture_to_world.rs"
       - "server/src/prealpha_authenticated_gesture.rs"
       - "server/src/prealpha_lmb_gesture_authority.rs"
       - "server/tests/combat4c_release_only_source_ownership.rs"
