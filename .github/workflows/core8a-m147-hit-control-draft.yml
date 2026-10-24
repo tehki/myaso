@@ -7,6 +7,7 @@ on:
       - "server/src/combat_hit_receipt.rs"
       - "server/src/combat_hit_journal.rs"
       - "server/src/combat_hit_delivery_proposal.rs"
+      - "server/src/combat_hit_control_ingress_proposal.rs"
       - "server/src/lib.rs"
       - "src/network/m147-hit-control-proposal.mjs"
       - "src/network/m147-hit-receipt-codec.mjs"
@@ -15,6 +16,7 @@ on:
       - "tests/m147-authoritative-hit-receipt.test.mjs"
       - "docs/CORE8A_M147_HIT_RECEIPT_OWNER_REVIEW_20261024.md"
       - "docs/CORE8A_M147_PER_RECIPIENT_HIT_DELIVERY_REVIEW_20261024.md"
+      - "docs/CORE8A_M147_OFFLINE_CONTROL_INGRESS_REVIEW_20261024.md"
       - ".github/workflows/core8a-m147-hit-control-draft.yml"
   workflow_dispatch:
 
@@ -43,6 +45,8 @@ jobs:
         run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit
       - name: Server-owned recipient-incarnation contiguous projection and ACK safety
         run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_delivery_proposal
+      - name: Fail-closed dormant u16-framed HELLO/ACK/NACK and same-lease replay ingress
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_control_ingress_proposal
       - name: Original Rust formatting unchanged
         run: cargo fmt --all --manifest-path server/Cargo.toml -- --check
       - name: Strict Rust Clippy (no live feature flags)
