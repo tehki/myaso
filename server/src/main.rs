@@ -586,12 +586,13 @@ fn m201_flight_proof_lines(
         let contact = match event {
             CombatEvent::Block { attacker, target } => Some(("BLOCK", *attacker, *target)),
             CombatEvent::Parry { attacker, target } => Some(("PARRY", *attacker, *target)),
-            CombatEvent::Hit { attacker, target, .. } => Some(("HIT", *attacker, *target)),
+            CombatEvent::Hit {
+                attacker, target, ..
+            } => Some(("HIT", *attacker, *target)),
             _ => None,
         };
         if let Some((outcome, attacker, target)) = contact {
-            if let (Some(source), Some(defender)) =
-                (world.fighter(attacker), world.fighter(target))
+            if let (Some(source), Some(defender)) = (world.fighter(attacker), world.fighter(target))
             {
                 lines.push(format!(
                     "M201_AUTH_CONTACT tick={tick} world={} outcome={outcome} attacker={attacker} target={target} attackerLife={} targetLife={} defenderAction={} defenderActionElapsedMs={:.1} defenderHp={:.1} defenderGuard={:.1}",
@@ -1948,11 +1949,18 @@ mod m201_original_world_contact_tests {
             let mut events = Vec::new();
             world.step_into(&mut events);
             let lines = m201_flight_proof_lines(&world, &events, &mut previous);
-            if events.iter().any(|event| matches!(
-                event,
-                CombatEvent::Block { attacker: 1, target: 2 }
-            )) {
-                assert!(!events.iter().any(|event| matches!(event, CombatEvent::Hit { .. })));
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Block {
+                        attacker: 1,
+                        target: 2
+                    }
+                )
+            }) {
+                assert!(!events
+                    .iter()
+                    .any(|event| matches!(event, CombatEvent::Hit { .. })));
                 observed = lines.into_iter().find(|line| {
                     line.contains("M201_AUTH_CONTACT")
                         && line.contains("outcome=BLOCK")
@@ -1961,7 +1969,8 @@ mod m201_original_world_contact_tests {
                 break;
             }
         }
-        let contact = observed.expect("real original World Block must emit read-only contact evidence");
+        let contact =
+            observed.expect("real original World Block must emit read-only contact evidence");
         assert!(contact.contains(&format!("tick={}", world.tick)));
         assert!(contact.contains("defenderAction=6"));
         assert!(contact.contains("defenderHp=100.0"));
