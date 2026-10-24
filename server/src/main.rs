@@ -580,6 +580,31 @@ fn m201_flight_proof_lines(
             )),
             _ => {}
         }
+        // Original World event provenance at the actual collision/guard
+        // resolution tick. Loopback-only, read-only CI evidence; never a
+        // recipient HIT receipt, transport ACK, or another event producer.
+        let contact = match event {
+            CombatEvent::Block { attacker, target } => Some(("BLOCK", *attacker, *target)),
+            CombatEvent::Parry { attacker, target } => Some(("PARRY", *attacker, *target)),
+            CombatEvent::Hit { attacker, target, .. } => Some(("HIT", *attacker, *target)),
+            _ => None,
+        };
+        if let Some((outcome, attacker, target)) = contact {
+            if let (Some(source), Some(defender)) =
+                (world.fighter(attacker), world.fighter(target))
+            {
+                lines.push(format!(
+                    "M201_AUTH_CONTACT tick={tick} world={} outcome={outcome} attacker={attacker} target={target} attackerLife={} targetLife={} defenderAction={} defenderActionElapsedMs={:.1} defenderHp={:.1} defenderGuard={:.1}",
+                    world.world_instance(),
+                    source.world_incarnation(),
+                    defender.world_incarnation(),
+                    defender.action.wire_code(),
+                    defender.action_elapsed_ms,
+                    defender.hp,
+                    defender.guard,
+                ));
+            }
+        }
     }
     lines
 }
@@ -1882,6 +1907,67 @@ mod tests {
             4,
             Duration::from_millis(250)
         ));
+    }
+}
+
+#[cfg(test)]
+mod m201_original_world_contact_tests {
+    use super::*;
+    use crate::simulation::InputIntent;
+
+    #[test]
+    fn real_guard_block_contact_reports_original_defender_age_without_hit_credit() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 200.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        let mut previous = BTreeMap::new();
+        for _ in 0..4 {
+            let mut events = Vec::new();
+            world.step_into(&mut events);
+            let _ = m201_flight_proof_lines(&world, &events, &mut previous);
+        }
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
+        ));
+
+        let mut observed = None;
+        for _ in 0..20 {
+            let mut events = Vec::new();
+            world.step_into(&mut events);
+            let lines = m201_flight_proof_lines(&world, &events, &mut previous);
+            if events.iter().any(|event| matches!(
+                event,
+                CombatEvent::Block { attacker: 1, target: 2 }
+            )) {
+                assert!(!events.iter().any(|event| matches!(event, CombatEvent::Hit { .. })));
+                observed = lines.into_iter().find(|line| {
+                    line.contains("M201_AUTH_CONTACT")
+                        && line.contains("outcome=BLOCK")
+                        && line.contains("attacker=1 target=2")
+                });
+                break;
+            }
+        }
+        let contact = observed.expect("real original World Block must emit read-only contact evidence");
+        assert!(contact.contains(&format!("tick={}", world.tick)));
+        assert!(contact.contains("defenderAction=6"));
+        assert!(contact.contains("defenderHp=100.0"));
+        assert!(contact.contains("defenderGuard=62.0"));
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert_eq!(world.fighter(2).unwrap().guard, 62.0);
     }
 }
 
