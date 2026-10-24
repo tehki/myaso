@@ -175,10 +175,7 @@ impl SessionGestureWorldPath {
                         // the authoritative fighter returns to Idle.
                         if event.action
                             == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
-                            && matches!(
-                                decision.command,
-                                Command::BeginLightWindup
-                            )
+                            && matches!(decision.command, Command::BeginLightWindup)
                         {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
