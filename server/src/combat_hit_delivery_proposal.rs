@@ -356,6 +356,12 @@ pub fn project_world_tick_for_recipients(
     committed: &[(CombatEvent, CommittedHitIdentity)],
     recipients: &mut [ProposedRecipientHitDelivery],
 ) -> Result<Vec<(ActorIncarnation, Vec<HitReceipt>)>, DeliveryError> {
+    // Enforce the one-World documented 512-seat ceiling BEFORE allocating
+    // transient actor indexes or staging any actor's bounded HIT queue.
+    // Actual QUIC admission remains the server's responsibility.
+    if recipients.len() > 512 {
+        return Err(DeliveryError::InvalidScope);
+    }
     let Some(first) = recipients.first() else {
         return Err(DeliveryError::InvalidScope);
     };
@@ -1097,6 +1103,20 @@ mod tests {
         assert!(credited[2].1.is_empty());
         assert_eq!(scopes[0].pending(), 2);
         assert_eq!(scopes[1].pending(), 1);
+    }
+
+    #[test]
+    fn more_than_512_actor_scopes_reject_before_any_world_hit_credit() {
+        let mut scopes = (1..=513).map(scope).collect::<Vec<_>>();
+        let original = [(event(1, 2), commit(915, 0, 1, 2))];
+        assert_eq!(
+            project_world_tick_for_recipients(915, &original, &mut scopes),
+            Err(DeliveryError::InvalidScope),
+            "review-only World fanout must not grow beyond the 512-seat limit"
+        );
+        assert!(scopes.iter().all(|scope| scope.pending() == 0));
+        assert!(scopes.iter().all(|scope| scope.next_sequence() == 0));
+        assert!(scopes.iter().all(|scope| scope.gap().is_none()));
     }
 
     #[test]
