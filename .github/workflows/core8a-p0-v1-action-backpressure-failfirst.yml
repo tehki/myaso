@@ -1,0 +1,26 @@
+name: Core8A P0 original v1 action backpressure — fail-first (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "tests/core8a-p0-v1-action-backpressure-failfirst.test.mjs"
+      - "web/network-transport.mjs"
+      - "web/authoritative-client.mjs"
+      - "src/network/input-codec.mjs"
+      - ".github/workflows/core8a-p0-v1-action-backpressure-failfirst.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-transport-congestion-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Assert genuine v1 discrete action cannot be silently dropped by latest-wins transport
+        run: node --test tests/core8a-p0-v1-action-backpressure-failfirst.test.mjs
