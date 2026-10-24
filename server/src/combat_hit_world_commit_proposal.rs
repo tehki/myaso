@@ -532,7 +532,11 @@ mod tests {
         for _ in 0..40 {
             let before_tick = world.tick;
             world.step_into(&mut events);
-            assert_eq!(world.tick, before_tick + 1, "only original World step advances");
+            assert_eq!(
+                world.tick,
+                before_tick + 1,
+                "only original World step advances"
+            );
             let hp2 = world.fighter(2).unwrap().hp;
             let hp3 = world.fighter(3).unwrap().hp;
             let tick = world.tick;
@@ -546,14 +550,22 @@ mod tests {
                 assert_eq!((hp2, hp3), (66.0, 66.0));
                 assert_eq!(immutable_hits[0].1.server_tick, tick);
                 assert_eq!(immutable_hits[1].1.server_tick, tick);
-                assert!(immutable_hits[0].1.within_tick_ordinal < immutable_hits[1].1.within_tick_ordinal);
+                assert!(
+                    immutable_hits[0].1.within_tick_ordinal
+                        < immutable_hits[1].1.within_tick_ordinal
+                );
                 assert_eq!(
-                    origin.capture_committed_hits_from_step(&world, &events).unwrap(),
+                    origin
+                        .capture_committed_hits_from_step(&world, &events)
+                        .unwrap(),
                     immutable_hits,
                     "read-only recapture cannot reexecute damage"
                 );
-                let mut projected = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
-                let published = projected.project_committed_tick_batch(tick, &immutable_hits).unwrap();
+                let mut projected =
+                    ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+                let published = projected
+                    .project_committed_tick_batch(tick, &immutable_hits)
+                    .unwrap();
                 assert_eq!(published.len(), 2);
                 assert_eq!((published[0].sequence, published[1].sequence), (0, 1));
                 assert_eq!(
@@ -562,7 +574,10 @@ mod tests {
                     "re-reading original events cannot yield second recipient credit"
                 );
                 assert_eq!(world.tick, tick);
-                assert_eq!((world.fighter(2).unwrap().hp, world.fighter(3).unwrap().hp), (66.0, 66.0));
+                assert_eq!(
+                    (world.fighter(2).unwrap().hp, world.fighter(3).unwrap().hp),
+                    (66.0, 66.0)
+                );
                 return;
             }
         }
