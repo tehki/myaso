@@ -1758,6 +1758,31 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     hp: { attacker: attackerResult.playerHp, victim: defenderResult.playerHp },
   }));
 
+  // Combat 4A: a genuine short physical LMB can reach the 30Hz sender
+  // but be absent from the original authenticated v1 accepted batch.
+  // Diagnostic only: never replay a click or treat transport acceptance as HIT.
+  const releaseSentTicks = (attackerResult.acceptance?.m121SentSamples ?? [])
+    .filter((sample) => sample.attack && !sample.heavyAttack)
+    .map((sample) => sample.clientTick);
+  const releaseAdmittedTicks = m201ServerOutput().split(/\r?\n/)
+    .filter((line) => line.startsWith("M121_V1_SERVER_INPUT ")
+      && line.includes(` actor=${attackerResult.playerNetId} `))
+    .flatMap((line) => {
+      const accepted = line.match(/accepted=\[([^\]]*)\]/)?.[1] ?? "";
+      return [...accepted.matchAll(/(?:^|,)(\d+):1:0:/g)]
+        .map((match) => Number(match[1]));
+    });
+  if (releaseSentTicks.length
+      && !releaseSentTicks.some((tick) => releaseAdmittedTicks.includes(tick))) {
+    console.error("M121_ORIGINAL_V1_SHORT_RELEASE_INGRESS_GAP " + JSON.stringify({
+      actor: attackerResult.playerNetId,
+      releaseClientTicks: releaseSentTicks,
+      acceptedReleaseClientTicks: releaseAdmittedTicks,
+      physicalLmbEvents: attackerResult.pointers.filter((event) => event.button === 0),
+      originalWorldActions: attackerResult.acceptance?.ownActionTransitions?.slice(-10) ?? [],
+    }));
+  }
+
   const lightDown = attackerResult.pointers.find((event) =>
     event.type === "pointerdown" && event.button === 0);
   const lightUp = attackerResult.pointers.find((event) =>
