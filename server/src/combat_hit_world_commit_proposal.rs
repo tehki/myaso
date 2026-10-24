@@ -567,8 +567,10 @@ mod tests {
             .iter()
             .all(|scope| scope.pending() == 0 && scope.next_sequence() == 0));
 
-        // If the attacker scope only has room for one of two original HITs,
-        // the entire tick refuses publication; only the bottleneck GAPs.
+        // If attacker capacity cannot cover both original World HITs,
+        // publish none and GAP-fence every actual HIT participant. All
+        // already-committed World damage remains authoritative; uninvolved
+        // spectators must neither gain credit nor lose their good lease.
         let mut full = fresh();
         full[0] = ProposedRecipientHitDelivery::new(attacker, [1; 16], 1).unwrap();
         assert_eq!(
@@ -579,7 +581,11 @@ mod tests {
         assert!(full
             .iter()
             .all(|scope| scope.pending() == 0 && scope.next_sequence() == 0));
-        assert!(full.iter().skip(1).all(|scope| scope.gap().is_none()));
+        assert!(
+            full.iter().take(3).all(|scope| scope.gap() == Some(0)),
+            "all original attacker/victim scopes must request resync on lost tick"
+        );
+        assert_eq!(full[3].gap(), None, "spectator never claimed the HIT");
 
         // Successful canonical tick publication is contiguous for the source
         // and each involved victim, with no unrelated spectator receipt.
