@@ -1,0 +1,70 @@
+name: Graphics3C P0 original grid genuine Silver 2 and 4 native Canvas performance QA
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/graphics3c-p0-original-grid-native.yml"
+      - "tools/art/main0_knights_four_native.mjs"
+      - "tools/art/check_graphics3c_p0_original_grid_native.mjs"
+      - "web/online-game.mjs"
+      - "web/knight-sprites.mjs"
+      - "assets/knights/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-grid-p0-native:
+    name: original Rust 2+4 native Chrome Firefox Silver full-Canvas and draw telemetry
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact original draft HEAD
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Pin original source SHA, Silver assets and QA contracts
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --check
+          node --check tools/art/main0_knights_four_native.mjs
+          node --check tools/art/check_graphics3c_p0_original_grid_native.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3b-prealpha-zero-architecture.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          cargo --version
+      - name: Exact original Rust build and real 2-player Chrome Firefox original grid
+        env:
+          MYASO_KNIGHTS_CARGO_OFFLINE: "0"
+          MYASO_KNIGHTS_NATIVE_BROWSERS: "chrome,firefox"
+          MYASO_KNIGHTS_NATIVE_OUT: "artifacts/graphics3c-p0-original-grid/two"
+          MYASO_KNIGHTS_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p artifacts/graphics3c-p0-original-grid/two
+          timeout --signal=TERM --kill-after=5s 420s node tools/art/main0_knights_four_native.mjs
+      - name: Four real Chrome Firefox seats authentic Silver original grid
+        env:
+          MYASO_KNIGHTS_CARGO_OFFLINE: "0"
+          MYASO_KNIGHTS_NATIVE_BROWSERS: "chrome,firefox,chrome,firefox"
+          MYASO_KNIGHTS_NATIVE_OUT: "artifacts/graphics3c-p0-original-grid/four"
+          MYASO_KNIGHTS_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          timeout --signal=TERM --kill-after=5s 420s node tools/art/main0_knights_four_native.mjs
+      - name: Strict six full original 960x540 Canvas and W3C SHA plus timing proof
+        run: |
+          node tools/art/check_graphics3c_p0_original_grid_native.mjs \
+            artifacts/graphics3c-p0-original-grid/two \
+            artifacts/graphics3c-p0-original-grid/four
+      - name: Archive unchanged game Canvas and W3C PNGs with original hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3c-p0-original-grid-2-and-4-genuine-silver
+          path: artifacts/graphics3c-p0-original-grid/**
+          if-no-files-found: ignore
+          retention-days: 7

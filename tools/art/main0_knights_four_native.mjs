@@ -11,7 +11,7 @@ import {setTimeout as delay} from "node:timers/promises";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_KNIGHTS_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
-assert.equal(engines.length,4,"four distinct genuine browser sessions required");
+assert.ok([2,4].includes(engines.length),"only 2 or 4 authentic original W3C browser sessions accepted");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_KNIGHTS_NATIVE_OUT||join(root,".artifacts","main0-knights-native"));
 const sha=x=>createHash("sha256").update(x).digest("hex");
@@ -76,10 +76,12 @@ async function startStatic(){
 }
 const hook=String.raw`
 const canvas=document.querySelector("#arena");if(!canvas)return false;
-window.__arenaLiteNative={frames:[],last:null,knightWebPDraws:0,knightSources:{}};
+window.__arenaLiteNative={frames:[],drawDurationMs:[],last:null,knightWebPDraws:0,knightSources:{}};
 const proto=CanvasRenderingContext2D.prototype,real=proto.drawImage;
 proto.drawImage=function(...args){
- if(this.canvas===canvas&&args[0] instanceof HTMLCanvasElement&&args[0].width===960&&args[0].height===540){
+ const isFloorBlit=this.canvas===canvas&&args[0] instanceof HTMLCanvasElement&&args[0].width===960&&args[0].height===540;
+ const floorStartMs=isFloorBlit?performance.now():null;
+ if(isFloorBlit){
    const obj=window.__arenaLiteNative;const t=performance.now();obj.frames.push(t);if(obj.frames.length>600)obj.frames.shift();
    if(!obj.last){
      const src=args[0],pixels=src.getContext("2d").getImageData(0,0,960,540).data;
@@ -94,14 +96,22 @@ proto.drawImage=function(...args){
      const key=s.split("/").pop();audit.knightSources[key]=(audit.knightSources[key]||0)+1;
    }
  }
- return real.apply(this,args);
+ const originalResult=real.apply(this,args);
+ if(isFloorBlit){
+   const times=window.__arenaLiteNative.drawDurationMs;
+   times.push(performance.now()-floorStartMs);
+   if(times.length>600)times.shift();
+ }
+ return originalResult;
 };return true;`;
 const stats=String.raw`
 const x=window.__arenaLiteNative;if(!x?.last)return null;
 const ms=x.frames.slice(1).map((v,i)=>v-x.frames[i]).filter(v=>v>=0);
 ms.sort((a,b)=>a-b);
-const p=q=>ms.length?ms[Math.min(ms.length-1,Math.floor((ms.length-1)*q))]:null;
-return {floor:x.last,frames:x.frames.length,frameIntervalP50Ms:p(.5),frameIntervalP95Ms:p(.95),over33ms:ms.filter(v=>v>33).length,
+const p=(sorted,q)=>sorted.length?sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))]:null;
+const drawMs=[...x.drawDurationMs].sort((a,b)=>a-b);
+return {floor:x.last,frames:x.frames.length,frameIntervalP50Ms:p(ms,.5),frameIntervalP95Ms:p(ms,.95),over33ms:ms.filter(v=>v>33).length,
+ floorBlitDurationP50Ms:p(drawMs,.5),floorBlitDurationP95Ms:p(drawMs,.95),floorBlitSampleCount:drawMs.length,
 knightWebPDraws:x.knightWebPDraws,knightSources:x.knightSources,
 knightsFlag:new URLSearchParams(location.search).get("knights"),knightArt:new URLSearchParams(location.search).get("knightArt"),
 roster:[...document.querySelectorAll("#scoreboard-list li")].map(li=>li.textContent?.trim()||""),
@@ -111,7 +121,7 @@ await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert}=await startOriginalRust(),host=await startStatic();
  const actors=[];
- for(let i=0;i<4;i++){
+ for(let i=0;i<engines.length;i++){
   const s=await startW3C(engines[i],i);const flag="0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
@@ -130,7 +140,10 @@ try{
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
   assert.ok(Object.keys(data.knightSources).some(k=>k.startsWith("silver_")&&k.endsWith("_relit.webp")),
     "require actual original Blender relit Silver WebP drawImage calls, not a fallback Combat circle");
-  assert.ok(data.roster.length>=4,"genuine same-server four human roster must be visible");
+  assert.ok(data.roster.length>=engines.length,"original server-owned roster must show every real browser actor");
+  assert.ok(data.floorBlitSampleCount>=12,"real original full-floor drawImage timing samples required");
+  assert.ok(Number.isFinite(data.floorBlitDurationP50Ms)&&Number.isFinite(data.floorBlitDurationP95Ms));
+  assert.ok(data.floorBlitDurationP95Ms>=data.floorBlitDurationP50Ms,"original floor draw cost order");
   assert.equal(data.canvasWidth,960);assert.equal(data.canvasHeight,540);
   assert.ok(data.floor.centerLuminance>(flag==="1"?38:15));
   assert.ok(data.floor.centerLuminance<(flag==="1"?155:39));
@@ -139,17 +152,30 @@ try{
   const bytes=Buffer.from(image,"base64");assert.ok(bytes.length>1000&&bytes.subarray(0,4).equals(Buffer.from([137,80,78,71])),"genuine W3C PNG");
   const name=s.engine+"-"+s.index+"-"+(flag==="1"?"lite":"grid")+".png";
   await writeFile(join(output,name),bytes);
-  trial.push({browser:s.engine,actorId:actor.id,mode:flag==="1"?"lite":"grid",data,screenshot:name,pngSha256:sha(bytes)});
+  const fullData=await evaluate(s,"return document.querySelector('#arena')?.toDataURL('image/png')||null;");
+  assert.ok(typeof fullData==="string"&&fullData.startsWith("data:image/png;base64,"));
+  const fullBytes=Buffer.from(fullData.slice("data:image/png;base64,".length),"base64");
+  assert.ok(fullBytes.length>1500&&fullBytes.subarray(0,8).toString("hex")==="89504e470d0a1a0a");
+  assert.equal(fullBytes.readUInt32BE(16),960);
+  assert.equal(fullBytes.readUInt32BE(20),540);
+  const canvasName="canvas-"+name;
+  await writeFile(join(output,canvasName),fullBytes);
+  trial.push({browser:s.engine,actorId:actor.id,mode:"grid",data,screenshot:name,pngSha256:sha(bytes),
+   fullCanvasScreenshot:canvasName,fullCanvasSha256:sha(fullBytes),fullCanvasBytes:fullBytes.length});
  }
- assert.equal(trial.length,4,"four real native fighter sessions required");
+ assert.equal(trial.length,engines.length,"2/4 real native fighter sessions required");
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
  const report={sourceCommit:process.env.MYASO_KNIGHTS_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
-  actualOriginalClient:true,realSeparateNativeBrowserProcesses:4,independentPhysicalHumanHosts:false,
+  actualOriginalClient:true,realSeparateNativeBrowserProcesses:engines.length,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
-  genuineFullCombatApproval:false,trials:trial};
+  genuineFullCombatApproval:false,optionalTerrainEnabled:false,
+  includesGpuPresentLatency:false,presentationClockDebtSampled:false,
+  browserFrameTimingIsCallbackNotGpu:true,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
- console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot)}));
+ console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
+  fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
+  floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms)}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}
