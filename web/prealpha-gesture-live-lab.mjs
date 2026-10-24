@@ -23,6 +23,11 @@ export async function activateLoopbackGestureLab({
   const lease = gameClient.transport;
   const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
   let failed = false, detached = false, retryTimer = null;
+  // This is the ONE existing QUIC connection-owned writer, not another
+  // transport queue. An in-flight datagram has NOT yet reached the OS writer;
+  // the 170ms ACK-retry budget may begin only after outstanding writes drain.
+  let queuedWrites = 0, firstWriterQueuedAt = 0;
+  const MAX_WRITER_STALL_MS = 1500; // transport fail-close, never Combat timing
   const removeListeners = [];
   let gates = null, detachGates = null;
 
@@ -57,10 +62,21 @@ export async function activateLoopbackGestureLab({
     for (const packet of packets) {
       // One same-session QUIC datagram writer serializes all physical edges.
       // Never put an edge on latest-wins sampled movement transport.
+      if (queuedWrites++ === 0) firstWriterQueuedAt = Date.now();
       try {
-        void gameClient.sendExperimentalGestureEdge(packet.bytes)
-          .catch(() => fail("typed gesture QUIC delivery failed"));
+        void Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes))
+          .then(
+            () => {
+              queuedWrites--;
+              if (queuedWrites === 0) firstWriterQueuedAt = 0;
+            },
+            () => {
+              queuedWrites--;
+              fail("typed gesture QUIC delivery failed");
+            },
+          );
       } catch {
+        queuedWrites--;
         fail("typed gesture lease no longer current");
         return;
       }
@@ -103,6 +119,15 @@ export async function activateLoopbackGestureLab({
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
       if (outbox.snapshot.closed) { fail("typed gesture lease was retired"); return; }
+      // A stalled datagramWriter.ready MUST NOT consume the entire retry
+      // allowance before even the first genuine PRESS/RELEASE has been sent.
+      // Still fail closed on a permanently stuck writer: never silently
+      // strand a physical CANCEL or retry it against another actor lease.
+      if (queuedWrites > 0) {
+        if (Date.now() - firstWriterQueuedAt >= MAX_WRITER_STALL_MS)
+          fail("bounded gesture QUIC writer stall; retire actor lease");
+        return;
+      }
       if (outbox.snapshot.pending > 0) drain();
     },170);
     // Original-page localhost-only diagnostic: read-only physical edge/ACK
