@@ -178,8 +178,19 @@ test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", (
   const end = source.indexOf("\nasync function ", start + 40);
   assert.ok(start >= 0 && end > start);
   const proof = source.slice(start, end);
-  assert.match(proof, /const firstClickTargetMs = COMBAT\.heavyAttack\.windupMs\s*\+ COMBAT\.heavyAttack\.activeMs \+ COMBAT\.heavyAttack\.recoveryMs \+ 60/,
-    "M111 must release a genuine light after authoritative heavy recovery, not during it");
+  const hold = source.match(/const M110_LMB_HEAVY_HOLD_MS = (\d+);/);
+  assert.ok(hold && Number(hold[1]) >= LEFT_HEAVY_CHARGE_MS,
+    "M110 genuine physical LMB must remain held through 320ms heavy READY");
+  const inputStart = source.indexOf("async function performM110NativeHeldLmb(");
+  const inputEnd = source.indexOf("async function runOnlineUiHeavyGuardBreakFlight(", inputStart);
+  assert.ok(inputStart >= 0 && inputEnd > inputStart);
+  const nativeHeavy = source.slice(inputStart, inputEnd);
+  assert.match(nativeHeavy, /\{ type: "pointerDown", button: 0 \}[\s\S]*\{ type: "pause", duration: M110_LMB_HEAVY_HOLD_MS \}[\s\S]*\{ type: "pointerUp", button: 0 \}/,
+    "M110 must deliver one genuinely held-and-released LMB heavy");
+  assert.doesNotMatch(nativeHeavy, /keyDown|KeyE|pulseMovementKey/,
+    "E cannot substitute for original physical LMB heavy");
+  assert.match(proof, /const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS\s*\+ COMBAT\.heavyAttack\.activeMs \+ COMBAT\.heavyAttack\.recoveryMs \+ 60/,
+    "M111 must preserve 320ms READY, release-led heavy recovery and +60ms light-punish margin");
   assert.match(proof, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
   assert.doesNotMatch(proof, /performArenaAttackBurst\(attacker, 9/);
   assert.match(proof, /Opponent hit - 34 HP\./);
