@@ -856,20 +856,42 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uidirectionallight") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        // Combat 4A M121 diagnostic is read-only and runs only on the
+        // original loopback acceptance scenario. The network sample below
+        // remains byte-identical. Include the W3C KeyW+LMB overlap frames,
+        // rather than inferring left sweep from HUD/physical key timestamps.
+        const m121DirectionTrace = acceptanceScenario === "uidirectionallight";
+        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack
+          || (m121DirectionTrace && (keys.has("KeyW") || keys.has("KeyD") || keys.has("KeyS") || keys.has("KeyA")))) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
             attack: Boolean(currentInput.attack),
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
+            ...(m121DirectionTrace ? {
+              keyWHeldAtSample: keys.has("KeyW"),
+              keyDHeldAtSample: keys.has("KeyD"),
+              keySHeldAtSample: keys.has("KeyS"),
+              keyAHeldAtSample: keys.has("KeyA"),
+              lmbHeldAtSample: Boolean(leftButtonDown),
+              leftChargingAtSample: leftButtonCharge.isCharging(),
+              pendingLightReleaseAtSample: Boolean(attackRequested),
+              pendingHeavyReleaseAtSample: Boolean(heavyAttackRequested),
+              moveX: currentInput.moveX,
+              moveY: currentInput.moveY,
+              facing: currentInput.facing,
+              pressMoveY: leftButtonPressMovement?.moveY ?? null,
+              committedLightMoveY: committedLightMove?.moveY ?? null,
+              observedServerTick: networkClient.latestServerTick,
+            } : {}),
           });
-          if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+          if (debug.inputSubmissions.length > (m121DirectionTrace ? 96 : 32)) debug.inputSubmissions.shift();
         }
       }
     }

@@ -437,6 +437,8 @@ jobs:
           MYASO_PVP_SCENARIO: "uidirectionallight"
         run: |
           node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          node --test tests/combat4a-m121-unchanged-sender-provenance.test.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
       - name: Validate M129 real recovery roll buffer
