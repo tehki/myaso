@@ -137,8 +137,12 @@ class WebTransportGameConnection {
       throw new Error("gesture datagram requires current server grant");
     }
     const payload = toUint8Array(bytes);
-    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11) {
-      throw new TypeError("only original typed 16-byte v2 gesture events accepted");
+    // Owner retired source1 Key E from Combat. Reject even handcrafted old
+    // source1 bytes BEFORE they can occupy the one bounded QUIC writer queue.
+    // Rust admission independently rejects them before World mutation.
+    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11
+        || payload[3] !== 0) {
+      throw new TypeError("only source0 LMB typed 16-byte Combat events accepted");
     }
     // Never let a stalled datagram writer accumulate arbitrarily many
     // outstanding 16-byte gesture events/promises. Overflow is not an ACK,
