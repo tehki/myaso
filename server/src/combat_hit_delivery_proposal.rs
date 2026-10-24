@@ -362,8 +362,15 @@ pub fn project_world_tick_for_recipients(
     if recipients.len() > 512 {
         return Err(DeliveryError::InvalidScope);
     }
+    // A server World with no admitted players legitimately advances idle
+    // ticks. Such a tick has no recipients to fence or publish; a committed
+    // HIT without any current admitted recipient must still fail closed.
     let Some(first) = recipients.first() else {
-        return Err(DeliveryError::InvalidScope);
+        return if committed.is_empty() {
+            Ok(Vec::new())
+        } else {
+            Err(DeliveryError::InvalidScope)
+        };
     };
     let boot = first.recipient.boot_nonce;
     let world = first.recipient.world_instance;
@@ -1032,6 +1039,29 @@ mod tests {
         assert_eq!(
             project_world_tick_for_recipients(700, &committed, &mut none),
             Err(DeliveryError::InvalidScope)
+        );
+    }
+
+    #[test]
+    fn empty_authoritative_world_tick_without_sessions_is_a_safe_noop() {
+        // The original 60Hz World can run before the first QUIC admission
+        // or after the last disconnect. Do not require a fake actor identity
+        // to project a tick with no original committed HIT events.
+        let mut none = Vec::<ProposedRecipientHitDelivery>::new();
+        assert_eq!(project_world_tick_for_recipients(0, &[], &mut none), Ok(vec![]));
+        assert_eq!(
+            project_world_tick_for_recipients(1, &[], &mut none),
+            Ok(vec![])
+        );
+        assert!(none.is_empty());
+        assert_eq!(
+            project_world_tick_for_recipients(
+                2,
+                &[(event(2, 1), commit(2, 0, 2, 1))],
+                &mut none,
+            ),
+            Err(DeliveryError::InvalidScope),
+            "never invent HIT ownership with no authenticated recipients"
         );
     }
 
