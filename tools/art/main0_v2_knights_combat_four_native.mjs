@@ -332,8 +332,15 @@ try{
    freshIndependentRustWorld:true,genuineChromeFirefox:isolatedPair,
    noInjectedPlayerState:true
  }));
- // Original fighter1/fighter2 spawn 96px apart: physically move 140ms toward
- // the real target so 34HP short-light reach is genuine, not a fake hit.
+ // Original fighter1/fighter2 spawn 96px apart. After the REAL Chrome
+ // navigation to the new World, focus the NEW game canvas before true W3C
+ // keyboard movement; otherwise KeyD lands on document body and attacker
+ // remains physically out of short-light range despite valid source0 ACKs.
+ const movementCanvasFocused=await evaluate(attacker,
+  "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
+ assert.equal(movementCanvasFocused,true,
+  "actual fresh native game canvas MUST own authentic keyboard positioning");
+ // Physically move 140ms toward the real target so 34HP reach is genuine.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
   actions:[{type:"key",id:"combat4a-original-new-two-seat-move",actions:[
    {type:"keyDown",value:"d"},{type:"pause",duration:140},{type:"keyUp",value:"d"},
