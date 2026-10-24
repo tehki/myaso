@@ -1014,7 +1014,8 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
 async function prepareHeavyCounterplayFlight(
   entries,
   label,
-  { attackerName = "chrome", defenderName = "firefox", movementMs = 180 } = {},
+  { attackerName = "chrome", defenderName = "firefox", movementMs = 180,
+    nativeBoundedApproach = false } = {},
 ) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -1039,7 +1040,11 @@ async function prepareHeavyCounterplayFlight(
   const attackerElementId = await resolveArenaElement(attacker, `${label} attacker`);
   const defenderElementId = await resolveArenaElement(defender, `${label} defender`);
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, movementKey, movementMs);
+  if (nativeBoundedApproach) {
+    await pulseMovementKeyBoundedW3c(attacker, movementKey, movementMs);
+  } else {
+    await pulseMovementKey(attacker, movementKey, movementMs);
+  }
   await Promise.all([
     aimArena(attacker, attackerElementId, attackOffset),
     aimArena(defender, defenderElementId, blockOffset),
@@ -1579,7 +1584,8 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M121 directional light",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+    { attackerName: "chrome", defenderName: "firefox", movementMs: 150,
+      nativeBoundedApproach: true },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
@@ -11965,6 +11971,28 @@ async function pulseMovementKey(session, value, durationMs) {
   await setMovementKey(session, value, true);
   await sleep(durationMs);
   await setMovementKey(session, value, false);
+}
+
+// M121 native staging: a single W3C keyboard action sequence bounds the
+// actual genuine held approach in the browser, instead of two serial driver
+// requests spanning an unconstrained host pause. Original M121 full native
+// #40046205578 observed KeyD held ~699ms for a requested 150ms and a real
+// LEFT SWEEP whiff (no 34HP). No Combat geometry/damage/threshold changes.
+async function pulseMovementKeyBoundedW3c(session, value, durationMs) {
+  if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 250) {
+    throw new RangeError("M121 bounded native approach outside staging budget");
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value },
+        { type: "pause", duration: durationMs },
+        { type: "keyUp", value },
+      ],
+    }],
+  });
 }
 
 async function resolveArenaElement(session, label) {
