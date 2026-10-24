@@ -37,14 +37,16 @@ export async function awaitM223HeavyWindup({
 // wheel ingress (~31ms), so subtracting all 103ms expired short block early.
 // For restored short-reach heavy, the independent M107 155ms lead yielded
 // authoritative block at tick 2643, expiry 2656 and 46HP hit at tick 2660.
-// The explicitly qualified 255ms block target centers genuine guard before
-// lunge contact; 365ms genuine parry arrived seven server ticks before
-// impact and still guarded. 405ms aims near five ticks. Retain fail-closed
+// Explicit nonrelease 395ms BLOCK objective is grounded in 31ea9d3
+// 14-tick (~233ms) near-expiry 365ms sample; the revised wheel targets
+// ~12 ticks of server short block without entering the 125ms parry.
+// 405ms with +40ms physical offset remains PARRY acceptance-only.
+// Retain fail-closed
 // real parry assertions and unchanged authoritative 125ms parry duration.
 // Keep the planned defender activation safely between parry and block expiry.
 // Wrong authoritative outcome still fails the existing strict M107 checks.
 export function planM223WheelDelay({ targetAfterWindupMs, sampledWheelIngressMs }) {
-  if (![155, 255, 285, 365, 405].includes(targetAfterWindupMs)
+  if (![155, 255, 285, 365, 395, 405].includes(targetAfterWindupMs)
     || !Number.isFinite(sampledWheelIngressMs)
     || sampledWheelIngressMs < 0 || sampledWheelIngressMs > 750) {
     throw new TypeError("M223 requires genuine bounded heavy wheel calibration");
