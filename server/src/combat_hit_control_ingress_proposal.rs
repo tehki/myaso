@@ -841,7 +841,9 @@ mod tests {
 
     #[test]
     fn os_prepared_same_actor_lease_grants_only_offline_and_retires_on_rejoin() {
-        use crate::combat_hit_lease_mint_proposal::{PreparedHitLeaseError, PreparedHitLeaseUnallocated};
+        use crate::combat_hit_lease_mint_proposal::{
+            PreparedHitLeaseError, PreparedHitLeaseUnallocated,
+        };
         let live = binding(2, 1);
         let mut prepared = PreparedHitLeaseUnallocated::prepare_review_only(live, 64).unwrap();
         let (token, cap) = prepared.inspect_for_review_only(live).unwrap();
@@ -877,7 +879,12 @@ mod tests {
         // Exact transport owner must retire on a genuine life transition;
         // merely presenting the same numeric player ID is never enough.
         assert_eq!(
-            reader.feed_review_chunk(&mut receiver, replacement, &framed_control(hello()), |_| Ok(())),
+            reader.feed_review_chunk(
+                &mut receiver,
+                replacement,
+                &framed_control(hello()),
+                |_| Ok(())
+            ),
             Err(IngressError::ForeignConnection)
         );
         assert_eq!(
@@ -889,6 +896,4 @@ mod tests {
             prepared.inspect_for_review_only(live),
             Err(PreparedHitLeaseError::Retired)
         );
-    }
-
-}
+    }}
