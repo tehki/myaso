@@ -86,8 +86,7 @@ impl SessionGestureWorldPath {
 
     /// Called synchronously under original GameState/World mutex, not after
     /// unlocking or by a transport ACK handler. Returns real World tick ACK.
-    /// Both LMB0 and independent KeyE1 share the SAME lease monotonic
-    /// sequence, gesture ID fence, replay journal, and World action ownership.
+    /// Only source0 LMB is admitted to Combat. Retired source1 is rejected.
     /// Only an already-negotiated, server-owned current QUIC actor can enter.
     pub fn accept_under_world_lock(
         &mut self,
@@ -178,7 +177,7 @@ impl SessionGestureWorldPath {
                             == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
                             && matches!(
                                 decision.command,
-                                Command::BeginLightWindup | Command::BeginKeyEHeavy
+                                Command::BeginLightWindup
                             )
                         {
                             self.last_gesture_id = Some(event.gesture_id);
