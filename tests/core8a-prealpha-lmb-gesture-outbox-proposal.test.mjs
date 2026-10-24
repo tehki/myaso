@@ -67,6 +67,9 @@ test("cancel terminates current edge without synthesizing a RELEASE or a Combat 
 test("ACKs only settle exact event+gesture on correct bound connection and cannot prove a hit",()=>{
   const lease=token(),q=open(lease);
   const p=q.begin(),r=q.release();
+  assert.throws(()=>q.receiveAck(ack(r),lease),/unscheduled/);
+  assert.equal(q.snapshot.pending,2,"unsent terminal must remain queued");
+  assert.deepEqual(q.nextSendBatch().map(e=>e.sequence),[p.sequence,r.sequence]);
   assert.throws(()=>q.receiveAck(ack(p),token()),/cross-lease/);
   assert.throws(()=>q.receiveAck(ack({...p,gestureId:p.gestureId+1}),lease),/does not match/);
   assert.throws(()=>q.receiveAck(ack({...p,sequence:777}),lease),/unexpected/);
@@ -86,12 +89,16 @@ test("late and invalid server ACKs fail closed, do not invent accepted action",(
   const lease=token(),q=open(lease),p=q.begin();
   const bad=ack(p);bad[3]=1;
   assert.throws(()=>q.receiveAck(bad,lease),/reserved/);
+  assert.throws(()=>q.receiveAck(ack(p),lease),/unscheduled/);
+  q.nextSendBatch();
   const outcome=q.receiveAck(ack({...p,status:GESTURE_ACK_STATUS.STALE}),lease);
   assert.equal(outcome.transportSettled,false);
   assert.equal(outcome.combatCommitted,false);
   assert.equal(q.snapshot.closed,true);
   assert.throws(()=>q.begin(),/closed/);
   const rejectLease=token(),reject=open(rejectLease);const x=reject.begin();
+  assert.throws(()=>reject.receiveAck(ack(x),rejectLease),/unscheduled/);
+  reject.nextSendBatch();
   assert.equal(reject.receiveAck(ack({...x,status:GESTURE_ACK_STATUS.REJECTED}),rejectLease).transportSettled,false);
   assert.equal(reject.snapshot.closed,true);
 });
@@ -126,6 +133,8 @@ test("old connection ACKs cannot clear new lease's coincident sequence after rec
   assert.equal(newPress.sequence,p.sequence); // numeric IDs alone cannot fence sessions
   assert.throws(()=>fresh.receiveAck(ack(p),formerLease),/cross-lease/);
   assert.equal(fresh.snapshot.pending,1);
+  assert.throws(()=>fresh.receiveAck(ack(newPress),newLease),/unscheduled/);
+  fresh.nextSendBatch();
   assert.equal(fresh.receiveAck(ack(newPress),newLease).transportSettled,true);
 });
 
