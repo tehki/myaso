@@ -78,6 +78,6 @@ test("real first-party multiplayer URL activates relit art ONLY with explicit kn
   const source=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
   assert.match(source,/params\.get\("knights"\) === "1"/);
   assert.match(source,/params\.get\("knightArt"\) === "relit"/);
-  assert.match(source,/createKnightSpriteRenderer\(\{sourceArtVariant:/);
+  assert.match(source,/createKnightSpriteRenderer\(\{\s*sourceArtVariant:/);
   assert.doesNotMatch(source,/params\.get\("knightArt"\) === "relit" \|\|/);
 });
