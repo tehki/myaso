@@ -374,5 +374,45 @@ mod key_e_actor_rejoin_fence_tests {
         );
         assert_eq!(current.authority.highest_accepted_sequence(), 1);
         assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+        // A delayed old-session source1 terminal may arrive AFTER the new
+        // actor owns the first genuine LMB press. It must neither release
+        // that press nor consume source0 sequence 2, even if its claimed
+        // lease-local gesture ID and next sequence match the new actor.
+        let old_e_release = old_typed_event(1, GestureAction::Release, 2);
+        assert_eq!(
+            previous
+                .accept_under_world_lock(&mut world, 11, boot_nonce, &old_e_release)
+                .unwrap()
+                .status,
+            AckStatus::Rejected
+        );
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &old_e_release)
+                .unwrap()
+                .status,
+            AckStatus::Rejected
+        );
+        assert_eq!(current.authority.highest_accepted_sequence(), 1);
+        assert_eq!(current.held_source_id[0], Some(9));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+
+        let current_lmb_release = old_typed_event(0, GestureAction::Release, 2);
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &current_lmb_release)
+                .unwrap()
+                .status,
+            AckStatus::Accepted
+        );
+        assert_eq!(current.authority.highest_accepted_sequence(), 2);
+        assert_eq!(
+            current
+                .accept_under_world_lock(&mut world, 12, boot_nonce, &current_lmb_release)
+                .unwrap()
+                .status,
+            AckStatus::Duplicate
+        );
     }
 }
