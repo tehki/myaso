@@ -5801,6 +5801,28 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   let rollerState = hitEvidence.find((entry) => entry.browser === roller.name);
   let defenderState = hitEvidence.find((entry) => entry.browser === defender.name);
   let punisherState = hitEvidence.find((entry) => entry.browser === punisher.name);
+  // M156 read-only forensic record BEFORE any later strict rejection. The
+  // existing hitEvidence was already collected; no additional WebDriver
+  // command, input, packet, scheduling delay or authoritative World mutation.
+  // Log original #3 physical short click, ACTUALLY transmitted legacy 30Hz
+  // attack/heavy frames, actor actions, and #2 recovery together, even when
+  // an otherwise legitimate light becomes active after the knockdown ends.
+  const m156ClickEpoch = punisherState.pointers
+    .filter((event) => event.button === 0 && event.type === "pointerdown")
+    .at(-1)?.epochMs;
+  console.log("M156_NATIVE_SENDER_CHRONOLOGY " + JSON.stringify({
+    attackerId: punisherId,
+    victimId: defenderId,
+    clickEpochMs: m156ClickEpoch,
+    pointerEvents: punisherState.pointers
+      .filter((event) => event.button === 0).slice(-4),
+    actualSentInput: (punisherState.acceptance?.inputSubmissions ?? [])
+      .filter((sample) => Number.isFinite(m156ClickEpoch)
+        && sample.epochMs >= m156ClickEpoch - 130
+        && sample.epochMs <= m156ClickEpoch + 320),
+    attackerWorldActions: (punisherState.acceptance?.ownActionTransitions ?? []).slice(-12),
+    victimWorldActions: (defenderState.acceptance?.ownActionTransitions ?? []).slice(-12),
+  }));
   const knockdownFocusSeen = punisherState.focusTransitions.some((entry) =>
     entry.label === "KNOCKDOWN #" + defenderId);
   const knockdownCueSeen = punisherState.recoveryTransitions.some((entry) =>
