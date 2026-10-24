@@ -340,7 +340,17 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   await writeFile(join(output,"combat4-four-native-combat-lifecycle-world.json"),JSON.stringify(evidence,null,2)+"\n");
   console.log("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_WORLD_PASS",JSON.stringify(evidence));
  }catch(error){
-  const evidence={error:String(error),rounds,staging,replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
+  // Retain REAL W3C pointer provenance on failure: the four-browser load can
+  // occasionally stretch an intended short click beyond READY320. Never
+  // reclassify it as a valid light or waive the original World 34HP invariant.
+  // Physical evidence distinguishes native driver scheduling from ingress.
+  const physicalEvents=await Promise.all(actors.map(async a=>({
+   actorId:a.actor.id,browser:a.s.engine,
+   events:await evaluate(a.s,"return (window.__MYASO_FOUR_PHYSICAL_LMB__??[]).map(e=>({...e}));")
+    .catch(e=>({error:String(e)}))
+  })));
+  const evidence={error:String(error),rounds,staging,physicalEvents,
+   replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
   await writeFile(join(output,"combat4-four-native-combat-lifecycle-failure.json"),JSON.stringify(evidence,null,2)+"\n");
   console.error("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_FAILURE",JSON.stringify(evidence));throw error;
  }
