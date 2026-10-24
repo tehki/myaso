@@ -1328,11 +1328,11 @@ mod tests {
     }
 
     #[test]
-    fn m229_heavy_one_shot_replay_matrix_shows_exact_three_packet_boundary() {
+    fn m229_lmb_light_one_shot_replay_matrix_shows_exact_three_packet_boundary() {
         use myaso_server::simulation::Action;
 
         // Deterministic protocol test, not synthetic browser acceptance:
-        // a genuine KeyE is encoded as one heavy-action client tick.
+        // one genuine short-LMB light edge is encoded as one attack client tick.
         // Each 34-byte datagram carries newest-to-oldest three samples.
         const ACTION_TICK: u32 = 700;
         for additional_losses in 0..=2_u32 {
@@ -1341,7 +1341,7 @@ mod tests {
             let mut state = GameState::new(0, 0);
             assert!(state.world.add_player(1));
             let mut acks = VecDeque::new();
-            let mut accepted_heavy_ticks = Vec::new();
+            let mut accepted_light_ticks = Vec::new();
 
             for packet_offset in 0..4_u32 {
                 let packet_tick = ACTION_TICK + packet_offset;
@@ -1355,14 +1355,14 @@ mod tests {
                     let sample_tick = packet_tick - sample_offset;
                     let index = 16 + sample_offset as usize * 6;
                     bytes[index] = sample_offset as u8;
-                    bytes[index + 5] = u8::from(sample_tick == ACTION_TICK) << 3;
+                    bytes[index + 5] = u8::from(sample_tick == ACTION_TICK) << 2;
                 }
                 let packet = decode_input_packet(&bytes).expect("valid genuine input wire format");
                 assert_eq!(packet.samples().len(), 3);
 
                 if packet_offset == 0 {
                     // Existing M63 fixture must deliberately drop the first
-                    // datagram with the new one-shot heavy action.
+                    // datagram with the new one-shot physical LMB attack edge.
                     assert_eq!(
                         register_new_action_datagram(packet.samples(), &mut dropped_action_ticks),
                         Some(ACTION_TICK)
@@ -1370,7 +1370,7 @@ mod tests {
                     continue;
                 }
                 if packet_offset <= additional_losses {
-                    // Additional simulated QUIC loss, not a repeated KeyE.
+                    // Additional simulated QUIC loss, not a repeated physical LMB press.
                     continue;
                 }
                 assert_eq!(
@@ -1380,9 +1380,10 @@ mod tests {
                 );
                 let accepted = ingress.ingest(&packet);
                 if let Some(sample) = coalesce_accepted_input_batch(accepted.as_slice()) {
-                    if sample.heavy_attack {
-                        accepted_heavy_ticks.push(ACTION_TICK);
+                    if sample.attack {
+                        accepted_light_ticks.push(ACTION_TICK);
                     }
+                    assert!(!sample.heavy_attack, "single short LMB must never synthesize a heavy bit");
                     apply_coalesced_input_and_read_tick(
                         &mut state,
                         1,
@@ -1396,7 +1397,7 @@ mod tests {
 
             let within_replay = additional_losses < 2;
             assert_eq!(
-                accepted_heavy_ticks,
+                accepted_light_ticks,
                 if within_replay {
                     vec![ACTION_TICK]
                 } else {
@@ -1407,11 +1408,11 @@ mod tests {
             assert_eq!(
                 state.world.fighter(1).expect("fighter").action,
                 if within_replay {
-                    Action::HeavyAttackWindup
+                    Action::AttackWindup
                 } else {
                     Action::Idle
                 },
-                "never invent a heavy action after replay is exhausted"
+                "a fully lost LMB must not invent a light action after replay is exhausted"
             );
             assert_eq!(state.world.fighter(1).expect("fighter").hp, 100.0);
         }
