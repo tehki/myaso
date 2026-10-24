@@ -4,7 +4,7 @@ use myaso_server::prealpha_authenticated_gesture::SessionGestureWorldPath;
 use myaso_server::prealpha_lmb_gesture_proposal::{
     encode_typed_event, AckStatus, GestureAction, GestureEvent, GestureSource, TypedGestureEvent,
 };
-use myaso_server::simulation::{Action, CombatEvent, World};
+use myaso_server::simulation::{Action, CombatEvent, InputIntent, World};
 
 const LEASE: u64 = 0x4455;
 const BOOT: u128 = 0x1122_3344_7788_99aa;
@@ -221,6 +221,28 @@ fn original_world_death_respawn_stales_old_held_lmb_lease() {
         assert_eq!(hit_count, 1);
         assert_eq!(w.fighter(2).unwrap().hp, f32::from(expected_hp));
     }
+
+    // Genuine World knockback from the first two hits changes geometry.
+    // Restore actual combat distance through normal server-owned movement,
+    // never a teleport, synthetic HIT, or expanded attack reach.
+    let approach = InputIntent {
+        move_x: -1.0,
+        ..InputIntent::default()
+    };
+    let mut staged = false;
+    for _ in 0..120 {
+        let separation = w.fighter(2).unwrap().x - w.fighter(1).unwrap().x;
+        if (40.0..=65.0).contains(&separation) {
+            staged = true;
+            break;
+        }
+        assert!(w.set_input(2, approach));
+        w.step();
+        attacker.advance_under_world_lock(&mut w, LEASE, BOOT);
+        old.advance_under_world_lock(&mut w, LEASE + 1, BOOT);
+    }
+    assert!(staged, "actual World movement must restore honest light reach");
+    assert!(w.set_input(2, InputIntent::default()));
 
     // The victim's physical LMB is held at the instant the original third
     // attack commits real death. This in-flight gesture must lose authority.
