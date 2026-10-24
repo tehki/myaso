@@ -9126,16 +9126,16 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // commits 320ms windup + 100ms active + 420ms recovery after KeyE UP.
   // A keydown-based 840+60ms target can still fall inside real recovery when
   // the physical KeyE hold lasted >60ms, producing no buffered light at all.
-  // Allow 20ms beyond unchanged recovery to preserve actual same-World
-  // guard-break stun window: #963 2/2 real HP66 arrived 26/31ms after
-  // STUNNED exited when padding was 60ms. Fail closed if this genuine
-  // earlier click is still in heavy recovery or World damage is post-stun.
+  // Preserve the original protected R2 contract: 60ms after the
+  // unchanged 840ms heavy recovery. #963 still shows real HP66 landing
+  // 26/31ms after Firefox STUNNED disappears; that remains an unresolved
+  // authoritative-time/replication/timing issue, never a waived predicate.
   // Keep exactly one real 10ms W3C LMB,
   // the real 135ms light windup and every original stun/HP/HIT predicate.
   // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
   const firstClickTargetMs = COMBAT.heavyAttack.windupMs
-    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 20;
+    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
