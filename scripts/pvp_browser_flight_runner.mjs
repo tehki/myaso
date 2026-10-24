@@ -528,6 +528,7 @@ async function startGameServer() {
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uidirectionallight"
+        || scenario === "uiparrytell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
