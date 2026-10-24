@@ -258,6 +258,8 @@ pub struct Fighter {
     // Only genuine review-v2 owned action may accept preview commands;
     // normal v1 LMB attack intents must never be hijacked by this bridge.
     gesture_review_owns_light: bool,
+    // Original admitted LMB light direction; one scalar in the existing World.
+    gesture_review_light_lateral: f32,
     // Dormant reviewed v2 gesture ownership; no network/runtime callers.
     // Original v1 input release handling is unchanged when this is false.
     gesture_review_owns_held_charge: bool,
@@ -321,6 +323,7 @@ impl Fighter {
             heavy_attack_input_was_down: false,
             charging_heavy: false,
             gesture_review_owns_light: false,
+            gesture_review_light_lateral: 0.0,
             gesture_review_owns_held_charge: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
@@ -526,6 +529,7 @@ impl Fighter {
                 | Action::HeavyAttackWindup
         ) {
             self.gesture_review_owns_light = false;
+            self.gesture_review_light_lateral = 0.0;
         }
         if action != Action::HeavyAttackWindup {
             self.charging_heavy = false;
@@ -773,6 +777,7 @@ impl World {
                     - fighter.facing.cos() * fighter.latest_input.move_y;
                 fighter.begin_light_attack(lateral);
                 fighter.gesture_review_owns_light = true;
+                fighter.gesture_review_light_lateral = lateral;
                 true
             }
             Command::UpgradeHeldHeavy { server_elapsed_ms }
@@ -804,8 +809,9 @@ impl World {
                         <= SERVER_DT_MS + 2.0 =>
             {
                 let elapsed = fighter.action_elapsed_ms;
-                let lateral = fighter.facing.sin() * fighter.latest_input.move_x
-                    - fighter.facing.cos() * fighter.latest_input.move_y;
+                // Resume the originally admitted light variant; newer neutral
+                // locomotion never reclassifies an already-owned LMB action.
+                let lateral = fighter.gesture_review_light_lateral;
                 fighter.begin_light_attack(lateral);
                 // An undercharged RELEASE can never reset original light
                 // time, add a second damage window, or secretly become heavy.
@@ -1951,6 +1957,116 @@ mod r2_combat_control_tests {
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::Dash);
         assert!(world.fighter(1).unwrap().dash_dir_x > 0.99);
+    }
+
+    #[test]
+    fn combat4b_p0_undercharged_release_retains_original_pointerdown_direction() {
+        // The existing dormant source-tagged bridge starts a directional light
+        // on LMB pointerDOWN. An undercharged upgrade->release must resume
+        // THAT light, even if movement changes before the real release.
+        // No second action classifier, hit owner, client clock, or wire.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        for (direction_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_y: direction_y,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup,));
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+            assert!(world.step().is_empty());
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::UpgradeHeldHeavy {
+                    server_elapsed_ms: SERVER_DT_MS as u64,
+                },
+            ));
+
+            // True neutral/reversed movement belongs to movement simulation,
+            // not to reclassification of an already-authorized light.
+            assert!(world.set_input(1, InputIntent::default()));
+            for _ in 0..4 {
+                assert!(world.step().is_empty());
+            }
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::ResumeLight {
+                    server_elapsed_ms: world.now_ms as u64,
+                },
+            ));
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "undercharged LMB must resume original directional light, not classify latest neutral",
+            );
+            assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy,));
+        }
+    }
+
+    #[test]
+    fn combat4b_p0_cancelled_upgrade_cannot_leak_direction_or_late_hit() {
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
+        assert!(world.step().is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: SERVER_DT_MS as u64,
+            },
+        ));
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert!(!world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::ResumeLight {
+                server_elapsed_ms: world.now_ms as u64,
+            },
+        ));
+        assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+        for _ in 0..24 {
+            assert!(
+                world.step().is_empty(),
+                "cancelled LMB must not deal late damage"
+            );
+        }
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        // Only a NEW accepted gesture can establish a new attack origin.
+        // The cancelled leftward origin must not leak into a fresh right.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: 1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::AttackRightWindup,
+            "new opposite-side gesture must not inherit cancelled left direction"
+        );
     }
 
     #[test]
