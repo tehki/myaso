@@ -258,6 +258,9 @@ pub struct Fighter {
     // Only genuine review-v2 owned action may accept preview commands;
     // normal v1 KeyE and LMB attacks must never be hijacked by this bridge.
     gesture_review_owns_light: bool,
+    // One ORIGINAL pointerDOWN direction survives a server-owned upgrade.
+    // This is World-local, not another attack producer or wire field.
+    gesture_review_light_lateral: f32,
     // Dormant reviewed v2 gesture ownership; no network/runtime callers.
     // Original v1 input release handling is unchanged when this is false.
     gesture_review_owns_held_charge: bool,
@@ -321,6 +324,7 @@ impl Fighter {
             heavy_attack_input_was_down: false,
             charging_heavy: false,
             gesture_review_owns_light: false,
+            gesture_review_light_lateral: 0.0,
             gesture_review_owns_held_charge: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
@@ -526,6 +530,7 @@ impl Fighter {
                 | Action::HeavyAttackWindup
         ) {
             self.gesture_review_owns_light = false;
+            self.gesture_review_light_lateral = 0.0;
         }
         if action != Action::HeavyAttackWindup {
             self.charging_heavy = false;
@@ -773,6 +778,7 @@ impl World {
                     - fighter.facing.cos() * fighter.latest_input.move_y;
                 fighter.begin_light_attack(lateral);
                 fighter.gesture_review_owns_light = true;
+                fighter.gesture_review_light_lateral = lateral;
                 true
             }
             Command::BeginKeyEHeavy
@@ -820,8 +826,10 @@ impl World {
                         <= SERVER_DT_MS + 2.0 =>
             {
                 let elapsed = fighter.action_elapsed_ms;
-                let lateral = fighter.facing.sin() * fighter.latest_input.move_x
-                    - fighter.facing.cos() * fighter.latest_input.move_y;
+                // Preserve the already-selected light variant when the
+                // authenticated undercharged RELEASE follows newer neutral
+                // or reversed movement. No new direction/HIT classification.
+                let lateral = fighter.gesture_review_light_lateral;
                 fighter.begin_light_attack(lateral);
                 // An undercharged RELEASE can never reset original light
                 // time, add a second damage window, or secretly become heavy.
