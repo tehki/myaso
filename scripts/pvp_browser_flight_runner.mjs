@@ -1317,8 +1317,12 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // The block expired five ticks before impact. Shift the same genuine wheel
   // objective 110ms later to 365ms: approximately 13 ticks / 217ms of block
   // lead, within unchanged 125-240ms block-only timing, beyond parry.
+  // Recent exact-head 31ea9d3: measured BLOCK tick735 and 46HP HIT tick749
+  // (14 World ticks / ~233ms); the guard expired on the impact boundary.
+  // Shift only the genuine W3C wheel aim 30ms later to target ~12 ticks
+  // (~200ms) before contact: strictly >125ms parry, <240ms block. The
+  // original exact -64 guard, HP100, no-parry assertions still decide PASS.
   // This changes only physical test staging, NOT server timing or balance.
-  // Strict 100HP, -64 guard and no-parry assertions still decide acceptance.
   // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
   // parry/late-block failure gates unchanged.
   const staged = await prepareHeavyCounterplayFlight(
@@ -1341,7 +1345,7 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 365,
+      attackOffset, blockOffset, 395,
     );
     await sleep(470);
 
