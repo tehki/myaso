@@ -132,7 +132,8 @@ impl GestureAuthority {
         event: GestureEvent,
         server_ms: u64,
     ) -> Decision {
-        if source == GestureSource::KeyE && event.action == GestureAction::Upgrade {
+        // E is reserved for future Use. Never admit its legacy Combat source.
+        if source == GestureSource::KeyE {
             return Decision::rejected();
         }
         if lease != self.lease_epoch
@@ -359,5 +360,30 @@ impl GestureAuthority {
         self.phase = Phase::Idle;
         self.released = false;
         true
+    }
+}
+
+#[cfg(test)]
+mod key_e_reserved_for_use_tests {
+    use super::*;
+    use crate::prealpha_lmb_gesture_proposal::{GestureAction, GestureEvent};
+
+    #[test]
+    fn retired_key_e_source_cannot_open_heavy_or_advance_combat_sequence() {
+        let mut authority = GestureAuthority::new(9);
+        let press = GestureEvent {
+            action: GestureAction::Press,
+            sequence: 1,
+            gesture_id: 1,
+            client_tick: 0,
+        };
+        let rejected = authority.process_typed(9, GestureSource::KeyE, press, 0);
+        assert_eq!(rejected.disposition, Disposition::Rejected);
+        assert_eq!(rejected.command, Command::None);
+        assert_eq!(authority.highest_accepted_sequence(), 0);
+        assert_eq!(authority.phase(), Phase::Idle);
+        let lmb = authority.process_typed(9, GestureSource::Lmb, press, 0);
+        assert_eq!(lmb.disposition, Disposition::Accepted);
+        assert_eq!(lmb.command, Command::BeginLightWindup);
     }
 }
