@@ -2318,7 +2318,10 @@ mod r2_combat_control_tests {
         ));
         assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
         for _ in 0..24 {
-            assert!(world.step().is_empty(), "cancelled LMB must not deal late damage");
+            assert!(
+                world.step().is_empty(),
+                "cancelled LMB must not deal late damage"
+            );
         }
         assert_eq!(world.fighter(2).unwrap().hp, 100.0);
 
