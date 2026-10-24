@@ -148,9 +148,14 @@ test("one typed queue reserves terminal for a valid LMB while declining concurre
   assert.equal(q.snapshot.closed,true);
 });
 
-test("the selected typed v2 proposal is still absent from the live browser and Rust World ingress",()=>{
+test("v2 remains explicitly default-off and loopback-only in original Rust QUIC ingress",()=>{
   const browser=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
   const server=readFileSync(new URL("../server/src/main.rs",import.meta.url),"utf8");
+  // The original server DOES import the v2 codec for its opt-in lab. An
+  // absent-import assertion would be false and would hide this real control.
   assert.doesNotMatch(browser,/prealpha-lmb-gesture-outbox-proposal/);
-  assert.doesNotMatch(server,/prealpha_lmb_gesture_proposal/);
+  assert.match(server,/env::var\("MYASO_EXPERIMENTAL_GESTURE_V2"\)/);
+  assert.match(server,/Ok\("0"\) \| Err\(_\) => false/);
+  assert.match(server,/if v2_lab && !bind\.ip\(\)\.is_loopback\(\)/);
+  assert.match(server,/negotiation = connection\.accept_uni\(\), if v2_lab && !v2_enabled/);
 });
