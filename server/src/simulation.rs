@@ -1146,6 +1146,8 @@ fn begin_requested_action(
     // only during its unlanded windup. Running light may upgrade as well.
     // Once active, already-hit or recovering, the second action is rejected.
     if edges.heavy_attack
+        && input.attack
+        && input.heavy_attack
         && matches!(
             fighter.action,
             Action::AttackWindup
@@ -1160,16 +1162,13 @@ fn begin_requested_action(
                 ATTACK_WINDUP_MS
             })
     {
-        // Preserve the actual server-observed light windup time. Only a
-        // still-held LMB combo enters READY mode; no keyboard heavy exists.
+        // Only an uninterrupted held-LMB light may upgrade before contact.
+        // The standalone heavy bit formerly used for E never qualifies.
         let light_elapsed_ms = fighter.action_elapsed_ms;
-        let held_lmb = input.attack && input.heavy_attack;
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
-        if held_lmb {
-            fighter.action_elapsed_ms = light_elapsed_ms;
-            fighter.charging_heavy = true;
-        }
+        fighter.action_elapsed_ms = light_elapsed_ms;
+        fighter.charging_heavy = true;
         return;
     }
 
@@ -1266,17 +1265,6 @@ fn begin_requested_action(
         return;
     }
 
-    if edges.heavy_attack && fighter.action == Action::Idle {
-        // A delayed heavy edge while the SAME LMB remains held must never
-        // start a second attack after its original light already recovered.
-        // Legacy heavy bit remains for held-LMB compatibility, not keyboard E.
-        if input.attack && fighter.attack_input_was_down {
-            return;
-        }
-        fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
-        return;
-    }
 
     if edges.attack && fighter.action == Action::Idle {
         let lateral = fighter
@@ -1982,6 +1970,7 @@ mod r2_combat_control_tests {
         world.set_input(
             1,
             InputIntent {
+                attack: true,
                 heavy_attack: true,
                 ..InputIntent::default()
             },
@@ -1989,6 +1978,35 @@ mod r2_combat_control_tests {
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
         assert!(world.fighter(1).unwrap().attack_hit_targets.is_empty());
+    }
+
+    #[test]
+    fn retired_keyboard_heavy_bit_cannot_upgrade_an_unlanded_light() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        ));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        ));
+        world.step();
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::AttackWindup,
+            "orphaned heavy bit cannot hijack an existing LMB light"
+        );
+        assert!(!world.fighter(1).unwrap().charging_heavy);
     }
 
     #[test]
@@ -2012,6 +2030,7 @@ mod r2_combat_control_tests {
         world.set_input(
             1,
             InputIntent {
+                attack: true,
                 heavy_attack: true,
                 run: true,
                 move_x: 1.0,
@@ -2399,7 +2418,7 @@ mod r2_combat_control_tests {
     }
 
     #[test]
-    fn cancelled_charge_never_strikes_and_existing_e_heavy_remains_authoritative() {
+    fn cancelled_lmb_charge_rejects_orphan_heavy_and_preserves_real_charge() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
         world.set_input(
@@ -2414,6 +2433,35 @@ mod r2_combat_control_tests {
         world.set_input(1, InputIntent::default());
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        // A retired keyboard E heavy-only sample is inert.
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        for _ in 0..24 {
+            assert!(world.step().is_empty());
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        }
+        world.set_input(1, InputIntent::default());
+        world.step();
+        // The generic heavy bit remains valid inside a genuine held LMB.
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.fighter(1).unwrap().charging_heavy);
+        for _ in 0..24 {
+            assert!(world.step().is_empty());
+        }
         world.set_input(
             1,
             InputIntent {
@@ -2422,8 +2470,7 @@ mod r2_combat_control_tests {
             },
         );
         world.step();
-        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-        assert!(!world.fighter(1).unwrap().charging_heavy);
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
     }
 
     #[test]
