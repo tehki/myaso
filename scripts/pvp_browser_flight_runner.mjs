@@ -8822,7 +8822,7 @@ async function runOnlineUiStunOverlayFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false } = {}) {
+async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false, onAcceptedLiveBreak = null } = {}) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M110 heavy guard break",
@@ -9041,6 +9041,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         entry.visible && entry.title === "STUNNED");
       if (feedbackReady && defenderStunned) {
         finalEvidence = states;
+        // Genuine server guard break + defender STUNNED already attested.
+        // Pre-arm exactly one real Chrome W3C action before slow extra reads.
+        if (returnTiming && typeof onAcceptedLiveBreak === "function") {
+          onAcceptedLiveBreak(secondHeavyIssuedAt);
+        }
         break;
       }
       await sleep(20);
@@ -9049,7 +9054,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
   }
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  // In pre-armed M111 only, preserve the actual attested LIVE M110 snapshot
+  // rather than queue another Chrome WebDriver read behind its genuine click.
+  // Standalone M110 remains unchanged and re-reads both real browsers.
+  const evidence = returnTiming && onAcceptedLiveBreak
+    ? finalEvidence : await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
@@ -9099,11 +9108,28 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 }
 
 async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
-  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming: true });
-  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
   const attacker = entries.find((entry) => entry.name === "chrome");
   const defender = entries.find((entry) => entry.name === "firefox");
   if (!attacker || !defender) throw new Error("M111 could not resolve fixed heavy guard-break roles");
+  let genuineNativePunish = null;
+  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, {
+    returnTiming: true,
+    onAcceptedLiveBreak: (trustedSecondKeyEUpEpoch) => {
+      if (genuineNativePunish || !Number.isFinite(trustedSecondKeyEUpEpoch)) {
+        throw new Error("M111 must issue exactly one genuine key-release-based W3C punish");
+      }
+      // Preserve ORIGINAL protected +60ms after 840ms recovery; only initiate
+      // WebDriver command earlier, as soon as true live guard-break is seen.
+      const secondHeavyIssuedAt = trustedSecondKeyEUpEpoch;
+      const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
+      const firstClickTargetMs = COMBAT.heavyAttack.windupMs
+        + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
+      const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+      genuineNativePunish = performArenaAttackBurst(attacker, 1, initialPauseMs, 0)
+        .then(() => ({ ok: true }), error => ({ ok: false, error }));
+    },
+  });
+  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
 
   const baselineAttacker = guardBreakEvidence.find((entry) => entry.browser === attacker.name);
   const baselineDefender = guardBreakEvidence.find((entry) => entry.browser === defender.name);
@@ -9120,22 +9146,11 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
-  // Time the one genuine click from the second heavy's actual trusted KeyE
-  // RELEASE epoch, not its earlier KeyE DOWN. This original release-only heavy
-  // commits 320ms windup + 100ms active + 420ms recovery after KeyE UP.
-  // A keydown-based 840+60ms target can still fall inside real recovery when
-  // the physical KeyE hold lasted >60ms, producing no buffered light at all.
-  // Preserve the original protected R2 contract: 60ms after the
-  // unchanged 840ms heavy recovery. #963 still shows real HP66 landing
-  // 26/31ms after Firefox STUNNED disappears; that remains an unresolved
-  // authoritative-time/replication/timing issue, never a waived predicate.
-  // Keep exactly one real 10ms W3C LMB,
-  // the real 135ms light windup and every original stun/HP/HIT predicate.
-  // No extra clicks, synthetic events, damage relaxations or combat balance changes.
-  const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = COMBAT.heavyAttack.windupMs
-    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
-  const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+  // M111 pre-armed exactly one real WebDriver click from accepted M110 while
+  // defender's live guard-break STUNNED state is still authoritatively visible.
+  if (!genuineNativePunish || !Number.isFinite(secondHeavyIssuedAt)) {
+    throw new Error("M111 could not pre-arm genuine W3C after attested guard break");
+  }
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
@@ -9143,7 +9158,8 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // nine-tap burst mixed repeated charged-hold flags with releases and CI
   // #39412048012 resolved an unintended 46HP heavy instead of 34HP light.
   // Preserve all stun, HP, parry and recovery fail-closed proofs below.
-  await performArenaAttackBurst(attacker, 1, initialPauseMs, 0);
+  const genuineNativeResult = await genuineNativePunish;
+  if (!genuineNativeResult.ok) throw genuineNativeResult.error;
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
