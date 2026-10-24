@@ -526,6 +526,8 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        // M151: original three-player FFA guarded strike read-only World ticks.
+        || scenario === "uiguardbreakpunishffa"
         // M111 native-only 60Hz original World ACTION/HIT tick forensic.
         // The server itself still refuses this probe on public binds.
         || scenario === "uiheavyguardbreakpunish"
