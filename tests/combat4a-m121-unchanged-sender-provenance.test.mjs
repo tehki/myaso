@@ -15,9 +15,11 @@ test("M121 real original 30Hz KeyW+LMB accepts read-only direction evidence", ()
   const readonly = originalSender.slice(captureStart, captureEnd);
   for (const evidence of [
     'const m121DirectionTrace = acceptanceScenario === "uidirectionallight"',
-    'm121DirectionTrace && (keys.has("KeyW") || keys.has("KeyD"))',
+    'm121DirectionTrace && (keys.has("KeyW") || keys.has("KeyD") || keys.has("KeyS") || keys.has("KeyA"))',
     "keyWHeldAtSample: keys.has(\"KeyW\")",
     "keyDHeldAtSample: keys.has(\"KeyD\")",
+    "keySHeldAtSample: keys.has(\"KeyS\")",
+    "keyAHeldAtSample: keys.has(\"KeyA\")",
     "lmbHeldAtSample: Boolean(leftButtonDown)",
     "leftChargingAtSample: leftButtonCharge.isCharging()",
     "pendingLightReleaseAtSample: Boolean(attackRequested)",
