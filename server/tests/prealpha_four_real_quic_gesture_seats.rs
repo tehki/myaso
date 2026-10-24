@@ -998,8 +998,7 @@ async fn native_old_quic_session_does_not_own_replacement_lmb_after_close() {
     timeout(Duration::from_secs(2), async {
         loop {
             let baseline = server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_FLIGHT_ACTOR_BASELINE")
-                    && line.contains(" fighter=2 action=0")
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=2 action=0")
             });
             if baseline {
                 break;
@@ -1022,8 +1021,7 @@ async fn native_old_quic_session_does_not_own_replacement_lmb_after_close() {
     timeout(Duration::from_secs(2), async {
         loop {
             let found = server.lines.lock().unwrap().iter().any(|line| {
-                line.contains("M201_AUTH_ACTION")
-                    && line.contains(" fighter=2 from=0 to=1")
+                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=2 from=0 to=1")
             });
             if found {
                 break;
@@ -1036,8 +1034,7 @@ async fn native_old_quic_session_does_not_own_replacement_lmb_after_close() {
     let lines = server.lines.lock().unwrap().clone();
     assert!(
         !lines.iter().any(|line| {
-            line.contains("M201_AUTH_ACTION")
-                && line.contains(" fighter=2 from=0 to=9")
+            line.contains("M201_AUTH_ACTION") && line.contains(" fighter=2 from=0 to=9")
         }),
         "obsolete E or old socket cannot start a heavy windup for actor2"
     );
