@@ -196,6 +196,34 @@ test("reliable send rejects lease retirement while waiting for writer readiness"
   assert.equal(c.transport.closedByClient, true);
 }));
 
+test("reliable write completion after lease retirement is not credited as current delivery", () => withFixture(async () => {
+  const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
+  let markWriteStarted, finishWrite;
+  const writeStarted = new Promise(resolve => { markWriteStarted = resolve; });
+  const writeFinished = new Promise(resolve => { finishWrite = resolve; });
+  const attempted = [];
+  // Preserve ONE original bidi writer: simulate the in-flight write completing
+  // after its actor/connection lease is retired, not a new protocol or HIT.
+  c.reliableWriter = {
+    ready: Promise.resolve(),
+    async write(bytes) {
+      attempted.push(Array.from(bytes));
+      markWriteStarted();
+      await writeFinished;
+    },
+    releaseLock() {},
+  };
+  const pending = c.sendReliable(Uint8Array.from([5, 6]));
+  await writeStarted;
+  c.close("retired during original reliable write");
+  finishWrite();
+  await assert.rejects(pending, /closed/,
+    "an old-lease write completion cannot advance an M147 written cursor");
+  assert.deepEqual(attempted, [[2, 0, 5, 6]],
+    "exactly one original length-framed write was attempted before retirement");
+  assert.equal(c.transport.closedByClient, true);
+}));
+
 test("backpressured 65th physical gesture edge fails closed without loss or unbounded writes", () => withFixture(async () => {
   const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
   await c.negotiateExperimentalGestureV2();

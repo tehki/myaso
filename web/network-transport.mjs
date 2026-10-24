@@ -217,6 +217,10 @@ class WebTransportGameConnection {
     // The M147 recipient ledger may advance written-state ONLY after write().
     if (this.closed) throw new Error("WebTransport connection is closed");
     await this.reliableWriter.write(payload);
+    // A completed writer promise is not a current-lease delivery if the
+    // connection was retired while the write was still in flight. Keep this
+    // conservative: any later recipient ACK/replay must use its own lease.
+    if (this.closed) throw new Error("WebTransport connection is closed");
   }
 
   close(reason = "client close") {
