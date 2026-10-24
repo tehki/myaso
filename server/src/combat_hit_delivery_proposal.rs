@@ -63,7 +63,7 @@ pub enum AckOutcome {
 }
 
 /// Enqueue means pending, NOT written or acknowledged.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProposedRecipientHitDelivery {
     recipient: ActorIncarnation,
     token: [u8; 16],
@@ -73,6 +73,7 @@ pub struct ProposedRecipientHitDelivery {
     written_next: u32,
     acknowledged_next: u32,
     last_world_hit: Option<(u32, u32)>,
+    last_committed_batch_tick: Option<u32>,
     gapped_at: Option<u32>,
     retired: bool,
 }
@@ -98,6 +99,7 @@ impl ProposedRecipientHitDelivery {
             written_next: 0,
             acknowledged_next: 0,
             last_world_hit: None,
+            last_committed_batch_tick: None,
             gapped_at: None,
             retired: false,
         })
@@ -168,7 +170,11 @@ impl ProposedRecipientHitDelivery {
             return Err(DeliveryError::InvalidWorldIdentity);
         }
         let key = (identity.server_tick, identity.within_tick_ordinal);
-        if self.last_world_hit.is_some_and(|previous| key <= previous) {
+        if self
+            .last_committed_batch_tick
+            .is_some_and(|tick| identity.server_tick <= tick)
+            || self.last_world_hit.is_some_and(|previous| key <= previous)
+        {
             return Err(DeliveryError::ReplayedOrReorderedWorldHit);
         }
         // Validate the actual event BEFORE any receipt gets appended or a
@@ -196,6 +202,55 @@ impl ProposedRecipientHitDelivery {
         self.next_sequence += 1;
         self.last_world_hit = Some(key);
         Ok(Some(candidate))
+    }
+
+    /// Atomic review-only projection for all original HIT events of one
+    /// completed authoritative World tick. The trusted World-lock owner must
+    /// supply every original committed HIT with its captured immutable actor
+    /// identities and original within-tick ordinal. There is no network send.
+    ///
+    /// A malformed *later* HIT must not expose earlier HITs from the same
+    /// batch to the client. Overflow is still a terminal, explicit GAP; no
+    /// part of an overflowing batch is published or treated as ACKed.
+    /// Callers must not combine this method with per-event publication for
+    /// the same tick; the production writer must use only one atomic API.
+    pub fn project_committed_tick_batch(
+        &mut self,
+        server_tick: u32,
+        committed: &[(CombatEvent, CommittedHitIdentity)],
+    ) -> Result<Vec<HitReceipt>, DeliveryError> {
+        self.ready()?;
+        if self
+            .last_committed_batch_tick
+            .is_some_and(|previous| server_tick <= previous)
+            || self
+                .last_world_hit
+                .is_some_and(|(prior_tick, _)| server_tick <= prior_tick)
+        {
+            return Err(DeliveryError::ReplayedOrReorderedWorldHit);
+        }
+        let mut staged = self.clone();
+        let mut entitled = Vec::new();
+        for (event, identity) in committed {
+            if identity.server_tick != server_tick || !matches!(event, CombatEvent::Hit { .. }) {
+                return Err(DeliveryError::InvalidWorldIdentity);
+            }
+            match staged.project_hit(event, *identity) {
+                Ok(Some(receipt)) => entitled.push(receipt),
+                Ok(None) => {}
+                Err(DeliveryError::PendingOverflow { .. }) => {
+                    // No part of this tick is committed; the first LOST
+                    // local sequence is the original, not staged cursor.
+                    let first_missing = self.next_sequence;
+                    self.gapped_at = Some(first_missing);
+                    return Err(DeliveryError::PendingOverflow { first_missing });
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        staged.last_committed_batch_tick = Some(server_tick);
+        *self = staged;
+        Ok(entitled)
     }
 
     fn check_authenticated_lease(
@@ -588,6 +643,114 @@ mod tests {
         assert_eq!(
             ProposedRecipientHitDelivery::new(actor(1, 1, 1), TOKEN, 65).err(),
             Some(DeliveryError::InvalidScope)
+        );
+    }
+    #[test]
+    fn committed_batch_rejects_invalid_second_hit_without_partial_credit() {
+        let mut delivery = scope(2);
+        let good = (event(2, 1), commit(100, 0, 2, 1));
+        let invalid = (event(2, 1), commit(101, 1, 2, 1));
+        assert_eq!(
+            delivery.project_committed_tick_batch(100, &[good, invalid]),
+            Err(DeliveryError::InvalidWorldIdentity)
+        );
+        assert_eq!(delivery.pending(), 0);
+        assert_eq!(delivery.next_sequence(), 0);
+        assert_eq!(delivery.acknowledged_next(), 0);
+        // The same authoritative tick can be safely retried only if no
+        // prior partial batch was published.
+        let valid = [
+            (event(3, 4), commit(100, 0, 3, 4)),
+            (event(2, 1), commit(100, 1, 2, 1)),
+        ];
+        let committed = delivery.project_committed_tick_batch(100, &valid).unwrap();
+        assert_eq!(committed.len(), 1);
+        assert_eq!(committed[0].sequence, 0);
+        assert_eq!(delivery.next_sequence(), 1);
+        assert_eq!(
+            delivery.project_committed_tick_batch(100, &valid),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+    }
+
+    #[test]
+    fn committed_batch_retains_real_same_tick_ordinal_and_local_delivery_order() {
+        let mut delivery = scope(2);
+        let batch = [
+            (event(3, 4), commit(200, 0, 3, 4)),
+            (event(2, 1), commit(200, 1, 2, 1)),
+            (event(1, 2), commit(200, 3, 1, 2)),
+        ];
+        let actual = delivery.project_committed_tick_batch(200, &batch).unwrap();
+        assert_eq!(actual.len(), 2);
+        assert_eq!((actual[0].sequence, actual[0].attacker), (0, 2));
+        assert_eq!((actual[1].sequence, actual[1].attacker), (1, 1));
+        assert_eq!(delivery.pending(), 2);
+        assert_eq!(
+            delivery.ack_next(actor(2, 1, 2), &TOKEN, 2),
+            Err(DeliveryError::FutureAck),
+            "enqueued batch is never a processed client ACK"
+        );
+    }
+
+    #[test]
+    fn committed_batch_capacity_overflow_is_terminal_without_partial_enqueue() {
+        let mut delivery = ProposedRecipientHitDelivery::new(actor(2, 1, 2), TOKEN, 1).unwrap();
+        let batch = [
+            (event(2, 1), commit(300, 0, 2, 1)),
+            (event(2, 3), commit(300, 1, 2, 3)),
+        ];
+        assert_eq!(
+            delivery.project_committed_tick_batch(300, &batch),
+            Err(DeliveryError::PendingOverflow { first_missing: 0 })
+        );
+        assert_eq!(delivery.pending(), 0);
+        assert_eq!(delivery.next_sequence(), 0);
+        assert_eq!(delivery.gap(), Some(0));
+        assert_eq!(
+            delivery.project_committed_tick_batch(301, &[]),
+            Err(DeliveryError::ScopeGapped)
+        );
+    }
+
+    #[test]
+    fn atomic_and_incremental_publish_modes_cannot_mix_on_one_world_tick() {
+        let mut scoped = scope(2);
+        let batch = [(event(2, 1), commit(100, 0, 2, 1))];
+        scoped.project_committed_tick_batch(100, &batch).unwrap();
+        assert_eq!(
+            scoped.project_hit(&event(2, 1), commit(100, 1, 2, 1)),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        let mut incremental = scope(2);
+        incremental
+            .project_hit(&event(2, 1), commit(200, 0, 2, 1))
+            .unwrap();
+        assert_eq!(
+            incremental.project_committed_tick_batch(200, &[(event(2, 1), commit(200, 1, 2, 1))]),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(incremental.next_sequence(), 1);
+    }
+
+    #[test]
+    fn committed_empty_tick_is_fenced_against_delayed_same_tick_credit() {
+        let mut delivery = scope(2);
+        assert!(delivery
+            .project_committed_tick_batch(400, &[])
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            delivery.project_committed_tick_batch(400, &[(event(2, 1), commit(400, 0, 2, 1))]),
+            Err(DeliveryError::ReplayedOrReorderedWorldHit)
+        );
+        assert_eq!(delivery.next_sequence(), 0);
+        assert_eq!(
+            delivery
+                .project_committed_tick_batch(401, &[(event(2, 1), commit(401, 0, 2, 1))])
+                .unwrap()[0]
+                .sequence,
+            0
         );
     }
 }
