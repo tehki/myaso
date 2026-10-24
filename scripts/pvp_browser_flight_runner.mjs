@@ -12321,6 +12321,11 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
+          // Keep physical strafe held across the LMB UP source tick; the old
+          // two sources released within ~1ms and under driver jitter World
+          // classified some genuine side attacks as ordinary light (1/2/3).
+          // One extra synchronized W3C tick; no game/input/World mutation.
+          { type: "pause", duration: 0 },
           { type: "keyUp", value: strafeKey },
         ],
       },
@@ -12334,6 +12339,9 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pointerDown", button: 0 },
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
+          // The extra physical keyboard tick follows, rather than races,
+          // the authentic pointerUP. The original 150ms observation remains.
+          { type: "pause", duration: 0 },
           { type: "pause", duration: 150 },
         ],
       },
