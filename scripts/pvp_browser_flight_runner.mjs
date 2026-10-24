@@ -525,7 +525,10 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
-      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+      MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiheavyguardbreakpunish"
+        // Preserve original Rust 60Hz ACTION/BREAK/HIT diagnostics,
+        // read-only and refused on non-loopback by original server.
+        || scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         || scenario === "uiheavydodge"
@@ -9123,12 +9126,16 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // commits 320ms windup + 100ms active + 420ms recovery after KeyE UP.
   // A keydown-based 840+60ms target can still fall inside real recovery when
   // the physical KeyE hold lasted >60ms, producing no buffered light at all.
-  // Allow 60ms beyond unchanged recovery. Keep exactly one real 10ms W3C LMB,
+  // Allow 20ms beyond unchanged recovery to preserve actual same-World
+  // guard-break stun window: #963 2/2 real HP66 arrived 26/31ms after
+  // STUNNED exited when padding was 60ms. Fail closed if this genuine
+  // earlier click is still in heavy recovery or World damage is post-stun.
+  // Keep exactly one real 10ms W3C LMB,
   // the real 135ms light windup and every original stun/HP/HIT predicate.
   // No extra clicks, synthetic events, damage relaxations or combat balance changes.
   const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
   const firstClickTargetMs = COMBAT.heavyAttack.windupMs
-    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
+    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 20;
   const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
@@ -9792,6 +9799,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
           trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
+          // Reviewed Combat4D #954 native wheel must be attested before
+          // one genuine Chrome down/up. Original World block/parry unchanged.
+          preWheelHeadStartMs: scenario === "uiguardbreak" ? 35 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
