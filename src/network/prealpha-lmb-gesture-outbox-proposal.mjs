@@ -132,6 +132,10 @@ export class ProposedLmbGestureOutbox {
     if (!existing) throw new Error("unexpected, old or replayed gesture ACK");
     if (existing.gestureId !== ack.gestureId)
       throw new Error("ACK gesture identity does not match pending event");
+    // A queued edge is not a sent edge. A same-lease 0x12 ACK must not
+    // erase a PRESS or terminal that has never been scheduled for delivery.
+    if (existing.attempts === 0)
+      throw new Error("unscheduled gesture ACK rejected");
     this.#pending.delete(ack.sequence);
     const acceptedEdge = ack.status === GESTURE_ACK_STATUS.ACCEPTED;
     const duplicateEdge = ack.status === GESTURE_ACK_STATUS.DUPLICATE;
