@@ -852,6 +852,27 @@ function simulatePrediction(stepMs) {
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
+    // M121: read-only source-of-truth on the EXACT original 30Hz sender. W3C
+    // keydown in a browser does not prove a movement bit left the client or
+    // reached the Rust World. Preserve attack/release and quiet samples too.
+    // QA only, original packet/World/render path remains byte-for-byte intact.
+    if (acceptanceScenario === "uidirectionallight" && !reviewedGestureLab) {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.m121SentSamples ??= [];
+        debug.m121SentSamples.push({
+          clientTick: outgoingTick, epochMs: Date.now(),
+          moveX: currentInput.moveX, moveY: currentInput.moveY,
+          attack: Boolean(currentInput.attack),
+          heavyAttack: Boolean(currentInput.heavyAttack),
+          keyD: keys.has("KeyD"), keyA: keys.has("KeyA"),
+          keyW: keys.has("KeyW"), keyS: keys.has("KeyS"),
+          focus: document.activeElement?.id ?? null,
+          predictedAction: local.action,
+        });
+        if (debug.m121SentSamples.length > 96) debug.m121SentSamples.shift();
+      }
+    }
     // M336: read-only, scenario-scoped input-plane provenance. A real DOM
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
