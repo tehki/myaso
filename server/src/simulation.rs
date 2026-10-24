@@ -2045,6 +2045,98 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_existing_review_world_commits_one_heavy_only_after_ready_release() {
+        // The existing dormant source-tagged gesture bridge uses the SAME
+        // original World damage path; it is not a second simulation or a
+        // permission to activate an unapproved QUIC protocol.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert!(world.step().is_empty());
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        // Server-time proof: only the still-unlanded light may upgrade.
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: SERVER_DT_MS as u64,
+            },
+        ));
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        for _ in 0..24 {
+            let events = world.step();
+            assert!(
+                !events.iter().any(|event| matches!(event, CombatEvent::Hit { .. })),
+                "READY while held must not create an automatic 34HP or 46HP HIT"
+            );
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::HeavyReady));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+
+        let mut hits = Vec::new();
+        for _ in 0..20 {
+            hits.extend(world.step().into_iter().filter(|event| {
+                matches!(event, CombatEvent::Hit { .. })
+            }));
+        }
+        assert_eq!(
+            hits,
+            vec![CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage: 46,
+                hp: 54,
+            }],
+            "one admitted LMB gesture may produce exactly one original World heavy HIT"
+        );
+        assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+        assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+    }
+
+    #[test]
+    fn combat4b_p0_existing_review_world_keeps_keye_and_cancel_distinct() {
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginKeyEHeavy));
+        assert!(
+            !world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup),
+            "a standalone KeyE owner cannot start an overlapping LMB attack"
+        );
+        for _ in 0..4 {
+            assert!(world.step().is_empty());
+        }
+        assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelKeyEHeavy));
+        for _ in 0..23 {
+            assert!(
+                world.step().is_empty(),
+                "undercharged KeyE CANCEL must not queue a delayed 46HP HIT"
+            );
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert!(world.step().is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
+        for _ in 0..16 {
+            assert!(world.step().is_empty(), "LMB CANCEL must never commit phantom HIT");
+        }
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
