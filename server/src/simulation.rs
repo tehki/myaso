@@ -353,7 +353,11 @@ impl Fighter {
         self.latest_input
     }
 
-    fn latch_action_edges(&mut self, input: InputIntent) {
+    fn latch_action_edges(
+        &mut self,
+        input: InputIntent,
+        release_motion: Option<(f32, f32, f32)>,
+    ) {
         // Preserve only the actual original v1 directional light-release
         // provenance. A subsequent neutral packet in this same World tick
         // must not turn genuine W+LMB LEFT SWEEP into generic light. Do not
@@ -361,9 +365,16 @@ impl Fighter {
         if input.attack && !input.heavy_attack
             && (!self.latest_input.attack || self.latest_input.heavy_attack)
         {
-            let facing = normalize_angle(input.facing_radians);
+            // Original QUIC batch coalescing keeps latest neutral movement,
+            // but the selected one-shot attack may belong to an earlier
+            // accepted sample in the SAME datagram. Use that authenticated
+            // sample solely to choose the attack variant (never locomotion).
+            let (move_x, move_y, facing) = release_motion
+                .filter(|(x, y, angle)| x.is_finite() && y.is_finite() && angle.is_finite())
+                .unwrap_or((input.move_x, input.move_y, input.facing_radians));
+            let facing = normalize_angle(facing);
             self.pending_attack_lateral =
-                Some(facing.sin() * input.move_x - facing.cos() * input.move_y);
+                Some(facing.sin() * move_x - facing.cos() * move_y);
         }
         // A completed LMB charge sends ONE of the release modes below. When
         // press and release arrive between two server ticks, pending edges
@@ -706,6 +717,20 @@ impl World {
     }
 
     pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
+        self.set_input_with_light_release_motion(net_id, input, None)
+    }
+
+    /// Original authenticated input ingress may coalesce an action-bearing
+    /// release with a newer neutral movement sample from the same datagram.
+    /// Retain the trusted light sample's (move_x, move_y, facing) for action
+    /// selection only; latest input still owns movement and facing. This
+    /// does not introduce a second set_input or another attack producer.
+    pub fn set_input_with_light_release_motion(
+        &mut self,
+        net_id: u32,
+        input: InputIntent,
+        release_motion: Option<(f32, f32, f32)>,
+    ) -> bool {
         if self.winner.is_some() {
             return false;
         }
@@ -713,7 +738,7 @@ impl World {
             return false;
         };
         let input = normalize_input(input);
-        self.fighters[index].latch_action_edges(input);
+        self.fighters[index].latch_action_edges(input, release_motion);
         self.fighters[index].latest_input = input;
         true
     }
