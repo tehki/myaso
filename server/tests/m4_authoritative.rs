@@ -5,6 +5,7 @@ use myaso_server::{
     },
     CONSERVATIVE_DATAGRAM_BYTES,
 };
+use myaso_server::prealpha_lmb_gesture_authority::Command as LmbCommand;
 use std::collections::BTreeMap;
 
 fn duel(distance: f32) -> World {
@@ -30,6 +31,34 @@ fn advance(
         elapsed += dt;
     }
     events
+}
+
+// Use the already-existing, server-owned source0 LMB World bridge.
+// These are deterministic World tests; they do not activate public v2.
+fn begin_real_lmb_heavy(world: &mut World, defender: InputIntent) {
+    assert!(world.set_input(1, InputIntent::default()));
+    assert!(world.set_input(2, defender));
+    assert!(world.apply_review_only_lmb_gesture_command(1, LmbCommand::BeginLightWindup));
+    assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+    assert!(world.step_by(5.0).is_empty());
+    assert!(world.apply_review_only_lmb_gesture_command(
+        1,
+        LmbCommand::UpgradeHeldHeavy { server_elapsed_ms: 5 },
+    ));
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+}
+
+fn hold_real_lmb_to_ready(world: &mut World, defender: InputIntent) {
+    let events = advance(world, 315.0, InputIntent::default(), defender);
+    assert!(!events.iter().any(|event| matches!(event, CombatEvent::Hit { .. })));
+    assert!(world.apply_review_only_lmb_gesture_command(1, LmbCommand::HeavyReady));
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+}
+
+fn release_real_lmb_heavy(world: &mut World) {
+    assert!(world.apply_review_only_lmb_gesture_command(1, LmbCommand::ReleaseHeavy));
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
+    assert!(!world.apply_review_only_lmb_gesture_command(1, LmbCommand::ReleaseHeavy));
 }
 
 fn fresh_attack_when_idle(world: &mut World, attack: InputIntent) -> Vec<CombatEvent> {
@@ -215,8 +244,8 @@ fn recovered_light_edge_survives_newer_idle_input_before_authoritative_step() {
 }
 
 #[test]
-fn recovered_heavy_edge_survives_newer_idle_input_before_authoritative_step() {
-    let mut world = duel(200.0);
+fn retired_orphan_heavy_edge_cannot_be_revived_by_newer_idle_sample() {
+    let mut world = duel(72.0);
     assert!(world.set_input(
         1,
         InputIntent {
@@ -233,13 +262,13 @@ fn recovered_heavy_edge_survives_newer_idle_input_before_authoritative_step() {
             ..InputIntent::default()
         },
     ));
-
-    world.step_by(5.0);
-
-    let attacker = world.fighter(1).expect("attacker");
-    assert_eq!(attacker.action, Action::HeavyAttackWindup);
-    assert_eq!(attacker.input().move_x, 0.25);
-    assert!(!attacker.input().heavy_attack);
+    assert!(world.step_by(5.0).is_empty());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(world.fighter(1).unwrap().input().move_x, 0.25);
+    for _ in 0..70 {
+        assert!(world.step_by(5.0).is_empty());
+    }
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
 }
 
 #[test]
@@ -293,229 +322,86 @@ fn attack_preserves_windup_active_and_recovery_commitment() {
 #[test]
 fn held_heavy_does_not_auto_repeat_without_a_new_press() {
     let mut world = duel(200.0);
-    let held_heavy = InputIntent {
-        heavy_attack: true,
-        facing_radians: 0.0,
-        ..InputIntent::default()
-    };
-
-    advance(&mut world, 5.0, held_heavy, InputIntent::default());
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::HeavyAttackWindup
-    );
-    advance(&mut world, 865.0, held_heavy, InputIntent::default());
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    advance(&mut world, 200.0, held_heavy, InputIntent::default());
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    assert_eq!(world.fighter(2).expect("target").hp, 100.0);
-
-    advance(
-        &mut world,
-        5.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    advance(&mut world, 5.0, held_heavy, InputIntent::default());
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::HeavyAttackWindup
-    );
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    // An uninterrupted server READY hold does not auto-release or HIT.
+    let held = advance(&mut world, 865.0, InputIntent::default(), InputIntent::default());
+    assert!(!held.iter().any(|e| matches!(e, CombatEvent::Hit { .. })));
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert!(world.apply_review_only_lmb_gesture_command(1, LmbCommand::HeavyReady));
+    release_real_lmb_heavy(&mut world);
+    advance(&mut world, 520.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    advance(&mut world, 200.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
 }
 
 #[test]
 fn fresh_heavy_during_recovery_is_not_buffered() {
     let mut world = duel(200.0);
-    let held_heavy = InputIntent {
-        heavy_attack: true,
-        ..InputIntent::default()
-    };
-    advance(&mut world, 5.0, held_heavy, InputIntent::default());
-    advance(
-        &mut world,
-        420.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::HeavyAttackRecovery
-    );
-
-    advance(&mut world, 5.0, held_heavy, InputIntent::default());
-    advance(&mut world, 465.0, held_heavy, InputIntent::default());
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-
-    advance(
-        &mut world,
-        5.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    advance(&mut world, 5.0, held_heavy, InputIntent::default());
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::HeavyAttackWindup
-    );
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    hold_real_lmb_to_ready(&mut world, InputIntent::default());
+    release_real_lmb_heavy(&mut world);
+    advance(&mut world, 100.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackRecovery);
+    assert!(!world.apply_review_only_lmb_gesture_command(1, LmbCommand::BeginLightWindup));
+    advance(&mut world, 420.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
 }
 
 #[test]
 fn heavy_attack_preserves_long_commitment_and_deals_46_once() {
     let mut commitment = duel(200.0);
-    commitment.set_input(
-        1,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-    );
-    commitment.step_by(5.0);
-    assert_eq!(
-        commitment.fighter(1).expect("attacker").action,
-        Action::HeavyAttackWindup
-    );
-    assert_eq!(
-        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
-        9
-    );
-
-    advance(
-        &mut commitment,
-        320.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert_eq!(
-        commitment.fighter(1).expect("attacker").action,
-        Action::HeavyAttackActive
-    );
-    assert_eq!(
-        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
-        10
-    );
-    advance(
-        &mut commitment,
-        100.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert_eq!(
-        commitment.fighter(1).expect("attacker").action,
-        Action::HeavyAttackRecovery
-    );
-    assert_eq!(
-        WireEntity::from_fighter(commitment.fighter(1).expect("attacker")).action,
-        11
-    );
-    advance(
-        &mut commitment,
-        420.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert_eq!(
-        commitment.fighter(1).expect("attacker").action,
-        Action::Idle
-    );
+    begin_real_lmb_heavy(&mut commitment, InputIntent::default());
+    assert_eq!(WireEntity::from_fighter(commitment.fighter(1).unwrap()).action, 9);
+    hold_real_lmb_to_ready(&mut commitment, InputIntent::default());
+    release_real_lmb_heavy(&mut commitment);
+    assert_eq!(WireEntity::from_fighter(commitment.fighter(1).unwrap()).action, 10);
+    advance(&mut commitment, 100.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(commitment.fighter(1).unwrap().action, Action::HeavyAttackRecovery);
+    assert_eq!(WireEntity::from_fighter(commitment.fighter(1).unwrap()).action, 11);
+    advance(&mut commitment, 420.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(commitment.fighter(1).unwrap().action, Action::Idle);
 
     let mut hit_world = duel(72.0);
-    let events = advance(
-        &mut hit_world,
-        435.0,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent {
-            facing_radians: std::f32::consts::PI,
-            ..InputIntent::default()
-        },
-    );
-    assert_eq!(
-        events
-            .iter()
-            .filter(|event| matches!(event, CombatEvent::Hit { .. }))
-            .count(),
-        1
-    );
-    assert!(events.iter().any(|event| matches!(
-        event,
-        CombatEvent::Hit {
-            damage: 46,
-            hp: 54,
-            ..
-        }
-    )));
-    assert_eq!(hit_world.fighter(2).expect("target").hp.round() as u8, 54);
+    begin_real_lmb_heavy(&mut hit_world, InputIntent::default());
+    hold_real_lmb_to_ready(&mut hit_world, InputIntent::default());
+    release_real_lmb_heavy(&mut hit_world);
+    let events = advance(&mut hit_world, 115.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(events.iter().filter(|e| matches!(e, CombatEvent::Hit { .. })).count(), 1);
+    assert!(events.iter().any(|e| matches!(e, CombatEvent::Hit { damage: 46, hp: 54, .. })));
+    assert_eq!(hit_world.fighter(2).unwrap().hp.round() as u8, 54);
 }
 
 #[test]
 fn heavy_attack_applies_64_guard_pressure_and_remains_parryable() {
+    let blocking = InputIntent {
+        block: true,
+        facing_radians: std::f32::consts::PI,
+        ..InputIntent::default()
+    };
     let mut blocked = duel(72.0);
-    advance(
-        &mut blocked,
-        135.0,
-        InputIntent::default(),
-        InputIntent {
-            block: true,
-            facing_radians: std::f32::consts::PI,
-            ..InputIntent::default()
-        },
-    );
-    let events = advance(
-        &mut blocked,
-        435.0,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent {
-            block: true,
-            facing_radians: std::f32::consts::PI,
-            ..InputIntent::default()
-        },
-    );
-    assert_eq!(blocked.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(blocked.fighter(2).expect("target").guard.round() as u8, 36);
-    assert!(events
-        .iter()
-        .any(|event| matches!(event, CombatEvent::Block { .. })));
+    advance(&mut blocked, 135.0, InputIntent::default(), blocking);
+    begin_real_lmb_heavy(&mut blocked, blocking);
+    hold_real_lmb_to_ready(&mut blocked, blocking);
+    release_real_lmb_heavy(&mut blocked);
+    let events = advance(&mut blocked, 115.0, InputIntent::default(), blocking);
+    assert_eq!(blocked.fighter(2).unwrap().hp.round() as u8, 100);
+    assert_eq!(blocked.fighter(2).unwrap().guard.round() as u8, 36);
+    assert!(events.iter().any(|e| matches!(e, CombatEvent::Block { .. })));
 
     let mut parried = duel(72.0);
-    advance(
-        &mut parried,
-        295.0,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    let parry_events = advance(
-        &mut parried,
-        45.0,
-        InputIntent {
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent {
-            block: true,
-            facing_radians: std::f32::consts::PI,
-            ..InputIntent::default()
-        },
-    );
-    assert_eq!(parried.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(
-        parried.fighter(1).expect("attacker").action,
-        Action::Stunned
-    );
-    assert!(parry_events
-        .iter()
-        .any(|event| matches!(event, CombatEvent::Parry { .. })));
+    begin_real_lmb_heavy(&mut parried, InputIntent::default());
+    hold_real_lmb_to_ready(&mut parried, InputIntent::default());
+    release_real_lmb_heavy(&mut parried);
+    let parry_events = advance(&mut parried, 45.0, InputIntent::default(), blocking);
+    assert_eq!(parried.fighter(2).unwrap().hp.round() as u8, 100);
+    assert_eq!(parried.fighter(1).unwrap().action, Action::Stunned);
+    assert!(parry_events.iter().any(|e| matches!(e, CombatEvent::Parry { .. })));
 }
 
 #[test]
@@ -588,78 +474,43 @@ fn heavy_guard_break_preserves_a_real_light_punish_window_after_recovery() {
         facing_radians: std::f32::consts::PI,
         ..InputIntent::default()
     };
-    let heavy = InputIntent {
-        heavy_attack: true,
-        facing_radians: 0.0,
-        ..InputIntent::default()
-    };
-
-    // Enter ordinary held Block outside the 115 ms fresh-parry window.
     advance(&mut world, 135.0, InputIntent::default(), blocking);
 
-    let first_events = advance(&mut world, 435.0, heavy, blocking);
-    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 36);
-    assert!(first_events
-        .iter()
-        .any(|event| matches!(event, CombatEvent::Block { .. })));
+    begin_real_lmb_heavy(&mut world, blocking);
+    hold_real_lmb_to_ready(&mut world, blocking);
+    release_real_lmb_heavy(&mut world);
+    let first_events = advance(&mut world, 115.0, InputIntent::default(), blocking);
+    assert_eq!(world.fighter(2).unwrap().hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).unwrap().guard.round() as u8, 36);
+    assert!(first_events.iter().any(|e| matches!(e, CombatEvent::Block { .. })));
 
-    // Finish the first heavy commitment while Block remains held.
     advance(&mut world, 405.0, InputIntent::default(), blocking);
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Block);
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Block);
 
-    // The second heavy exhausts guard at the start of its active phase.
-    let break_events = advance(&mut world, 325.0, heavy, blocking);
-    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 100);
-    assert_eq!(world.fighter(2).expect("target").guard.round() as u8, 0);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
-    assert!(break_events
-        .iter()
-        .any(|event| matches!(event, CombatEvent::GuardBreak { .. })));
+    begin_real_lmb_heavy(&mut world, blocking);
+    hold_real_lmb_to_ready(&mut world, blocking);
+    release_real_lmb_heavy(&mut world);
+    let break_events = advance(&mut world, 5.0, InputIntent::default(), blocking);
+    assert_eq!(world.fighter(2).unwrap().hp.round() as u8, 100);
+    assert_eq!(world.fighter(2).unwrap().guard.round() as u8, 0);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Stunned);
+    assert!(break_events.iter().any(|e| matches!(e, CombatEvent::GuardBreak { .. })));
 
-    // From this snapshot the attacker has 95 ms active + 420 ms recovery left.
-    // When that exact commitment is over, the defender must still be stunned.
-    advance(
-        &mut world,
-        515.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert_eq!(world.fighter(1).expect("attacker").action, Action::Idle);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
-
-    // A normal 135 ms light windup must fit inside that post-recovery opening.
+    advance(&mut world, 515.0, InputIntent::default(), InputIntent::default());
+    assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Stunned);
     advance(
         &mut world,
         5.0,
-        InputIntent {
-            attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
+        InputIntent { attack: true, facing_radians: 0.0, ..InputIntent::default() },
         InputIntent::default(),
     );
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::AttackWindup
-    );
-    let punish_events = advance(
-        &mut world,
-        130.0,
-        InputIntent::default(),
-        InputIntent::default(),
-    );
-    assert!(punish_events.iter().any(|event| matches!(
-        event,
-        CombatEvent::Hit {
-            damage: 34,
-            hp: 66,
-            ..
-        }
-    )));
-    assert_eq!(world.fighter(2).expect("target").hp.round() as u8, 66);
-    assert_eq!(world.fighter(2).expect("target").action, Action::Stunned);
+    assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+    let punish_events = advance(&mut world, 130.0, InputIntent::default(), InputIntent::default());
+    assert!(punish_events.iter().any(|e| matches!(e, CombatEvent::Hit { damage: 34, hp: 66, .. })));
+    assert_eq!(world.fighter(2).unwrap().hp.round() as u8, 66);
+    assert_eq!(world.fighter(2).unwrap().action, Action::Stunned);
 }
 
 #[test]
@@ -1773,42 +1624,17 @@ fn early_wheel_back_feints_light_into_authoritative_recovery() {
 #[test]
 fn late_wheel_back_cannot_cancel_committed_heavy() {
     let mut world = duel(60.0);
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    hold_real_lmb_to_ready(&mut world, InputIntent::default());
+    release_real_lmb_heavy(&mut world);
     advance(
         &mut world,
         5.0,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
+        InputIntent { block: true, facing_radians: 0.0, ..InputIntent::default() },
         InputIntent::default(),
     );
-    advance(
-        &mut world,
-        185.0,
-        InputIntent {
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    assert_eq!(
-        world.fighter(1).expect("attacker").action,
-        Action::HeavyAttackWindup
-    );
-
-    advance(
-        &mut world,
-        5.0,
-        InputIntent {
-            block: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    let attacker = world.fighter(1).expect("attacker");
-    assert_eq!(attacker.action, Action::HeavyAttackWindup);
+    let attacker = world.fighter(1).unwrap();
+    assert_eq!(attacker.action, Action::HeavyAttackActive);
     assert_eq!(attacker.stamina.round() as u8, 100);
 }
 
@@ -1872,61 +1698,26 @@ fn exhausted_attacker_cannot_feint_heavy() {
     advance(
         &mut world,
         3700.0,
-        InputIntent {
-            move_x: -1.0,
-            run: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
+        InputIntent { move_x: -1.0, run: true, facing_radians: 0.0, ..InputIntent::default() },
         InputIntent::default(),
     );
-    assert!(world.fighter(1).expect("attacker").stamina < 12.0);
+    assert!(world.fighter(1).unwrap().stamina < 12.0);
+    begin_real_lmb_heavy(&mut world, InputIntent::default());
+    advance(&mut world, 70.0, InputIntent::default(), InputIntent::default());
+    let before_feint = world.fighter(1).unwrap().stamina;
     advance(
         &mut world,
         5.0,
-        InputIntent {
-            heavy_attack: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
+        InputIntent { block: true, facing_radians: 0.0, ..InputIntent::default() },
         InputIntent::default(),
     );
-    advance(
-        &mut world,
-        70.0,
-        InputIntent {
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    let before_feint = world.fighter(1).expect("attacker").stamina;
-    advance(
-        &mut world,
-        5.0,
-        InputIntent {
-            block: true,
-            facing_radians: 0.0,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    let attacker = world.fighter(1).expect("attacker");
+    let attacker = world.fighter(1).unwrap();
     assert_eq!(attacker.action, Action::HeavyAttackWindup);
     assert!(attacker.stamina >= before_feint);
-
-    advance(
-        &mut world,
-        320.0,
-        InputIntent {
-            facing_radians: std::f32::consts::PI,
-            ..InputIntent::default()
-        },
-        InputIntent::default(),
-    );
-    let attacker = world.fighter(1).expect("attacker");
-    assert_eq!(attacker.action, Action::HeavyAttackActive);
-    assert!(attacker.stamina >= before_feint);
+    advance(&mut world, 245.0, InputIntent::default(), InputIntent::default());
+    assert!(world.apply_review_only_lmb_gesture_command(1, LmbCommand::HeavyReady));
+    release_real_lmb_heavy(&mut world);
+    assert!(world.fighter(1).unwrap().stamina >= before_feint);
 }
 
 #[test]
