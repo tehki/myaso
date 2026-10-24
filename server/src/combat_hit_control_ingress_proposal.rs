@@ -896,4 +896,5 @@ mod tests {
             prepared.inspect_for_review_only(live),
             Err(PreparedHitLeaseError::Retired)
         );
-    }}
+     }
+}
