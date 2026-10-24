@@ -775,7 +775,6 @@ async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() 
     println!("COMBAT4C_NATIVE_LMB_EARLY_UPGRADE_RELEASE_ONLY_QUIC_PASS");
 }
 
-
 // Core8A P0: exact original pinned QUIC actor, no alternate session/action
 // engine. One bounded outbox must be able to retry a real RELEASE which
 // arrived ahead of its PRESS, without getting a fatal REJECTED ACK that
@@ -793,7 +792,11 @@ async fn core8a_native_reordered_release_waits_for_original_press_then_retries()
         .expect("real same-lease reordered original v2 RELEASE");
     let premature = timeout(Duration::from_millis(125), async {
         loop {
-            let bytes = seat.connection.receive_datagram().await.expect("same native QUIC");
+            let bytes = seat
+                .connection
+                .receive_datagram()
+                .await
+                .expect("same native QUIC");
             if bytes.len() == 16 && bytes[0] == 2 && bytes[1] == 0x12 {
                 break bytes;
             }
