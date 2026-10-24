@@ -23,6 +23,8 @@ pub enum OriginError {
     UnadmittedActor(u32),
     StaleActor(u32),
     NoCompletedWorldTick,
+    // The only extra World stepping operation is a test-only fixture.
+    #[cfg(test)]
     TickExhausted,
     OrdinalExhausted,
 }
@@ -36,6 +38,8 @@ pub struct ProposedWorldHitOrigin {
     accepted: BTreeMap<u32, ActorIncarnation>,
 }
 
+// Test-only structure: no second production World stepping interface.
+#[cfg(test)]
 #[derive(Debug)]
 pub struct OriginalWorldTick {
     pub tick: u32,
@@ -170,6 +174,7 @@ impl ProposedWorldHitOrigin {
     /// OFFLINE fixture only: drives the original World once, then delegates
     /// attribution to the same non-stepping capture used by future integration.
     /// Production's existing GameState clock MUST NEVER call this step helper.
+    #[cfg(test)]
     pub fn step_and_capture(&self, world: &mut World) -> Result<OriginalWorldTick, OriginError> {
         self.ensure_world(world)?;
         if world.tick == u32::MAX {
