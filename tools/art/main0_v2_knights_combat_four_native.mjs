@@ -361,8 +361,8 @@ try{
    // UNDER the original World lock. Sampled 60Hz action logs may show 0→1→9,
    // not legacy KeyE's direct 0→9. Require both real admitted source0 edges.
    pressed=await waitFor(()=>{
-     const admissions=readAuthoritativeWorld().split("\\n").filter(line=>
-       /M201_AUTH_GESTURE_ACTION tick=\\d+ fighter=1 source=0 gesture=\\d+ sequence=\\d+ eventAction=\\d+ status=1 from=\\d+ to=\\d+/.test(line));
+     const admissions=readAuthoritativeWorld().split("\n").filter(line=>
+       /M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 gesture=\d+ sequence=\d+ eventAction=\d+ status=1 from=\d+ to=\d+/.test(line));
      const light=admissions.find(line=>/eventAction=1 status=1 from=0 to=1/.test(line));
      const upgrade=admissions.find(line=>/eventAction=2 status=1 from=1 to=9/.test(line));
      return light&&upgrade?upgrade:false;
