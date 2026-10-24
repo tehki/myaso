@@ -12199,7 +12199,10 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
           { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
+          // Genuine lateral key remains physically held through pointerUP
+          // and the attack-bearing original 30Hz sample. Reviewed W3C timing
+          // from Combat4B #953; server timing, hit and strict M121 unchanged.
+          { type: "pause", duration: 150 },
           { type: "keyUp", value: strafeKey },
         ],
       },
@@ -12214,6 +12217,7 @@ async function performArenaDirectionalLight(session, elementId, strafeKey, xOffs
           { type: "pause", duration: 40 },
           { type: "pointerUp", button: 0 },
           { type: "pause", duration: 150 },
+          { type: "pause", duration: 0 },
         ],
       },
     ],
