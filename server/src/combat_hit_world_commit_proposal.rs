@@ -344,12 +344,24 @@ mod tests {
             .expect("one original World LightActive must strike two in-arc distinct actors");
         assert_eq!(hits[0].1.server_tick, hits[1].1.server_tick);
         assert!(hits[0].1.within_tick_ordinal < hits[1].1.within_tick_ordinal);
-        assert_eq!(hits[0].0, CombatEvent::Hit {
-            attacker: 1, target: 2, damage: 34, hp: 66,
-        });
-        assert_eq!(hits[1].0, CombatEvent::Hit {
-            attacker: 1, target: 3, damage: 34, hp: 66,
-        });
+        assert_eq!(
+            hits[0].0,
+            CombatEvent::Hit {
+                attacker: 1,
+                target: 2,
+                damage: 34,
+                hp: 66,
+            }
+        );
+        assert_eq!(
+            hits[1].0,
+            CombatEvent::Hit {
+                attacker: 1,
+                target: 3,
+                damage: 34,
+                hp: 66,
+            }
+        );
         let mut a = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
         let mut v2 = ProposedRecipientHitDelivery::new(victim2, [2; 16], 64).unwrap();
         let mut v3 = ProposedRecipientHitDelivery::new(victim3, [3; 16], 64).unwrap();
