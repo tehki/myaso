@@ -1995,6 +1995,52 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_pointerdown_light_begins_before_any_heavy_upgrade() {
+        // #1011 / #695 / #696: the physical LMB down must begin the
+        // server-owned 135ms light windup. A still-unlanded light may later
+        // upgrade to an authenticated held-LMB charge; READY 320ms does
+        // not authorize heavy damage until a deliberate release.
+        //
+        // Control: the existing attack-only input starts the correct state.
+        let mut light_control = World::new(800.0, 600.0);
+        assert!(light_control.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(light_control.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        light_control.step();
+        assert_eq!(
+            light_control.fighter(1).unwrap().action,
+            Action::AttackWindup
+        );
+
+        // Original genuine held-LMB v1 intent enters World as dual bits
+        // before any release. It cannot skip the initial light windup.
+        // This is fail-first against the historical release-to-strike path,
+        // not permission to reinterpret standalone KeyE or invent a packet.
+        let mut held_pointer_down = World::new(800.0, 600.0);
+        assert!(held_pointer_down.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(held_pointer_down.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            }
+        ));
+        held_pointer_down.step();
+        assert_eq!(
+            held_pointer_down.fighter(1).unwrap().action,
+            Action::AttackWindup,
+            "owner P0: held LMB pointerDOWN starts 135ms light; heavy upgrade must be a later server-owned transition before light contact"
+        );
+        assert!(held_pointer_down.fighter(1).unwrap().attack_hit_targets.is_empty());
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
