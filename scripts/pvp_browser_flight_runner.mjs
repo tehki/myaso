@@ -1241,7 +1241,18 @@ async function performHeavyCounterplayWindowWheel(
       targetAfterWindupMs,
       sampledWheelIngressMs: calibration.wheelIngressMs,
     });
-    const m223WheelDelayMs = m223Plan.wheelDelayMs;
+    // Combat4B M188 genuine held-LMB release: the prior parry objective
+    // 405ms entered Block at original World tick687 while heavy impact after
+    // tick689 resolved a normal -64 guard BLOCK, not <=125ms PARRY.
+    // Preserve the World timing, one physical wheel, and all strict HP/guard
+    // predicates. Stage the same wheel 40ms later and require exact-head
+    // Chrome/Firefox proof; this is not a certified gameplay change.
+    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 40 : 0;
+    const m223WheelDelayMs = m223Plan.wheelDelayMs + m188HeldLmbParryOffsetMs;
+    if (!Number.isSafeInteger(m223WheelDelayMs)
+      || m223WheelDelayMs < 0 || m223WheelDelayMs > 450) {
+      throw new Error("M188 genuine wheel timing outside bounded native pause");
+    }
     const wheelIssuedAtMs = Date.now();
     const [eResult, wheelResult] = await Promise.all([
       eOutcome,
@@ -1257,6 +1268,7 @@ async function performHeavyCounterplayWindowWheel(
       wheelIngressCalibrationMs: calibration.wheelIngressMs,
       boundedWheelIngressMs: m223Plan.boundedWheelIngressMs,
       wheelDelayMs: m223WheelDelayMs, targetAfterWindupMs,
+      m188HeldLmbParryOffsetMs,
       physicalHeavySource: "held-lmb", requestedHoldMs: M110_LMB_HEAVY_HOLD_MS,
       lmbW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
     }));
