@@ -754,7 +754,7 @@ mod tests {
 
         // The original World advances once more; holding the old event slice
         // must not create false future identity or any new damage/receipt.
-        let mut inbox = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+        let inbox = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
         world.step_into(&mut events);
         assert_eq!(world.tick, committed_tick + 1);
         assert_eq!(world.fighter(2).unwrap().hp, 66.0);
