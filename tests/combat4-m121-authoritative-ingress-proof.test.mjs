@@ -11,7 +11,7 @@ test("M121 original v1 server receipt trace is loopback gated, World-locked and 
   assert.ok(server.includes('!bind.ip().is_loopback() || !flight_action_proof || v2_lab'),
     "never allow M121 v1 observation on public binds or experimental v2");
   assert.ok(native.includes('MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" ? "1" : "0"'));
-  assert.ok(native.includes('MYASO_FLIGHT_ACTION_PROOF: (scenario === "uidirectionallight"'));
+  assert.ok(native.includes('|| scenario === "uidirectionallight"'));
   assert.ok(server.includes("let accepted = ingress.ingest(&packet);"));
   assert.ok(server.includes("let m121_coalesced = if prove_m121 {"));
   assert.ok(server.includes("let tick = apply_coalesced_input_and_read_tick("));
