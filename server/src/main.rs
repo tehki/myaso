@@ -317,6 +317,16 @@ async fn main() -> Result<()> {
     if flight_action_proof && !bind.ip().is_loopback() {
         bail!("authoritative flight action proof is permitted only on loopback binds");
     }
+    // M121 native W3C forensic only: opt-in original v1 accepted input samples,
+    // separate from the existing v2 lab and NEVER available on public binds.
+    let flight_m121_input_proof = match env::var("MYASO_FLIGHT_M121_INPUT_PROOF").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_FLIGHT_M121_INPUT_PROOF must be 0 or 1"),
+    };
+    if flight_m121_input_proof && (!bind.ip().is_loopback() || !flight_action_proof || v2_lab) {
+        bail!("M121 original-v1 ingress proof requires loopback, flight action proof and v2 OFF");
+    }
     tokio::spawn(run_authoritative_clock(
         Arc::clone(&game),
         flight_action_proof,
@@ -384,6 +394,7 @@ async fn main() -> Result<()> {
                 lease_epoch,
                 v2_lab,
                 flight_action_proof,
+                flight_m121_input_proof,
                 Arc::clone(&game),
             )
             .await;
@@ -611,6 +622,7 @@ async fn handle_connection(
     lease_epoch: u64,
     v2_lab: bool,
     flight_action_proof: bool,
+    flight_m121_input_proof: bool,
     game: Arc<SharedGame>,
 ) -> Result<()> {
     let stable_id = connection.stable_id();
@@ -843,15 +855,62 @@ async fn handle_connection(
                         }
                     }
                 }
-                let server_tick = {
+                // M121: preserve actual accepted v1 samples and post-set-input
+                // World state under one original authoritative lock. A client
+                // send, a decoded QUIC datagram, an ingress-accepted sample
+                // and a World action are four different proofs.
+                let prove_m121 = flight_m121_input_proof && player_id <= 3
+                    && packet.samples().iter().any(|sample| {
+                        sample.attack || sample.heavy_attack
+                            || sample.move_x != 0.0 || sample.move_y != 0.0
+                    });
+                let m121_accepted = if prove_m121 {
+                    accepted.iter().map(|sample| format!(
+                        "{}:{}:{}:{:.2}:{:.2}",
+                        sample.tick, u8::from(sample.attack),
+                        u8::from(sample.heavy_attack), sample.move_x, sample.move_y
+                    )).collect::<Vec<_>>().join(",")
+                } else {
+                    String::new()
+                };
+                let m121_coalesced = if prove_m121 {
+                    coalesced.as_ref().map(|(tick, input)| format!(
+                        "{tick}:{}:{}:{:.2}:{:.2}",
+                        u8::from(input.attack), u8::from(input.heavy_attack),
+                        input.move_x, input.move_y
+                    )).unwrap_or_else(|| "none".to_owned())
+                } else {
+                    String::new()
+                };
+                let (server_tick, m121_world) = {
                     let mut state = game.state.lock().await;
-                    apply_coalesced_input_and_read_tick(
+                    let tick = apply_coalesced_input_and_read_tick(
                         &mut state,
                         player_id,
                         coalesced,
                         &mut pending_input_acks,
-                    )
+                    );
+                    let probe = if prove_m121 {
+                        state.world.fighter(player_id).map(|fighter| {
+                            let latest = fighter.input();
+                            format!(
+                                "{}:{}:{}:{:.2}:{:.2}",
+                                fighter.action.wire_code(),
+                                u8::from(latest.attack), u8::from(latest.heavy_attack),
+                                latest.move_x, latest.move_y
+                            )
+                        })
+                    } else {
+                        None
+                    };
+                    (tick, probe)
                 };
+                if prove_m121 {
+                    println!(
+                        "M121_V1_SERVER_INPUT actor={player_id} session={stable_id} packet_tick={} accepted=[{m121_accepted}] coalesced={m121_coalesced} world_tick={server_tick} world={}",
+                        packet.client_tick, m121_world.as_deref().unwrap_or("missing")
+                    );
+                }
                 if server_tick.wrapping_sub(packet.ack_server_tick) > 600 {
                     eprintln!(
                         "session {stable_id} stale server acknowledgement: client={} server={}",
