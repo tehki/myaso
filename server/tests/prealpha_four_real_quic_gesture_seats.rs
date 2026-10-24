@@ -9,7 +9,7 @@ use std::{
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
-    SendStream, VarInt,
+    SendStream,
 };
 
 const WAIT: Duration = Duration::from_secs(8);
