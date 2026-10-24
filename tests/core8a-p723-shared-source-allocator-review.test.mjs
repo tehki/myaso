@@ -1,133 +1,153 @@
+// Core8A P0 one selected typed Combat source. Owner retired KeyE source1.
+// Preserve the old per-connection seq/gesture/replay and u32 saturation gates.
 import test from "node:test";
 import assert from "node:assert/strict";
-import {ProposedSharedSourceGestureAllocator} from "../src/network/prealpha-shared-source-allocator-proposal.mjs";
-import {decodeProposedTypedGestureEvent,
-  PROPOSED_GESTURE_SOURCE as S, GESTURE_ACTION as A,
+import {ProposedSharedSourceGestureAllocator as Allocator}
+  from "../src/network/prealpha-shared-source-allocator-proposal.mjs";
+import {
+  decodeProposedTypedGestureEvent as decode,
+  PROPOSED_GESTURE_SOURCE as S,
+  GESTURE_ACTION as A,
 } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
-const lease=()=>Object.freeze({});
-const make=trustedLease=>new ProposedSharedSourceGestureAllocator({reviewVersion:2,trustedLease});
 
-test("one LMB lease allocates PRESS, upgrade and terminal without keyboard Combat",()=>{
-  const q=make(lease()), p=q.begin(S.LMB,42), u=q.upgrade(43), r=q.release(S.LMB,44);
-  assert.deepEqual([p,u,r].map(e=>e.action),[A.PRESS,A.UPGRADE,A.RELEASE]);
-  assert.deepEqual([p,u,r].map(e=>e.sequence),[1,2,3]);
-  assert.deepEqual([p,u,r].map(e=>e.gestureId),[1,1,1]);
-  assert.deepEqual([p,u,r].map(e=>e.source),[S.LMB,S.LMB,S.LMB]);
-  assert.deepEqual([p,u,r].map(e=>decodeProposedTypedGestureEvent(e.bytes).sequence),[1,2,3]);
-  assert.deepEqual(q.snapshot,{nextSequence:4,nextGestureId:2,activeSources:[],closed:false});
+const token=()=>Object.freeze({});
+const make=(trustedLease,first=1)=>new Allocator({
+  reviewVersion:2,trustedLease,testOnlyInitialSequence:first,
+});
+const parsed=e=>decode(e.bytes);
+const denied=fn=>assert.throws(fn,/Combat permits only the physical LMB gesture source/);
+
+test("one lease allocates monotonic LMB PRESS/UPGRADE/RELEASE; denied KeyE has no ID",()=>{
+  const q=make(token());
+  const p=q.begin(S.LMB,42);
+  const before=q.snapshot;
+  for(const fn of [
+    ()=>q.begin(S.KEY_E,43),()=>q.release(S.KEY_E,44),
+    ()=>q.cancel(S.KEY_E,44),()=>q.begin(2,43),
+  ]) {
+    denied(fn);
+    assert.deepEqual(q.snapshot,before,"retired source must never consume LMB ownership");
+  }
+  const up=q.upgrade(45),end=q.release(S.LMB,46);
+  assert.deepEqual([p,up,end].map(x=>x.sequence),[1,2,3]);
+  assert.deepEqual([p,up,end].map(x=>x.gestureId),[1,1,1]);
+  assert.deepEqual([p,up,end].map(x=>x.source),[0,0,0]);
+  assert.deepEqual([p,up,end].map(parsed).map(x=>x.action),
+    [A.PRESS,A.UPGRADE,A.RELEASE]);
+  assert.deepEqual(q.snapshot,{
+    nextSequence:4,nextGestureId:2,activeSources:[],closed:false,
+  });
   assert.equal(q.receiveAck,undefined);
   assert.equal(q.nextSendBatch,undefined);
   assert.equal(q.combatCommitted,undefined);
 });
 
-test("retired source1 Key E cannot open, terminate, or steal a live LMB",()=>{
-  const q=make(lease()), p=q.begin(S.LMB,15), before=q.snapshot;
-  for(const op of [()=>q.begin(S.KEY_E,16),()=>q.release(S.KEY_E,16),
-    ()=>q.cancel(S.KEY_E,16)]) assert.throws(op,/only the physical LMB/);
-  assert.deepEqual(q.snapshot,before,"rejected E cannot consume sequence or gesture identity");
-  const r=q.release(S.LMB,17);
-  assert.equal(r.gestureId,p.gestureId);
-  assert.equal(r.sequence,2);
-});
-
-test("only current physical LMB may CANCEL; old terminal cannot replay",()=>{
-  const q=make(lease()), p=q.begin(S.LMB,55), c=q.cancel(S.LMB,56);
-  assert.equal(c.gestureId,p.gestureId);
-  assert.equal(c.action,A.CANCEL);
-  assert.throws(()=>q.release(S.LMB,57),/no active/);
-  assert.throws(()=>q.cancel(S.LMB,57),/no active/);
+test("KeyE during LMB hold/charge cannot steal, release, upgrade or cancel it",()=>{
+  const q=make(token());
+  const p=q.begin(S.LMB,5);
+  const before=q.snapshot;
+  denied(()=>q.begin(S.KEY_E,6));
+  denied(()=>q.release(S.KEY_E,6));
+  denied(()=>q.cancel(S.KEY_E,6));
+  assert.deepEqual(q.snapshot,before);
+  assert.equal(q.upgrade(7).gestureId,p.gestureId);
+  denied(()=>q.begin(S.KEY_E,8));
+  assert.equal(q.cancel(S.LMB,9).sequence,3);
   assert.deepEqual(q.snapshot.activeSources,[]);
+  assert.equal(q.begin(S.LMB,10).gestureId,2,
+    "new legitimate LMB receives next gesture, not one consumed by E");
 });
 
-test("invalid source, tick and duplicate PRESS cannot advance counters",()=>{
-  const q=make(lease());
-  assert.throws(()=>q.begin(2,1),/only the physical LMB/);
-  assert.throws(()=>q.begin(S.KEY_E,1),/only the physical LMB/);
+test("invalid source/tick/duplicate begin never advances source0 counters",()=>{
+  const q=make(token());
+  denied(()=>q.begin(2,1));
+  denied(()=>q.begin(S.KEY_E,2**32));
   assert.throws(()=>q.begin(S.LMB,-1),/diagnostic clientTick/);
-  assert.throws(()=>q.begin(S.LMB,2**32),/diagnostic clientTick/);
   const p=q.begin(S.LMB,0);
   assert.equal(p.sequence,1);
   assert.throws(()=>q.begin(S.LMB,0),/must terminate/);
   assert.throws(()=>q.upgrade(-1),/diagnostic clientTick/);
+  assert.deepEqual(q.snapshot.activeSources,[S.LMB]);
   assert.equal(q.snapshot.nextSequence,2);
   assert.equal(q.snapshot.nextGestureId,2);
   assert.equal(q.release(S.LMB,0).sequence,2);
 });
 
-test("retirement fences stale keyboard and pointer events, fresh incarnation owns new IDs",()=>{
-  const old=make(lease()), p=old.begin(S.LMB,0);
+test("old lease cannot revive its active LMB and new actor reuses scoped IDs",()=>{
+  const old=make(token());
+  const p=old.begin(S.LMB,0);
   old.retire();
-  for(const op of [()=>old.begin(S.KEY_E,1),()=>old.begin(S.LMB,1),
-    ()=>old.upgrade(1),()=>old.cancel(S.LMB,1),()=>old.release(S.LMB,1)])
-    assert.throws(op,/retired/);
   assert.equal(old.snapshot.closed,true);
-  const fresh=make(lease()), again=fresh.begin(S.LMB,0);
-  assert.equal(again.sequence,p.sequence);
-  assert.equal(again.gestureId,p.gestureId);
+  for(const fn of [
+    ()=>old.begin(S.LMB,1),()=>old.begin(S.KEY_E,1),
+    ()=>old.upgrade(1),()=>old.cancel(S.LMB,1),
+    ()=>old.release(S.LMB,1),
+  ])assert.throws(fn,/retired/);
+  const fresh=make(token()),q=fresh.begin(S.LMB,0);
+  assert.deepEqual([p.sequence,p.gestureId],[q.sequence,q.gestureId]);
   assert.notEqual(fresh,old);
+  assert.equal(fresh.combatCommitted,undefined);
 });
 
-test("four independently scoped actors use only source0; one retired actor cannot affect peers",()=>{
-  const qs=[make(lease()),make(lease()),make(lease()),make(lease())];
-  const presses=qs.map(q=>q.begin(S.LMB,999));
-  assert.deepEqual(presses.map(e=>[e.source,e.sequence,e.gestureId]),
-    Array.from({length:4},()=>[S.LMB,1,1]));
-  assert.deepEqual(presses.map(e=>Array.from(e.bytes)),
-    Array.from({length:4},()=>Array.from(presses[0].bytes)));
-  qs[1].retire();
-  assert.throws(()=>qs[1].release(S.LMB,1000),/retired/);
-  assert.equal(qs[0].release(S.LMB,1000).sequence,2);
-  assert.equal(qs[2].cancel(S.LMB,1000).sequence,2);
-  assert.deepEqual(qs[3].snapshot.activeSources,[S.LMB]);
+test("four independent actor review leases reuse LMB bytes without cross-actor state",()=>{
+  const queues=Array.from({length:4},()=>make(token()));
+  const presses=queues.map(q=>q.begin(S.LMB,999));
+  assert.deepEqual(presses.map(x=>[x.sequence,x.gestureId]),
+    [[1,1],[1,1],[1,1],[1,1]]);
+  const golden=Array.from(presses[0].bytes);
+  assert.ok(presses.every(x=>JSON.stringify(Array.from(x.bytes))===JSON.stringify(golden)));
+  queues[1].retire();
+  assert.throws(()=>queues[1].cancel(S.LMB,1000),/retired/);
+  assert.equal(queues[0].release(S.LMB,1000).sequence,2);
+  assert.equal(queues[2].cancel(S.LMB,1000).sequence,2);
+  assert.deepEqual(queues[3].snapshot.activeSources,[S.LMB]);
+  denied(()=>queues[3].begin(S.KEY_E,1001));
 });
 
-test("review allocator is not live QUIC authentication or a HIT writer",()=>{
-  assert.throws(()=>new ProposedSharedSourceGestureAllocator(),/review version/i);
+test("allocator is explicitly review-only, not a trusted QUIC admission",()=>{
+  assert.throws(()=>new Allocator(),/review version/i);
   assert.throws(()=>make(null),/lease object/);
-  assert.throws(()=>make("client-provided-claim"),/lease object/);
-  assert.throws(()=>new ProposedSharedSourceGestureAllocator({
-    reviewVersion:1,trustedLease:lease()}),/review version/i);
+  assert.throws(()=>make("self-declared actor"),/lease object/);
+  assert.throws(()=>new Allocator({reviewVersion:1,trustedLease:token()}),/review version/i);
 });
 
-test("near-u32 rejecting Key E preserves exact LMB upgrade and release reservation",()=>{
+test("near-u32 rejected KeyE cannot consume reserved LMB UPGRADE/terminal",()=>{
   const max=0xffff_ffff;
-  const q=new ProposedSharedSourceGestureAllocator({
-    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:max-3});
-  const p=q.begin(S.LMB,1), before=q.snapshot;
-  assert.throws(()=>q.begin(S.KEY_E,2),/only the physical LMB/);
+  const q=make(token(),max-3);
+  const press=q.begin(S.LMB,1);
+  const before=q.snapshot;
+  denied(()=>q.begin(S.KEY_E,2));
+  denied(()=>q.release(S.KEY_E,2));
+  denied(()=>q.cancel(S.KEY_E,2));
   assert.deepEqual(q.snapshot,before);
-  const u=q.upgrade(3), r=q.release(S.LMB,4);
-  assert.deepEqual([p.sequence,u.sequence,r.sequence],[max-3,max-2,max-1]);
-  assert.equal(u.gestureId,p.gestureId);
-  assert.equal(r.gestureId,p.gestureId);
+  const up=q.upgrade(3),terminal=q.release(S.LMB,4);
+  assert.deepEqual([press.sequence,up.sequence,terminal.sequence],
+    [max-3,max-2,max-1]);
+  assert.equal(press.gestureId,terminal.gestureId);
   assert.equal(q.snapshot.closed,false);
 });
 
-test("exact three sequence slots suffice for LMB, and lease never wraps at u32",()=>{
+test("at u32 boundary only legitimate LMB consumes nonwrapping sequence capacity",()=>{
   const max=0xffff_ffff;
-  const q=new ProposedSharedSourceGestureAllocator({
-    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:max-2});
+  const q=make(token(),max-2);
   const p=q.begin(S.LMB,100);
-  assert.throws(()=>q.begin(S.KEY_E,101),/only the physical LMB/);
-  const u=q.upgrade(102), r=q.release(S.LMB,103);
-  assert.deepEqual([p.sequence,u.sequence,r.sequence],[max-2,max-1,max]);
+  denied(()=>q.begin(S.KEY_E,101));
+  assert.equal(q.upgrade(102).sequence,max-1);
+  assert.equal(q.release(S.LMB,103).sequence,max);
   assert.equal(q.snapshot.nextSequence,max+1);
   assert.deepEqual(q.snapshot.activeSources,[]);
   assert.throws(()=>q.begin(S.LMB,104),/sequence capacity exhausted/);
   assert.equal(q.snapshot.closed,true);
 });
 
-test("test-only counter seam rejects malformed IDs and source1 cannot exhaust lease",()=>{
-  for(const value of [0,-1,2**32,1.5,"123",NaN])
-    assert.throws(()=>new ProposedSharedSourceGestureAllocator({
-      reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:value}),
-    /test-only initial sequence/);
-  const q=new ProposedSharedSourceGestureAllocator({
-    reviewVersion:2,trustedLease:lease(),testOnlyInitialSequence:0xffff_ffff});
-  assert.throws(()=>q.begin(S.KEY_E,1),/only the physical LMB/);
+test("exhausted or malformed test-only source budget does not grant combat authority",()=>{
+  for(const v of [0,-1,2**32,1.5,"123",NaN])
+    assert.throws(()=>make(token(),v),/test-only initial sequence/);
+  const q=make(token(),0xffff_ffff);
+  denied(()=>q.begin(S.KEY_E,1));
   assert.equal(q.snapshot.nextSequence,0xffff_ffff);
-  assert.equal(q.snapshot.closed,false);
+  assert.equal(q.snapshot.nextGestureId,1);
+  assert.equal(q.snapshot.closed,false,"retired E must not exhaust the valid LMB lease");
   assert.throws(()=>q.begin(S.LMB,1),/sequence capacity exhausted/);
-  assert.equal(q.snapshot.closed,true);
-  assert.equal(q.receiveAck,undefined);
+  assert.equal(q.snapshot.closed,true,"true LMB capacity exhaustion retires the lease");
 });
