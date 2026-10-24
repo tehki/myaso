@@ -23,6 +23,7 @@ pub enum OriginError {
     UnadmittedActor(u32),
     StaleActor(u32),
     NoCompletedWorldTick,
+    WrongCommittedTick,
     // The only extra World stepping operation is a test-only fixture.
     #[cfg(test)]
     TickExhausted,
@@ -139,17 +140,23 @@ impl ProposedWorldHitOrigin {
     /// NONRELEASE read-only extraction from a completed authoritative World tick.
     /// The existing GameState owner MUST supply the actual immutable events
     /// returned by its single original World::step_into under the SAME lock.
+    /// The caller MUST preserve the tick of that completed original step:
+    /// delayed old event slices must not be relabeled with a later World tick.
     /// This helper never steps or mutates World, and does not authenticate an
     /// arbitrary caller-supplied event slice by itself. Never expose it as an
     /// alternate path for clients to claim HIT or damage.
     pub fn capture_committed_hits_from_step(
         &self,
         world: &World,
+        completed_tick: u32,
         original_events: &[CombatEvent],
     ) -> Result<Vec<(CombatEvent, CommittedHitIdentity)>, OriginError> {
         self.ensure_world(world)?;
         if world.tick == 0 {
             return Err(OriginError::NoCompletedWorldTick);
+        }
+        if completed_tick != world.tick {
+            return Err(OriginError::WrongCommittedTick);
         }
         let mut committed_hits = Vec::new();
         for (index, event) in original_events.iter().enumerate() {
@@ -182,7 +189,7 @@ impl ProposedWorldHitOrigin {
         }
         let mut events = Vec::new();
         world.step_into(&mut events);
-        let committed_hits = self.capture_committed_hits_from_step(world, &events)?;
+        let committed_hits = self.capture_committed_hits_from_step(world, world.tick, &events)?;
         Ok(OriginalWorldTick {
             tick: world.tick,
             events,
@@ -627,7 +634,7 @@ mod tests {
         let spectator = origin.bind_admitted(&world, 4, 104).unwrap();
 
         assert_eq!(
-            origin.capture_committed_hits_from_step(&world, &[]),
+            origin.capture_committed_hits_from_step(&world, world.tick, &[]),
             Err(OriginError::NoCompletedWorldTick),
             "an unstepped World cannot invent a committed HIT"
         );
@@ -646,7 +653,7 @@ mod tests {
             let hp3 = world.fighter(3).unwrap().hp;
             let tick = world.tick;
             let immutable_hits = origin
-                .capture_committed_hits_from_step(&world, &events)
+                .capture_committed_hits_from_step(&world, tick, &events)
                 .unwrap();
             assert_eq!(world.tick, tick, "HIT extraction cannot step World");
             assert_eq!(world.fighter(2).unwrap().hp, hp2);
@@ -661,7 +668,7 @@ mod tests {
                 );
                 assert_eq!(
                     origin
-                        .capture_committed_hits_from_step(&world, &events)
+                        .capture_committed_hits_from_step(&world, tick, &events)
                         .unwrap(),
                     immutable_hits,
                     "read-only recapture cannot reexecute damage"
@@ -703,5 +710,60 @@ mod tests {
             }
         }
         panic!("original World did not produce expected two-victim 34 HP HIT");
+    }
+
+    #[test]
+    fn stale_original_world_hit_slice_cannot_be_relabelled_as_later_tick() {
+        // Only the existing original World may commit HIT. If an adapter
+        // releases its tick boundary, old events cannot acquire a newer tick.
+        let mut world = arena();
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim = origin.bind_admitted(&world, 2, 102).unwrap();
+        origin.bind_admitted(&world, 3, 103).unwrap();
+        attack(&mut world);
+
+        let mut events = Vec::new();
+        let mut prior = None;
+        for _ in 0..40 {
+            world.step_into(&mut events);
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 34,
+                        hp: 66
+                    }
+                )
+            }) {
+                prior = Some((world.tick, events.clone()));
+                break;
+            }
+        }
+        let (committed_tick, immutable_events) =
+            prior.expect("one genuine original World light HIT at 34 HP");
+        let current = origin
+            .capture_committed_hits_from_step(&world, committed_tick, &immutable_events)
+            .unwrap();
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0].1.server_tick, committed_tick);
+        assert_eq!(current[0].1.attacker, attacker);
+        assert_eq!(current[0].1.victim, victim);
+
+        // The original World advances once more; holding the old event slice
+        // must not create false future identity or any new damage/receipt.
+        let mut inbox = ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap();
+        world.step_into(&mut events);
+        assert_eq!(world.tick, committed_tick + 1);
+        assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+        assert_eq!(
+            origin.capture_committed_hits_from_step(&world, committed_tick, &immutable_events),
+            Err(OriginError::WrongCommittedTick)
+        );
+        assert_eq!(inbox.pending(), 0);
+        assert_eq!(inbox.next_sequence(), 0);
+        assert_eq!(world.fighter(2).unwrap().world_incarnation(), victim.incarnation);
     }
 }
