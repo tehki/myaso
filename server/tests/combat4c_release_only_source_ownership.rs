@@ -1,6 +1,7 @@
-//! Combat 4C fail-first P0 on Main-selected release-only KeyE lineage #862.
-//! Real 60Hz World HP and single-lease 0x11/0x12 ACK; never ACK-as-hit.
-//! NO production World, reducer, input, protocol or protected test changes.
+//! Combat 4C original-World LMB-only source ownership and replay regressions.
+//! E is reserved for future Use: retired source1 always rejects before Combat.
+//! Server tick, 34/46 HP and exactly-once authentic LMB HIT stay authoritative.
+//! Nonrelease review, no public v2, no new Combat authority.
 use myaso_server::prealpha_authenticated_gesture::SessionGestureWorldPath;
 use myaso_server::prealpha_lmb_gesture_proposal::{
     encode_typed_event, AckStatus, GestureAction, GestureEvent, GestureSource, TypedGestureEvent,
@@ -189,67 +190,7 @@ fn held_lmb_after_original_world_recovery_must_not_be_ghost_repressed() {
 }
 
 #[test]
-fn release_only_keye_second_press_during_first_heavy_recovery_has_no_phantom_hit() {
-    let mut w = arena();
-    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    assert_eq!(
-        ack(
-            &mut p,
-            &mut w,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            1,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert!(hits(&mut p, &mut w, 37).is_empty());
-    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-    assert_eq!(
-        ack(
-            &mut p,
-            &mut w,
-            GestureSource::KeyE,
-            GestureAction::Release,
-            2,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert_eq!(hits(&mut p, &mut w, 10), vec![(46, 54)]);
-    assert_ne!(w.fighter(1).unwrap().action, Action::Idle);
-
-    // Distinct legitimate physical source1 tap while original World still
-    // recovers must not retire the single shared bounded Core8A outbox.
-    assert_eq!(
-        ack(
-            &mut p,
-            &mut w,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            3,
-            2
-        ),
-        AckStatus::Accepted
-    );
-    assert_eq!(
-        ack(
-            &mut p,
-            &mut w,
-            GestureSource::KeyE,
-            GestureAction::Release,
-            4,
-            2
-        ),
-        AckStatus::Accepted
-    );
-    assert!(hits(&mut p, &mut w, 55).is_empty());
-    assert_eq!(w.fighter(2).unwrap().hp, 54.0);
-}
-
-#[test]
-fn original_held_lmb_is_not_released_by_newer_release_only_keye_world_owner() {
+fn retired_keye_during_lmb_light_recovery_cannot_strand_the_next_real_attack() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     assert_eq!(
@@ -263,20 +204,48 @@ fn original_held_lmb_is_not_released_by_newer_release_only_keye_world_owner() {
         ),
         AckStatus::Accepted
     );
-    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
-    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 10), vec![(34, 66)]);
+    assert_ne!(w.fighter(1).unwrap().action, Action::Idle);
+
+    // Historical source1 does NOT admit a separate recovery action and cannot
+    // take source0's subsequent physical sequence numbers.
     assert_eq!(
         ack(
             &mut p,
             &mut w,
             GestureSource::KeyE,
             GestureAction::Press,
-            2,
+            3,
             2
         ),
-        AckStatus::Accepted
+        AckStatus::Rejected
     );
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            3,
+            2
+        ),
+        AckStatus::Rejected
+    );
+    assert!(hits(&mut p, &mut w, 55).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
     assert_eq!(
         ack(
             &mut p,
@@ -286,20 +255,27 @@ fn original_held_lmb_is_not_released_by_newer_release_only_keye_world_owner() {
             3,
             3
         ),
-        AckStatus::Rejected,
-        "new KeyE World owner is not proof previous physical LMB was released"
+        AckStatus::Accepted
     );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            4,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 32)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
 
 #[test]
-fn late_old_held_lmb_release_after_new_keye_world_owner_must_not_retire_shared_lease() {
-    // Real physical LMB is STILL held even after its original 34HP action
-    // recovers; KeyE later starts its own, different, RELEASE-TO-STRIKE heavy.
-    // The LMB's matching eventual UP is a valid old physical terminal:
-    // 0x12 ACCEPTED no-combat, not fatal REJECTED and never KeyE release.
+fn original_held_lmb_is_not_released_or_replaced_by_retired_keye_packets() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-
     assert_eq!(
         ack(
             &mut p,
@@ -313,7 +289,7 @@ fn late_old_held_lmb_release_after_new_keye_world_owner_must_not_retire_shared_l
     );
     assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
-
+    // World idle after a landed light does not fabricate a physical source0 UP.
     assert_eq!(
         ack(
             &mut p,
@@ -323,20 +299,55 @@ fn late_old_held_lmb_release_after_new_keye_world_owner_must_not_retire_shared_l
             2,
             2
         ),
-        AckStatus::Accepted
+        AckStatus::Rejected
     );
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            2,
+            3
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Cancel,
+            2,
+            2
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert_eq!(
         ack(
             &mut p,
             &mut w,
             GestureSource::Lmb,
             GestureAction::Release,
-            3,
+            2,
             1
         ),
-        AckStatus::Accepted,
-        "genuine prior LMB UP must be tombstoned without closing same KeyE lease"
+        AckStatus::Accepted
+    );
+
+    // Genuine later source0 gesture still owns its own sequence and one HIT.
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            3
+        ),
+        AckStatus::Accepted
     );
     assert_eq!(
         ack(
@@ -344,27 +355,140 @@ fn late_old_held_lmb_release_after_new_keye_world_owner_must_not_retire_shared_l
             &mut w,
             GestureSource::Lmb,
             GestureAction::Release,
-            3,
+            4,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 32)]);
+}
+
+#[test]
+fn late_old_lmb_release_after_retired_keye_does_not_poison_new_lmb_heavy() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+
+    // The original light landed, but its physical left button stays held
+    // through World recovery. A stale Key E may not claim the next source0 UP.
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(hits(&mut p, &mut w, 55), vec![(34, 66)]);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Press,
+            2,
+            2
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            2,
             1
         ),
         AckStatus::Duplicate
     );
-    // The previous source0 terminal CANNOT auto-commit newer KeyE.
-    assert!(hits(&mut p, &mut w, 37).is_empty());
-    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-
     assert_eq!(
         ack(
             &mut p,
             &mut w,
             GestureSource::KeyE,
             GestureAction::Release,
-            4,
+            3,
             2
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+
+    // A DIFFERENT source0 gesture starts its own legitimate 320ms charge.
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert!(hits(&mut p, &mut w, 4).is_empty());
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            4,
+            3
+        ),
+        AckStatus::Accepted
+    );
+    assert!(hits(&mut p, &mut w, 35).is_empty());
+    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::KeyE,
+            GestureAction::Cancel,
+            5,
+            4
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            5,
+            3
         ),
         AckStatus::Accepted
     );
     assert_eq!(hits(&mut p, &mut w, 55), vec![(46, 20)]);
+    assert_eq!(
+        ack(
+            &mut p,
+            &mut w,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            5,
+            3
+        ),
+        AckStatus::Duplicate
+    );
     assert_eq!(w.fighter(2).unwrap().hp, 20.0);
 }

@@ -309,6 +309,22 @@ async fn one_native_key_e_source_is_rejected_and_cannot_hit_original_world() {
 async fn retired_key_e_source_does_not_consume_server_actor_sequence() {
     let (server, url, digest) = real_server();
     let seat = admitted_seat(&url, &digest).await;
+    // Synchronize the read-only 60Hz original World observer BEFORE sending
+    // authenticated inputs. Otherwise an authentic source0 PRESS can arrive
+    // before the flight journal's first Idle snapshot, making a real
+    // Idle->LightWindup transition invisible without any admission defect.
+    timeout(Duration::from_secs(2), async {
+        loop {
+            if server.lines.lock().unwrap().iter().any(|line| {
+                line.contains("M201_FLIGHT_ACTOR_BASELINE") && line.contains(" fighter=1 action=0")
+            }) {
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("original World Idle baseline recorded before hostile E and valid LMB");
     // Same authenticated lease: rejected old E seq1 MUST NOT block genuine LMB seq1.
     combat4c_ack(&seat.connection, 1, 1, 1, 1, 4).await;
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
