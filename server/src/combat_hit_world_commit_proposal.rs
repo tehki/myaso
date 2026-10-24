@@ -734,6 +734,77 @@ mod tests {
     }
 
     #[test]
+    fn actual_original_world_guard_block_never_creates_m147_hit_credit() {
+        // A genuine World Block is a resolved authoritative defense, NOT a HIT.
+        // The delayed M188 heavy-parry case may correctly commit a 64-guard
+        // BLOCK, but neither a client ACK nor an HP snapshot can mint a receipt.
+        let mut world = arena();
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim = origin.bind_admitted(&world, 2, 102).unwrap();
+        let spectator = origin.bind_admitted(&world, 3, 103).unwrap();
+        let mut recipients = vec![
+            ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(victim, [2; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(spectator, [3; 16], 64).unwrap(),
+        ];
+        // A real defender, facing the original attacker, holds the existing
+        // server-side block input while the original light windup resolves.
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        attack(&mut world);
+
+        let mut events = Vec::new();
+        for _ in 0..40 {
+            let before = world.tick;
+            world.step_into(&mut events); // exactly ONE production World step
+            assert_eq!(world.tick, before + 1);
+            let tick = world.tick;
+            let hp = world.fighter(2).unwrap().hp;
+            let actual_hits = origin
+                .capture_committed_hits_from_step(&world, tick, &events)
+                .expect("current under-lock original World event slice");
+            // Even the original non-HIT World event must advance each scope's
+            // tick fence; there is no phantom app ACK or publishable damage.
+            let delivered =
+                project_world_tick_for_recipients(tick, &actual_hits, &mut recipients)
+                    .expect("current World block/no-HIT tick is valid");
+            assert!(delivered.iter().all(|(_, receipts)| receipts.is_empty()));
+            assert!(recipients.iter().all(|r| r.pending() == 0));
+            assert_eq!(world.fighter(2).unwrap().hp, hp);
+            if events.iter().any(|event| {
+                matches!(
+                    event,
+                    CombatEvent::Block {
+                        attacker: 1,
+                        target: 2
+                    }
+                )
+            }) {
+                assert!(actual_hits.is_empty(), "guard BLOCK is not a HIT");
+                assert_eq!(hp, 100.0, "actual World block preserves victim HP");
+                assert!(world.fighter(2).unwrap().guard < 100.0);
+                assert!(recipients
+                    .iter()
+                    .all(|r| r.pending() == 0 && r.next_sequence() == 0));
+                assert_eq!(
+                    project_world_tick_for_recipients(tick, &actual_hits, &mut recipients),
+                    Err(DeliveryError::ReplayedOrReorderedWorldHit),
+                    "even an empty completed original World tick is not reusable"
+                );
+                return;
+            }
+        }
+        panic!("original World must actually commit a guard BLOCK, not a fake HIT");
+    }
+
+    #[test]
     fn stale_original_world_hit_slice_cannot_be_relabelled_as_later_tick() {
         // Only the existing original World may commit HIT. If an adapter
         // releases its tick boundary, old events cannot acquire a newer tick.
