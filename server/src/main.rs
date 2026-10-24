@@ -1125,10 +1125,7 @@ mod tests {
             },
             ..event
         };
-        let upgrade_ack = GestureAck {
-            sequence: 2,
-            ..ack
-        };
+        let upgrade_ack = GestureAck { sequence: 2, ..ack };
         assert_eq!(
             m201_gesture_action_proof_line(1359, 1, upgraded, upgrade_ack, 1, 9),
             "M201_AUTH_GESTURE_ACTION tick=1359 fighter=1 source=0 gesture=7 sequence=2 eventAction=2 status=1 from=1 to=9"
