@@ -528,6 +528,7 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uidirectionallight"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
         || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
@@ -537,6 +538,9 @@ async function startGameServer() {
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
+      // Dedicated M121 original-v1 ingress evidence is never enabled for
+      // v2 or other production paths; the Rust server rejects nonloopback.
+      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
     },
@@ -1678,6 +1682,14 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     defenderWorldView: defenderResult.acceptance?.focusActionTransitions?.slice(-12) ?? [],
     defenderThreat: defenderResult.threatTransitions.slice(-12),
     defenderRecovery: defenderResult.recoveryTransitions.slice(-12),
+    serverInputAcceptance: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => line.startsWith("M121_V1_SERVER_INPUT ")
+        && line.includes(` actor=${attackerResult.playerNetId} `))
+      .slice(-96),
+    serverWorldActionEvents: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => line.startsWith("M201_AUTH_ACTION ")
+        && line.includes(` fighter=${attackerResult.playerNetId} `))
+      .slice(-32),
     hp: { attacker: attackerResult.playerHp, victim: defenderResult.playerHp },
   }));
 
