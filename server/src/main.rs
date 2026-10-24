@@ -887,22 +887,10 @@ async fn handle_connection(
                 // Carry only the authenticated selected one-shot light sample
                 // direction separately; otherwise same-datagram RELEASE then
                 // neutral would produce a generic attack despite real W+LMB.
-                let release_motion = if coalesced.as_ref().is_some_and(|(_, intent)| {
-                    intent.attack && !intent.heavy_attack
-                }) {
-                    accepted.iter().rev().find(|sample| {
-                        sample.attack || sample.heavy_attack || sample.dodge
-                            || sample.kick || sample.jump || sample.dash
-                    }).and_then(|sample| {
-                        if sample.attack && !sample.heavy_attack {
-                            Some((sample.move_x, sample.move_y, sample.facing_radians))
-                        } else {
-                            None
-                        }
-                    })
-                } else {
-                    None
-                };
+                let release_motion = selected_light_release_motion(
+                    accepted.as_slice(),
+                    coalesced.as_ref(),
+                );
                 let (server_tick, m121_world) = {
                     let mut state = game.state.lock().await;
                     let tick = apply_coalesced_input_and_read_tick(
@@ -1131,6 +1119,32 @@ fn record_pending_input_ack(
         pending.pop_front();
     }
     pending.push_back((client_tick, server_tick));
+}
+
+// Use the SAME most-recent one-shot sample as coalesce_accepted_input_batch,
+// but only for directional attack selection. Do not override the newer
+// continuous movement, or fabricate another World input.
+fn selected_light_release_motion(
+    accepted: &[InputSample],
+    coalesced: Option<&(u32, InputIntent)>,
+) -> Option<(f32, f32, f32)> {
+    if !coalesced.is_some_and(|(_, intent)| intent.attack && !intent.heavy_attack) {
+        return None;
+    }
+    accepted
+        .iter()
+        .rev()
+        .find(|sample| {
+            sample.attack || sample.heavy_attack || sample.dodge
+                || sample.kick || sample.jump || sample.dash
+        })
+        .and_then(|sample| {
+            if sample.attack && !sample.heavy_attack {
+                Some((sample.move_x, sample.move_y, sample.facing_radians))
+            } else {
+                None
+            }
+        })
 }
 
 fn apply_coalesced_input_and_read_tick(
