@@ -111,7 +111,7 @@ test("Combat4B M188 physical held-LMB parry preserves one bounded wheel and stri
     source.indexOf("async function runOnlineUiHeavyParryFlight("));
   const parry = source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
     source.indexOf("async function runOnlineUi", source.indexOf("async function runOnlineUiHeavyParryFlight(") + 20));
-  assert.match(block, /attackOffset, blockOffset, 365,/);
+  assert.match(block, /attackOffset, blockOffset, 395,/);
   assert.match(block, /defenderResult\.playerHp === 100/);
   assert.match(block, /defenderGuardInWindow/);
   assert.match(parry, /attackOffset, blockOffset, 405,/);
@@ -132,12 +132,12 @@ test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict 
   // without altering either server timer or World damage assertions.
   const worldTickMs = 1000 / 60;
   const oldLeadMs = (724 - 704) * worldTickMs;
-  const predictedBlockTick = 704 + Math.round((365 - 255) / worldTickMs);
+  const predictedBlockTick = 704 + Math.round((395 - 255) / worldTickMs);
   const newLeadMs = (724 - predictedBlockTick) * worldTickMs;
   assert.ok(oldLeadMs > COMBAT.block.shortBlockMs);
   assert.ok(newLeadMs > COMBAT.block.parryWindowMs);
   assert.ok(newLeadMs < COMBAT.block.shortBlockMs);
-  assert.ok(block.includes("attackOffset, blockOffset, 365,"));
+  assert.ok(block.includes("attackOffset, blockOffset, 395,"));
   assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
   // Short-reach active lunge: authoritative block tick 605, hit tick 615
   // proves 285ms is ~167ms before contact; aim genuine parry wheel later.
