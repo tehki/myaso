@@ -9,7 +9,7 @@
 //! In contrast to the donor 256-entry *global* HitReceiptJournal, this
 //! projector gives each exact actor/session incarnation its own contiguous
 //! sequence, so unrelated FFA hits cannot cause phantom missing ACKs.
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::combat_hit_receipt::{HitReceipt, HitReceiptError};
 use crate::simulation::CombatEvent;
@@ -361,11 +361,13 @@ pub fn project_world_tick_for_recipients(
     };
     let boot = first.recipient.boot_nonce;
     let world = first.recipient.world_instance;
+    // One temporary lookup for this original World tick, not a new actor
+    // registry. Validate all IDs once, in O(participants) expected time,
+    // instead of pairwise scanning every preceding scope each 60Hz tick.
+    let mut by_player_id = HashMap::with_capacity(recipients.len());
     for (index, scope) in recipients.iter().enumerate() {
         if !valid_binding(scope.recipient)
-            || recipients[..index]
-                .iter()
-                .any(|prior| prior.recipient.player_id == scope.recipient.player_id)
+            || by_player_id.insert(scope.recipient.player_id, index).is_some()
         {
             return Err(DeliveryError::InvalidScope);
         }
@@ -389,9 +391,8 @@ pub fn project_world_tick_for_recipients(
             return Err(DeliveryError::InvalidWorldIdentity);
         }
         for bound in [identity.attacker, identity.victim] {
-            let index = recipients
-                .iter()
-                .position(|scope| scope.recipient.player_id == bound.player_id)
+            let index = *by_player_id
+                .get(&bound.player_id)
                 .ok_or(DeliveryError::InvalidScope)?;
             if recipients[index].recipient != bound {
                 return Err(DeliveryError::InvalidWorldIdentity);
@@ -1036,6 +1037,22 @@ mod tests {
         );
         assert!(scopes.iter().all(|s| s.pending() == 0));
         assert!(scopes.iter().all(|s| s.gap().is_none()));
+    }
+
+    #[test]
+    fn last_of_512_duplicate_player_ids_fail_before_any_publication() {
+        // Exercise the last possible duplicate rather than only two scopes:
+        // the temporary per-tick index must reject it before any mutable
+        // receipt is credited, including when the event concerns actor 1.
+        let mut scopes = (1..=512).map(scope).collect::<Vec<_>>();
+        scopes[511] = scope(1);
+        let hit = [(event(1, 2), commit(910, 0, 1, 2))];
+        assert_eq!(
+            project_world_tick_for_recipients(910, &hit, &mut scopes),
+            Err(DeliveryError::InvalidScope)
+        );
+        assert!(scopes.iter().all(|s| s.pending() == 0));
+        assert!(scopes.iter().all(|s| s.next_sequence() == 0));
     }
 
     #[test]
