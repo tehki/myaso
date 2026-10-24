@@ -2094,6 +2094,88 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn genuine_directional_short_release_keeps_lateral_through_same_tick_neutral() {
+        // M121 original native Chrome/Firefox: the authenticated 30Hz sender
+        // released LMB as attack-only + held KeyW, then delivered a neutral
+        // frame in the SAME 60Hz World tick. The strike still dealt 34 HP,
+        // but World selected generic 1/2/3 instead of LEFT 24/25/26.
+        // This characterizes the missing *directional origin*, without
+        // changing the original 135ms light, guard, damage, or protocol.
+        for (move_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            let mut direct = World::new(800.0, 600.0);
+            assert!(direct.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(direct.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            direct.step();
+            assert_eq!(direct.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+            assert!(direct.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            direct.step();
+            assert_eq!(
+                direct.fighter(1).unwrap().action,
+                expected,
+                "control: directional release before a neutral frame"
+            );
+
+            let mut coalesced = World::new(800.0, 600.0);
+            assert!(coalesced.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(coalesced.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            coalesced.step();
+            assert_eq!(
+                coalesced.fighter(1).unwrap().action,
+                Action::HeavyAttackWindup
+            );
+            assert!(coalesced.set_input(
+                1,
+                InputIntent {
+                    attack: true,
+                    move_y,
+                    ..InputIntent::default()
+                }
+            ));
+            // The later neutral sample is genuine, but it must not overwrite
+            // the direction of the already-admitted attack-only release.
+            assert!(coalesced.set_input(1, InputIntent::default()));
+            coalesced.step();
+            assert_eq!(
+                coalesced.fighter(1).unwrap().action,
+                expected,
+                "the admitted directional release must retain its origin"
+            );
+            coalesced.step();
+            assert_eq!(
+                coalesced.fighter(1).unwrap().action,
+                expected,
+                "the neutral frame cannot trigger a second hit or variant"
+            );
+        }
+    }
+
+    #[test]
     fn server_ready_release_then_neutral_activates_once_but_cancel_stays_idle() {
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 250.0, 300.0, 0.0);
