@@ -65,7 +65,11 @@ export function createCombatReadabilityTracker() {
       if (own && beforeOwn) collectEntityEvents(candidates, beforeOwn, own, true);
       for (const entity of peers) {
         const before = previous.get(entity.netId);
-        if (before) collectEntityEvents(candidates, before, entity, false);
+        // A snapshot HP decrement identifies a damaged fighter, NOT the
+        // attacker. In FFA, never grant hit-confirm to uninvolved observers.
+        // Real per-actor attacker credit requires an authenticated World HIT
+        // receipt; the offline M147 presenter must not be wired here yet.
+        if (before) collectEntityEvents(candidates, before, entity, false, peers.length === 1);
       }
       if (own && beforeOwn && peer && beforePeer) {
         collectControlImpactEvents(candidates, beforeOwn, own, beforePeer, peer);
@@ -701,7 +705,7 @@ export function combatLifePresentation(entity) {
   return { visible: true, title: presentation.title, detail: presentation.detail };
 }
 
-function collectEntityEvents(events, before, current, own) {
+function collectEntityEvents(events, before, current, own, singleOpponent = false) {
   if (before.action !== COMBAT_ACTION.dead && current.action === COMBAT_ACTION.dead) {
     push(events, "death", own ? "Defeated - read the exchange." : "Opponent down.", 1050);
     return;
@@ -717,7 +721,7 @@ function collectEntityEvents(events, before, current, own) {
     const spent = before.guard - current.guard;
     push(events, "block", own ? `Block held - guard -${spent}.` : `Opponent blocked - guard -${spent}.`, 700, own ? "guard-pressure" : "block-confirm");
   }
-  if (current.hp < before.hp) {
+  if (current.hp < before.hp && (own || singleOpponent)) {
     const damage = before.hp - current.hp;
     push(
       events,
