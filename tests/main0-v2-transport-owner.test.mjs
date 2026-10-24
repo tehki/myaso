@@ -176,6 +176,26 @@ test("unnegotiated typed ACK closes original client transport, never admits a ph
   assert.match(errors[0],/current reviewed grant/);
 }));
 
+test("reliable send rejects lease retirement while waiting for writer readiness", () => withFixture(async () => {
+  const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
+  let unblock;
+  const wrote = [];
+  // Existing original bidi writer, intentionally stalled. No second client,
+  // stream or sender is introduced; this models a genuine writer.ready wait.
+  c.reliableWriter = {
+    ready: new Promise(resolve => { unblock = resolve; }),
+    write: async bytes => { wrote.push(Array.from(bytes)); },
+    releaseLock() {},
+  };
+  const pending = c.sendReliable(Uint8Array.from([5, 6]));
+  c.close("actor lease retired while reliable writer stalled");
+  unblock();
+  await assert.rejects(pending, /closed/,
+    "unwritten reliable data must not resolve as a successful transport write");
+  assert.deepEqual(wrote, [], "retired-lease bytes never reach the original writer");
+  assert.equal(c.transport.closedByClient, true);
+}));
+
 test("backpressured 65th physical gesture edge fails closed without loss or unbounded writes", () => withFixture(async () => {
   const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
   await c.negotiateExperimentalGestureV2();

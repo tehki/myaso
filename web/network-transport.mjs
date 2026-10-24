@@ -213,7 +213,9 @@ class WebTransportGameConnection {
     if (this.closed) throw new Error("WebTransport connection is closed");
     const payload = frameReliable(toUint8Array(bytes));
     await this.reliableWriter.ready;
-    if (this.closed) return;
+    // A closed session cannot treat an unsent reliable frame as delivered.
+    // The M147 recipient ledger may advance written-state ONLY after write().
+    if (this.closed) throw new Error("WebTransport connection is closed");
     await this.reliableWriter.write(payload);
   }
 
