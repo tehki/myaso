@@ -165,6 +165,21 @@ try{
   assert.equal(keySolo.trustedKey.length,2);
   assert.ok(keySolo.trustedKey.every(e=>e.trusted));
   assert.equal(keySolo.snapshot.active,false,"E cannot start any LMB Combat gesture");
+  // Owner P0: a truly held physical E must remain completely silent even
+  // after the original 320ms heavy READY deadline. No fake/computed HIT,
+  // locally upgraded LMB, typed source1 or stolen sequence number.
+  await nav();
+  await evaluate("document.querySelector('#arena').focus()");
+  await keys([{type:"keyDown",value:"e"}]);
+  await sleep(430);
+  const heldE=await evaluate("return ui10.report()");
+  assert.deepEqual(heldE.edges,[],"holding E past 320ms cannot initiate Combat");
+  assert.equal(heldE.snapshot.active,false,"held E cannot arm LMB");
+  assert.ok(heldE.trustedKey.some(e=>e.type==="down"&&e.trusted));
+  await keys([{type:"keyUp",value:"e"}]);
+  const heldEReleased=await evaluate("return ui10.report()");
+  assert.deepEqual(heldEReleased.edges,[],"E UP after 320ms cannot strike");
+  assert.ok(heldEReleased.trustedKey.some(e=>e.type==="up"&&e.trusted));
   await nav();
   await run([move(),down]);
   // The original game focuses its canvas on pointerdown; this isolated QA
@@ -185,6 +200,26 @@ try{
   assert.equal(completed.edges[0].gestureId,completed.edges[1].gestureId);
   assert.deepEqual(completed.edges.map(e=>e.sequence),[1,2],
     "obsolete E must not steal LMB sequence ownership");
+  // Owner P0: even while LMB is charging and the server-approved UPGRADE
+  // edge is present, E cannot create a second heavy or terminate this LMB.
+  await nav();
+  await run([move(),down]);
+  assert.equal(await evaluate("return ui10.upgrade()"),true);
+  await evaluate("document.querySelector('#arena').focus()");
+  await pressE();
+  const chargedAndE=await evaluate("return ui10.report()");
+  assert.deepEqual(chargedAndE.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.UPGRADE]
+  ],"E cannot create or hijack a charging LMB heavy");
+  assert.equal(chargedAndE.snapshot.active,true);
+  assert.equal(chargedAndE.snapshot.upgraded,true);
+  await run([up]);
+  const chargedAndReleased=await evaluate("return ui10.report()");
+  assert.deepEqual(chargedAndReleased.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.UPGRADE],[0,GESTURE_ACTION.RELEASE]
+  ],"only physical LMB UP terminates heavy, never E");
+  assert.deepEqual(chargedAndReleased.edges.map(e=>e.sequence),[1,2,3]);
+  assert.equal(new Set(chargedAndReleased.edges.map(e=>e.gestureId)).size,1);
   await nav();
   await evaluate("document.querySelector('#arena').focus();ui10.chat(true)");
   await pressE();
@@ -193,7 +228,8 @@ try{
    browser:family,realPointerTrusted:true,shortTap:true,
    longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
-   realKeyETrusted:true,keyEReservedForUse:true,keyECannotStealLmb:true,chatKeyENoCombat:true,
+   realKeyETrusted:true,keyEReservedForUse:true,keyEHeldBeyond320NoCombat:true,
+   keyECannotStealLmb:true,keyECannotStealUpgradedLmb:true,chatKeyENoCombat:true,
    authenticatedServer:false,combatHits:false,enabledLive:false
   }));
  }
