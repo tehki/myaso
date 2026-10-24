@@ -47,6 +47,12 @@ test("genuine hold upgrade is an intent before server-controlled READY, terminal
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:8,button:0,buttons:1}));
   await pause(125);
   assert.ok(f.wire.some(e=>e.source===0&&e.action===2),"held pointer queues upgrade request");
+  const evidence=f.win.__MYASO_LOCAL_GESTURE_PROOF__().upgradeIntents;
+  assert.equal(evidence.length,1,"one physical source0 hold schedules exactly one intent");
+  assert.equal(evidence[0].heldAtFire,true,"same physical gesture remained held");
+  assert.equal(evidence[0].edgeQueued,true,"intent actually entered existing typed outbox");
+  assert.ok(evidence[0].firedAtMs>=evidence[0].scheduledAtMs,
+    "timing witness is diagnostic-only and monotonic");
   assert.ok(!f.wire.some(e=>e.action===3),"no phantom RELEASE at 85ms/125ms");
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:8,button:0,buttons:0}));
   await pause(10);

@@ -25,6 +25,9 @@ export async function activateLoopbackGestureLab({
   let failed = false, detached = false, retryTimer = null;
   const removeListeners = [];
   let gates = null, detachGates = null;
+  // Read-only bounded loopback diagnostics. Never sent on wire or used for
+  // World time, combat admission, HP, or authoritative deadlines.
+  const upgradeIntentTiming = [];
 
   function close(reason = "experimental gesture lease retired") {
     if (detached) return;
@@ -100,11 +103,22 @@ export async function activateLoopbackGestureLab({
       // light and 320ms charge; this timer is merely a hold-intent edge.
       if (lastUpgradeScheduledGestureId === gestureId) return;
       lastUpgradeScheduledGestureId = gestureId;
+      // Physical event time is only a diagnostic; the World clock, never
+      // performance.now(), decides whether the upgrade beats 135ms contact.
+      const timing = {
+        gestureId, scheduledAtMs:performance.now(),
+        firedAtMs:null, heldAtFire:false, edgeQueued:false,
+      };
+      upgradeIntentTiming.push(timing);
+      if (upgradeIntentTiming.length > 16) upgradeIntentTiming.shift();
       setTimeout(() => {
-        if (detached || failed || !gates.lmb.snapshot.active
-            || gates.lmb.snapshot.pointerId !== pointerId
-            || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drainNewEdges();
+        timing.firedAtMs = performance.now();
+        timing.heldAtFire = !detached && !failed && gates.lmb.snapshot.active
+          && gates.lmb.snapshot.pointerId === pointerId
+          && gates.lmb.snapshot.gestureId === gestureId;
+        if (!timing.heldAtFire) return;
+        timing.edgeQueued = Boolean(gates.lmb.approvedHoldUpgrade(pointerId));
+        if (timing.edgeQueued) drainNewEdges();
       },85);
     }
     add(canvas,"pointerdown",event => {
@@ -139,6 +153,7 @@ export async function activateLoopbackGestureLab({
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
       acknowledged:receipts.map(x=>({...x})),
+      upgradeIntents:upgradeIntentTiming.map(x=>({...x})),
     });
     Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
       configurable:true,value:proof,
@@ -149,6 +164,7 @@ export async function activateLoopbackGestureLab({
           sequence:receipt.sequence,gestureId:receipt.gestureId,
           source:receipt.source,action:receipt.action,status:receipt.status,
           serverTick:receipt.serverTick,transportSettled:receipt.transportSettled,
+          receivedAtMs:performance.now(),
         }));
         if (receipts.length > 16) receipts.shift();
       },
