@@ -87,7 +87,7 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const section = runner.slice(runner.indexOf("async function runOnlineUiGuardBreakFlight("),
     runner.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
+  assert.match(section, /trustedWheelWaitMs: wheelFirstGuardOnly \? 190 : 0/);
   assert.match(section, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(section, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(section, /M193 guard-break exchange/);
@@ -172,10 +172,13 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
   assert.equal(downs, 0);
 });
 
-test("M194 original W3C guard-only scenario alone opts into real wheel-first order", () => {
+test("M194 and actual M151/M152 guard-only scenarios retain strict real wheel-first order", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
-  assert.match(runner, /preWheelHeadStartMs: scenario === "uiguardbreak" \? 15 : 0/);
-  assert.match(runner, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
+  const guardOnly = runner.match(/const wheelFirstGuardOnly = (\[[\s\S]*?\])\.includes\(scenario\);/);
+  assert.ok(guardOnly, "only explicit native guard-only scenarios may opt in");
+  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreak", "uiguardbreakpunishffa", "uiguardbreakpunishffahit"]);
+  assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: wheelFirstGuardOnly \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.attack.guardDamage, 38);

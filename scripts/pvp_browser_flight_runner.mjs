@@ -9785,6 +9785,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
   let blockHeld = false;
   try {
     blockHeld = true;
+    // M151/M152 require the same block-only exchange as M194. The old
+    // attack-first path admitted the wheel only3ticks before impact (a valid
+    // parry), so share the proven real wheel-first choreography. Actual
+    // trusted wheel, native driver ACK and all38guard/noHP/noPARRY gates stay.
+    const wheelFirstGuardOnly = ["uiguardbreak", "uiguardbreakpunishffa",
+      "uiguardbreakpunishffahit"].includes(scenario);
     const m198Plan = planM198GuardBreakW3cExchange({
       parryWindowMs: COMBAT.block.parryWindowMs,
       shortBlockMs: COMBAT.block.shortBlockMs,
@@ -9840,8 +9846,8 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           // arrived after the fixed 100ms Chrome release on attempt 5/5.
           // Require trusted native wheel BEFORE release for M194 only, with
           // the same unchanged server parry/guard/damage and strict W3C gates.
-          trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
-          preWheelHeadStartMs: scenario === "uiguardbreak" ? 15 : 0,
+          trustedWheelWaitMs: wheelFirstGuardOnly ? 190 : 0,
+          preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),

@@ -24,8 +24,23 @@ jobs:
   four-real-browser-original-world:
     runs-on: ubuntu-latest
     timeout-minutes: 14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - acceptance: original
+            mode: original
+            browsers: chrome,firefox,chrome,chrome
+          - acceptance: held-lmb-chrome
+            mode: held-lmb
+            browsers: chrome,firefox,chrome,chrome
+          - acceptance: held-lmb-firefox
+            mode: held-lmb
+            browsers: firefox,chrome,chrome,chrome
     env:
-      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: chrome,firefox,chrome,chrome
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
+      MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
     steps:
       - uses: actions/checkout@v4
@@ -41,13 +56,13 @@ jobs:
           firefox --version
           chromedriver --version
           geckodriver --version
-      - name: Four real W3C original game Silver fighters and physical gesture World + 34/46HP
+      - name: Four real W3C original game Silver fighters and physical gesture World (${{ matrix.acceptance }})
         run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
       - name: Preserve original native evidence and SHA256 screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: main0-localhost-original-game-gesture-w3c
+          name: main0-localhost-original-game-gesture-w3c-${{ matrix.acceptance }}
           path: .artifacts/main0-knights-combat-gesture/
           if-no-files-found: ignore
           retention-days: 5

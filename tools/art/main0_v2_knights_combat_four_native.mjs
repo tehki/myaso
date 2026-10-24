@@ -11,6 +11,8 @@ import {setTimeout as delay} from "node:timers/promises";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
+const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
+assert.ok(["original","held-lmb"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -147,6 +149,113 @@ try{
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
  // True WebDriver key/pointer actions run against a fresh admitted original
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
+ if(physicalMode==="held-lmb"){
+  // A separate fresh World preserves the original KeyE+short-LMB acceptance
+  // below. The real game page owns every canonical source0 edge and ACK.
+  const attacker=actors[0].s,attackerId=actors[0].actor.id,targetId=actors[1].actor.id;
+  const worldStart=readAuthoritativeWorld().length;
+  const worldLines=()=>readAuthoritativeWorld().slice(worldStart).split("\n");
+  const actions=()=>worldLines().flatMap(line=>{
+   const m=line.match(/^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)\s*$/);
+   return m&&Number(m[2])===attackerId?[{line,tick:Number(m[1]),from:Number(m[3]),to:Number(m[4])}]:[];
+  });
+  const hits=()=>worldLines().filter(line=>new RegExp("^M201_AUTH_HIT tick=\\d+ attacker="+attackerId+" target=\\d+ damage=").test(line));
+  const pointer=await evaluate(attacker,String.raw`
+   const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();
+   const b=c.getBoundingClientRect(),events=[];
+   for(const type of ['pointerdown','pointerup','pointercancel']){
+    window.addEventListener(type,e=>{if(e.button===0){events.push({type,trusted:e.isTrusted,
+     pointerId:e.pointerId,pointerType:e.pointerType,at:performance.now(),epochMs:Date.now()});
+     if(events.length>12)events.shift();}},true);
+   }
+   window.__MYASO_COMBAT4_HELD_LMB_TRACE__=()=>events.map(e=>({...e}));
+   return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focused:document.activeElement===c};`);
+  assert(pointer.focused,"actual original canvas owns held LMB");
+  const physical=()=>evaluate(attacker,"return {events:window.__MYASO_COMBAT4_HELD_LMB_TRACE__(),gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};");
+  let physicalUpCompleted=false;
+  try{
+   await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+    actions:[{type:"pointer",id:"real-held-lmb",parameters:{pointerType:"mouse"},actions:[
+     {type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0},
+     {type:"pointerDown",button:0},
+    ]}]
+   });
+   const upgrade=await waitFor(()=>{
+    const a=actions(),light=a.find(e=>e.from===0&&e.to===1),heavy=a.find(e=>e.from===1&&e.to===9);
+    return light&&heavy?{light,heavy}:false;
+   },5000);
+   assert.ok(upgrade.heavy.tick>=upgrade.light.tick,"World upgrade follows original light windup");
+   assert.ok((upgrade.heavy.tick-upgrade.light.tick)*1000/60<135,
+    "genuine held LMB must upgrade in original World BEFORE 135ms light active deadline");
+   await sleeps(460); // authentic browser remains physically held beyond READY320ms
+   const held=await physical();
+   assert.equal(held.events.length,1,"physical UP/cancel must not occur while held");
+   assert.equal(held.events[0].type,"pointerdown");
+   assert.equal(held.events[0].trusted,true);
+   assert.equal(held.events[0].pointerType,"mouse");
+   assert.ok(!actions().some(e=>e.to===2||e.to===10),"neither light nor heavy may become Active while physically held");
+   assert.equal(hits().length,0,"held LMB must never auto-hit any World fighter");
+   await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+    actions:[{type:"pointer",id:"real-held-lmb",parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
+   });
+   physicalUpCompleted=true;
+   const heavyActive=await waitFor(()=>actions().find(e=>e.from===9&&e.to===10),5000);
+   await waitFor(()=>hits().length>0,5000);
+   await waitFor(()=>actions().find(e=>e.from===11&&e.to===0),5000);
+   await sleeps(250); // observe entire completed World commitment, including duplicate-hit negatives
+   const released=await physical();
+   assert.equal(released.events.length,2,"exactly one physical down/up pair, no cancellation or second click");
+   const [down,up]=released.events;
+   assert.equal(up.type,"pointerup");assert.equal(up.trusted,true);
+   assert.equal(up.pointerId,down.pointerId,"matching physical pointer owns release");
+   assert.ok(up.at-down.at>320,"actual physical LMB hold exceeds server heavy READY duration");
+   assert.equal(actions().filter(e=>e.to===1).length,1,"exactly one World light windup");
+   assert.equal(actions().filter(e=>e.from===1&&e.to===9).length,1,"exactly one actual World light-to-heavy upgrade");
+   assert.equal(actions().filter(e=>e.to===2).length,0,"upgraded hold cannot produce a double light active");
+   assert.equal(actions().filter(e=>e.to===10).length,1,"physical release commits heavy exactly once");
+   assert.equal(hits().length,1,"exactly one World HIT from physical held LMB");
+   assert.match(hits()[0],new RegExp("^M201_AUTH_HIT tick=\\d+ attacker="+attackerId+" target="+targetId+" damage=46 hp=54\\s*$"),
+    "exactly46HP belongs to intended independent fighter; no34HP or fallback damage");
+   const ack=await waitFor(async()=>{
+    const p=await physical(),receipts=p.gesture?.acknowledged??[];
+    return [1,2,3].every(action=>receipts.some(r=>r.source===0&&r.action===action&&r.status===1))?p:false;
+   },5000);
+   const accepted=ack.gesture.acknowledged.filter(r=>r.source===0&&r.status===1);
+   assert.equal(new Set(accepted.map(r=>r.gestureId)).size,1,"PRESS/UPGRADE/RELEASE ACKs own the same actual source0 gesture");
+   for(const action of [1,2,3])assert.equal(accepted.filter(r=>r.action===action).length,1,"one accepted ACK per physical gesture edge");
+   const releaseReceipt=accepted.find(r=>r.action===3);
+   assert.ok(heavyActive.tick>=releaseReceipt.serverTick,
+    "World HeavyActive cannot precede server admission of matching genuine physical UP");
+   // Read each independent client's existing authoritative own HUD. These
+   // values come from real replicas; no hidden gameplay object is written.
+   const replicas=await waitFor(async()=>{
+    const states=await Promise.all(actors.map(async({s,actor})=>({actorId:actor.id,browser:s.engine,
+     ...await evaluate(s,String.raw`return {
+      hp:Number(document.querySelector('#player-hp-value')?.textContent),
+      guard:Number(document.querySelector('#player-guard-value')?.textContent),
+      stamina:Number(document.querySelector('#player-stamina-value')?.textContent),
+      status:document.querySelector('#event-text')?.textContent||'',
+      roster:[...document.querySelectorAll('#scoreboard-list li')].map(li=>li.textContent||'')};`)})));
+    return states.every(s=>s.hp===(s.actorId===targetId?54:100)&&s.guard===100&&s.stamina===100&&s.roster.length===4)?states:false;
+   },5000);
+   assert.equal(replicas.length,4,"all four original independent replicas confirm exact victim HP and preserved guard/stamina");
+   const evidence={mode:physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",
+    attackerBrowser:attacker.engine,attackerId,targetId,physical:released.events,canonicalSource0Receipts:accepted,
+    originalWorldUpgrade:upgrade,originalWorldHeavyActive:heavyActive,originalWorldActions:actions(),originalWorldHits:hits(),
+    replicas,originalGamePage:true,actualRustWorld:true,publicListener:false,independentPhysicalHumanHosts:false};
+   await writeFile(join(output,"combat4-physical-held-lmb-upgrade-world.json"),JSON.stringify(evidence,null,2)+"\n");
+   console.log("COMBAT4_PHYSICAL_HELD_LMB_UPGRADE_WORLD_PASS",JSON.stringify(evidence));
+  }catch(error){
+   const evidence={error:String(error),browser:await physical().catch(e=>({driverError:String(e)})),originalWorld:worldLines()};
+   await writeFile(join(output,"combat4-physical-held-lmb-upgrade-failure.json"),JSON.stringify(evidence,null,2)+"\n");
+   console.error("COMBAT4_PHYSICAL_HELD_LMB_UPGRADE_FAILURE",JSON.stringify(evidence));
+   throw error;
+  }finally{
+   if(!physicalUpCompleted)await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+    actions:[{type:"pointer",id:"real-held-lmb",parameters:{pointerType:"mouse"},actions:[{type:"pointerUp",button:0}]}]
+   }).catch(()=>{});
+  }
+ }else{
  const attacker=actors[0].s;
  const worldAction=(from,to)=>{
    const re=new RegExp("M201_AUTH_ACTION tick=\\d+ fighter=1 from="+from+" to="+to);
@@ -298,7 +407,8 @@ try{
   originalWorldCombatHitEvidence:honestWorldHits,
   actualIndependentHumanOperators:false,publicListener:false,
  }));
- const report={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
+ }
+ const report={physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:4,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
