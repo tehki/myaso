@@ -226,3 +226,125 @@ fn held_heavy_ready_reconnect_same_numeric_actor_fences_old_terminal_but_fresh_r
     );
     assert_eq!(world.fighter(2).unwrap().hp, 54.0);
 }
+
+#[test]
+fn disconnect_during_light_or_heavy_windup_fences_old_edges_without_ghost_hit() {
+    // Separate lifecycle phases: the old actor is retired while it is still
+    // winding up. A new incarnation reuses the same numeric World actor ID,
+    // but neither the old physical edges nor its previous sequence may act.
+    for (heavy, phase) in [(false, "light"), (true, "heavy")] {
+        let boot = new_server_boot_nonce().expect("new CSPRNG boot nonce");
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+
+        let old_lease = 51;
+        let fresh_lease = 52;
+        let mut old = SessionGestureWorldPath::from_admitted_world(
+            &world, 1, old_lease, boot,
+        )
+        .expect("old session admitted by authoritative World");
+        let old_binding = old.binding();
+        assert_eq!(
+            admit(
+                &mut old,
+                &mut world,
+                old_lease,
+                boot,
+                GestureAction::Press,
+                1,
+                7
+            ),
+            AckStatus::Accepted,
+            "{phase} PRESS must be legitimate before disconnect"
+        );
+        if heavy {
+            assert!(advance(&mut old, &mut world, old_lease, boot, 4).is_empty());
+            assert_eq!(
+                admit(
+                    &mut old,
+                    &mut world,
+                    old_lease,
+                    boot,
+                    GestureAction::Upgrade,
+                    2,
+                    7
+                ),
+                AckStatus::Accepted
+            );
+            assert_eq!(
+                world.fighter(1).unwrap().action.wire_code(),
+                9,
+                "heavy disconnect must happen in real HeavyWindup"
+            );
+        } else {
+            assert_eq!(
+                world.fighter(1).unwrap().action.wire_code(),
+                1,
+                "light disconnect must happen in real LightWindup"
+            );
+        }
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        assert!(world.remove_player(1));
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        let mut fresh = SessionGestureWorldPath::from_admitted_world(
+            &world, 1, fresh_lease, boot,
+        )
+        .expect("replacement incarnation admitted by original World");
+        assert_eq!(fresh.binding().player_id, old_binding.player_id);
+        assert_ne!(fresh.binding().incarnation, old_binding.incarnation);
+        assert_ne!(fresh.binding().lease_epoch, old_binding.lease_epoch);
+
+        // Tick advancement must independently retire the old actor even when
+        // no old datagrams are subsequently delivered.
+        old.advance_under_world_lock(&mut world, old_lease, boot);
+        assert!(old.retired(), "{phase} old lease must retire at next tick");
+        for (action, sequence) in [
+            (GestureAction::Release, 3),
+            (GestureAction::Cancel, 4),
+            (GestureAction::Upgrade, 5),
+            (GestureAction::Press, 6),
+        ] {
+            assert_eq!(
+                admit(&mut old, &mut world, old_lease, boot, action, sequence, 7),
+                AckStatus::Stale,
+                "{phase} old edge must remain stale after reincarnation"
+            );
+            assert_eq!(world.fighter(1).unwrap().action.wire_code(), 0);
+            assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        }
+
+        // The retired actor must not spend the replacement's source0 ordering.
+        assert_eq!(
+            admit(
+                &mut fresh,
+                &mut world,
+                fresh_lease,
+                boot,
+                GestureAction::Press,
+                1,
+                1
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut fresh,
+                &mut world,
+                fresh_lease,
+                boot,
+                GestureAction::Release,
+                2,
+                1
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            advance(&mut fresh, &mut world, fresh_lease, boot, 55),
+            vec![(34, 66)],
+            "{phase} reconnect must yield only one genuine fresh 34HP HIT"
+        );
+        assert_eq!(world.fighter(2).unwrap().hp, 66.0);
+    }
+}
