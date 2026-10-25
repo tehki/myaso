@@ -41,3 +41,28 @@ The private images are at `head_attach_walk_prototype/head_attach_eight_view_con
 - The existing overall quality run remains governed by its independent Combat browser gates; Graphics 3A results do not waive those gates.
 
 Next safe step: open the private composite in Blender, inspect the collar/neck seam, and get Graphics Art Director approval before making a reusable export path. Keep the Silver Knight P0 and live player model unchanged.
+
+## Reproducible GitHub-side renderer — 2026-10-26
+
+The previous eight-view head attachment was an uncommitted private feasibility script. **That gap is now closed for offline review only:**
+
+- [`scripts/graphics3a_p1_head_attachment_review.py`](../../scripts/graphics3a_p1_head_attachment_review.py) contains the reusable, explicit source-archive/source-model/target-model CLI. It loads the actual approved Base Character, UAL1 Standard GLB and target Peasant glTF; checks named rig parent topology and upper neck/head/clavicle anchor positions; validates inverse-bind matrices; selects only upper face geometry; maps skin indices by joint name; uses the target's actual retargeted Walk pose; and writes eight rotated 256px stills plus a private source-hash report.
+- The head cutoff is computed from **the actual upper extent of the target outfit mesh + 0.02 m**, instead of hard-coding distinct male/female collar heights. This is a deterministic lookdev choice, **not** approved seam topology.
+- [`scripts/graphics3a_p1_head_attach_rules.py`](../../scripts/graphics3a_p1_head_attach_rules.py) contains source-only fail-closed ZIP-path, cutoff, bone remapping, upper anchor and finite geometry safeguards. [`tests/test_graphics3a_p1_head_attach_rules.py`](../../tests/test_graphics3a_p1_head_attach_rules.py) adds **12 passing source-only unit tests** to protected quality CI. All existing mandatory Combat, Core, World tests remain intact.
+- Both originals were rerendered privately on X230i with the generalized pipeline: **Male Peasant** head-attachment sheet SHA256 `e3897e4addfb5c651631b00e2b7d3cb4fb463e5e227e7077bfc101c1d8bc287c`; **Female Peasant** sheet SHA256 `52db765d080ee610ceeb21ed0ef039303f841cdbb547bd35bc126a7d3d2a0a35`. Each was eight actually rotated source-mesh views, sampled at 50% of real UAL1 `Walk_Loop`, with private original-derived textures.
+- **Reproducibility:** re-fetching the *committed script* from HEAD `fe5e895916217f4bd208207d38f05ba8f8ea59ad` and rerunning Male Peasant produced the identical contact-sheet SHA256 `e3897e4addfb5c651631b00e2b7d3cb4fb463e5e227e7077bfc101c1d8bc287c` on the same X230i.
+
+Example **private-only** invocation (substitute local paths with your own approved vendor files):
+
+```bash
+python3 scripts/graphics3a_p1_head_attachment_review.py \
+  --target-model "/private/review/Male_Peasant/Male_Peasant.gltf" \
+  --base-archive "/private/Universal Base Characters[Standard].zip" \
+  --base-model-suffix "Superhero_Male_FullBody.gltf" \
+  --animation-archive "/private/Universal Animation Library[Standard].zip" \
+  --animation-model-suffix "Unreal-Godot/UAL1_Standard.glb" \
+  --clip Walk_Loop --fraction 0.5 \
+  --output "/private/head-attachment-review/Male_Peasant"
+```
+
+**Strict HOLD remains**: the output is **not** a composite Blender/glTF master model; there is no cloth/skin seam approval, acceptable hair/head appearance, complete animation source/atlas, cardinal facing verification, grounded/shadow/foot contact, 960×540 native game integration, Chrome/Firefox 2/4-player p50/p95, or Art Director/Main 0 release authorization. The rejected Mid-Poly Knight was not used; no commercial paid assets or vendor binaries were committed.
