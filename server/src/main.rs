@@ -117,6 +117,7 @@ struct LoopbackFlightConfig {
     near_pressure_players: usize,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    drop_following_input_datagrams: usize,
 }
 
 #[derive(Debug)]
@@ -239,6 +240,7 @@ struct SharedGame {
     next_lease_epoch: AtomicU64,
     reliable_write_delay: Duration,
     drop_new_action_datagrams: bool,
+    drop_following_input_datagrams: usize,
 }
 
 impl SharedGame {
@@ -251,6 +253,7 @@ impl SharedGame {
             next_lease_epoch: AtomicU64::new(1),
             reliable_write_delay: flight.reliable_write_delay,
             drop_new_action_datagrams: flight.drop_new_action_datagrams,
+            drop_following_input_datagrams: flight.drop_following_input_datagrams,
         })
     }
 
@@ -526,13 +529,31 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         })
         .transpose()?
         .unwrap_or(false);
+    let drop_following_input_datagrams = env::var("MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS")
+        .ok()
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .context("MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS must be an integer")
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if drop_following_input_datagrams > 2 {
+        bail!("MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS must be between 0 and 2");
+    }
+    if drop_following_input_datagrams > 0 && !drop_new_action_datagrams {
+        bail!("MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS requires MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS=1");
+    }
     if background_players > MAX_FLIGHT_BACKGROUND_PLAYERS {
         bail!("MYASO_FLIGHT_BACKGROUND_PLAYERS exceeds bounded flight maximum");
     }
     if near_pressure_players > background_players {
         bail!("MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS exceeds background player count");
     }
-    if (background_players > 0 || reliable_delay_ms > 0 || drop_new_action_datagrams)
+    if (background_players > 0
+        || reliable_delay_ms > 0
+        || drop_new_action_datagrams
+        || drop_following_input_datagrams > 0)
         && !bind.ip().is_loopback()
     {
         bail!("flight impairment fixtures are permitted only on loopback binds");
@@ -542,6 +563,7 @@ fn load_loopback_flight_config(bind: SocketAddr) -> Result<LoopbackFlightConfig>
         near_pressure_players,
         reliable_write_delay: Duration::from_millis(reliable_delay_ms),
         drop_new_action_datagrams,
+        drop_following_input_datagrams,
     })
 }
 
@@ -742,6 +764,7 @@ async fn handle_connection(
     // fixture is loopback-only and OFF in the normal server configuration.
     let mut first_loss_probe_seen = false;
     let mut first_loss_probe_packets_remaining = 0_u8;
+    let mut followup_input_datagrams_to_drop = 0_usize;
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
     let (mut reliable_send, mut reliable_recv) = connection
         .accept_bi()
@@ -1011,6 +1034,23 @@ async fn handle_connection(
                     }
                 };
 
+                // Optional loopback-only M230 stress: after dropping the first
+                // authentic rising-action datagram, drop the next bounded number
+                // of actual input datagrams before ingress. No packet is forged,
+                // resent, widened, or acknowledged by this fixture.
+                if followup_input_datagrams_to_drop > 0 {
+                    let wire_samples = packet.samples().iter().take(3)
+                        .map(|sample| format!("{}:{}:{}", sample.tick, u8::from(sample.attack), u8::from(sample.heavy_attack)))
+                        .collect::<Vec<_>>().join(",");
+                    followup_input_datagrams_to_drop -= 1;
+                    println!(
+                        "CORE8A_FOLLOWING_INPUT_DATAGRAM_DROPPED session={stable_id} packet_tick={} remaining_after={} wire_tick_attack_heavy=[{wire_samples}]",
+                        packet.client_tick,
+                        followup_input_datagrams_to_drop,
+                    );
+                    continue;
+                }
+
                 if game.drop_new_action_datagrams {
                     if let Some(action_tick) =
                         register_new_action_datagram(packet.samples(), &mut dropped_action_ticks)
@@ -1033,6 +1073,7 @@ async fn handle_connection(
                             }
                             first_loss_probe_seen = true;
                             first_loss_probe_packets_remaining = 4;
+                            followup_input_datagrams_to_drop = game.drop_following_input_datagrams;
                         }
                         continue;
                     }
