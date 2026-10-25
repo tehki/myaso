@@ -42,3 +42,20 @@
 ## Intake disposition
 
 **This file records owner decisions and independent publisher metadata only.** As of this manifest, no Standard ZIP, raw vendor mesh, source .blend or third-party animation binary has been fetched into this branch, no hash has been calculated and no assets were integrated or deployed.
+
+## Verified read-only intake tooling (2026-10-25)
+
+The independent importer **does not download or unzip** anything. It is an offline archive metadata validator maintained in `scripts/graphics3a_p1_standard_intake.py`; seven small synthetic tests in `tests/test_graphics3a_p1_standard_intake.py` verify path traversal rejection, Windows paths, case collisions, the HOLD status and missing-license warnings. Protected CI invokes these assertions before the existing Combat test matrix; no mandatory test is waived.
+
+Run this only **after acquiring the no-payment Standard ZIP from itch.io** and recording its original download URL:
+
+```bash
+python3 scripts/graphics3a_p1_standard_intake.py \
+  --pack quaternius-outfits \
+  --zip '/local/private/Modular Character Outfits - Fantasy[Standard].zip' \
+  --output /local/private/graphics3a-outfits-audit.json
+```
+
+For other approved packs, substitute `quaternius-base`, `quaternius-ual1`, `quaternius-ual2` or `kaykit-animations`. The script records archive SHA256, total file counts, potential meshes and license filename hints; it does **not** verify the license contents, animations or rig quality. All results remain `HOLD_NOT_IMPORTED`.
+
+**Actual acquisition checkpoint:** Standard archives remain **NOT DOWNLOADED** in this branch. The public zero-cost itch.io download flow is interactive. We attempted nontransactional retrieval on the X230i Linux dev runner, and did not find a direct static download URL; no third-party mirror has been substituted. No Source-tier purchase, archive import or mesh retarget has occurred.
