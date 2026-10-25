@@ -67,10 +67,14 @@ def main():
             if len(infos) > 8000 or any(i.file_size > 50_000_000 for i in infos):
                 raise ValueError("unexpected creator ZIP inventory/individual file size")
             index = {}
+            zip_paths = {}
             for info in infos:
                 name = PurePosixPath(info.filename.replace("\\", "/"))
                 if ".." in name.parts or name.is_absolute():
                     raise ValueError("unsafe entry in source ZIP")
+                if name.as_posix() in zip_paths:
+                    raise ValueError('duplicate full path in creator Standard ZIP')
+                zip_paths[name.as_posix()] = info
                 index.setdefault(name.name, []).append(info)
             original_gltfs = {k: v for k, v in index.items() if k.endswith(".gltf")}
             report["archiveGltfCount"] = sum(len(v) for v in original_gltfs.values())
@@ -116,12 +120,21 @@ def main():
                     filename = PurePosixPath(resource).name
                     if filename != resource or filename.startswith("."):
                         raise ValueError("unexpected external selected texture/buffer URI")
-                    possibilities = index.get(filename, [])
-                    if len(possibilities) != 1:
-                        report["textureDiffs"].append({"name":filename,"reason":"absent or ambiguous"})
+                    # Quaternius ships OBJ/FBX/glTF versions side-by-side,
+                    # so shared texture basenames appear more than once.
+                    # Resolve referenced files relative to the REAL original
+                    # glTF's directory, not by archive-wide basename.
+                    original_model_dir = PurePosixPath(entries[0].filename.replace("\\\\", "/")).parent
+                    resource_path = (original_model_dir / filename).as_posix()
+                    official_entry = zip_paths.get(resource_path)
+                    if official_entry is None:
+                        report["textureDiffs"].append({
+                            "name":filename,"reason":"not colocated with original glTF",
+                            "expectedOriginalPath":resource_path,
+                            "archiveEntriesWithSameName":[v.filename for v in index.get(filename,[])][:5]})
                         selected_ok = False
                         continue
-                    original_resource = z.read(possibilities[0])
+                    original_resource = z.read(official_entry)
                     pinned_resource = (mirror / filename).read_bytes()
                     if original_resource != pinned_resource:
                         report["textureDiffs"].append({
