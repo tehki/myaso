@@ -1914,7 +1914,6 @@ mod tests {
 #[cfg(test)]
 mod m201_original_world_contact_tests {
     use super::*;
-    use crate::simulation::InputIntent;
 
     #[test]
     fn real_guard_block_contact_reports_original_defender_age_without_hit_credit() {
