@@ -15,7 +15,7 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", releaseDelay);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && releaseDelay > lead && wheel > releaseDelay && proof > wheel);
-  assert.match(flight, /const releaseToStrikeParryDelayMs = scenario === "uiparrytell" \? 35 : 95/);
+  assert.match(flight, /const releaseToStrikeParryDelayMs = 95/);
   assert.match(flight, /Any actual -38 guard block or 34 HP hit remains a terminal failure/);
   assert.ok(flight.includes("const parryIngress = await calibrateNativeParryIngress("));
   // Preserve genuine input and fail-closed outcomes; only staged native

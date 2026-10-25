@@ -8251,16 +8251,12 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Move the genuine wheel 95ms later (target ~85ms before impact);
     // continue to reject every block, HP hit, missed/parried input or
     // changed 650ms stun/punish contract as before.
-    // M41 genuine native failure on d969d173: Chrome local trusted
-    // source0 UP t320ms, Firefox local trusted +120 wheel t442ms;
-    // the UI showed a true 34HP HIT. Per-browser t values do NOT share
-    // a synchronized origin; do not subtract them to infer a World tick
-    // or assert a measured wheel-to-contact lead. Stage only M41's
-    // one real wheel 48ms earlier as a test-input hypothesis, to be
-    // qualified by the QA-only original World CONTACT trace on rerun.
-    // Never weaken strict 125ms server parry or original M41 raster gates;
-    // M33/M146 staging, HP/guard and World remain unchanged.
-    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 35 : 95;
+    // M41 e31994b9 native World contact 1691 was BLOCK at 133.3ms defender
+    // age: the old 35ms special wait armed its one real wheel too early for
+    // the unchanged 125ms parry window. Reuse M35's existing 95ms wait;
+    // this shifts ONLY M41's wheel 60ms later. Actual World parry and the
+    // exact remote raster/source-frame assertions still qualify the run.
+    const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
