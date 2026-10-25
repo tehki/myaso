@@ -181,6 +181,22 @@
       "maximumBottomOffsetMeters": 0.09,
       "maximumDepthOffsetMeters": 0.1,
       "sourceMeshesUnchanged": true
+    },
+    "cameraReview": {
+      "projection": "ORTHO",
+      "position": [
+        0,
+        -12,
+        10
+      ],
+      "target": [
+        0,
+        0,
+        2.8
+      ],
+      "orthoScale": 12.8,
+      "intent": "front-gable Blood & Iron sprite alignment; compare against original A2.32 Red Lion",
+      "liveWorld9CameraChanged": false
     }
   },
   "output": {
