@@ -21,6 +21,14 @@ test("Key E is reserved for future Use in both playable game pages, with no heav
   }
 });
 
+
+test("visible control legend explicitly reserves E and never advertises a heavy shortcut", () => {
+  const html=read("../web/index.html");
+  assert.match(html, /<kbd>E<\/kbd>\s*Use \/ Interact \(reserved; not active yet\)/);
+  assert.doesNotMatch(html, /<kbd>E<\/kbd>[^<]*(?:heavy|attack|shortcut)/i);
+  assert.doesNotMatch(html, /<kbd>E<\/kbd>[^<]*\b(?:press|activate|pick up)\b/i);
+});
+
 test("retired Key E typed Combat source cannot encode or enter the selected outbox", () => {
   const lease = Object.freeze({});
   const q = new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
