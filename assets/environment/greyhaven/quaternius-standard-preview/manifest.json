@@ -129,7 +129,7 @@
       {
         "model": "Door_1_Round",
         "at": [
-          1,
+          0.486255,
           -2.05,
           0
         ],
@@ -171,7 +171,17 @@
         ],
         "yawDeg": 20
       }
-    ]
+    ],
+    "doorFrameAlignment": {
+      "doorModel": "Door_1_Round",
+      "frameModel": "DoorFrame_Round_WoodDark",
+      "localDoorCenterX": 0.5137433372,
+      "localFrameCenterX": 0,
+      "maximumCenterOffsetMeters": 0.015,
+      "maximumBottomOffsetMeters": 0.09,
+      "maximumDepthOffsetMeters": 0.1,
+      "sourceMeshesUnchanged": true
+    }
   },
   "output": {
     "render": [
