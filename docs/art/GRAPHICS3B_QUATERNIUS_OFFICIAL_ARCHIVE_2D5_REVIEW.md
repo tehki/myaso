@@ -1,0 +1,24 @@
+# Graphics3B P1 — OFFICIAL Quaternius CC0 source audit + native Blender 2.5D REVIEW sprite
+
+**Development continuation, 2026-10-25.** Based on [V2 Blood & Iron art PR #1043](https://github.com/tehki/myaso/pull/1043), exact `6d3203c09d62631cd7a1090deb5b3eeb72d2f0d0`. User approved use of Quaternius [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html). Release remains **P1 HOLD**.
+
+## Creator-origin verification contract
+
+The ORIGINAL creator Quaternius [OpenGameArt free Standard upload](https://opengameart.org/content/medieval-village-megakit) states **176 glTF/FBX/OBJ models under CC0**; official ZIP link `https://opengameart.org/sites/default/files/medieval_village_megakitstandard.zip`. Earlier V2 art used a pinned third-party **secondary mirror** `J-Ponzo/gltf-medieval-village-megakit` at `21104b4045261c28fc312360841ed1a7b0ac8782`. That mirror having a `LICENSE` does not by itself establish **byte parity** with the original creator upload.
+
+The new independent `graphics3b-quaternius-official-source-audit.yml` downloads the original archive WITHOUT redistributing it and executes `tools/art/verify_quaternius_official_standard_zip.py`: SHA256 records the original archive, compares all **176** original creator glTF bytes against the pinned glTF mirror, and checks selected **11** actual source mesh buffers / PBR textures bytewise. Audit JSON is published as CI evidence, never the ZIP. A mismatch, ambiguous original filename, unavailable original ZIP, zip bomb/path traversal anomaly, missing buffer or changed mirror forces **failure / release HOLD**. If this comparison is negative, do NOT silently waive it, pretend the community mirror is official, or revise the CC0 source chain without review. Use the official creator archive for a revised isolated pipeline if necessary.
+
+In this environment the original ZIP could not be fetched; the parity gate is intentionally **not yet claimed passed**. Any completed native CI source-audit outcome is definitive for the specific original/archive hash recorded there.
+
+## Real 2.5D preview sprite bake — NOT mapped into the game
+
+`tools/art/bake_quaternius_greyhaven_review_sprites.py` consumes the original headless Blender V2 output and its integrity report, **not** synthetic geometry, recreated textures or AI generated screenshots. It validates day/dusk SHA and 640×640 camera, source Quaternius CC0, `importedSourceModules=14`, no original Red Lion modifications and applied muted Blood & Iron tile shading. It encodes original Blender RGBA art into 90-quality transparent WebPs, reads them back and requires pixel-exact alpha and substantial transfer savings. Art images plus hash report are CI artifacts only at `.artifacts/quaternius-greyhaven-sprite-review/`; this directory is not in the live asset manifest or gameplay fetch path.
+
+For a local editorial comparison, run ordinary local HTTP from repo root, after CI-generated art artifacts have been copied into `.artifacts`. Open
+`http://127.0.0.1:8000/web/graphics3b-quaternius-2d5-local-review.html?quaterniusReview=1`. The page imports **genuine original first-party World9/Graphics3C + A2.32 Red Lion module**, verifies its immutable source SHA and composes the source World+roof; the right canvas adds a **screen-space cottage comparison inset**, not a newly authorized world coordinate. Switching Day/Dusk only updates the render preview. The page refuses all non-localhost origins or non-opted-in URLs and has no dependency from `online-game.mjs` or game index.
+
+**Absolutely NOT evidenced:** independent original-world entity/placement rights; legal new house footprint; player entry/portal/door logic; roof fade/occlusion with 4 real authoritative clients; original Rust static/dynamic collision; sword economics; actor ownership/identity or FPS under load. World9/Core8C/Physics6 must authorize any future building placement, while Graphics3/3C + owner visually sign off palette and roof in context. P0 Combat original arena remains independent.
+
+## CI and gate policy
+
+Dedicated original Blender review+sprite quality, separate original creator byte audit, and existing full protected quality run must be reported separately. Previous full quality #40192050352 failed Combat M33 short-click parry during M41, independently from art. An art-green run is NOT overall Alpha-green. All drafts unmerged, no deployment, no production activation, no main edits.
