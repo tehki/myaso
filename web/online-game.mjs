@@ -566,6 +566,7 @@ function recordAcceptanceState(state, ownId) {
     );
   }
   if (acceptanceScenario === "uidirectionallight"
+    || acceptanceScenario === "uijumprecoveryffa"
     || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
@@ -882,7 +883,7 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uijumprecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;

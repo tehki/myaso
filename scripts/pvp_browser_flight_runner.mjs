@@ -538,6 +538,7 @@ async function startGameServer() {
         // no World stepping, input synthesis, HIT recipient, or protocol change.
         || scenario === "uistun" || scenario === "uiparrytell"
         || scenario === "uiheavydodge"
+        || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
@@ -11154,6 +11155,25 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   const observerId = ordered[1].playerNetId;
   const closerId = ordered[2].playerNetId;
 
+  // Passive native lifecycle witness: real focus/visibility loss can clear
+  // browser input latches. DOM delivery alone is not server admission proof.
+  await execute(jumpAttacker.base, jumpAttacker.sessionId, `
+    const records = [];
+    const append = event => {
+      if ((event.type === 'keydown' || event.type === 'keyup') && event.code !== 'Space') return;
+      if ((event.type === 'pointerdown' || event.type === 'pointerup') && event.button !== 0) return;
+      records.push({type:event.type, code:event.code??null, button:event.button??null,
+        trusted:event.isTrusted===true, epochMs:Date.now(), hidden:document.hidden,
+        focus:document.activeElement?.id??null,
+        serverTick:window.__MYASO_ACCEPTANCE_STATE__?.serverTick??null});
+      if (records.length > 64) records.shift();
+    };
+    for (const type of ['focus','blur','keydown','keyup','pointerdown','pointerup']) window.addEventListener(type, append, true);
+    document.addEventListener('visibilitychange', append, true);
+    window.__MYASO_M143_NATIVE_TIMELINE__ = records;
+    return true;
+  `);
+
   // Keep the jump attacker at its original farther spawn while moving #3
   // decisively inward. Before any recovery exists, Firefox must therefore keep
   // its ordinary nearest-rival focus on #3.
@@ -11195,6 +11215,7 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // the real click, authoritative jump-attack phases, 100HP and HUD gates.
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
+  const jumpServerLogOffset = m201ServerOutput().length;
   await Promise.all([
     performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
     sampleUiEvidenceWhileActive(entries, 720, 8),
@@ -11207,6 +11228,25 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   if (!jumpState || !observerState || !closerState) {
     throw new Error(`${milestone} incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
+
+  // Emit the actual source/replica/World chronology BEFORE every untouched
+  // focus and jump-phase assertion. Missing admission remains a fatal result.
+  console.log("M143_NATIVE_SOURCE_WORLD_DIAGNOSTIC " + JSON.stringify({
+    jumpId, observerId, closerId,
+    geometryBefore: baseline.map(state => ({ browser:state.browser,
+      serverTick:state.acceptance?.serverTick, fighters:state.acceptance?.fighters })),
+    nativeLifecycle: await execute(jumpAttacker.base, jumpAttacker.sessionId,
+      "return (window.__MYASO_M143_NATIVE_TIMELINE__??[]).map(event=>({...event}));"),
+    physical: { keys:jumpState.keyTransitions.slice(jumpKeyOffset), pointers:jumpState.pointers.slice(jumpPointerOffset) },
+    actualOriginalSender: jumpState.acceptance?.inputSubmissions ?? [],
+    ownReplicatedActions: jumpState.acceptance?.ownActionTransitions ?? [],
+    observerFocus: observerState.focusTransitions.slice(observerFocusOffset),
+    observerRecovery: observerState.recoveryTransitions.slice(observerRecoveryOffset),
+    geometryAfter: evidence.map(state => ({ browser:state.browser,
+      serverTick:state.acceptance?.serverTick, fighters:state.acceptance?.fighters })),
+    originalWorld: m201ServerOutput().slice(jumpServerLogOffset).split(/\r?\n/)
+      .filter(line=>/^M201_(AUTH_ACTION|AUTH_HIT|AUTH_BLOCK|AUTH_PARRY|AUTH_BREAK|FLIGHT_ACTOR_BASELINE) /.test(line)).slice(-128),
+  }));
 
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const recoveryTransitions = observerState.recoveryTransitions.slice(observerRecoveryOffset);
