@@ -6764,13 +6764,19 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   const idleDeadline = Date.now() + COMBAT.kick.recoveryMs + 500;
   while (Date.now() < idleDeadline && !suppressorIdle) {
     const actions = await readOwnActions(suppressor);
-    const activeIndex = actions.findIndex((entry) =>
-      entry.action === COMBAT_ACTION.kickActive
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs === suppressedKickActive.epochMs);
-    suppressorIdle = actions.find((entry, index) =>
-      index > activeIndex
-      && entry.action === COMBAT_ACTION.idle
+    // A short #3 KickActive can fall between #3's sampled own frames.
+    // activeIndex=-1 used to admit the INITIAL Idle (before suppression)
+    // and send the verification RMB during the first kick's recovery.
+    // Match the same authoritative World tick across actor replicas,
+    // never unrelated browser-local epoch clocks or stale Idle snapshots.
+    const suppressedTick = suppressedKickActive.serverTick;
+    if (!Number.isSafeInteger(suppressedTick) || suppressedTick < 1) {
+      throw new Error(milestone + " suppressed kick lacks original World tick");
+    }
+    suppressorIdle = actions.find((entry) =>
+      entry.action === COMBAT_ACTION.idle
+      && Number.isSafeInteger(entry.serverTick)
+      && entry.serverTick > suppressedTick
       && Number.isFinite(entry.epochMs)) ?? null;
     if (!suppressorIdle) await sleep(5);
   }
