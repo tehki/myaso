@@ -296,9 +296,10 @@ fn malformed_source_and_incompatible_052_do_not_generate_hits() {
     assert_eq!(w.fighter(2).unwrap().hp, 100.0);
 }
 #[test]
-fn independent_keye_hold_ready_and_release_commits_one_original_46hp_hit() {
+fn retired_keye_hold_and_release_cannot_commit_heavy_but_real_lmb_ready_can() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    // Obsolete E cannot charge heavy, however long it is held.
     assert_eq!(
         admit(
             &mut p,
@@ -309,16 +310,11 @@ fn independent_keye_hold_ready_and_release_commits_one_original_46hp_hit() {
             1,
             1
         ),
-        AckStatus::Accepted
+        AckStatus::Rejected
     );
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
     assert!(advance(&mut p, &mut w, 37).is_empty());
-    assert_eq!(w.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-    assert_eq!(
-        w.fighter(2).unwrap().hp,
-        100.0,
-        "KeyE held past 320ms must never auto-hit"
-    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
     assert_eq!(
         admit(
             &mut p,
@@ -327,6 +323,60 @@ fn independent_keye_hold_ready_and_release_commits_one_original_46hp_hit() {
             GestureSource::KeyE,
             GestureAction::Release,
             2,
+            1
+        ),
+        AckStatus::Rejected
+    );
+
+    // Genuine source0 LMB remains the ONLY 320ms READY / 46HP heavy.
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert!(advance(&mut p, &mut w, 4).is_empty());
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert!(advance(&mut p, &mut w, 33).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+    // A forged E terminal with the next sequence cannot finish the LMB hold.
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::KeyE,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Rejected
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
             1
         ),
         AckStatus::Accepted
@@ -337,140 +387,77 @@ fn independent_keye_hold_ready_and_release_commits_one_original_46hp_hit() {
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Release,
-            2,
+            3,
             1
         ),
         AckStatus::Duplicate
     );
     assert_eq!(w.fighter(2).unwrap().hp, 54.0);
 }
+
 #[test]
-fn undercharged_keye_release_and_cancel_never_fabricate_light_or_heavy() {
+fn retired_keye_short_and_long_terminals_never_spend_lmb_cursor_or_hit() {
     for terminal in [GestureAction::Release, GestureAction::Cancel] {
-        let mut w = arena();
-        let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-        assert_eq!(
-            admit(
-                &mut p,
-                &mut w,
-                LEASE,
-                GestureSource::KeyE,
-                GestureAction::Press,
-                1,
-                1
-            ),
-            AckStatus::Accepted
-        );
-        assert!(advance(&mut p, &mut w, 4).is_empty());
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, terminal, 2, 1),
-            AckStatus::Accepted
-        );
-        assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
-        assert!(advance(&mut p, &mut w, 55).is_empty());
-        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
-    }
-    // A standalone KeyE charge cannot be auto-committed after reaching READY.
-    let mut w = arena();
-    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            1,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert!(advance(&mut p, &mut w, 32).is_empty());
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
-            GestureAction::Cancel,
-            2,
-            1
-        ),
-        AckStatus::Accepted
-    );
-    assert!(advance(&mut p, &mut w, 55).is_empty());
-    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
-}
-#[test]
-fn cross_source_release_cancel_and_replay_cannot_mutate_other_sources_world() {
-    for original in [GestureSource::Lmb, GestureSource::KeyE] {
-        let other = if original == GestureSource::Lmb {
-            GestureSource::KeyE
-        } else {
-            GestureSource::Lmb
-        };
-        let mut w = arena();
-        let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, original, GestureAction::Press, 1, 1),
-            AckStatus::Accepted
-        );
-        let before = w.fighter(1).unwrap().action;
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Release, 2, 1),
-            AckStatus::Rejected
-        );
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Cancel, 2, 1),
-            AckStatus::Rejected
-        );
-        // A genuine independent source2 gesture with its own monotonic
-        // identity cannot make World do a second attack. Its ordered edge is
-        // admitted as NO-COMBAT, never as a forged terminal or a HIT.
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Press, 2, 2),
-            AckStatus::Accepted
-        );
-        assert_eq!(w.fighter(1).unwrap().action, before);
-        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Press, 2, 2),
-            AckStatus::Duplicate
-        );
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, original, GestureAction::Press, 1, 1),
-            AckStatus::Duplicate
-        );
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Press, 1, 1),
-            AckStatus::Rejected,
-            "same seq/id with different typed source must not duplicate"
-        );
-        assert_eq!(
-            admit(
-                &mut p,
-                &mut w,
-                LEASE,
-                original,
-                GestureAction::Release,
-                3,
-                1
-            ),
-            AckStatus::Accepted,
-            "busy source must not strand original attack terminal"
-        );
-        assert_eq!(
-            admit(&mut p, &mut w, LEASE, other, GestureAction::Release, 4, 2),
-            AckStatus::Accepted,
-            "busy-source terminal is transport-admitted but never World damage"
-        );
-        assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+        for hold_ticks in [4, 37] {
+            let mut w = arena();
+            let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+            assert_eq!(
+                admit(
+                    &mut p,
+                    &mut w,
+                    LEASE,
+                    GestureSource::KeyE,
+                    GestureAction::Press,
+                    1,
+                    1
+                ),
+                AckStatus::Rejected
+            );
+            assert!(advance(&mut p, &mut w, hold_ticks).is_empty());
+            assert_eq!(
+                admit(&mut p, &mut w, LEASE, GestureSource::KeyE, terminal, 2, 1),
+                AckStatus::Rejected
+            );
+            assert!(advance(&mut p, &mut w, 55).is_empty());
+            assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+            assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
+            // The same numeric sequence still belongs to the valid LMB,
+            // regardless of the rejected E hold duration or cancellation.
+            assert_eq!(
+                admit(
+                    &mut p,
+                    &mut w,
+                    LEASE,
+                    GestureSource::Lmb,
+                    GestureAction::Press,
+                    1,
+                    1
+                ),
+                AckStatus::Accepted
+            );
+            assert_eq!(
+                admit(
+                    &mut p,
+                    &mut w,
+                    LEASE,
+                    GestureSource::Lmb,
+                    GestureAction::Release,
+                    2,
+                    1
+                ),
+                AckStatus::Accepted
+            );
+            assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
+            assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+        }
     }
 }
+
 #[test]
-fn one_shared_source_sequence_allows_lmb_hit_then_later_independent_keye_hit() {
+fn retired_keye_cross_source_terminal_and_replay_cannot_steal_lmb() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     assert_eq!(
@@ -484,6 +471,40 @@ fn one_shared_source_sequence_allows_lmb_hit_then_later_independent_keye_hit() {
             1
         ),
         AckStatus::Accepted
+    );
+    let before = w.fighter(1).unwrap().action;
+    for (action, gesture) in [
+        (GestureAction::Release, 1),
+        (GestureAction::Cancel, 1),
+        (GestureAction::Press, 2),
+        (GestureAction::Press, 2),
+        (GestureAction::Release, 2),
+    ] {
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::KeyE,
+                action,
+                2,
+                gesture
+            ),
+            AckStatus::Rejected
+        );
+        assert_eq!(w.fighter(1).unwrap().action, before);
+    }
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Duplicate
     );
     assert_eq!(
         admit(
@@ -498,33 +519,78 @@ fn one_shared_source_sequence_allows_lmb_hit_then_later_independent_keye_hit() {
         AckStatus::Accepted
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
-    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(
         admit(
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
-            GestureAction::Press,
-            3,
-            2
-        ),
-        AckStatus::Accepted
-    );
-    assert!(advance(&mut p, &mut w, 36).is_empty());
-    assert_eq!(
-        admit(
-            &mut p,
-            &mut w,
-            LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Release,
-            4,
-            2
+            2,
+            1
         ),
-        AckStatus::Accepted
+        AckStatus::Duplicate
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 20)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+}
+
+#[test]
+fn one_source0_sequence_allows_two_lmb_hits_but_no_interleaved_keye_hit() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    for (gesture, press_seq, release_seq, hp) in [(1, 1, 2, 66), (2, 3, 4, 32)] {
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::KeyE,
+                GestureAction::Press,
+                press_seq,
+                gesture
+            ),
+            AckStatus::Rejected
+        );
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Press,
+                press_seq,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::KeyE,
+                GestureAction::Release,
+                release_seq,
+                gesture
+            ),
+            AckStatus::Rejected
+        );
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                release_seq,
+                gesture
+            ),
+            AckStatus::Accepted
+        );
+        assert_eq!(advance(&mut p, &mut w, 55), vec![(34, hp)]);
+        assert_eq!(w.fighter(2).unwrap().hp, f32::from(hp));
+        assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    }
 }
 
 #[test]
@@ -913,17 +979,19 @@ fn old_gesture_unrelated_terminal_is_rejected_without_resurrecting_completed_dam
 }
 
 #[test]
-fn future_keye_press_cannot_overtake_lost_lmb_press_across_one_lease_sequence() {
+fn retired_keye_cannot_overtake_missing_lmb_or_spend_lease_sequence() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
-    // A later valid source1 event arrived first with global seq3.
-    // One outbox must retry missing source0 seq1+2 before granting it.
-    let future = edge(GestureSource::KeyE, GestureAction::Press, 3, 2);
-    assert!(p
-        .accept_under_world_lock(&mut w, LEASE, BOOT, &future)
-        .is_none());
+    // A legacy Key E packet with a FAR-FUTURE sequence is always denied
+    // immediately, before it can claim the monotonic LMB sequence fence.
+    let old_e = edge(GestureSource::KeyE, GestureAction::Press, 3, 2);
+    let denied = p
+        .accept_under_world_lock(&mut w, LEASE, BOOT, &old_e)
+        .unwrap();
+    assert_eq!(denied.status, AckStatus::Rejected);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
     assert_eq!(
         admit(
             &mut p,
@@ -950,70 +1018,91 @@ fn future_keye_press_cannot_overtake_lost_lmb_press_across_one_lease_sequence() 
     );
     assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+    // Replayed invalid source1 cannot revive a key-driven heavy or steal
+    // sequences3/4 from the legitimate next source0 LMB gesture.
+    for (action, seq) in [(GestureAction::Press, 3), (GestureAction::Release, 4)] {
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, action, seq, 2),
+            AckStatus::Rejected
+        );
+    }
     assert_eq!(
         admit(
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Press,
             3,
             2
         ),
         AckStatus::Accepted
     );
-    assert!(advance(&mut p, &mut w, 36).is_empty());
     assert_eq!(
         admit(
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Release,
             4,
             2
         ),
         AckStatus::Accepted
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 20)]);
-    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }
+
 #[test]
-fn future_lmb_press_cannot_overtake_missing_keye_press_or_terminal() {
+fn future_lmb_press_waits_for_missing_lmb_terminal_not_retired_keye() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    // Valid future LMB seq3 cannot leapfrog lost LMB seq1/seq2.
     let future = edge(GestureSource::Lmb, GestureAction::Press, 3, 2);
     assert!(p
         .accept_under_world_lock(&mut w, LEASE, BOOT, &future)
         .is_none());
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
+    // Retired E may not fill the missing sequence gap or cause 46HP.
+    for (action, seq) in [(GestureAction::Press, 1), (GestureAction::Release, 2)] {
+        assert_eq!(
+            admit(&mut p, &mut w, LEASE, GestureSource::KeyE, action, seq, 1),
+            AckStatus::Rejected
+        );
+    }
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 100.0);
+
     assert_eq!(
         admit(
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Press,
             1,
             1
         ),
         AckStatus::Accepted
     );
-    assert!(advance(&mut p, &mut w, 36).is_empty());
     assert_eq!(
         admit(
             &mut p,
             &mut w,
             LEASE,
-            GestureSource::KeyE,
+            GestureSource::Lmb,
             GestureAction::Release,
             2,
             1
         ),
         AckStatus::Accepted
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(46, 54)]);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 66)]);
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+
     assert_eq!(
         admit(
             &mut p,
@@ -1038,6 +1127,6 @@ fn future_lmb_press_cannot_overtake_missing_keye_press_or_terminal() {
         ),
         AckStatus::Accepted
     );
-    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 20)]);
-    assert_eq!(w.fighter(2).unwrap().hp, 20.0);
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
+    assert_eq!(w.fighter(2).unwrap().hp, 32.0);
 }

@@ -47,11 +47,11 @@ window.ui10={
  ready:true,
  report:()=>{const edges=outbox.nextSendBatch(8).map(e=>decodeProposedTypedGestureEvent(e.bytes));return ({trusted:[...trusted],snapshot:gates.lmb.snapshot,
   keyEdges:edges.filter(e=>e.source===1),
-  trustedKey:[...trustedKey],keySnapshot:gates.keye.snapshot,
+  trustedKey:[...trustedKey],
   edges,
   realServer:false,combatCommit:false});},
  upgrade:()=>gates.lmb.approvedHoldUpgrade(gates.lmb.snapshot.pointerId),
- blur:()=>{const lmbCanceled=gates.lmb.blur();gates.keye.blur();return lmbCanceled;},
+ blur:()=>gates.lmb.blur(),
  chat:x=>{chat=x;if(x)gates.chatOpened();},
  jump:x=>jump=x
 };
@@ -160,10 +160,26 @@ try{
   await evaluate("document.querySelector('#arena').focus()");
   await pressE();
   const keySolo=await evaluate("return ui10.report()");
-  assert.deepEqual(keySolo.keyEdges.map(e=>[e.source,e.action]),[[1,1],[1,3]]);
+  assert.deepEqual(keySolo.keyEdges,[],"physical E cannot create a typed Combat edge");
+  assert.deepEqual(keySolo.edges,[],"physical E cannot claim source0 either");
   assert.equal(keySolo.trustedKey.length,2);
   assert.ok(keySolo.trustedKey.every(e=>e.trusted));
-  assert.equal(keySolo.keySnapshot.active,false);
+  assert.equal(keySolo.snapshot.active,false,"E cannot start any LMB Combat gesture");
+  // Owner P0: a truly held physical E must remain completely silent even
+  // after the original 320ms heavy READY deadline. No fake/computed HIT,
+  // locally upgraded LMB, typed source1 or stolen sequence number.
+  await nav();
+  await evaluate("document.querySelector('#arena').focus()");
+  await keys([{type:"keyDown",value:"e"}]);
+  await sleep(430);
+  const heldE=await evaluate("return ui10.report()");
+  assert.deepEqual(heldE.edges,[],"holding E past 320ms cannot initiate Combat");
+  assert.equal(heldE.snapshot.active,false,"held E cannot arm LMB");
+  assert.ok(heldE.trustedKey.some(e=>e.type==="down"&&e.trusted));
+  await keys([{type:"keyUp",value:"e"}]);
+  const heldEReleased=await evaluate("return ui10.report()");
+  assert.deepEqual(heldEReleased.edges,[],"E UP after 320ms cannot strike");
+  assert.ok(heldEReleased.trustedKey.some(e=>e.type==="up"&&e.trusted));
   await nav();
   await run([move(),down]);
   // The original game focuses its canvas on pointerdown; this isolated QA
@@ -172,18 +188,58 @@ try{
   assert.equal(await evaluate("return document.activeElement?.id"),"arena");
   await pressE();
   const chord=await evaluate("return ui10.report()");
-  assert.deepEqual(chord.keyEdges.map(e=>[e.source,e.action]),[[1,1],[1,3]]);
+  assert.deepEqual(chord.keyEdges,[],"held LMB plus KeyE still emits no source1");
   assert.deepEqual(chord.edges.map(e=>[e.source,e.action]),
-   [[0,GESTURE_ACTION.PRESS],[1,GESTURE_ACTION.PRESS],[1,GESTURE_ACTION.RELEASE]]);
+   [[0,GESTURE_ACTION.PRESS]],"E during LMB must not introduce, cancel or upgrade Combat");
   assert.equal(chord.snapshot.active,true,"KeyE UP cannot release active LMB");
   await run([up]);
   const completed=await evaluate("return ui10.report()");
   assert.deepEqual(completed.edges.map(e=>[e.source,e.action]),
-    [[0,GESTURE_ACTION.PRESS],[1,GESTURE_ACTION.PRESS],[1,GESTURE_ACTION.RELEASE],[0,GESTURE_ACTION.RELEASE]]);
-  assert.equal(completed.edges[0].gestureId,completed.edges[3].gestureId);
-  assert.equal(completed.edges[1].gestureId,completed.edges[2].gestureId);
-  assert.notEqual(completed.edges[0].gestureId,completed.edges[1].gestureId);
-  assert.deepEqual(completed.edges.map(e=>e.sequence),[1,2,3,4]);
+    [[0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.RELEASE]],
+    "after E DOWN/UP, real LMB UP alone ends the original gesture");
+  assert.equal(completed.edges[0].gestureId,completed.edges[1].gestureId);
+  assert.deepEqual(completed.edges.map(e=>e.sequence),[1,2],
+    "obsolete E must not steal LMB sequence ownership");
+  // Owner P0: even while LMB is charging and the server-approved UPGRADE
+  // edge is present, E cannot create a second heavy or terminate this LMB.
+  await nav();
+  await run([move(),down]);
+  assert.equal(await evaluate("return ui10.upgrade()"),true);
+  await evaluate("document.querySelector('#arena').focus()");
+  await pressE();
+  const chargedAndE=await evaluate("return ui10.report()");
+  assert.deepEqual(chargedAndE.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.UPGRADE]
+  ],"E cannot create or hijack a charging LMB heavy");
+  assert.equal(chargedAndE.snapshot.active,true);
+  assert.equal(chargedAndE.snapshot.upgraded,true);
+  await run([up]);
+  const chargedAndReleased=await evaluate("return ui10.report()");
+  assert.deepEqual(chargedAndReleased.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.UPGRADE],[0,GESTURE_ACTION.RELEASE]
+  ],"only physical LMB UP terminates heavy, never E");
+  assert.deepEqual(chargedAndReleased.edges.map(e=>e.sequence),[1,2,3]);
+  assert.equal(new Set(chargedAndReleased.edges.map(e=>e.gestureId)).size,1);
+  // With genuine RMB already DOWN, W3C emits mousedown(button0,buttons3)
+  // without a second pointerdown. That path must still use ONE LMB source0
+  // gesture. Physical E during the chord cannot steal or release its owner.
+  await nav();
+  await run([move(),{type:"pointerDown",button:2},{type:"pointerDown",button:0}]);
+  await evaluate("document.querySelector('#arena').focus()");
+  await pressE();
+  const rmbHeld=await evaluate("return ui10.report()");
+  assert.deepEqual(rmbHeld.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS]
+  ],"RMB-first physical LMB must begin once; E cannot add an attack");
+  assert.equal(rmbHeld.snapshot.active,true,"E cannot interrupt RMB-held physical LMB");
+  assert.equal(rmbHeld.keyEdges.length,0);
+  await run([{type:"pointerUp",button:0},{type:"pointerUp",button:2}]);
+  const rmbEnded=await evaluate("return ui10.report()");
+  assert.deepEqual(rmbEnded.edges.map(e=>[e.source,e.action]),[
+    [0,GESTURE_ACTION.PRESS],[0,GESTURE_ACTION.RELEASE]
+  ],"RMB-first LMB UP alone must terminate the source0 gesture");
+  assert.deepEqual(rmbEnded.edges.map(e=>e.sequence),[1,2]);
+  assert.equal(rmbEnded.edges[0].gestureId,rmbEnded.edges[1].gestureId);
   await nav();
   await evaluate("document.querySelector('#arena').focus();ui10.chat(true)");
   await pressE();
@@ -192,7 +248,9 @@ try{
    browser:family,realPointerTrusted:true,shortTap:true,
    longHoldUpgradeSameId:true,releaseOutsideCanvas:true,
    chatPrevented:true,jumpChordDelegated:true,blurCanceled:true,
-   realKeyETrusted:true,keyEIndependentFromHeldLmb:true,chatKeyEPrevented:true,
+   realKeyETrusted:true,keyEReservedForUse:true,keyEHeldBeyond320NoCombat:true,
+   keyECannotStealLmb:true,keyECannotStealUpgradedLmb:true,
+   rmbFirstLmbPhysicalEIsolated:true,chatKeyENoCombat:true,
    authenticatedServer:false,combatHits:false,enabledLive:false
   }));
  }

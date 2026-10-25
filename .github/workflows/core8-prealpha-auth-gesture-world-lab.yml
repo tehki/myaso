@@ -78,20 +78,20 @@ jobs:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
         run: |
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
-      - name: UI10 actual physical source0/source1 -> one outbox -> real original Rust World
+      - name: UI10 real LMB source0 only; E no-Combat, original Rust World
         run: |
           node --check scripts/ui10-native-real-world-shared-gesture-review.mjs
           node --test tests/ui10-prealpha-lmb-dom-review.test.mjs tests/ui10-shared-typed-sources-review.test.mjs
           timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
-      - name: UI10 physical two-source lost PRESS -> bounded original World ordered replay
+      - name: UI10 real LMB PRESS loss; E cannot steal ordered World replay
         env:
           CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
         run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
-      - name: UI10 original World admitted PRESS + lost ACK -> genuine DUPLICATE no extra hit
+      - name: UI10 source0 World PRESS lost-ACK -> DUPLICATE, no extra HIT
         env:
           CORE8A_LAB_DROP_FIRST_ACK: "1"
         run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
-      - name: UI10 true KeyE held READY with NO HIT until matching physical RELEASE
+      - name: UI10 held E causes no Combat; same actor accepts physical LMB afterward
         env:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
         run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs

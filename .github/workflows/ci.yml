@@ -82,7 +82,7 @@ jobs:
           node --check src/browser/left-button-charge.mjs
           node --check web/online-game.mjs
           node --check web/game.mjs
-          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs tests/combat4a-simplify-focus-cancellation.test.mjs
+          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs tests/combat-keye-reserved-use.test.mjs tests/combat4a-simplify-focus-cancellation.test.mjs
 
       - name: Validate realtime networking JavaScript
         run: |

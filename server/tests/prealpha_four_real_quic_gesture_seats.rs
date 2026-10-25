@@ -9,7 +9,7 @@ use std::{
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
-    SendStream, VarInt,
+    SendStream,
 };
 
 const WAIT: Duration = Duration::from_secs(8);
@@ -280,258 +280,60 @@ async fn fifth_independent_native_quic_game_seat_is_refused_at_real_server_gate(
     }
 }
 
-/// Actual end-to-end typed KeyE 1 -> original Rust World HeavyActive 10.
-/// No browser, user principal or hit damage is implied by a 0x12 receipt.
+/// Actual TLS-pinned QUIC negative: retired source1 Key E cannot mutate
+/// the original Rust World or commit damage. The 0x12 ACK is NOT a HIT.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn one_native_keye_standalone_heavy_requires_320ms_then_matching_source1_release() {
+async fn one_native_key_e_source_is_rejected_and_cannot_hit_original_world() {
     let (server, url, digest) = real_server();
     let seat = admitted_seat(&url, &digest).await;
-    seat.connection
-        .send_datagram(typed_event(1, 1, 1, 1))
-        .expect("actual KeyE PRESS QUIC event");
-    let ack = timeout(WAIT, async {
-        loop {
-            let p = seat
-                .connection
-                .receive_datagram()
-                .await
-                .expect("QUIC press ACK");
-            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
-                break p;
-            }
-        }
-    })
-    .await
-    .expect("KeyE PRESS acknowledged by real Rust server");
-    assert_eq!(ack[2], 1, "KeyE PRESS admitted");
-    assert_eq!(u32::from_le_bytes(ack[4..8].try_into().unwrap()), 1);
-    assert_eq!(u32::from_le_bytes(ack[8..12].try_into().unwrap()), 1);
-    // Wait well beyond original 320ms. Held READY cannot auto-hit.
-    sleep(Duration::from_millis(425)).await;
-    let before = server.lines.lock().unwrap().clone();
+    // Retired legacy typed source1 PRESS/RELEASE can never acquire Combat authority.
+    combat4c_ack(&seat.connection, 1, 1, 1, 1, 4).await;
+    combat4c_ack(&seat.connection, 1, 3, 2, 1, 4).await;
+    sleep(Duration::from_millis(430)).await;
+    let lines = server.lines.lock().unwrap().clone();
     assert!(
-        !before.iter().any(|line| {
-            line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
-        }),
-        "held KeyE may not auto-commit heavy before matching release"
+        !lines
+            .iter()
+            .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9")),
+        "reserved Use key cannot start original World heavy windup"
     );
-
-    // Attack sequence2/id1 carried on WRONG source0 is not a valid terminal.
-    seat.connection
-        .send_datagram(typed_event(0, 3, 2, 1))
-        .expect("forged LMB terminal actual QUIC packet");
-    let wrong = timeout(WAIT, async {
-        loop {
-            let p = seat
-                .connection
-                .receive_datagram()
-                .await
-                .expect("QUIC wrong ACK");
-            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
-                break p;
-            }
-        }
-    })
-    .await
-    .expect("wrong source rejected");
-    assert_eq!(wrong[2], 4, "wrong LMB source cannot end KeyE held heavy");
-    assert_eq!(u32::from_le_bytes(wrong[4..8].try_into().unwrap()), 2);
-
-    // The wrong source MUST NOT consume the shared sequence tombstone.
-    seat.connection
-        .send_datagram(typed_event(1, 3, 2, 1))
-        .expect("matching real KeyE RELEASE");
-    let release = timeout(WAIT, async {
-        loop {
-            let p = seat
-                .connection
-                .receive_datagram()
-                .await
-                .expect("QUIC release ACK");
-            if p.len() == 16 && p[0] == 2 && p[1] == 0x12 {
-                break p;
-            }
-        }
-    })
-    .await
-    .expect("KeyE matching release real ACK");
-    assert_eq!(release[2], 1, "matching source1 RELEASE accepted");
-    assert_eq!(u32::from_le_bytes(release[4..8].try_into().unwrap()), 2);
-    timeout(Duration::from_secs(3), async {
-        loop {
-            let lines = server.lines.lock().unwrap().clone();
-            if lines.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=9 to=10")
-            }) {
-                println!("CORE8_NATIVE_SOURCE1_KEYE_HEAVY_WORLD_PASS");
-                break;
-            }
-            sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("actual Rust World heavy became active only after matching KeyE RELEASE");
+    assert!(
+        !lines
+            .iter()
+            .any(|l| l.contains("M201_AUTH_HIT") && l.contains(" attacker=1 ")),
+        "reserved Use key cannot commit World damage"
+    );
+    println!("KEYE_RESERVED_USE_NO_HEAVY_HIT_QUIC_PASS");
 }
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn retired_release_only_keye_quic_seat_cannot_strike_after_replacement() {
+async fn retired_key_e_source_does_not_consume_server_actor_sequence() {
     let (server, url, digest) = real_server();
-    let mut seats = Vec::new();
-    for _ in 0..4 {
-        seats.push(admitted_seat(&url, &digest).await);
-    }
-
-    // Actor #2 starts an ORIGINAL World-owned KeyE 320ms charging attack,
-    // and receives actual server-typed acknowledgement of PRESS. There is
-    // no client-provided actor or clock authority.
-    seats[1]
-        .connection
-        .send_datagram(typed_event(1, 1, 1, 1))
-        .expect("actor #2 real source1 PRESS");
-    let old_press_ack = timeout(WAIT, async {
-        loop {
-            let packet = seats[1]
-                .connection
-                .receive_datagram()
-                .await
-                .expect("actor #2 QUIC still connected");
-            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
-                break packet;
-            }
-        }
-    })
-    .await
-    .expect("original World source1 PRESS admitted");
-    assert_eq!(old_press_ack[2], 1);
-    assert_eq!(
-        u32::from_le_bytes(old_press_ack[4..8].try_into().unwrap()),
-        1
-    );
-    assert_eq!(
-        u32::from_le_bytes(old_press_ack[8..12].try_into().unwrap()),
-        1
-    );
-    assert!(u32::from_le_bytes(old_press_ack[12..16].try_into().unwrap()) > 0);
-
-    // No matching KeyE terminal is sent by the departing player.
-    seats[1]
-        .connection
-        .close(VarInt::from_u32(0), b"retired-keye-release-only");
-    sleep(Duration::from_millis(900)).await;
-    let replacement = admitted_seat(&url, &digest).await;
-    let boundary = server.lines.lock().unwrap().len();
-
-    // Three survivors remain authoritative, and replacement #5 owns a
-    // FRESH source1 lease. A repeated gesture id=1 is valid only for #5.
-    for current in [&seats[0], &seats[2], &seats[3]] {
-        current
-            .connection
-            .send_datagram(event(1, 1))
-            .expect("survivor current LMB PRESS");
-        current
-            .connection
-            .send_datagram(event(3, 2))
-            .expect("survivor current LMB RELEASE");
-    }
-    replacement
-        .connection
-        .send_datagram(typed_event(1, 1, 1, 1))
-        .expect("replacement #5 KeyE PRESS");
-    let new_press_ack = timeout(WAIT, async {
-        loop {
-            let packet = replacement
-                .connection
-                .receive_datagram()
-                .await
-                .expect("replacement #5 QUIC still live");
-            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
-                break packet;
-            }
-        }
-    })
-    .await
-    .expect("replacement #5 source1 PRESS admitted");
-    assert_eq!(new_press_ack[2], 1);
-    assert_eq!(
-        u32::from_le_bytes(new_press_ack[4..8].try_into().unwrap()),
-        1
-    );
-    assert_eq!(
-        u32::from_le_bytes(new_press_ack[8..12].try_into().unwrap()),
-        1
-    );
-    for survivor in [&seats[0], &seats[2], &seats[3]] {
-        assert_both_server_acks(&survivor.connection).await;
-    }
-
-    // The selected RELEASE-TO-STRIKE behavior is immutable: 320ms READY
-    // alone is not an attack, not even for an authentically admitted #5.
-    sleep(Duration::from_millis(425)).await;
-    let ready = server.lines.lock().unwrap().clone();
-    assert!(
-        !ready[boundary..].iter().any(|line| {
-            line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=5 from=9 to=10")
-        }),
-        "current KeyE heavy must not auto-hit while held beyond READY"
-    );
-    assert!(
-        !ready[boundary..].iter().any(|line| {
-            line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=9 to=10")
-        }),
-        "departed KeyE lease cannot auto-commit after actor replacement"
-    );
-
-    replacement
-        .connection
-        .send_datagram(typed_event(1, 3, 2, 1))
-        .expect("replacement #5 genuine KeyE RELEASE");
-    let release_ack = timeout(WAIT, async {
-        loop {
-            let packet = replacement
-                .connection
-                .receive_datagram()
-                .await
-                .expect("replacement #5 release ACK");
-            if packet.len() == 16 && packet[0] == 2 && packet[1] == 0x12 {
-                break packet;
-            }
-        }
-    })
-    .await
-    .expect("replacement #5 release receipt received");
-    assert_eq!(release_ack[2], 1);
-    assert_eq!(u32::from_le_bytes(release_ack[4..8].try_into().unwrap()), 2);
-    assert_eq!(
-        u32::from_le_bytes(release_ack[8..12].try_into().unwrap()),
-        1
-    );
-
-    timeout(Duration::from_secs(4), async {
+    let seat = admitted_seat(&url, &digest).await;
+    // Same authenticated lease: rejected old E seq1 MUST NOT block genuine LMB seq1.
+    combat4c_ack(&seat.connection, 1, 1, 1, 1, 4).await;
+    combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
+    let observed = timeout(Duration::from_secs(2), async {
         loop {
             let lines = server.lines.lock().unwrap().clone();
-            let since = &lines[boundary..];
-            let survivor_lights = [1_u32, 3, 4].iter().all(|id| {
-                since.iter().any(|line| {
-                    line.contains("M201_AUTH_ACTION tick=")
-                        && line.contains(&format!(" fighter={id} from=1 to=2"))
-                })
-            });
-            let current_heavy = since.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=5 from=9 to=10")
-            });
-            let no_old_heavy = !since.iter().any(|line| {
-                line.contains("M201_AUTH_ACTION tick=") && line.contains(" fighter=2 from=9 to=10")
-            });
-            if survivor_lights && current_heavy && no_old_heavy {
-                break;
+            if lines
+                .iter()
+                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=1"))
+            {
+                break lines;
             }
-            sleep(Duration::from_millis(20)).await;
+            sleep(Duration::from_millis(5)).await;
         }
     })
     .await
-    .expect("survivors attack; only matching current KeyE release can strike");
+    .expect("real LMB still enters original LightWindup after rejected E");
+    assert!(
+        !observed
+            .iter()
+            .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9")),
+        "retired Key E must not start a heavy World action"
+    );
+    println!("KEYE_RESERVED_USE_QUIC_SEQUENCE_UNCHANGED_PASS");
 }
-
 async fn combat4c_ack(conn: &Connection, source: u8, action: u8, seq: u32, id: u32, status: u8) {
     conn.send_datagram(typed_event(source, action, seq, id))
         .expect("real same-connection v2 event");
@@ -570,94 +372,30 @@ async fn combat4c_ack(conn: &Connection, source: u8, action: u8, seq: u32, id: u
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn native_displaced_lmb_release_does_not_retire_same_quic_release_only_keye_world() {
-    // One REAL pinned original Rust WebTransport/QUIC session with two typed
-    // physical sources. This is not two human browsers or an authenticated
-    // user account. The v2 test server is loopback-only and default-OFF.
+async fn retired_key_e_source_cannot_displace_a_valid_lmb_world_action() {
     let (server, url, digest) = real_server();
     let seat = admitted_seat(&url, &digest).await;
-
-    // First source0 LMB is held (no UP). The original Rust World automatically
-    // performs its ONE legal 135ms light and finishes full recovery.
     combat4c_ack(&seat.connection, 0, 1, 1, 1, 1).await;
-    timeout(Duration::from_secs(4), async {
-        loop {
-            let original = server.lines.lock().unwrap().clone();
-            if original
-                .iter()
-                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=3 to=0"))
-            {
-                assert!(
-                    original.iter().any(|l| {
-                        l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=1 to=2")
-                    }),
-                    "first original World light must genuinely reach Active"
-                );
-                break;
-            }
-            sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("original World first light completed recovery while LMB physically held");
-
-    // Source1 KeyE is a DIFFERENT real physical press, now the new original
-    // World owner. Server 320ms charge must stay READY with no auto-hit.
-    combat4c_ack(&seat.connection, 1, 1, 2, 2, 1).await;
-    timeout(Duration::from_secs(4), async {
-        loop {
-            if server
-                .lines
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=0 to=9"))
-            {
-                break;
-            }
-            sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("genuine independently held source1 original World HeavyWindup");
-
-    // Original source0 finger finally lifts AFTER the source1 World takeover.
-    // It must receive ACCEPTED no-combat, not REJECTED (fatal to shared queue).
-    combat4c_ack(&seat.connection, 0, 3, 3, 1, 1).await;
-    combat4c_ack(&seat.connection, 0, 3, 3, 1, 2).await;
-
-    // Wait beyond the original 320ms READY boundary; the old LMB RELEASE
-    // MUST NOT release the newer KeyE or create a phantom heavy.
-    sleep(Duration::from_millis(425)).await;
-    let before = server.lines.lock().unwrap().clone();
+    // Legacy source1 cannot become a second Combat owner or consume sequence2.
+    combat4c_ack(&seat.connection, 1, 1, 2, 2, 4).await;
+    combat4c_ack(&seat.connection, 0, 3, 2, 1, 1).await;
+    sleep(Duration::from_millis(370)).await;
+    let lines = server.lines.lock().unwrap().clone();
     assert!(
-        !before
-            .iter()
-            .any(|l| { l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10") }),
-        "stale-but-authentic LMB release cannot commit newer held KeyE"
+        !lines.iter().any(
+            |line| line.contains("M201_AUTH_ACTION") && line.contains(" fighter=1 from=0 to=9")
+        ),
+        "Key E cannot steal original World HeavyWindup: {lines:?}"
     );
-
-    // Only true source1 UP seq4/id2 can enter original World HeavyActive.
-    combat4c_ack(&seat.connection, 1, 3, 4, 2, 1).await;
-    timeout(Duration::from_secs(4), async {
-        loop {
-            let actions = server.lines.lock().unwrap().clone();
-            let count = actions
-                .iter()
-                .filter(|l| l.contains("M201_AUTH_ACTION") && l.contains(" fighter=1 from=9 to=10"))
-                .count();
-            if count >= 1 {
-                assert_eq!(count, 1, "one released KeyE World heavy, no double-commit");
-                break;
-            }
-            sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("matching source1 physical release genuinely commits 46HP World heavy");
-    println!("COMBAT4C_NATIVE_DISPLACED_LMB_KEYE_RELEASE_ONLY_QUIC_PASS");
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("M201_AUTH_ACTION")
+                && line.contains(" fighter=1 from=9 to=10")),
+        "Key E cannot commit a heavy attack after LMB release: {lines:?}"
+    );
+    println!("KEYE_RESERVED_USE_CANNOT_DISPLACE_LMB_QUIC_PASS");
 }
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn combat4c_native_lmb_early_upgrade_stays_ready_until_matching_release() {
     // One actual pinned WebTransport/QUIC lease, source0 LMB, original 60Hz
