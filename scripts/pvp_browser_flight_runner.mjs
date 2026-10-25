@@ -526,6 +526,7 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiguardbreakpunishffa"
         || scenario === "uidirectionallight"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
         || scenario === "uiheavyguardbreakpunish"
@@ -10005,8 +10006,11 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     // attack-first path admitted the wheel only3ticks before impact (a valid
     // parry), so share the proven real wheel-first choreography. Actual
     // trusted wheel, native driver ACK and all38guard/noHP/noPARRY gates stay.
-    const wheelFirstGuardOnly = ["uiguardbreak", "uiguardbreakpunishffa",
-      "uiguardbreakpunishffahit"].includes(scenario);
+    // M151 failed with wheel-first block expiring before a loaded Chrome
+    // compound-click release. Keep M194 and M152 passing wheel-first unchanged;
+    // only M151 uses a true Chrome DOWN -> trusted Firefox wheel -> UP.
+    const wheelFirstGuardOnly = ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario);
+    const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";
     const m198Plan = planM198GuardBreakW3cExchange({
       parryWindowMs: COMBAT.block.parryWindowMs,
       shortBlockMs: COMBAT.block.shortBlockMs,
@@ -10062,8 +10066,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // DOWN ACK barrier (52ms physical hold on e7ce01df). Actual DOM edges,
         // wheel ACK and all guard/HP/parry gates below remain mandatory.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
-          trustedWheelWaitMs: wheelFirstGuardOnly ? 190 : 0,
+          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
+          postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
@@ -10142,7 +10147,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m320AuthoritativeLines = m201ServerOutput()
         .slice(m320ServerOutputStart)
         .split(/\r?\n/)
-        .filter(line => /^M201_AUTH_(ACTION|BLOCK|PARRY|BREAK) /.test(line))
+        .filter(line => /^(M201_AUTH_(ACTION|BLOCK|PARRY|BREAK|HIT)|CORE8C_WORLD_CONTACT) /.test(line))
         .slice(-16);
       console.log("M320_GUARD_BREAK_AUTH_TRACE " + JSON.stringify({
         attempt: attempt + 1,
