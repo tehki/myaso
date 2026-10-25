@@ -8211,7 +8211,7 @@ async function calibrateNativeParryIngress(
   return result;
 }
 
-async function waitForM41WorldWindup(attacker, timeoutMs) {
+async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount) {
   // Both hints come solely from the replicated original World action.
   // A short genuine LMB first enters HeavyWindup before transitioning to
   // LightWindup on release. The Heavy hint can arrive ~50ms earlier;
@@ -8220,10 +8220,13 @@ async function waitForM41WorldWindup(attacker, timeoutMs) {
     "Heavy strike committed - the long windup is readable.",
     "Attack committed - your windup is readable.",
   ]);
+  if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0) {
+    throw new TypeError("M41 requires a nonnegative current-attempt event baseline");
+  }
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const evidence = await readUiEvidence(attacker);
-    const cue = evidence.events.find((event) => authoritativeCues.has(event));
+    const cue = evidence.events.slice(baselineEventCount).find((event) => authoritativeCues.has(event));
     if (cue) return cue;
     await sleep(10);
   }
@@ -8292,7 +8295,13 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // do we issue the defender's ONE genuine W3C wheel-back.
       // No second attack, client-authored parry or modified World timings.
       await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
-      const authoritativeWindup = await waitForM41WorldWindup(attacker, 180);
+      const attemptAttackerBaseline = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
+      if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
+        throw new Error("M41 could not record current-attempt original World cue baseline");
+      }
+      const authoritativeWindup = await waitForM41WorldWindup(
+        attacker, 180, attemptAttackerBaseline.events.length,
+      );
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
         attacker: attacker.name, cue: authoritativeWindup,
       }));

@@ -9,7 +9,7 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.ok(start >= 0, "M41 must have a dedicated authoritative choreography branch");
   const rest = source.slice(start, source.indexOf("} else {", start));
   const genuineAttack = rest.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);");
-  const worldMessage = rest.indexOf("await waitForM41WorldWindup(attacker, 180);");
+  const worldMessage = rest.indexOf("await waitForM41WorldWindup(");
   const genuineWheel = rest.indexOf("await setArenaBlock(defender, defenderElementId, true);");
   assert.ok(genuineAttack >= 0 && worldMessage > genuineAttack && genuineWheel > worldMessage,
     "M41 must observe original World windup before one actual defender wheel");
@@ -17,6 +17,14 @@ test("M41 native parry waits for the original replicated World windup before its
     "the transient authoritative Heavy windup must be available as the first genuine stage");
   assert.match(source, /async function waitForM41WorldWindup[\s\S]*?Attack committed - your windup is readable\./,
     "the authoritative Light-windup fallback must remain available");
+  assert.match(source, /async function waitForM41WorldWindup\(attacker, timeoutMs, baselineEventCount\)/,
+    "M41 cue must require an explicit per-attempt baseline");
+  assert.match(source, /evidence\.events\.slice\(baselineEventCount\)\.find\(/,
+    "stale windup cues from earlier attempts must never trigger another wheel");
+  assert.match(source, /lastAttemptBaseline\.find\(\(entry\) => entry\.browser === attacker\.name\)/,
+    "fresh cue baseline must come from the attacker immediately before this attack");
+  assert.match(source, /attacker, 180, attemptAttackerBaseline\.events\.length/,
+    "M41 must pass the current genuine attempt offset into cue admission");
   assert.match(source, /M33 genuine short-click parry resolved unexpectedly:/,
     "a genuine HP or guard impact must remain a fatal failure");
   assert.match(source, /M41 remote parry-stun tell never appeared:/,
