@@ -521,7 +521,7 @@ def run_render(target_path: Path, source_archive: Path, source_suffix: str, outp
             texture = image_cache[image_index]
         mat = pyrender.MetallicRoughnessMaterial(
             baseColorTexture=texture,
-            baseColorFactor=tuple(pbr.get("baseColorFactor", [1, 1, 1, 1])),
+            baseColorFactor=tuple(float(v) for v in pbr.get("baseColorFactor", [1.0, 1.0, 1.0, 1.0])),
             metallicFactor=float(pbr.get("metallicFactor", 1.0)),
             roughnessFactor=float(pbr.get("roughnessFactor", 1.0)),
             alphaMode=material_doc.get("alphaMode", "OPAQUE"),
@@ -648,7 +648,7 @@ def run_render(target_path: Path, source_archive: Path, source_suffix: str, outp
                     scene.add(light_a, pose=look_at(center + np.asarray([3., 5., 4.]), center))
                     scene.add(light_b, pose=look_at(center + np.asarray([-3., 2., -2.]), center))
                     rgba, _ = renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
-                    alpha_pixels = int((rgba[:, :, 3] > 0).sum())
+                    alpha_pixels = int((rgba[:, :, 3] > 127).sum())
                     if not 250 <= alpha_pixels <= 20_000:
                         raise ValueError(f"{clip_name} phase {fraction} direction {direction}: blank/clipped frame ({alpha_pixels})")
                     frame = Image.fromarray(rgba, mode="RGBA")
