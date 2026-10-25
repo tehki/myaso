@@ -69,7 +69,51 @@ def install_piece(name, location, yaw, source):
         obj.matrix_world = world_matrix
     pivot.location = Vector(location)
     pivot.rotation_euler[2] = math.radians(yaw)
-    return len(meshes)
+    return len(meshes), meshes
+
+
+def mesh_world_bounds(meshes):
+    """Imported ORIGINAL Quaternius mesh vertices, never surrogate geometry."""
+    corners = []
+    for item in meshes:
+        corners.extend(item.matrix_world @ Vector(v) for v in item.bound_box)
+    if not corners:
+        raise ValueError("original imported mesh bounds absent")
+    return {name: (min(v[i] for v in corners), max(v[i] for v in corners))
+            for i, name in enumerate(("x", "y", "z"))}
+
+
+def verify_actual_original_door_alignment(spec, imported):
+    """Fail-closed on the genuine Blender world-space meshes, not manifest poses."""
+    door_name, frame_name = spec["doorModel"], spec["frameModel"]
+    if door_name not in imported or frame_name not in imported:
+        raise ValueError("original Quaternius door or arched frame missing")
+    door = mesh_world_bounds(imported[door_name])
+    frame = mesh_world_bounds(imported[frame_name])
+    center = lambda bounds, axis: sum(bounds[axis]) / 2.0
+    horizontal = abs(center(door, "x") - center(frame, "x"))
+    depth = abs(center(door, "y") - center(frame, "y"))
+    bottom_gap = door["z"][0] - frame["z"][0]
+    above = frame["z"][1] - door["z"][1]
+    if horizontal > spec["maximumCenterOffsetMeters"]:
+        raise ValueError("real Blender door offset from arched frame center: " + str(horizontal))
+    if not 0 <= bottom_gap <= spec["maximumBottomOffsetMeters"]:
+        raise ValueError("real door threshold floats or falls below frame: " + str(bottom_gap))
+    if depth > spec["maximumDepthOffsetMeters"]:
+        raise ValueError("real door leaf protrudes from frame plane: " + str(depth))
+    if above < 0:
+        raise ValueError("original door top penetrates arched frame")
+    return {"verifiedGenuineImportedBlenderMeshes": True,
+            "doorModel": door_name, "frameModel": frame_name,
+            "doorXWorldCenter": center(door, "x"),
+            "frameXWorldCenter": center(frame, "x"),
+            "horizontalCenterOffsetMeters": horizontal,
+            "depthCenterOffsetMeters": depth,
+            "thresholdBottomOffsetMeters": bottom_gap,
+            "frameTopClearanceMeters": above,
+            "doorMeshWorldBounds": door,
+            "frameMeshWorldBounds": frame,
+            "unchangedOriginalMeshVertexData": True}
 
 
 def apply_blood_iron_review_palette():
@@ -144,10 +188,19 @@ def main():
     pieces = cfg["sample"]["parts"]
     selected = set(cfg["selection"])
     counts = []
+    imported = {}
     for part in pieces:
         if part["model"] not in selected:
             raise ValueError("Model outside the CC0 reviewed Standard selection: " + part["model"])
-        counts.append(install_piece(part["model"], part["at"], part["yawDeg"], source))
+        count, meshes = install_piece(part["model"], part["at"], part["yawDeg"], source)
+        counts.append(count)
+        imported.setdefault(part["model"], []).extend(meshes)
+    # Geometry evidence is measured in Blender WORLD coordinates after actual
+    # original glTF import and parent transforms have been applied.
+    door_alignment = verify_actual_original_door_alignment(
+        cfg["sample"]["doorFrameAlignment"], imported)
+    print("GRAPHICS3B_ORIGINAL_QUATERNIUS_REAL_DOOR_ALIGNMENT_PASS " +
+          json.dumps(door_alignment, sort_keys=True))
     review_roof_materials = apply_blood_iron_review_palette()
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -203,6 +256,7 @@ def main():
         "sourceMirrorCommit": cfg["source"]["mirrorCommit"],
         "mirrorVerifiedByteIdenticalToOfficialArchive": False,
         "sourceLicense": cfg["source"]["license"],
+        "doorFrameAlignment": door_alignment,
         "sourceTextureFilesOverwritten": False,
         "materialReview": {"roofMaterialNodesChanged": review_roof_materials,
           "roofSaturation": 0.62, "roofValue": 0.72,

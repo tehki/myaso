@@ -19,7 +19,9 @@ else try{
  const manifest=await (await fetch(sourceBase+"greyhaven-quaternius-2d5-review-manifest.json",{cache:"no-store"})).json();
  if(manifest.kind!=="graphics3b-quaternius-real-blender-v2-review-2d5" ||
     manifest.placedInWorld9!==false||manifest.serverAuthorized!==false||
-    manifest.noChangedRedLion!==true||manifest.sourceCreatorArchiveMirrorParityVerified!==false)
+    manifest.noChangedRedLion!==true||manifest.sourceCreatorArchiveMirrorParityVerified!==false||
+    manifest.realQuaterniusDoorFrameWorldBoundsVerified!==true||
+    !(manifest.doorFrameCenterOffsetMeters>=0&&manifest.doorFrameCenterOffsetMeters<=0.015))
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={};
  for(const key of ["day","dusk"]){
