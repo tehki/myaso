@@ -6,7 +6,7 @@ import {createInputRedundancy} from "../src/network/input-redundancy.mjs";
 import {InputIngressWindow} from "../src/network/input-ingress.mjs";
 
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
-async function blockedReleaseFlight(release,{blockTick=58}={}){
+async function blockedReleaseFlight(release,{blockTick=58,neutralTicks=3}={}){
   const original=globalThis.WebTransport;
   let unblock;
   const gate=new Promise(resolve=>{unblock=resolve;});
@@ -34,13 +34,29 @@ async function blockedReleaseFlight(release,{blockTick=58}={}){
       client.sendInput({tick,attack:true,heavyAttack:true});await flush();
     }
     client.sendInput({tick:blockTick+1,...release});
-    for(const tick of [blockTick+2,blockTick+3,blockTick+4])client.sendInput({tick});
+    for(let tick=blockTick+2;tick<=blockTick+1+neutralTicks;tick++)client.sendInput({tick});
     unblock();await flush();
     return written;
   }finally{
     client.close();unblock();await flush();
     if(original===undefined)delete globalThis.WebTransport;else globalThis.WebTransport=original;
   }
+}
+
+for(const [name,release] of [["light",{attack:true,heavyAttack:false}],["heavy",{attack:false,heavyAttack:true}]]){
+  test(`actual ${name} terminal retains its ORIGINAL three frames after more than four ticks of stalled writes`,async()=>{
+    const written=await blockedReleaseFlight(release,{blockTick:79,neutralTicks:7});
+    assert.deepEqual(written.slice(-4).map(p=>p.clientTick),[80,81,82,87]);
+    assert.equal(written.at(-1).samples.some(s=>s.tick===80),false,
+      "latest neutral no longer contains the expired terminal; recovery must use ORIGINAL frames");
+    for(const packet of written.filter(p=>p.clientTick>=80&&p.clientTick<=82)){
+      const terminal=packet.samples.find(s=>s.tick===80);
+      assert.ok(terminal);
+      assert.equal(terminal.attack,release.attack);
+      assert.equal(terminal.heavyAttack,release.heavyAttack);
+      assert.ok(((packet.clientTick-terminal.tick)>>>0)<=2);
+    }
+  });
 }
 
 test("actual long-held heavy release remains the original one-bit physical terminal after congestion",async()=>{
@@ -54,7 +70,7 @@ test("actual long-held heavy release remains the original one-bit physical termi
 
 test("actual standard client preserves committed light release59 through blocked held write58",async()=>{
   const written=await blockedReleaseFlight({attack:true,heavyAttack:false,moveY:-1,facing:0.75});
-  assert.deepEqual(written.map(p=>p.clientTick),[56,57,58,59,62],"same writer retains original action replay frames before latest movement");
+  assert.deepEqual(written.map(p=>p.clientTick),[56,57,58,59,60,61,62],"same writer retains original hold AND terminal replay frames before latest movement");
   assert.ok(written.filter(p=>p.clientTick===57||p.clientTick===58)
     .every(p=>p.samples[0].attack&&p.samples[0].heavyAttack),"real held samples were written first");
   const latest=written.at(-1);

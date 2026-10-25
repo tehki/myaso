@@ -1,4 +1,4 @@
-// Retain only ORIGINAL authored v1 packets carrying a rising action's three
+// Retain only ORIGINAL authored v1 packets carrying a genuine action's three
 // encoded replay opportunities. One transport writer consumes these bytes;
 // this helper never authors input, changes ticks/bits, allocates actors or ACKs.
 import {decodeInputPacket} from "./input-codec.mjs";
@@ -35,7 +35,9 @@ export function createV1InputReplayWindow({capacity=8,stallMs=1500,onStall}={}) 
     for(let i=0;i<packet.samples.length;i++){
       const sample=packet.samples[i],older=packet.samples[i+1]
         ??(previous&&newer(sample.tick,previous.tick)?previous:null);
-      if((older&&(actionMask(sample)&~actionMask(older)))
+      const committedRelease=older?.attack&&older.heavyAttack
+        &&Boolean(sample.attack)!==Boolean(sample.heavyAttack);
+      if((older&&((actionMask(sample)&~actionMask(older))||committedRelease))
         ||(!previous&&packet.samples.length===1&&actionMask(sample)))edges.add(sample.tick);
     }
     previous=packet.samples[0];
