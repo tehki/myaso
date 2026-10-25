@@ -1991,6 +1991,77 @@ mod m201_original_world_contact_tests {
         assert_eq!(world.fighter(2).unwrap().hp, 100.0);
         assert_eq!(world.fighter(2).unwrap().guard, 62.0);
     }
+
+    #[test]
+    fn fresh_original_world_parry_contact_has_correct_life_age_and_no_hit() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 255.0, 200.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
+        ));
+        let mut previous = BTreeMap::new();
+        // Commit an actual light windup before the defender's later fresh
+        // block. No synthetic collision tick, HIT receipt or parry event.
+        for _ in 0..4 {
+            let mut events = Vec::new();
+            world.step_into(&mut events);
+            let _ = m201_flight_proof_lines(&world, &events, &mut previous);
+        }
+        assert!(world.set_input(
+            2,
+            InputIntent {
+                block: true,
+                facing_radians: std::f32::consts::PI,
+                ..InputIntent::default()
+            }
+        ));
+        let mut contact = None;
+        for _ in 0..20 {
+            let mut events = Vec::new();
+            world.step_into(&mut events);
+            let lines = m201_flight_proof_lines(&world, &events, &mut previous);
+            if events.iter().any(|event| {
+                matches!(event, CombatEvent::Parry { attacker: 1, target: 2 })
+            }) {
+                assert!(!events.iter().any(|event| {
+                    matches!(event, CombatEvent::Hit { .. } | CombatEvent::Block { .. })
+                }));
+                contact = lines.into_iter().find(|line| {
+                    line.contains("CORE8C_WORLD_CONTACT")
+                        && line.contains("outcome=PARRY")
+                        && line.contains("attacker=1 target=2")
+                });
+                break;
+            }
+        }
+        let contact = contact.expect("real original World parry must have contact evidence");
+        let attacker = world.fighter(1).expect("original World attacker");
+        let defender = world.fighter(2).expect("original World defender");
+        assert!(contact.contains(&format!("tick={}", world.tick)));
+        assert!(contact.contains(&format!("world={}", world.world_instance())));
+        assert!(contact.contains(&format!("attackerLife={}", attacker.world_incarnation())));
+        assert!(contact.contains(&format!("targetLife={}", defender.world_incarnation())));
+        assert!(contact.contains(&format!(
+            "defenderActionElapsedMs={:.1}",
+            defender.action_elapsed_ms
+        )));
+        assert!(
+            defender.action_elapsed_ms <= 125.0,
+            "fresh original World block must parry within the protected window"
+        );
+        assert!(contact.contains("defenderAction=6"));
+        assert!(contact.contains("defenderHp=100.0"));
+        assert!(contact.contains("defenderGuard=100.0"));
+        assert_eq!(attacker.action.wire_code(), 7, "genuine parry stuns attacker");
+        assert_eq!(defender.hp, 100.0);
+        assert_eq!(defender.guard, 100.0);
+    }
 }
 
 #[cfg(test)]
