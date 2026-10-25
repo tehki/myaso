@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "title": "Quaternius Medieval Village MegaKit — Greyhaven Blood & Iron architecture review",
+  "source": {
+    "author": "Quaternius",
+    "originalPage": "https://quaternius.com/packs/medievalvillagemegakit.html",
+    "creatorPublishedStandard": "https://opengameart.org/content/medieval-village-megakit",
+    "officialEdition": "Standard (free, 176 source models)",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "mirror": "https://github.com/J-Ponzo/gltf-medieval-village-megakit",
+    "mirrorCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+    "mirrorOnlyGlTF": true,
+    "mirroredArchiveByteParityVerified": false
+  },
+  "scope": {
+    "status": "artist-preview-only",
+    "runtimeOptInOnly": true,
+    "preserveOriginalRedLion": true,
+    "noOriginalRoofChange": true,
+    "noLiveCollisionAuthority": true,
+    "noCombatChange": true,
+    "noServerChange": true,
+    "noItemsOrSwords": true,
+    "noProductionActivation": true
+  },
+  "selection": [
+    "Wall_Plaster_Window_Wide_Round",
+    "Wall_Plaster_Door_Round",
+    "Wall_UnevenBrick_Straight",
+    "Wall_Plaster_WoodGrid",
+    "Wall_Plaster_Straight",
+    "Door_1_Round",
+    "DoorFrame_Round_WoodDark",
+    "Window_Wide_Round1",
+    "Roof_RoundTiles_4x4",
+    "Prop_Chimney",
+    "Prop_Crate"
+  ],
+  "sample": {
+    "id": "greyhaven-quaternius-masonry-cottage-review",
+    "unscaledLocalUnits": "Quaternius glTF meters; authoring-only, not World9 coords",
+    "buildingFootprint": [
+      4,
+      4
+    ],
+    "parts": [
+      {
+        "model": "Wall_Plaster_Window_Wide_Round",
+        "at": [
+          -1,
+          -2,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Wall_Plaster_Door_Round",
+        "at": [
+          1,
+          -2,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Wall_UnevenBrick_Straight",
+        "at": [
+          -1,
+          2,
+          0
+        ],
+        "yawDeg": 180
+      },
+      {
+        "model": "Wall_UnevenBrick_Straight",
+        "at": [
+          1,
+          2,
+          0
+        ],
+        "yawDeg": 180
+      },
+      {
+        "model": "Wall_Plaster_WoodGrid",
+        "at": [
+          -2,
+          -1,
+          0
+        ],
+        "yawDeg": 90
+      },
+      {
+        "model": "Wall_Plaster_WoodGrid",
+        "at": [
+          -2,
+          1,
+          0
+        ],
+        "yawDeg": 90
+      },
+      {
+        "model": "Wall_Plaster_Straight",
+        "at": [
+          2,
+          -1,
+          0
+        ],
+        "yawDeg": -90
+      },
+      {
+        "model": "Wall_Plaster_Straight",
+        "at": [
+          2,
+          1,
+          0
+        ],
+        "yawDeg": -90
+      },
+      {
+        "model": "DoorFrame_Round_WoodDark",
+        "at": [
+          1,
+          -2.02,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Door_1_Round",
+        "at": [
+          1,
+          -2.05,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Window_Wide_Round1",
+        "at": [
+          -1,
+          -2.04,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Roof_RoundTiles_4x4",
+        "at": [
+          0,
+          0,
+          3
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Prop_Chimney",
+        "at": [
+          1.25,
+          0.7,
+          4.05
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Prop_Crate",
+        "at": [
+          -1.6,
+          -3.15,
+          0
+        ],
+        "yawDeg": 20
+      }
+    ]
+  },
+  "output": {
+    "render": [
+      "greyhaven-quaternius-cottage-day.png",
+      "greyhaven-quaternius-cottage-dusk.png"
+    ],
+    "sourceBlend": "greyhaven-quaternius-cottage-source.blend",
+    "pngTransparent": true,
+    "finalArtApproved": false
+  }
+}
