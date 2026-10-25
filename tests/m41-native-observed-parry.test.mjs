@@ -1,19 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "../scripts/m41-native-observed-parry.mjs";
-const cue="Heavy strike committed - the long windup is readable.";
-const state={online:"Online - player #1 - server tick 1637",events:[cue],eventTransitions:[{text:cue,t:1176.4}]};
+const heavy="Heavy strike committed - the long windup is readable.";
+const cue="Attack committed - your windup is readable.";
+const state={online:"Online - player #1 - server tick 1637",events:[heavy,cue],
+  eventTransitions:[{text:heavy,t:1173.0},{text:cue,t:1176.4}]};
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const tick=()=>new Promise(setImmediate);
 
 test("scalar cue is actual fresh same-actor recorded World text, never stale history or a copied foreign cue",()=>{
   assert.equal(readM41ScalarWorldCue(state,0,1).t,1176.4);
   assert.equal(readM41ScalarWorldCue(state,0,2),null);
-  assert.equal(readM41ScalarWorldCue(state,1,1),null);
-  assert.equal(readM41ScalarWorldCue({...state,eventTransitions:[{text:"forged",t:1176.4}]},0,1),null);
+  assert.equal(readM41ScalarWorldCue(state,1,1).t,1176.4);
+  assert.equal(readM41ScalarWorldCue(state,2,1),null);
+  assert.equal(readM41ScalarWorldCue({...state,events:[heavy],
+    eventTransitions:[{text:heavy,t:1173.0}]},0,1),null,
+    "an earlier real heavy charge cannot trigger the short-click wheel");
+  assert.equal(readM41ScalarWorldCue({...state,eventTransitions:[{text:heavy,t:1173.0},{text:"forged",t:1176.4}]},0,1),null);
   assert.equal(readM41ScalarWorldCue({...state,eventTransitions:[]},0,1),null);
   assert.equal(readM41ScalarWorldCue({...state,events:["Opponent hit - 34 HP."]},0,1),null);
-  assert.equal(readM41ScalarWorldCue({...state,events:[cue,"Opponent hit - 34 HP."]},0,1),null,
+  assert.equal(readM41ScalarWorldCue({...state,events:[heavy,cue,"Opponent hit - 34 HP."]},0,1),null,
     "a fresh but already superseded windup cannot trigger a late native wheel");
 });
 test("fresh observed cue sends one native wheel before unrelated click ACK, but both ACKs remain mandatory",async()=>{

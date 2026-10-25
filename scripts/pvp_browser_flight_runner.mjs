@@ -8265,11 +8265,11 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     if (cue?.actorId === expectedActorId
       && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
       && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
-      && ["Heavy strike committed - the long windup is readable.", "Attack committed - your windup is readable."].includes(cue.text)
-      && ["Heavy strike committed - the long windup is readable.", "Attack committed - your windup is readable."].includes(cue.latestText)) return cue;
+      && cue.text === "Attack committed - your windup is readable."
+      && cue.latestText === "Attack committed - your windup is readable.") return cue;
     await sleep(10);
   }
-  throw new Error("M41 native attacker never exposed a fresh original World windup");
+  throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
 
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
@@ -11522,14 +11522,17 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
           && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event, focusLabel: focus } : null;
       `);
       if (isM147RenderedRecoveryCue(cue, jumpId)) { recoveryCue = cue; break; }
-      await sleep(8);
+      // Every driver round trip already yields; do not add another 8ms
+      // while the strict original World recovery window is counting down.
+      await sleep(1);
     }
     if (!recoveryCue) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    // Genuine pre-aimed native LMB: 20 ms stays within the original helper's
-    // 20..35 ms short-click bounds. Actual trusted release is checked below.
-    await performArenaM221GuardBreakClick(observer, 20);
+    // Genuine pre-aimed single-transaction native LMB. A 5ms hold keeps
+    // the same release classifier and trusted DOWN/UP assertions while
+    // reducing dispatch latency inside the unchanged recovery window.
+    await performArenaM221GuardBreakClick(observer, 5);
   } finally {
     const jumpError = await jumpCommand;
     if (jumpError) throw jumpError;
@@ -11672,8 +11675,27 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       || punishDown.pointerId !== punishUp.pointerId) {
     throw new Error(`${milestone} did not preserve one genuine same-pointer short release: ${JSON.stringify({ punishDown, punishUp })}`);
   }
+  // Read-only native chronology BEFORE the strict World proof. Keep a
+  // bounded actor/tick/input timeline even when the HIT is too late; this
+  // does not create input, change the choreography, or waive any assertion.
+  const actualWorldTrace = m201ServerOutput().slice(worldProofOffset);
+  console.log("M147_PRE_GATE_CHRONOLOGY " + JSON.stringify({
+    actors: { victim: jumpId, punisher: observerId, idle: closerId },
+    cue: { epochMs: recoveryCue.epochMs, t: recoveryCue.t,
+      state: recoveryCue.state, detail: recoveryCue.detail,
+      focusLabel: recoveryCue.focusLabel },
+    physical: { jumpDown: jumpDowns[0], jumpUp: jumpUps[0],
+      punishDown, punishUp, },
+    recovery: { entry: recovery, exit: idle },
+    focus: focusTransitions.slice(-6),
+    inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    sentSamples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
+    worldActions: actualWorldTrace.split(/\\r?\\n/)
+      .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
+      .slice(-24),
+  }));
   const worldRecoveryProof = verifyM147WorldRecoveryProof(
-    m201ServerOutput().slice(worldProofOffset),
+    actualWorldTrace,
     { jumpId, punisherId: observerId, closerId },
   );
   console.log(`M147_WORLD_RECOVERY_PROOF ${JSON.stringify(worldRecoveryProof)}`);

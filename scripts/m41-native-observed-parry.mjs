@@ -6,19 +6,18 @@ export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId
   const actorId = Number(state?.online?.match(/player #(\d+)/)?.[1]);
   if (actorId !== expectedActorId || !Array.isArray(state?.events)
       || state.events.length < baselineEventCount) return null;
+  // Heavy charging can precede the short-click release. Dispatching a
+  // defensive wheel on that earlier cue starts Block too soon and converts
+  // an otherwise valid Parry into an ordinary guard-damage BLOCK. Require
+  // the genuine current-attempt light-windup cue, still latest on-screen.
   const latestText = state.events.at(-1);
-  if (latestText !== "Heavy strike committed - the long windup is readable."
-      && latestText !== "Attack committed - your windup is readable.") return null;
-  for (let index = baselineEventCount; index < state.events.length; index++) {
-    const text = state.events[index];
-    if (text !== "Heavy strike committed - the long windup is readable."
-        && text !== "Attack committed - your windup is readable.") continue;
-    const transition = state.eventTransitions?.[index];
-    if (transition?.text !== text || !Number.isFinite(transition.t) || transition.t < 0) return null;
-    return { actorId, eventIndex:index, text, t:transition.t,
-      eventCount:state.events.length, latestText };
-  }
-  return null;
+  if (latestText !== "Attack committed - your windup is readable.") return null;
+  const index = state.events.length - 1;
+  if (index < baselineEventCount) return null;
+  const transition = state.eventTransitions?.[index];
+  if (transition?.text !== latestText || !Number.isFinite(transition.t) || transition.t < 0) return null;
+  return { actorId, eventIndex:index, text:latestText, t:transition.t,
+    eventCount:state.events.length, latestText };
 }
 
 export async function dispatchM41ObservedParry({ sendAttack, awaitWorldCue, sendWheel }) {
