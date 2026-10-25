@@ -978,11 +978,11 @@ function simulatePrediction(stepMs) {
     // sample provenance, scoped to native acceptance only. Never forge input.
     const m41InputProbe = acceptanceScenario === "uiparrytell"
       || acceptanceScenario === "uistun";
-    if (m41InputProbe
-      || acceptanceScenario === "uimultirecoveryspatial"
+    if (acceptanceScenario === "uimultirecoveryspatial"
       || acceptanceScenario === "uijumprecoveryffa"
       || acceptanceScenario === "uijumppunishffa"
-      || acceptanceScenario === "uimultirecoveryffa") {
+      || acceptanceScenario === "uimultirecoveryffa"
+      || m41InputProbe) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
