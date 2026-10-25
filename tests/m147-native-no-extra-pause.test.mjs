@@ -16,6 +16,8 @@ test("M147 genuine recovery cue precedes one pause-free W3C LMB and strict World
   const strict = m147.indexOf("verifyM147WorldRecoveryProof(");
   assert.ok(cue >= 0 && click > cue && strict > click, "require visible cue, genuine W3C and original World qualification");
   assert.ok(!m147.includes("performArenaM221GuardBreakClick(observer, 5)"));
+  const criticalPoll = m147.slice(m147.indexOf("while (Date.now() < recoveryDeadline)"), click);
+  assert.ok(!criticalPoll.includes("await sleep("), "do not delay native W3C action after scalar recovery poll");
   assert.match(flight, /async function performArenaM221GuardBreakClick\(session, clickHoldMs = 10\)/);
   assert.match(flight, /\{ type: "pointerDown", button: 0 \}/);
   assert.match(flight, /\{ type: "pointerUp", button: 0 \}/);

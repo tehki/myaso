@@ -11524,9 +11524,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
           && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event, focusLabel: focus } : null;
       `);
       if (isM147RenderedRecoveryCue(cue, jumpId)) { recoveryCue = cue; break; }
-      // Every driver round trip already yields; do not add another 8ms
-      // while the strict original World recovery window is counting down.
-      await sleep(1);
+      // Each awaited real WebDriver scalar poll already yields to both native
+      // browser drivers. Avoid an additional timer turn while the original
+      // 60Hz recovery clock advances; no synthetic event or early attack.
     }
     if (!recoveryCue) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
