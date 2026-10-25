@@ -11,13 +11,21 @@ const end = flight.indexOf("async function runOnlineUiMultiRecoveryFfaFocusFligh
 const m147 = flight.slice(start, end);
 test("M147 genuine recovery cue precedes one pause-free W3C LMB and strict World proof", () => {
   assert.ok(start >= 0 && end > start, "M147 genuine native function must exist");
-  const cue = m147.indexOf("isM147RenderedRecoveryCue(cue, jumpId)");
+  const observer = m147.indexOf("`/session/${observer.sessionId}/execute/async`");
+  const cue = m147.indexOf("isM147RenderedRecoveryCue(recoveryCue, jumpId)");
   const click = m147.indexOf("await performArenaM221GuardBreakClick(observer, 0)");
   const strict = m147.indexOf("verifyM147WorldRecoveryProof(");
-  assert.ok(cue >= 0 && click > cue && strict > click, "require visible cue, genuine W3C and original World qualification");
+  assert.ok(observer >= 0 && cue > observer && click > cue && strict > click,
+    "observe the genuine rendered cue, send one real W3C click, then enforce original World proof");
   assert.ok(!m147.includes("performArenaM221GuardBreakClick(observer, 5)"));
-  const criticalPoll = m147.slice(m147.indexOf("while (Date.now() < recoveryDeadline)"), click);
-  assert.ok(!criticalPoll.includes("await sleep("), "do not delay native W3C action after scalar recovery poll");
+  const criticalPoll = m147.slice(observer, click);
+  assert.ok(!criticalPoll.includes("await sleep("), "do not delay native W3C action after recovery observation");
+  assert.match(criticalPoll, /state\.recoveryTransitions \?\? \[\]/);
+  assert.match(criticalPoll, /!recovery\.hidden/);
+  assert.match(criticalPoll, /focus === 'PUNISH TARGET #' \+ victimId/);
+  assert.match(criticalPoll, /row\.label === 'PUNISH'/);
+  assert.match(criticalPoll, /const pristine =/);
+  assert.match(criticalPoll, /setInterval\(check, 4\)/);
   assert.match(flight, /async function performArenaM221GuardBreakClick\(session, clickHoldMs = 10\)/);
   assert.match(flight, /\{ type: "pointerDown", button: 0 \}/);
   assert.match(flight, /\{ type: "pointerUp", button: 0 \}/);

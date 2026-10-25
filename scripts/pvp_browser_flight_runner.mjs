@@ -11502,33 +11502,49 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // other driver's jump command ACK. Every command is still awaited below.
   const jumpCommand = performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)
     .then(() => null, (error) => error);
-  const recoveryDeadline = Date.now() + 900;
   let recoveryCue = null;
   try {
-    while (Date.now() < recoveryDeadline) {
-      // Read-only scalar; keep full three-browser histories off the critical
-      // response path. This reads real rendered state and existing cue history.
-      const cue = await execute(observer.base, observer.sessionId, `
-        const state = window.__MYASO_M30_UI__ ?? {};
-        const recovery = document.querySelector('#opponent-recovery');
-        const focus = document.querySelector('#focus-label')?.textContent?.trim();
-        const event = (state.recoveryTransitions ?? []).slice(${observerRecoveryOffset})
-          .find((entry) => entry.visible && entry.state === 'jump-attack-recovery'
-            && entry.label === 'PUNISH' && entry.detail === 'Jump attack recovery'
-            && Number.isFinite(entry.epochMs));
-        const pristine = ['#player-hp-value', '#player-guard-value',
-          '#bot-hp-value', '#bot-guard-value'].every((selector) =>
-            document.querySelector(selector)?.textContent?.trim() === '100');
-        return event && recovery && !recovery.hidden
-          && recovery.dataset.state === 'jump-attack-recovery'
-          && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event, focusLabel: focus } : null;
-      `);
-      if (isM147RenderedRecoveryCue(cue, jumpId)) { recoveryCue = cue; break; }
-      // Each awaited real WebDriver scalar poll already yields to both native
-      // browser drivers. Avoid an additional timer turn while the original
-      // 60Hz recovery clock advances; no synthetic event or early attack.
-    }
-    if (!recoveryCue) {
+    // Use the already-supported native W3C asynchronous browser observer
+    // rather than many sequential WebDriver HTTP scalar polls. The only
+    // observed signal is the SAME actually rendered recovery/focus/vitals
+    // gate, registered before the genuine Firefox LMB is dispatched.
+    // No fabricated action, input writer or World timeline is introduced.
+    recoveryCue = await webdriver(observer.base, "POST",
+      `/session/${observer.sessionId}/execute/async`, {
+        script: `
+          const [offset, victimId, timeoutMs] = arguments;
+          const done = arguments[arguments.length - 1];
+          const started = performance.now();
+          const inspect = () => {
+            const state = window.__MYASO_M30_UI__ ?? {};
+            const recovery = document.querySelector('#opponent-recovery');
+            const focus = document.querySelector('#focus-label')?.textContent?.trim();
+            const entry = (state.recoveryTransitions ?? []).slice(offset)
+              .find((row) => row.visible && row.state === 'jump-attack-recovery'
+                && row.label === 'PUNISH' && row.detail === 'Jump attack recovery'
+                && Number.isFinite(row.epochMs));
+            const pristine = ['#player-hp-value', '#player-guard-value',
+              '#bot-hp-value', '#bot-guard-value'].every((selector) =>
+                document.querySelector(selector)?.textContent?.trim() === '100');
+            return entry && recovery && !recovery.hidden
+              && recovery.dataset.state === 'jump-attack-recovery'
+              && focus === 'PUNISH TARGET #' + victimId && pristine
+              ? { ...entry, focusLabel: focus } : null;
+          };
+          let poll;
+          const check = () => {
+            const cue = inspect();
+            if (cue || performance.now() - started >= timeoutMs) {
+              clearInterval(poll);
+              done(cue ?? null);
+            }
+          };
+          poll = setInterval(check, 4);
+          check();
+        `,
+        args: [observerRecoveryOffset, jumpId, 900],
+      });
+    if (!isM147RenderedRecoveryCue(recoveryCue, jumpId)) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
     // M147: once the genuine recovery cue is visibly present, dispatch one

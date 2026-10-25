@@ -40,5 +40,6 @@ test("standard M147 accepts only actual finite rendered recovery cue for the sel
     {...cue,visible:false},{...cue,focusLabel:"PUNISH TARGET #3"}])
     assert.equal(isM147RenderedRecoveryCue(absent,1),false);
   assert.equal(isM147RenderedRecoveryCue(cue,1),true);
-  assert.match(source,/if \(isM147RenderedRecoveryCue\(cue, jumpId\)\)/);
+  assert.match(source,/if \(!isM147RenderedRecoveryCue\(recoveryCue, jumpId\)\)/);
+  assert.match(source,/\/session\/\$\{observer.sessionId\}\/execute\/async/);
 });
