@@ -1,8 +1,8 @@
 # 🌕🎨 Graphics 3A — Owner-approved external character library intake (P1, nonrelease)
 
-**Decision date:** 2026-10-25  
-**Status:** OWNER SELECTED / SOURCE ACQUISITION AND TECHNICAL QUALIFICATION PENDING  
-**Authority:** Graphics Orchestrator 3 / Main Orchestrator 0; see [P1 Graphics #1030](https://github.com/tehki/myaso/issues/1030).  
+**Decision date:** 2026-10-25
+**Status:** OWNER SELECTED / SOURCE ACQUISITION AND TECHNICAL QUALIFICATION PENDING
+**Authority:** Graphics Orchestrator 3 / Main Orchestrator 0; see [P1 Graphics #1030](https://github.com/tehki/myaso/issues/1030).
 **Budget authorization:** free Standard tiers only; no purchases or paid Source tier.
 
 ## Approved — acquire, evaluate and license-audit
