@@ -240,10 +240,8 @@ fn disconnect_during_light_or_heavy_windup_fences_old_edges_without_ghost_hit() 
 
         let old_lease = 51;
         let fresh_lease = 52;
-        let mut old = SessionGestureWorldPath::from_admitted_world(
-            &world, 1, old_lease, boot,
-        )
-        .expect("old session admitted by authoritative World");
+        let mut old = SessionGestureWorldPath::from_admitted_world(&world, 1, old_lease, boot)
+            .expect("old session admitted by authoritative World");
         let old_binding = old.binding();
         assert_eq!(
             admit(
@@ -288,10 +286,8 @@ fn disconnect_during_light_or_heavy_windup_fences_old_edges_without_ghost_hit() 
 
         assert!(world.remove_player(1));
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
-        let mut fresh = SessionGestureWorldPath::from_admitted_world(
-            &world, 1, fresh_lease, boot,
-        )
-        .expect("replacement incarnation admitted by original World");
+        let mut fresh = SessionGestureWorldPath::from_admitted_world(&world, 1, fresh_lease, boot)
+            .expect("replacement incarnation admitted by original World");
         assert_eq!(fresh.binding().player_id, old_binding.player_id);
         assert_ne!(fresh.binding().incarnation, old_binding.incarnation);
         assert_ne!(fresh.binding().lease_epoch, old_binding.lease_epoch);
