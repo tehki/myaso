@@ -23,7 +23,7 @@ else try{
     manifest.realQuaterniusDoorFrameWorldBoundsVerified!==true||
     !(manifest.doorFrameCenterOffsetMeters>=0&&manifest.doorFrameCenterOffsetMeters<=0.015)||
     manifest.cameraReview?.projection!=="ORTHO"||
-    JSON.stringify(manifest.cameraReview?.position)!=="[0,-12,10]"||
+    JSON.stringify(manifest.cameraReview?.position)!=="[3,-12,17]"||
     JSON.stringify(manifest.cameraReview?.target)!=="[0,0,2.8]"||
     manifest.cameraReview?.orthoScale!==12.8||
     manifest.cameraReview?.liveWorld9CameraChanged!==false)
