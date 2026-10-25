@@ -21,6 +21,18 @@ test("Key E is reserved for future Use in both playable game pages, with no heav
   }
 });
 
+test("player-facing arena controls reserve E for future Use and teach LMB-only heavy", () => {
+  const html=read("../web/index.html");
+  assert.match(html, /<kbd>E<\/kbd>\s*Use \/ Interact \(reserved[^<]*not active yet\)/,
+    "E may be labeled future Use/Interact only, not shipped interaction");
+  assert.doesNotMatch(html, /<kbd>E<\/kbd>\s*(?:heavy|attack|strike)/i,
+    "no obsolete E-heavy shortcut may appear in the visible control legend");
+  assert.match(html, /<kbd>LMB hold 320ms\+<\/kbd>[^<]*READY heavy/,
+    "the original deliberate held-LMB release remains the heavy control");
+  assert.match(html, /<kbd>LMB release before full charge<\/kbd>[^<]*light attack/,
+    "short LMB must remain discoverable to players");
+});
+
 test("retired Key E typed Combat source cannot encode or enter the selected outbox", () => {
   const lease = Object.freeze({});
   const q = new ProposedSharedTypedGestureOutbox({reviewVersion:2,trustedLease:lease});
