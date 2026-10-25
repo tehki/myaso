@@ -57,7 +57,7 @@ jobs:
           node --check scripts/pvp_browser_flight_runner.mjs
           node --test tests/*parry*.test.mjs tests/r1-m156-knockdown-light-latency.test.mjs tests/r1-m237-m156-short-click-early-commit.test.mjs tests/m156-original-world-trace.test.mjs
           node --test tests/standard-wheel-controls.test.mjs
-          node --test tests/m147-recovery-feedback-convergence.test.mjs tests/core8a-committed-release-redundancy.test.mjs tests/v1-input-replay-window.test.mjs
+          node --test tests/m147-recovery-feedback-convergence.test.mjs tests/m147-world-recovery-proof.test.mjs tests/m41-native-observed-parry.test.mjs tests/core8a-committed-release-redundancy.test.mjs tests/v1-input-replay-window.test.mjs
           google-chrome --version
           firefox --version
           chromedriver --version

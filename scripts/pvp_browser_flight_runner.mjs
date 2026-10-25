@@ -1,4 +1,5 @@
 import { hasM147PunishFeedback } from "./m147-recovery-feedback-convergence.mjs";
+import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -39,6 +40,7 @@ import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
+import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "./m41-native-observed-parry.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -8248,27 +8250,22 @@ async function calibrateNativeParryIngress(
   return result;
 }
 
-async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount) {
-  // Both hints come solely from the replicated original World action.
-  // A short genuine LMB first enters HeavyWindup before transitioning to
-  // LightWindup on release. The Heavy hint can arrive ~50ms earlier;
-  // use the first actually observed one, never infer/synthesize an action.
-  const authoritativeCues = new Set([
-    "Heavy strike committed - the long windup is readable.",
-    "Attack committed - your windup is readable.",
-  ]);
-  if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0) {
-    throw new TypeError("M41 requires a nonnegative current-attempt event baseline");
+async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, expectedActorId) {
+  if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0
+      || !Number.isSafeInteger(expectedActorId) || expectedActorId < 1) {
+    throw new TypeError("M41 requires a fresh current-attempt actor-bound World cue baseline");
   }
+  const script = "return (" + readM41ScalarWorldCue.toString()
+    + ")(window.__MYASO_M30_UI__, " + baselineEventCount + ", " + expectedActorId + ");";
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const evidence = await readUiEvidence(attacker);
-    const cue = evidence.events.slice(baselineEventCount).find((event) => authoritativeCues.has(event));
+    // Read only the actual production-visible cue and its original observer
+    // identity/index/frame timestamp. Do not serialize the entire HUD/history.
+    const cue = await execute(attacker.base, attacker.sessionId, script);
     if (cue) return cue;
     await sleep(10);
   }
-  throw new Error("M41 native attacker never exposed original World windup: "
-    + JSON.stringify(await readUiEvidence(attacker)));
+  throw new Error("M41 native attacker never exposed a fresh original World windup");
 }
 
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
@@ -8326,23 +8323,24 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     if (scenario === "uiparrytell" || scenario === "uistun") {
-      // M35/M41: avoid cross-browser wall-clock choreography. The original
-      // replicated World light-windup drives combatActionHint() on the real
-      // attacker browser; only AFTER that authoritative message is observed
-      // do we issue the defender's ONE genuine W3C wheel-back.
-      // No second attack, client-authored parry or modified World timings.
-      await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
       const attemptAttackerBaseline = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
       if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
         throw new Error("M41 could not record current-attempt original World cue baseline");
       }
-      const authoritativeWindup = await waitForM41WorldWindup(
-        attacker, 180, attemptAttackerBaseline.events.length,
-      );
+      // Finish genuine aim before the measured exchange. The same native
+      // 35ms DOWN/UP then runs while we observe the fresh real World cue;
+      // no full-click ACK or large evidence serialization gates the one wheel.
+      await aimArena(attacker, attackerElementId, attackOffset);
+      const observed = await dispatchM41ObservedParry({
+        sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
+        awaitWorldCue: () => waitForM41WorldWindup(
+          attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+        ),
+        sendWheel: () => setArenaBlock(defender, defenderElementId, true),
+      });
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
-        scenario, attacker: attacker.name, cue: authoritativeWindup,
+        scenario, attacker: attacker.name, ...observed,
       }));
-      await setArenaBlock(defender, defenderElementId, true);
     } else {
       await Promise.all([
         (async () => {
@@ -11478,6 +11476,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     throw new Error(`${milestone} staging changed authoritative vitals: ${JSON.stringify(baseline)}`);
   }
 
+  if (baseline.length !== 3 || !baseline.every(entry => entry.playerHp === 100 && entry.playerGuard === 100)) {
+    throw new Error(`${milestone} preflight vitals must be pristine: ${JSON.stringify(baseline)}`);
+  }
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const observerPointerOffset = observerBefore.pointers.length;
@@ -11486,53 +11487,52 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
 
   // Whiff the narrow jump attack away from Firefox. #1 stays close enough to be
   // hit by Firefox's normal light attack, while #3 remains closer on the right.
+  // Pre-aim while idle: no extra pointer move/driver tick on the punish path.
+  await aimArena(observer, observerArena, -200);
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
-  await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
-
-  let recoveryEvidence = null;
-  let recoveryCue = null;
+  const worldProofOffset = m201ServerOutput().length;
+  // Independent real drivers: observe the rendered cue without awaiting the
+  // other driver's jump command ACK. Every command is still awaited below.
+  const jumpCommand = performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)
+    .then(() => null, (error) => error);
   const recoveryDeadline = Date.now() + 900;
-  while (Date.now() < recoveryDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const jumpState = states.find((entry) => entry.browser === jumpAttacker.name);
-    const observerState = states.find((entry) => entry.browser === observer.name);
-    const closerState = states.find((entry) => entry.browser === closerIdle.name);
-    const ownTransitions = jumpState?.acceptance?.ownActionTransitions ?? [];
-    const recoveryIndex = ownTransitions.findIndex((entry) =>
-      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
-    const cue = observerState?.recoveryTransitions.slice(observerRecoveryOffset).find((entry) =>
-      entry.visible
-      && entry.state === "jump-attack-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Jump attack recovery");
-    const pristine = jumpState?.playerHp === 100
-      && observerState?.playerHp === 100
-      && closerState?.playerHp === 100
-      && jumpState?.playerGuard === 100
-      && observerState?.playerGuard === 100
-      && closerState?.playerGuard === 100;
-    if (recoveryIndex >= 0
-      && observerState?.focusLabel === `PUNISH TARGET #${jumpId}`
-      && cue
-      && pristine) {
-      recoveryEvidence = states;
-      recoveryCue = cue;
-      break;
+  let recoveryCue = null;
+  try {
+    while (Date.now() < recoveryDeadline) {
+      // Read-only scalar; keep full three-browser histories off the critical
+      // response path. This reads real rendered state and existing cue history.
+      const cue = await execute(observer.base, observer.sessionId, `
+        const state = window.__MYASO_M30_UI__ ?? {};
+        const recovery = document.querySelector('#opponent-recovery');
+        const focus = document.querySelector('#focus-label')?.textContent?.trim();
+        const event = (state.recoveryTransitions ?? []).slice(${observerRecoveryOffset})
+          .find((entry) => entry.visible && entry.state === 'jump-attack-recovery'
+            && entry.label === 'PUNISH' && entry.detail === 'Jump attack recovery'
+            && Number.isFinite(entry.epochMs));
+        const pristine = ['#player-hp-value', '#player-guard-value',
+          '#bot-hp-value', '#bot-guard-value'].every((selector) =>
+            document.querySelector(selector)?.textContent?.trim() === '100');
+        return event && recovery && !recovery.hidden
+          && recovery.dataset.state === 'jump-attack-recovery'
+          && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event } : null;
+      `);
+      if (cue) { recoveryCue = cue; break; }
+      await sleep(8);
     }
-    if (!pristine && Number.isFinite(jumpState?.playerHp)) {
-      throw new Error(`${milestone} jump attack failed to whiff cleanly: ${JSON.stringify(states)}`);
+    if (!recoveryCue) {
+      throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    await sleep(8);
+    // Genuine pre-aimed native LMB: 20 ms stays within the original helper's
+    // 20..35 ms short-click bounds. Actual trusted release is checked below.
+    await performArenaM221GuardBreakClick(observer, 20);
+  } finally {
+    const jumpError = await jumpCommand;
+    if (jumpError) throw jumpError;
   }
-  if (!recoveryEvidence || !recoveryCue) {
-    throw new Error(`${milestone} never exposed #${jumpId} as the actionable recovery target: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
-  }
-
-  // Act on the cue. Firefox aims left at #1 and commits one genuine LMB while
-  // #1 is still in authoritative jump-attack recovery. Idle #3 remains closer
-  // on the opposite side and must not take damage.
-  await performArenaAttackHold(observer, observerArena, -200, 90);
+  // Full recorded lifecycle/focus/input evidence is validated below. The World
+  // classifier additionally rejects every earlier HIT/BLOCK/PARRY/BREAK, so
+  // pristine baseline/final vitals cannot hide jump contact or guard recovery.
 
   let hitEvidence = null;
   const hitDeadline = Date.now() + 800;
@@ -11660,6 +11660,19 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   if (observerState.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} HUD did not return to closer idle #${closerId} after the punish window: ${JSON.stringify(observerState)}`);
   }
+
+  const punishUp = punishUps[0];
+  if (!Number.isFinite(punishUp?.epochMs) || punishUp.epochMs <= punishDown.epochMs
+      || punishUp.epochMs - punishDown.epochMs >= 320
+      || !punishDown.trusted || !punishUp.trusted
+      || punishDown.pointerId !== punishUp.pointerId) {
+    throw new Error(`${milestone} did not preserve one genuine same-pointer short release: ${JSON.stringify({ punishDown, punishUp })}`);
+  }
+  const worldRecoveryProof = verifyM147WorldRecoveryProof(
+    m201ServerOutput().slice(worldProofOffset),
+    { jumpId, punisherId: observerId, closerId },
+  );
+  console.log(`M147_WORLD_RECOVERY_PROOF ${JSON.stringify(worldRecoveryProof)}`);
 
   return evidence.map((entry) => ({
     ...entry,
