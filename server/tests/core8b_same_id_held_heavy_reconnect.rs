@@ -344,3 +344,130 @@ fn disconnect_during_light_or_heavy_windup_fences_old_edges_without_ghost_hit() 
         assert_eq!(world.fighter(2).unwrap().hp, 66.0);
     }
 }
+
+#[test]
+fn old_boot_held_heavy_cannot_cross_fresh_world_with_reset_actor_and_lease() {
+    // Simulate restart boundaries with two ORIGINAL Rust World instances.
+    // Actual new-OS-process CSPRNG non-reuse is tested separately in
+    // prealpha_boot_nonce_authority.rs; this is a deterministic lifecycle
+    // regression, not persistent account identity or real two-socket QA.
+    let previous_boot = new_server_boot_nonce().expect("original CSPRNG boot");
+    let current_boot = new_server_boot_nonce().expect("fresh CSPRNG boot");
+    assert_ne!(previous_boot, current_boot);
+    let reset_lease = 1;
+
+    let mut before = World::new(800.0, 600.0);
+    assert!(before.add_player_at(1, 250.0, 300.0, 0.0));
+    assert!(before.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    let mut old = SessionGestureWorldPath::from_admitted_world(
+        &before, 1, reset_lease, previous_boot,
+    )
+    .expect("old authoritative session admitted");
+    let prior_binding = old.binding();
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut before,
+            reset_lease,
+            previous_boot,
+            GestureAction::Press,
+            1,
+            7
+        ),
+        AckStatus::Accepted
+    );
+    assert!(advance(&mut old, &mut before, reset_lease, previous_boot, 4).is_empty());
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut before,
+            reset_lease,
+            previous_boot,
+            GestureAction::Upgrade,
+            2,
+            7
+        ),
+        AckStatus::Accepted
+    );
+    assert!(advance(&mut old, &mut before, reset_lease, previous_boot, 33).is_empty());
+    assert_eq!(
+        before.fighter(2).unwrap().hp,
+        100.0,
+        "old READY heavy must not produce damage without current release"
+    );
+
+    // Local actor ID and lease counter are deliberately recycled, exactly as
+    // a fresh server process may do. Neither is durable authentication.
+    let mut after = World::new(800.0, 600.0);
+    assert!(after.add_player_at(1, 250.0, 300.0, 0.0));
+    assert!(after.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
+    let mut current = SessionGestureWorldPath::from_admitted_world(
+        &after, 1, reset_lease, current_boot,
+    )
+    .expect("fresh server session admitted");
+    assert_eq!(current.binding().player_id, prior_binding.player_id);
+    assert_eq!(current.binding().lease_epoch, prior_binding.lease_epoch);
+    assert_ne!(current.binding().boot_nonce, prior_binding.boot_nonce);
+    assert_ne!(current.binding().world_instance, prior_binding.world_instance);
+
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut after,
+            reset_lease,
+            previous_boot,
+            GestureAction::Release,
+            3,
+            7
+        ),
+        AckStatus::Stale,
+        "old READY release cannot mutate the new server World"
+    );
+    assert!(old.retired());
+    old.advance_under_world_lock(&mut after, reset_lease, previous_boot);
+    assert_eq!(after.fighter(1).unwrap().action.wire_code(), 0);
+    assert_eq!(after.fighter(2).unwrap().hp, 100.0);
+    assert_eq!(
+        admit(
+            &mut old,
+            &mut after,
+            reset_lease,
+            previous_boot,
+            GestureAction::Cancel,
+            4,
+            7
+        ),
+        AckStatus::Stale
+    );
+
+    assert_eq!(
+        admit(
+            &mut current,
+            &mut after,
+            reset_lease,
+            current_boot,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut current,
+            &mut after,
+            reset_lease,
+            current_boot,
+            GestureAction::Release,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        advance(&mut current, &mut after, reset_lease, current_boot, 55),
+        vec![(34, 66)],
+        "only a new-boot admitted deliberate source0 release can commit HIT"
+    );
+    assert_eq!(after.fighter(2).unwrap().hp, 66.0);
+}
