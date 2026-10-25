@@ -810,7 +810,10 @@ try{
  let lightActive;
  try {
    lightActive=await waitFor(()=>readAuthoritativeWorld().slice(shortLightWorldStart)
-    .split("\n").find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=2/.test(line)),12000);
+   // A genuine short W3C click may briefly UPGRADE before release; the original
+   // World then resumes undercharged HeavyWindup(9) directly to LightActive(2).
+   // The strict original-World 34HP HIT / one-shot assertions below remain mandatory.
+    .split("\n").find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=(?:1|9) to=2/.test(line)),12000);
  } catch(error) {
    const browser=await evaluate(attacker,
     "return {event:document.querySelector('#event-text')?.textContent||'',gesture:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};"
