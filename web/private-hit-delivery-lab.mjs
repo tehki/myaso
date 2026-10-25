@@ -6,7 +6,10 @@ import { presentHitReceipt } from "../src/browser/m147-hit-receipt-feedback.mjs"
 const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export function createPrivateHitDeliveryLab({ transport, pageUrl, actorId, onReceipt, onGap,
-  timers = { setTimeout, clearTimeout } } = {}) {
+  // Browser host timer methods require their original global receiver.
+  // Do not invoke a detached Window.setTimeout with a plain timer-object this.
+  timers = { setTimeout: (...args) => globalThis.setTimeout(...args),
+    clearTimeout: (...args) => globalThis.clearTimeout(...args) } } = {}) {
   if (transport?.kind !== "webtransport" || transport.closed
       || transport.experimentalGestureState !== "granted"
       || !loopback.has(new URL(transport.webTransportUrl).hostname)

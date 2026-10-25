@@ -303,7 +303,19 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    await waitFor(async()=>{
     const all=await Promise.all(actors.map(privateProof));
     return all.every(p=>p?.closed===false&&p.status==="granted"&&p.expected===0&&p.delivered.length===0);
-   },12000);
+   },12000).catch(async error=>{
+    const participants=await Promise.all(actors.map(async a=>({
+     actorId:a.actor.id,engine:a.s.engine,privateScope:await privateProof(a),
+     failure:await evaluate(a.s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"),
+     status:await evaluate(a.s,"return document.querySelector('#event-text')?.textContent||'';"),
+     actor:await evaluate(a.s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.ownPlayerNetId??null;"),
+    })));
+    const server=lines().filter(x=>/session |private HIT|M201/.test(x)).slice(-70);
+    await writeFile(join(output,"core8-private-native-grant-failure.json"),
+      JSON.stringify({error:String(error),participants,server},null,2)+"\n");
+    console.error("CORE8_PRIVATE_NATIVE_GRANT_FAILURE",JSON.stringify({participants,server}));
+    throw error;
+   });
    // Passive DOM mutation history retains actual first-party feedback even
    // when the driver reads after the presentation animation has expired.
    await Promise.all(actors.map(a=>evaluate(a.s,String.raw`
@@ -457,6 +469,7 @@ try{
       actor:window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.ownPlayerNetId??null,
       transport:window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.transportState??null,
       privateReceipt:window.__MYASO_PRIVATE_HIT_PROOF__?.()??null,
+      privateFailure:window.__MYASO_PRIVATE_HIT_FAILURE__??null,
     };`).catch(e=>({error:String(e)}));
     const originalWorld=readAuthoritativeWorld().split("\n")
      .filter(line=>/session |private HIT|M201_AUTH_|listening on|admission cap/.test(line)).slice(-80);
@@ -480,7 +493,7 @@ try{
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
   assert.ok(Object.keys(data.knightSources).some(k=>k.startsWith("silver_")&&k.endsWith("_relit.webp")),
     "require actual original Blender relit Silver WebP drawImage calls, not a fallback Combat circle");
-  assert.ok(data.roster.length>=4,`genuine same-server four human roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
+  assert.ok(data.roster.length>=4,`genuine same-server four human roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,privateFailure:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
   assert.equal(data.canvasWidth,960);assert.equal(data.canvasHeight,540);
   assert.ok(data.floor.centerLuminance>(flag==="1"?38:15));
   assert.ok(data.floor.centerLuminance<(flag==="1"?155:39));

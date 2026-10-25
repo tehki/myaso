@@ -154,11 +154,47 @@ test("missing grant and server GAP retire the current lease with no replacement 
   assert.equal(gap.lab.snapshot.status, "retired");
 });
 
+test("default private HIT host timers keep browser global invocation receiver", async () => {
+  // Chrome Window.setTimeout/clearTimeout throw Illegal invocation if called
+  // with an unrelated plain-object receiver. The ordinary fake-timer tests
+  // cannot detect that native-only bootstrap failure.
+  const originalSet = globalThis.setTimeout;
+  const originalClear = globalThis.clearTimeout;
+  globalThis.setTimeout = function (...args) {
+    assert.equal(this, globalThis, "native timer must preserve the browser host receiver");
+    return originalSet(...args);
+  };
+  globalThis.clearTimeout = function (...args) {
+    assert.equal(this, globalThis, "native timer cleanup must preserve the host receiver");
+    return originalClear(...args);
+  };
+  let lab;
+  try {
+    const f = fixture();
+    lab = createPrivateHitDeliveryLab({
+      transport: f.transport, pageUrl: "http://localhost:8000", actorId: 2,
+    });
+    const admitted = lab.start(); // actual client HELLO path; no synthetic online actor
+    lab.receive(grant(), f.transport);
+    await admitted;
+    await settle();
+    assert.equal(lab.snapshot.status, "granted");
+    assert.equal(lab.snapshot.controlsWritten.length, 1);
+    assert.equal(lab.snapshot.controlsWritten[0].op, OP.CLIENT_HELLO);
+  } finally {
+    lab?.close();
+    globalThis.setTimeout = originalSet;
+    globalThis.clearTimeout = originalClear;
+  }
+});
+
 test("first-party private HIT bootstrap waits for genuine server-bound actor after starting frame", () => {
   const game = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   // An actor guessed before the first actual v1 input ACK is not authenticated.
   assert.match(game, /resolvePrivateHitActor = null/);
-  assert.match(game, /if \(resolvePrivateHitActor\)/);
+  assert.match(game, /onProcessedAck\(ack\)/);
+  assert.match(game, /privateHitProcessedAckActor = ack\.playerNetId/);
+  assert.match(game, /privateHitProcessedAckActor === ownId/);
   assert.match(game, /networkClient\.playerNetId !== actorId/);
   assert.match(game, /const actorId = await Promise\.race\(/);
   assert.match(game, /await networkClient\.transport\.negotiatePrivateHitDeliveryLab\(/);

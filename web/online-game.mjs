@@ -174,6 +174,7 @@ const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
 // The first sender frame runs only after module initialization; awaiting that
 // ACK during module startup would deadlock real online admission.
 let resolvePrivateHitActor = null;
+let privateHitProcessedAckActor = null;
 const privateHitActorReady = privateHitLabRequested
   ? new Promise(resolve => { resolvePrivateHitActor = resolve; }) : null;
 if (privateHitLabRequested && !reviewedGestureLab) {
@@ -432,6 +433,14 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      // Reconciliation's onAck can legally wait for a later snapshot. The
+      // original processed-input ACK plus this matching World snapshot is
+      // sufficient to prove the session-assigned actor without faking ACKs.
+      if (resolvePrivateHitActor && privateHitProcessedAckActor === ownId) {
+        const resolve = resolvePrivateHitActor;
+        resolvePrivateHitActor = null;
+        resolve(ownId);
+      }
       // Initial player state is available before the first aligned input ACK.
       if (networkStatus.startsWith("Connecting")) {
         networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
@@ -448,13 +457,20 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
+  onProcessedAck(ack) {
+    // Native 0x03 comes from the original pinned server, not client input.
+    // It is observed before the transport stores its own playerNetId; the
+    // next real World snapshot must confirm the same actor before HIT grant.
+    if (privateHitLabRequested && Number.isInteger(ack.playerNetId)
+        && ack.playerNetId > 0) privateHitProcessedAckActor = ack.playerNetId;
+  },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
     // Only an original processed-input ACK for this connection and a genuine
     // replicated own actor can establish the private recipient actor binding.
-    if (resolvePrivateHitActor) {
+    if (resolvePrivateHitActor && privateHitProcessedAckActor === ownId) {
       const resolve = resolvePrivateHitActor;
       resolvePrivateHitActor = null;
       resolve(ownId);
@@ -520,6 +536,16 @@ if (reviewedGestureLab) {
             configurable: true, value: () => privateHitDeliveryLab.snapshot,
           });
         } catch (error) {
+          // Only in the explicitly opted-in loopback laboratory: preserve the
+          // actual browser rejection class for native CI without ever exposing
+          // private capability bytes, lease tokens or synthetic online state.
+          Object.defineProperty(window, "__MYASO_PRIVATE_HIT_FAILURE__", {
+            configurable: true, value: Object.freeze({
+              message: String(error?.message ?? error),
+              boundActor: networkClient?.playerNetId ?? null,
+              gestureGrant: networkClient?.transport?.experimentalGestureState ?? null,
+            }),
+          });
           console.error("private HIT original admission/negotiation failed", error);
           networkClient?.close("private HIT original admission/negotiation failed");
           networkStatus = "Private HIT laboratory admission rejected.";
