@@ -176,6 +176,38 @@ test("unnegotiated typed ACK closes original client transport, never admits a ph
   assert.match(errors[0],/current reviewed grant/);
 }));
 
+test("last sampled QUIC datagram cannot strand at flush settlement", () => withFixture(async () => {
+  const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
+  let finishFirst, firstStarted;
+  const firstStartedPromise = new Promise(resolve => { firstStarted = resolve; });
+  const firstWriteGate = new Promise(resolve => { finishFirst = resolve; });
+  const writes = [];
+  // One original QUIC datagram writer. Returning the gate directly makes
+  // the async flush continuation run before our next queued microtask.
+  c.datagramWriter = {
+    ready: Promise.resolve(),
+    write(bytes) {
+      writes.push(Array.from(bytes));
+      if (writes.length === 1) { firstStarted(); return firstWriteGate; }
+      return Promise.resolve();
+    },
+    releaseLock() {},
+  };
+  const first = c.sendRealtimeOwned(Uint8Array.from([1, 2, 3]));
+  await firstStartedPromise;
+  finishFirst();
+  // This arrives just AFTER the final writer await resumes and the flushing
+  // loop observes no other sample, but BEFORE its promise finally settles.
+  queueMicrotask(() => {
+    void c.sendRealtimeOwned(Uint8Array.from([4, 5, 6]));
+  });
+  await first;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(writes, [[1, 2, 3], [4, 5, 6]],
+    "last current-lease sample must not wait for an unrelated third input");
+  c.close("test");
+}));
+
 test("reliable send rejects lease retirement while waiting for writer readiness", () => withFixture(async () => {
   const c = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game" });
   let unblock;

@@ -194,7 +194,18 @@ class WebTransportGameConnection {
         .catch((error) => {
           if (!this.closed) throw error;
         })
-        .finally(() => { this.realtimeFlush = null; });
+        .finally(() => {
+          this.realtimeFlush = null;
+          // A last sampled input can arrive after #flushRealtime observes an
+          // empty slot but BEFORE this settlement callback runs. Without a
+          // fresh flush it stays stranded until an unrelated future input.
+          // Preserve one latest-wins original datagram writer, no new queue.
+          if (!this.closed && this.latestRealtime) {
+            void this.#queueRealtime(this.latestRealtime, false).catch(() => {
+              if (!this.closed) this.close("realtime continuation failed");
+            });
+          }
+        });
     }
     return this.realtimeFlush;
   }
