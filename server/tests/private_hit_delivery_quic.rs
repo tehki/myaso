@@ -570,7 +570,9 @@ async fn duplicate_hello_and_spoofed_server_grant_close_only_offending_original_
     .await;
     no_receipt(&mut survivor).await;
     assert!(
-        survivor.connection.close_reason().is_none(),
+        timeout(Duration::from_millis(200), survivor.connection.closed())
+            .await
+            .is_err(),
         "invalid private controls from other seats must not retire a good lease"
     );
 }
