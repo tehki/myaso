@@ -738,6 +738,10 @@ async fn handle_connection(
     let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
+    // One bounded diagnostic window per original QUIC session. The impairment
+    // fixture is loopback-only and OFF in the normal server configuration.
+    let mut first_loss_probe_seen = false;
+    let mut first_loss_probe_packets_remaining = 0_u8;
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
     let (mut reliable_send, mut reliable_recv) = connection
         .accept_bi()
@@ -1015,6 +1019,21 @@ async fn handle_connection(
                             "M63_INPUT_ACTION_PACKET_DROPPED session={stable_id} tick={action_tick} packet_tick={}",
                             packet.client_tick
                         );
+                        if !first_loss_probe_seen {
+                            // Read-only proof from the actual dropped QUIC packet:
+                            // did we drop an initial light PRESS, or a heavy edge?
+                            if let Some(sample) = packet.samples().iter().find(|s| s.tick == action_tick) {
+                                println!(
+                                    "CORE8A_FIRST_LOSS_DROP session={stable_id} action_tick={action_tick} packet_tick={} mask={} attack={} heavy={}",
+                                    packet.client_tick,
+                                    one_shot_action_mask(sample),
+                                    u8::from(sample.attack),
+                                    u8::from(sample.heavy_attack)
+                                );
+                            }
+                            first_loss_probe_seen = true;
+                            first_loss_probe_packets_remaining = 4;
+                        }
                         continue;
                     }
                 }
@@ -1030,6 +1049,21 @@ async fn handle_connection(
                 }
 
                 let accepted = ingress.ingest(&packet);
+                if game.drop_new_action_datagrams && first_loss_probe_packets_remaining > 0 {
+                    // At most four post-drop datagrams. No raw bytes, tokens,
+                    // capabilities, addresses, or client-authored HIT claims.
+                    let wire_samples = packet.samples().iter().take(3)
+                        .map(|s| format!("{}:{}:{}", s.tick, u8::from(s.attack), u8::from(s.heavy_attack)))
+                        .collect::<Vec<_>>().join(",");
+                    let accepted_samples = accepted.iter().take(3)
+                        .map(|s| format!("{}:{}:{}", s.tick, u8::from(s.attack), u8::from(s.heavy_attack)))
+                        .collect::<Vec<_>>().join(",");
+                    println!(
+                        "CORE8A_FIRST_LOSS_INGRESS session={stable_id} packet_tick={} wire_tick_attack_heavy=[{wire_samples}] accepted_tick_attack_heavy=[{accepted_samples}]",
+                        packet.client_tick
+                    );
+                    first_loss_probe_packets_remaining -= 1;
+                }
                 let coalesced: Option<(u32, InputIntent)> =
                     coalesce_accepted_input_batch(accepted.as_slice()).map(|sample| {
                         let mut intent: InputIntent = sample.into();
@@ -1552,6 +1586,28 @@ mod tests {
             recovered_dropped_heavy_tick(&[action_sample(59, true)], &VecDeque::new()),
             None,
             "an unmatched heavy action cannot claim deliberate input loss"
+        );
+    }
+
+    #[test]
+    fn m230_dropped_light_edge_cannot_be_miscredited_as_replayed_heavy() {
+        // Reproduce the discriminating trace: a source0 initial light PRESS
+        // at tick34 is first seen in a packet whose newest client tick is35.
+        // Later heavy=true at tick36 is a different edge, not recovery of34.
+        let mut dropped = VecDeque::new();
+        let light = InputSample { attack: true, ..action_sample(34, false) };
+        let first_packet = [action_sample(35, false), light, action_sample(33, false)];
+        assert_eq!(register_new_action_datagram(&first_packet, &mut dropped), Some(34));
+        assert_eq!(one_shot_action_mask(&light), 1, "the dropped edge was light-only");
+        assert_eq!(
+            recovered_dropped_heavy_tick(&[action_sample(34, false), action_sample(36, true)], &dropped),
+            None,
+            "a later accepted heavy cannot prove replay of a dropped light-only tick"
+        );
+        assert_eq!(
+            recovered_dropped_heavy_tick(&[action_sample(34, true)], &dropped),
+            Some(34),
+            "only an accepted heavy bit on that exact original tick could qualify M230"
         );
     }
 
