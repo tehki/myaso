@@ -1244,12 +1244,15 @@ async function performHeavyCounterplayWindowWheel(
     // Combat4B M188: actual original-World protected CI on e1f2f9a
     // still BLOCKED a genuine held-LMB heavy at tick619 after Firefox
     // Block tick611 (8 ticks / 133ms > unchanged 125ms parry window).
-    // The earlier +40ms physical W3C parry offset was insufficient.
-    // Stage the same single genuine wheel a further 40ms later (+80ms total)
-    // and let three new exact-head Chrome/Firefox parry outcomes decide.
-    // Keep all 100HP, zero-guard-loss, World stun and no-fake-hit predicates.
-    // Block staging and original server World/balance remain untouched.
-    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 80 : 0;
+    // Exact original World CI e6f5c079: 3/3 real heavy BLOCK, 2/3 real
+    // heavy PARRY at contact age 116.7ms. Third parry BLOCK age150.0ms.
+    // Stage the SAME one physical W3C parry wheel 30ms later (+110ms
+    // total), seeking >=2 World ticks' contact-phase headroom without
+    // extending 125ms server parry. For M223 wheelIngress >=65ms, the
+    // physical pause stays within unchanged 450ms fixture bound.
+    // Keep strict 100HP, full guard, stun and no-fake-HIT assertions;
+    // heavy BLOCK 395ms and all original World/balance values unchanged.
+    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 110 : 0;
     const m223WheelDelayMs = m223Plan.wheelDelayMs + m188HeldLmbParryOffsetMs;
     if (!Number.isSafeInteger(m223WheelDelayMs)
       || m223WheelDelayMs < 0 || m223WheelDelayMs > 450) {
