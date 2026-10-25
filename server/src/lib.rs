@@ -811,4 +811,64 @@ mod tests {
         drop(third);
         assert_eq!(gate.current(), 0);
     }
+
+    #[test]
+    fn core8a_original_tick68_recovered_once_after_packet69_and_70_absence() {
+        // Same original v1 34-byte wire: packet69 carries the original heavy
+        // tick68, is deliberately lost; packet70 never reaches this ingress.
+        // Pinned third slot in packet71 is the actual original sample tick68.
+        fn wire(packet_tick: u32, samples: &[(u32, u8); 3]) -> InputPacket {
+            let mut bytes = vec![0u8; INPUT_HEADER_BYTES + 3 * INPUT_SAMPLE_BYTES];
+            bytes[0] = PROTOCOL_VERSION;
+            bytes[1] = INPUT_PACKET_TYPE;
+            bytes[2] = 3;
+            bytes[8..12].copy_from_slice(&packet_tick.to_le_bytes());
+            for (index, (sample_tick, buttons)) in samples.iter().enumerate() {
+                let offset = INPUT_HEADER_BYTES + index * INPUT_SAMPLE_BYTES;
+                bytes[offset] = packet_tick.wrapping_sub(*sample_tick) as u8;
+                bytes[offset + 5] = *buttons;
+            }
+            decode_input_packet(&bytes).expect("original v1 bytes")
+        }
+        let pre_drop = wire(67, &[(67, 0), (66, 0), (65, 0)]);
+        let dropped = wire(69, &[(69, 9), (68, 9), (67, 0)]);
+        let admitted = wire(71, &[(71, 13), (70, 9), (68, 9)]);
+        assert!(dropped
+            .samples()
+            .iter()
+            .any(|s| s.tick == 68 && s.heavy_attack));
+        assert_eq!(admitted.samples().len(), INPUT_REDUNDANCY_MAX);
+        let mut ingress = InputIngressWindow::default();
+        assert_eq!(ingress.ingest(&pre_drop).len(), 3);
+        // Drop packet69 by NOT admitting it. Packet70 is intentionally absent.
+        let recovered = ingress.ingest(&admitted);
+        assert_eq!(
+            recovered.iter().map(|s| s.tick).collect::<Vec<_>>(),
+            vec![68, 70, 71]
+        );
+        assert_eq!(
+            recovered
+                .iter()
+                .filter(|s| s.tick == 68 && s.attack && s.heavy_attack)
+                .count(),
+            1
+        );
+        let coalesced =
+            coalesce_accepted_input_batch(recovered.as_slice()).expect("admitted original");
+        assert_eq!(coalesced.tick, 71);
+        assert!(coalesced.heavy_attack && coalesced.attack && coalesced.block);
+        assert!(
+            ingress.ingest(&admitted).is_empty(),
+            "retransmit cannot produce a second action"
+        );
+        let later = wire(72, &[(72, 9), (71, 13), (68, 9)]);
+        assert_eq!(
+            ingress
+                .ingest(&later)
+                .iter()
+                .map(|s| s.tick)
+                .collect::<Vec<_>>(),
+            vec![72]
+        );
+    }
 }

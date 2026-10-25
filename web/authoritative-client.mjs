@@ -8,6 +8,7 @@ import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.m
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
+import { createInputRedundancy } from "../src/network/input-redundancy.mjs";
 import { decodeProposedGestureAck } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
 import { connectGameTransport } from "./network-transport.mjs";
@@ -34,7 +35,7 @@ export async function connectAuthoritativeClient({
   const diagnostics = createNetworkDiagnostics();
   const ackGate = createOwnSnapshotAckGate();
   const remoteInterpolator = createRemoteInterpolator();
-  const inputSamples = [];
+  const inputRedundancy = createInputRedundancy();
   let inputSequence = 0;
   let latestSnapshotSequence = 0xffff;
   let acknowledgedSnapshotSequence = 0xffff;
@@ -174,14 +175,13 @@ export async function connectAuthoritativeClient({
       dash: Boolean(sample.dash),
     };
     predictionHistory.push(normalized.tick, normalized);
-    inputSamples.push(normalized);
-    if (inputSamples.length > NETWORK.inputRedundancy) inputSamples.shift();
+    const redundantSamples = inputRedundancy.push(normalized);
     const packet = encodeInputPacket({
       sequence: inputSequence,
       ackSnapshotSequence: acknowledgedSnapshotSequence,
       clientTick: normalized.tick,
       ackServerTick: latestServerTick,
-      samples: [...inputSamples].reverse(),
+      samples: redundantSamples,
     });
     inputSequence = (inputSequence + 1) & 0xffff;
     transport.sendRealtimeOwned(new Uint8Array(packet));
