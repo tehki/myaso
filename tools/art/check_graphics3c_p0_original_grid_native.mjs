@@ -21,7 +21,7 @@ function validate(path,players){
  assert.equal(r.optionalTerrainEnabled,false);
  assert.equal(r.genuineFullCombatApproval,false);
  assert.equal(r.includesGpuPresentLatency,false);
- assert.equal(r.presentationClockDebtSampled,false);
+ assert.equal(r.presentationClockDebtSampled,true);
  assert.equal(r.browserFrameTimingIsCallbackNotGpu,true);
  assert.equal(r.trials.length,players);
  for(let i=0;i<players;i++){
@@ -43,6 +43,11 @@ function validate(path,players){
   assert.ok(t.data.frameIntervalP95Ms>=t.data.frameIntervalP50Ms);
   assert.ok(t.data.floorBlitDurationP95Ms>=t.data.floorBlitDurationP50Ms);
   assert.ok(t.data.floorBlitSampleCount>=12);
+  assert.ok(t.data.presentationDebtSamples>=12,"genuine display diagnostics original render-gap sample count");
+  assert.ok(Number.isInteger(t.data.presentationDebtP50Ms)&&t.data.presentationDebtP50Ms>=0);
+  assert.ok(Number.isInteger(t.data.presentationDebtP95Ms)&&t.data.presentationDebtP95Ms>=t.data.presentationDebtP50Ms);
+  assert.ok(Number.isInteger(t.data.presentationBoundedCatchups)&&t.data.presentationBoundedCatchups>=0);
+  assert.ok(t.data.diagnosticsText.includes("Render catch-ups")&&t.data.diagnosticsText.includes("Extra render lag p50"));
   const full=readFileSync(join(path,t.fullCanvasScreenshot));
   assert.equal(full.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
   assert.equal(full.readUInt32BE(16),960);
@@ -58,11 +63,14 @@ const two=validate(twoDir,2),four=validate(fourDir,4);
 assert.equal(two.sourceCommit,four.sourceCommit,"different source hashes cannot be combined");
 console.log("GRAPHICS3C_P0_REAL_GRID_FULL_CANVAS_PASS "+JSON.stringify({
  exactHead:two.sourceCommit,sessions:6,worlds:2,engines,realSilver:true,optionalTerrain:false,
- independentHumans:false,gpuPresent:false,presentationClockDebtSampled:false,
+ independentHumans:false,gpuPresent:false,presentationClockDebtSampled:true,
  trials:[...two.trials,...four.trials].map(t=>({
   browser:t.browser,mode:t.mode,actor:t.actorId,frames:t.data.frames,
   frameP50Ms:t.data.frameIntervalP50Ms,frameP95Ms:t.data.frameIntervalP95Ms,
   floorBlitP50Ms:t.data.floorBlitDurationP50Ms,
   floorBlitP95Ms:t.data.floorBlitDurationP95Ms,
+  presentationDebtP50Ms:t.data.presentationDebtP50Ms,
+  presentationDebtP95Ms:t.data.presentationDebtP95Ms,
+  presentationCatchUps:t.data.presentationBoundedCatchups,
   imageSha256:t.fullCanvasSha256
  }))}));

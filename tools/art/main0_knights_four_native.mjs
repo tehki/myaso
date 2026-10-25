@@ -116,14 +116,14 @@ knightWebPDraws:x.knightWebPDraws,knightSources:x.knightSources,
 knightsFlag:new URLSearchParams(location.search).get("knights"),knightArt:new URLSearchParams(location.search).get("knightArt"),
 roster:[...document.querySelectorAll("#scoreboard-list li")].map(li=>li.textContent?.trim()||""),
 status:document.querySelector("#event-text")?.textContent||"",innerWidth:innerWidth,innerHeight:innerHeight,
-canvasWidth:document.querySelector("#arena")?.width,canvasHeight:document.querySelector("#arena")?.height};`;
+canvasWidth:document.querySelector("#arena")?.width,canvasHeight:document.querySelector("#arena")?.height,diagnosticsText:document.querySelector("#network-diagnostics")?.textContent||""};`;
 await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert}=await startOriginalRust(),host=await startStatic();
  const actors=[];
  for(let i=0;i<engines.length;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("netstats","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
   assert.equal(actor.id,i+1,"genuine sequential Rust actor IDs required");
@@ -135,6 +135,17 @@ try{
  for(const {s,actor,flag} of actors){
   const data=await evaluate(s,stats);
   assert.ok(data&&data.frames>=12,"original real gameplay Canvas frames required");
+  // Read-only original #network-diagnostics UI: targetGapTicks-based
+  // render-gap telemetry, independently of DOM RAF and single floor blit cost.
+  const debt=data.diagnosticsText.match(/Extra render lag p50\s+(\d+)ms[\s\S]*?p95\s+(\d+)ms/);
+  const catchUps=data.diagnosticsText.match(/Render catch-ups\s+(\d+)/);
+  const sampleCount=data.diagnosticsText.match(/>\s*33ms[\s\S]*?\((\d+)\s+samples\)/);
+  assert.ok(debt&&catchUps&&sampleCount,"genuine opt-in renderer clock telemetry must be sampled in native client");
+  data.presentationDebtP50Ms=Number(debt[1]);
+  data.presentationDebtP95Ms=Number(debt[2]);
+  data.presentationBoundedCatchups=Number(catchUps[1]);
+  data.presentationDebtSamples=Number(sampleCount[1]);
+  assert.ok(data.presentationDebtP95Ms>=data.presentationDebtP50Ms&&data.presentationDebtSamples>=12);
   assert.equal(data.knightsFlag,"1","all four must use original authenticated source Silver renderer");
   assert.equal(data.knightArt,"relit","all four opt into original Blender 3A relit reference");
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
@@ -170,12 +181,13 @@ try{
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,optionalTerrainEnabled:false,
-  includesGpuPresentLatency:false,presentationClockDebtSampled:false,
+  includesGpuPresentLatency:false,presentationClockDebtSampled:true,
   browserFrameTimingIsCallbackNotGpu:true,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
  console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
-  floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms)}));
+  floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
+  presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms)}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}
