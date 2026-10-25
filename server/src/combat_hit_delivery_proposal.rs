@@ -632,7 +632,10 @@ mod tests {
             .unwrap();
         let first = delivery.next_unwritten(identity, &TOKEN).unwrap().unwrap();
         assert_eq!(first.sequence, 0);
-        assert_eq!(delivery.next_unwritten(identity, &TOKEN).unwrap(), Some(first));
+        assert_eq!(
+            delivery.next_unwritten(identity, &TOKEN).unwrap(),
+            Some(first)
+        );
         assert_eq!(
             delivery.ack_next(identity, &TOKEN, 1),
             Err(DeliveryError::FutureAck)

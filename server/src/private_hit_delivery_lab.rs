@@ -3,7 +3,9 @@
 //! server-assigned QUIC leases are not authenticated player accounts.
 use anyhow::{anyhow, bail, Result};
 use myaso_server::{
-    combat_hit_control_proposal::{decode_hit_control, encode_hit_control, HitControl, HitControlOp},
+    combat_hit_control_proposal::{
+        decode_hit_control, encode_hit_control, HitControl, HitControlOp,
+    },
     combat_hit_delivery_proposal::{
         project_world_tick_for_recipients, ActorIncarnation, DeliveryError,
         ProposedRecipientHitDelivery,
@@ -153,15 +155,19 @@ impl PrivateHitLab {
 
     pub fn control(&mut self, world: &World, epoch: u64, bytes: &[u8]) -> Result<()> {
         self.current(world, epoch)?;
-        let value = decode_hit_control(bytes)
-            .map_err(|e| anyhow!("private HIT control parse: {e:?}"))?;
+        let value =
+            decode_hit_control(bytes).map_err(|e| anyhow!("private HIT control parse: {e:?}"))?;
         let s = self.sessions.get_mut(&epoch).unwrap();
         if s.terminal.is_some() {
             bail!("private HIT terminal scope");
         }
         match value.op {
             HitControlOp::ClientHello => {
-                if s.hello || world.fighter(s.binding.player_id).is_none_or(|f| f.hp <= 0.0) {
+                if s.hello
+                    || world
+                        .fighter(s.binding.player_id)
+                        .is_none_or(|f| f.hp <= 0.0)
+                {
                     bail!("private HIT duplicate/dead HELLO");
                 }
                 s.hello = true;
@@ -177,7 +183,10 @@ impl PrivateHitLab {
                     .ack_next(binding, &token, value.cursor)
                     .map_err(|e| anyhow!("private HIT presented ACK: {e:?}"))?;
                 let session = self.sessions.get_mut(&epoch).unwrap();
-                if session.replay_request.is_some_and(|sequence| sequence < value.cursor) {
+                if session
+                    .replay_request
+                    .is_some_and(|sequence| sequence < value.cursor)
+                {
                     // A delayed NACK may be overtaken by the genuine original
                     // receipt's presentation ACK before its replay is queued.
                     session.replay_request = None;
@@ -280,9 +289,9 @@ impl PrivateHitLab {
         }
         // Conservatively bound a continuously unacknowledged batch as well
         // as writer stalls; explicit resync is safer than silent credit.
-        let expired = s.unacknowledged_since.is_some_and(|at| {
-            at.elapsed().as_millis() >= u128::from(WRITE_TIMEOUT_MS)
-        });
+        let expired = s
+            .unacknowledged_since
+            .is_some_and(|at| at.elapsed().as_millis() >= u128::from(WRITE_TIMEOUT_MS));
         if let Some(op) = s.terminal.or(expired.then_some(HitControlOp::ServerGap)) {
             let bytes = encode_hit_control(HitControl {
                 op,
@@ -368,7 +377,8 @@ impl PrivateHitLab {
 
     pub fn remove(&mut self, epoch: u64) {
         if let Some(mut s) = self.sessions.remove(&epoch) {
-            s.connection.close(VarInt::from_u32(0), b"private HIT incarnation retired");
+            s.connection
+                .close(VarInt::from_u32(0), b"private HIT incarnation retired");
             let _ = self.origin.retire_exact(s.binding);
             self.scopes[s.scope_index].retire();
             self.scopes.remove(s.scope_index);
@@ -389,7 +399,6 @@ impl Drop for WriterAbortGuard {
         self.0.abort();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

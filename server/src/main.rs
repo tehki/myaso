@@ -341,7 +341,10 @@ async fn main() -> Result<()> {
     #[cfg(feature = "experimental-hit-delivery-lab")]
     if hit_lab_enabled {
         let mut state = game.state.lock().await;
-        state.hit_lab = Some(private_hit_delivery_lab::PrivateHitLab::new(&state.world, boot_nonce)?);
+        state.hit_lab = Some(private_hit_delivery_lab::PrivateHitLab::new(
+            &state.world,
+            boot_nonce,
+        )?);
     }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
@@ -437,7 +440,9 @@ async fn main() -> Result<()> {
             {
                 let mut state = game.state.lock().await;
                 #[cfg(feature = "experimental-hit-delivery-lab")]
-                if let Some(lab) = &mut state.hit_lab { lab.remove(lease_epoch); }
+                if let Some(lab) = &mut state.hit_lab {
+                    lab.remove(lease_epoch);
+                }
                 if let Some(mut gesture) = state.gesture_sessions.remove(&lease_epoch) {
                     gesture.retire();
                 }
@@ -451,7 +456,12 @@ async fn main() -> Result<()> {
     }
 }
 
-fn private_hit_lab_config(raw: Option<&str>, compiled: bool, loopback: bool, v2: bool) -> Result<bool> {
+fn private_hit_lab_config(
+    raw: Option<&str>,
+    compiled: bool,
+    loopback: bool,
+    v2: bool,
+) -> Result<bool> {
     let enabled = match raw {
         Some("1") => true,
         Some("0") | None => false,
@@ -791,17 +801,28 @@ async fn handle_connection(
                 tokio::time::timeout(
                     Duration::from_millis(private_hit_delivery_lab::WRITE_TIMEOUT_MS),
                     reliable_send.write_all(&reliable_frame_buffer),
-                ).await.context("private HIT writer timeout")?.context("private HIT frame write")?;
-                if matches!(outgoing.kind, private_hit_delivery_lab::WrittenKind::Terminal) {
+                )
+                .await
+                .context("private HIT writer timeout")?
+                .context("private HIT frame write")?;
+                if matches!(
+                    outgoing.kind,
+                    private_hit_delivery_lab::WrittenKind::Terminal
+                ) {
                     // Terminal GAP/retirement drains this original reliable
                     // stream through FIN before closing its private connection.
                     tokio::time::timeout(
                         Duration::from_millis(private_hit_delivery_lab::WRITE_TIMEOUT_MS),
                         reliable_send.finish(),
-                    ).await.context("private HIT terminal FIN timeout")?
-                        .context("private HIT terminal FIN")?;
+                    )
+                    .await
+                    .context("private HIT terminal FIN timeout")?
+                    .context("private HIT terminal FIN")?;
                 }
-                private_written_tx.send(outgoing.kind).await.context("private HIT write completion receiver")?;
+                private_written_tx
+                    .send(outgoing.kind)
+                    .await
+                    .context("private HIT write completion receiver")?;
                 continue;
             }
             reliable_send
@@ -812,7 +833,8 @@ async fn handle_connection(
         Ok::<(), anyhow::Error>(())
     });
     #[cfg(feature = "experimental-hit-delivery-lab")]
-    let _private_writer_guard = hit_lab_enabled.then(|| private_hit_delivery_lab::WriterAbortGuard(reliable_writer.abort_handle()));
+    let _private_writer_guard = hit_lab_enabled
+        .then(|| private_hit_delivery_lab::WriterAbortGuard(reliable_writer.abort_handle()));
     let mut private_control_buffer = [0_u8; 34];
     let mut private_control_used = 0_usize;
     let mut private_control_window = tokio::time::Instant::now();
@@ -1405,18 +1427,20 @@ mod tests {
 
     #[test]
     fn private_hit_activation_requires_every_independent_engineering_gate() {
-        for compiled in [false,true] {
-            for loopback in [false,true] {
-                for v2 in [false,true] {
-                    assert!(!private_hit_lab_config(None,compiled,loopback,v2).unwrap());
-                    assert!(!private_hit_lab_config(Some("0"),compiled,loopback,v2).unwrap());
-                    assert_eq!(private_hit_lab_config(Some("1"),compiled,loopback,v2).is_ok(),compiled&&loopback&&v2);
+        for compiled in [false, true] {
+            for loopback in [false, true] {
+                for v2 in [false, true] {
+                    assert!(!private_hit_lab_config(None, compiled, loopback, v2).unwrap());
+                    assert!(!private_hit_lab_config(Some("0"), compiled, loopback, v2).unwrap());
+                    assert_eq!(
+                        private_hit_lab_config(Some("1"), compiled, loopback, v2).is_ok(),
+                        compiled && loopback && v2
+                    );
                 }
             }
         }
-        assert!(private_hit_lab_config(Some("true"),true,true,true).is_err());
+        assert!(private_hit_lab_config(Some("true"), true, true, true).is_err());
     }
-
 
     #[test]
     fn gesture_action_proof_keeps_actual_same_tick_admission_edges_distinct() {
