@@ -374,6 +374,21 @@ def retarget_pose(source: dict, target: dict, sampled: dict, height_ratio: float
     return pose
 
 
+def vertical_extent(points: list[list[float]]) -> float:
+    if not points or any(len(point) < 2 for point in points):
+        raise ValueError("At least one 3D point is required to measure skeleton height")
+    y_values = [float(point[1]) for point in points]
+    if not all(math.isfinite(value) for value in y_values):
+        raise ValueError("Skeleton joint positions must be finite")
+    return max(y_values) - min(y_values)
+
+
+def head_geometry_detected(mesh_top_y: float, head_joint_y: float, clearance: float = 0.05) -> bool:
+    if not all(math.isfinite(value) for value in (mesh_top_y, head_joint_y, clearance)) or clearance < 0:
+        raise ValueError("Invalid head geometry coverage inputs")
+    return mesh_top_y >= head_joint_y + clearance
+
+
 def node_trs_matrix(node: dict, override: dict | None, np):
     if "matrix" in node:
         if override is not None:
@@ -505,12 +520,23 @@ def run_render(target_path: Path, source_archive: Path, source_suffix: str, outp
 
     s_min, s_max, _ = world_bounds(source, source_buffers, source_world, source_mesh_nodes)
     t_min, t_max, target_bind_world_vertices = world_bounds(target, target_buffers, target_rest_world, target_mesh_nodes)
-    source_height, target_height = float(s_max[1]-s_min[1]), float(t_max[1]-t_min[1])
-    if not (0.5 < source_height < 5.0 and 0.5 < target_height < 5.0):
-        raise ValueError(f"Unexpected humanoid source/target scale: {source_height}, {target_height}")
+    source_mesh_height = float(s_max[1]-s_min[1])
+    target_mesh_height = float(t_max[1]-t_min[1])
+    source_joint_points = [source_world[i][:3, 3].tolist() for i in joint_map(source).values()]
+    target_joint_points = [target_rest_world[i][:3, 3].tolist() for i in joint_map(target).values()]
+    source_height = vertical_extent(source_joint_points)
+    target_height = vertical_extent(target_joint_points)
+    if not (0.5 < source_height < 5.0 and 0.5 < target_height < 5.0
+            and 0.5 < source_mesh_height < 5.0 and 0.5 < target_mesh_height < 5.0):
+        raise ValueError(f"Unexpected humanoid source/target scale: skeleton={source_height},{target_height}; mesh={source_mesh_height},{target_mesh_height}")
     height_ratio = target_height / source_height
+    target_head_index = joint_map(target).get("Head")
+    if target_head_index is None:
+        raise ValueError("Target rig has no Head joint")
+    target_head_y = float(target_rest_world[target_head_index][1, 3])
+    has_head_geometry = head_geometry_detected(float(t_max[1]), target_head_y)
     center = (t_min + t_max) / 2.0
-    span = max(target_height * 1.2, 1.8)
+    span = max(target_mesh_height * 1.2, 1.8)
 
     # Decode target mesh attributes once; all vendor bytes remain local/private.
     image_cache = {}
@@ -703,7 +729,16 @@ def run_render(target_path: Path, source_archive: Path, source_suffix: str, outp
         "target_skin_bind_matrix_max_error": target_skin_error,
         "source_character_height_m": source_height,
         "target_character_height_m": target_height,
+        "source_skeleton_joint_extent_height_m": source_height,
+        "target_skeleton_joint_extent_height_m": target_height,
+        "source_mesh_bounds_height_m": source_mesh_height,
+        "target_mesh_bounds_height_m": target_mesh_height,
         "translation_delta_scale_ratio": height_ratio,
+        "height_ratio_basis": "rest-pose joint world-space vertical extent, not visible outfit mesh bounds",
+        "target_head_joint_y_m": target_head_y,
+        "target_mesh_top_y_m": float(t_max[1]),
+        "target_head_geometry_detected_by_mesh_bounds": has_head_geometry,
+        "target_visual_role": "character outfit rig" if has_head_geometry else "headless outfit-only rig; attach an approved Base Character head before player use",
         "topology": topology,
         "render_resolution": [160, 160],
         "direction_yaw_degrees": [0,45,90,135,180,225,270,315],
