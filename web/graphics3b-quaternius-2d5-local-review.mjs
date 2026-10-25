@@ -21,14 +21,20 @@ else try{
     manifest.placedInWorld9!==false||manifest.serverAuthorized!==false||
     manifest.noChangedRedLion!==true||manifest.sourceCreatorArchiveMirrorParityVerified!==false||
     manifest.realQuaterniusDoorFrameWorldBoundsVerified!==true||
-    !(manifest.doorFrameCenterOffsetMeters>=0&&manifest.doorFrameCenterOffsetMeters<=0.015))
+    !(manifest.doorFrameCenterOffsetMeters>=0&&manifest.doorFrameCenterOffsetMeters<=0.015)||
+    manifest.cameraReview?.projection!=="ORTHO"||
+    JSON.stringify(manifest.cameraReview?.position)!=="[0,-12,10]"||
+    JSON.stringify(manifest.cameraReview?.target)!=="[0,0,2.8]"||
+    manifest.cameraReview?.orthoScale!==12.8||
+    manifest.cameraReview?.liveWorld9CameraChanged!==false)
    throw Error("not an isolated approved-comparison-only sprite manifest");
- const images={};
+ const images={},imageInfo={};
  for(const key of ["day","dusk"]){
   const info=manifest.images[key];
   if(!info||!new RegExp("^greyhaven-quaternius-cottage-"+key+"-2d5-review\\.webp$").test(info.name)
      ||info.width!==640||info.height!==640)throw Error("review sprite manifest mismatch");
   images[key]=await loadImage(sourceBase+info.name);
+  imageInfo[key]=info;
   if(images[key].naturalWidth!==640||images[key].naturalHeight!==640)
    throw Error("real Blender review frame did not decode");
  }
@@ -50,11 +56,17 @@ else try{
   c.fillRect(680,136,260,300);
   c.strokeStyle="#b6a07e";c.lineWidth=2;c.strokeRect(680,136,260,300);
   // Screen-space editorial comparison ONLY: no world coordinate, map entry or physics.
-  c.drawImage(images[mood],684,142,252,252);
+  // Crop transparent margins and match visible cottage height to the
+  // original 228x297 Red Lion facade at the same 0.84 review zoom.
+  // This is an editorial comparison only; sprite source pixels remain unchanged.
+  const [sx,sy,sw,sh]=imageInfo[mood].alphaBoundingBox;
+  const scale=Math.min(230/sw,249/sh);
+  const dw=sw*scale,dh=sh*scale;
+  c.drawImage(images[mood],sx,sy,sw,sh,810-dw/2,267-dh/2,dw,dh);
   c.fillStyle="#f4e2c1";c.font="bold 15px system-ui";
-  c.textAlign="center";c.fillText("COTTAGE ART CANDIDATE",810,411);
+  c.textAlign="center";c.fillText("COTTAGE / HEIGHT-MATCHED",810,411);
   status.textContent="Original World9 / 3C / Red Lion source validated. "+
-    "Quaternius visual-only cottage image: "+mood+
+    "Quaternius front-gable, height-matched art candidate: "+mood+
     ". Never mapped, placed, collided, or admitted as a live building.";
  }
  moodInput.addEventListener("change",()=>{try{paint()}catch(e){fail(String(e))}});
