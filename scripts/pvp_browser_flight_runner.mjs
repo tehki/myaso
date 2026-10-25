@@ -11531,10 +11531,12 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     if (!recoveryCue) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    // Genuine pre-aimed single-transaction native LMB. A 5ms hold keeps
-    // the same release classifier and trusted DOWN/UP assertions while
-    // reducing dispatch latency inside the unchanged recovery window.
-    await performArenaM221GuardBreakClick(observer, 5);
+    // M147: once the genuine recovery cue is visibly present, dispatch one
+    // real, pre-aimed W3C pointer DOWN/UP without an additional pause tick.
+    // Even a 5ms requested pause can cost a whole headless driver tick before
+    // the original 30Hz sender samples release. The physical release remains
+    // genuine and the strict original World HIT-before-exit gate is unchanged.
+    await performArenaM221GuardBreakClick(observer, 0);
   } finally {
     const jumpError = await jumpCommand;
     if (jumpError) throw jumpError;
