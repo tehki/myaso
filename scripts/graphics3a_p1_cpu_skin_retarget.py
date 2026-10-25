@@ -426,6 +426,18 @@ def skin_matrices(doc: dict, buffers: list[bytes], worlds: dict[int, object], me
     return matrices
 
 
+def normalized_base_color_factor(pbr: dict) -> tuple[float, float, float, float]:
+    values = pbr.get("baseColorFactor", [1.0, 1.0, 1.0, 1.0])
+    if not isinstance(values, list) or len(values) != 4:
+        raise ValueError("glTF baseColorFactor must contain four values")
+    # pyrender treats integer numpy color vectors as 0..255, so normalize
+    # glTF's already-normalized 0..1 factors explicitly to float.
+    result = tuple(float(value) for value in values)
+    if not all(math.isfinite(value) and 0.0 <= value <= 1.0 for value in result):
+        raise ValueError("glTF baseColorFactor is outside normalized 0..1 range")
+    return result
+
+
 def validate_asset_image(doc: dict, buffers: list[bytes], model_path: Path,
                           image_index: int, Image):
     image = doc["images"][image_index]
@@ -521,7 +533,7 @@ def run_render(target_path: Path, source_archive: Path, source_suffix: str, outp
             texture = image_cache[image_index]
         mat = pyrender.MetallicRoughnessMaterial(
             baseColorTexture=texture,
-            baseColorFactor=tuple(float(v) for v in pbr.get("baseColorFactor", [1.0, 1.0, 1.0, 1.0])),
+            baseColorFactor=normalized_base_color_factor(pbr),
             metallicFactor=float(pbr.get("metallicFactor", 1.0)),
             roughnessFactor=float(pbr.get("roughnessFactor", 1.0)),
             alphaMode=material_doc.get("alphaMode", "OPAQUE"),
