@@ -1,0 +1,9 @@
+# Quaternius Medieval Village MegaKit — FREE Standard edition (glTF only)
+# Owner/author: Quaternius; source pack is CC0-1.0 Universal.
+# Secondary glTF mirror pinned to commit 21104b4045261c28fc312360841ed1a7b0ac8782.
+# Original author distribution: https://quaternius.com/packs/medievalvillagemegakit.html
+# Original archive: https://opengameart.org/content/medieval-village-megakit
+# This submodule is an isolated art-source reference. Game runtime never loads it.
+[submodule "third_party/quaternius/medieval-village-megakit-standard"]
+	path = third_party/quaternius/medieval-village-megakit-standard
+	url = https://github.com/J-Ponzo/gltf-medieval-village-megakit.git
