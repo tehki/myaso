@@ -231,11 +231,18 @@ def main():
     # Align the review camera to the original Greyhaven painted sprite:
     # front-facing gable, symmetric roof planes, modest top-down visibility.
     # This is isolated asset-bake framing; it never changes the live World9 camera.
-    camera.location = (0, -12, 10)
-    camera_target = Vector((0, 0, 2.8))
+    camera_cfg = cfg["sample"]["cameraReview"]
+    if (camera_cfg.get("projection") != "ORTHO"
+            or camera_cfg.get("liveWorld9CameraChanged") is not False
+            or camera_cfg.get("position") != [0, -12, 10]
+            or camera_cfg.get("target") != [0, 0, 2.8]
+            or camera_cfg.get("orthoScale") != 12.8):
+        raise ValueError("unapproved Greyhaven art camera; do not bake a new game camera")
+    camera.location = Vector(camera_cfg["position"])
+    camera_target = Vector(camera_cfg["target"])
     camera.rotation_euler = (camera_target - camera.location).to_track_quat("-Z", "Y").to_euler()
-    camera_data.type = "ORTHO"
-    camera_data.ortho_scale = 12.8
+    camera_data.type = camera_cfg["projection"]
+    camera_data.ortho_scale = camera_cfg["orthoScale"]
     scene.camera = camera
     key = light("daylight / fire-amber key", (1, -7, 10), 1100, 6, (1, 0.87, 0.70))
     fill = light("blue-gray sky fill", (-6, 2, 7), 550, 7, (0.56, 0.70, 1))
@@ -266,10 +273,7 @@ def main():
           "roofSaturation": 0.62, "roofValue": 0.72,
           "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},
         "dayDuskMoodLightingDistinct": True,
-        "cameraReview": {"projection":"ORTHO","position":[0,-12,10],
-          "target":[0,0,2.8],"orthoScale":12.8,
-          "intent":"front-gable Blood & Iron sprite alignment; preview only",
-          "liveWorld9CameraChanged":False},
+        "cameraReview": camera_cfg,
         "cyclesSamplesPerFrame": 24,
     }
     (output / "quaternius-greyhaven-review-report.json").write_text(json.dumps(report, indent=2) + "\n")
