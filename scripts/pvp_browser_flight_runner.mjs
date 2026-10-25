@@ -531,6 +531,12 @@ async function startGameServer() {
         || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
+        // QA-only original-World proof for physical M35/M41 short-LMB parry:
+        // W3C wheel receipt and browser-local clocks cannot prove whether
+        // defender Block preceded server contact within the 125ms window.
+        // Read-only M201_AUTH_ACTION and CORE8C_WORLD_CONTACT on loopback;
+        // no World stepping, input synthesis, HIT recipient, or protocol change.
+        || scenario === "uistun" || scenario === "uiparrytell"
         || scenario === "uiheavydodge"
         || scenario === "uikickknockdownffahit"
         || scenario === "uimultiknockdownffahit"
