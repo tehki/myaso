@@ -10,6 +10,7 @@
  * transfers ownership of a fresh binary payload to the transport hot path and
  * avoids the extra browser-side copy for WebTransport datagrams.
  */
+import { createV1InputReplayWindow } from "../src/network/v1-input-replay-window.mjs";
 import { decodeProposedTypedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 
 export async function connectGameTransport({
@@ -47,6 +48,9 @@ class WebTransportGameConnection {
     this.latestRealtime = null;
     this.realtimeFlush = null;
     this.closed = false;
+    this.v1ReplayWindow = createV1InputReplayWindow({
+      onStall: () => this.close("original v1 replay writer stalled for 1500ms"),
+    });
     // Typed Combat edges are never fed to the latest-wins sampled input queue.
     this.experimentalGestureState = "off";
     this.gestureGrantWaiter = null;
@@ -190,8 +194,19 @@ class WebTransportGameConnection {
 
   #queueRealtime(bytes, copy) {
     if (this.closed) return Promise.resolve();
-    const payload = toUint8Array(bytes);
-    this.latestRealtime = copy ? payload.slice() : payload;
+    const offered = toUint8Array(bytes);
+    const payload = copy ? offered.slice() : offered;
+    try {
+      if (this.v1ReplayWindow.offer(payload)) this.latestRealtime = null;
+      else this.latestRealtime = payload;
+    } catch (error) {
+      this.close("original v1 replay window overflow");
+      throw error;
+    }
+    return this.#ensureRealtimeFlush();
+  }
+
+  #ensureRealtimeFlush() {
     if (!this.realtimeFlush) {
       this.realtimeFlush = this.#flushRealtime()
         .catch((error) => {
@@ -199,12 +214,9 @@ class WebTransportGameConnection {
         })
         .finally(() => {
           this.realtimeFlush = null;
-          // A last sampled input can arrive after #flushRealtime observes an
-          // empty slot but BEFORE this settlement callback runs. Without a
-          // fresh flush it stays stranded until an unrelated future input.
-          // Preserve one latest-wins original datagram writer, no new queue.
-          if (!this.closed && this.latestRealtime) {
-            void this.#queueRealtime(this.latestRealtime, false).catch(() => {
+          // Resume existing work without offering/counting its packets twice.
+          if (!this.closed && (this.v1ReplayWindow.pending || this.latestRealtime)) {
+            void this.#ensureRealtimeFlush().catch(() => {
               if (!this.closed) this.close("realtime continuation failed");
             });
           }
@@ -214,12 +226,15 @@ class WebTransportGameConnection {
   }
 
   async #flushRealtime() {
-    while (!this.closed && this.latestRealtime) {
+    while (!this.closed && (this.v1ReplayWindow.pending || this.latestRealtime)) {
       await this.datagramWriter.ready;
       if (this.closed) return;
-      const payload = this.latestRealtime;
-      this.latestRealtime = null;
+      const protectedPayload = this.v1ReplayWindow.peek();
+      const payload = protectedPayload ?? this.latestRealtime;
+      if (!protectedPayload) this.latestRealtime = null;
       await this.datagramWriter.write(payload);
+      if (this.closed) return;
+      if (protectedPayload) this.v1ReplayWindow.complete(protectedPayload);
     }
   }
 
@@ -260,6 +275,7 @@ class WebTransportGameConnection {
     this.gestureGrantWaiter?.reject(new Error("experimental gesture transport closed"));
     this.gestureGrantWaiter = null;
     this.latestRealtime = null;
+    this.v1ReplayWindow.close();
     const pendingFlush = this.realtimeFlush;
     const transportClosed = this.transport.closed;
     this.transport.close({ closeCode: 0, reason });

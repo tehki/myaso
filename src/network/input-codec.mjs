@@ -42,7 +42,9 @@ export function encodeInputPacket({
     const tick = sample.tick ?? clientTick;
     assertUint32(tick, "sample.tick");
     const delta = (clientTick - tick) >>> 0;
-    if (tick > clientTick || delta > 0xff) {
+    // The previous sampled tick can be numerically larger across uint32 wrap.
+    // Modular age still rejects future samples and preserves the 255-tick bound.
+    if (delta > 0xff) {
       throw new RangeError("sample.tick must be within 255 ticks at or before clientTick");
     }
     view.setUint8(offset, delta);

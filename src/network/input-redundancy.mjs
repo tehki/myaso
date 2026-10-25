@@ -1,6 +1,6 @@
 import { NETWORK } from "./constants.mjs";
 
-// Preserve one *actual* sampled rising edge across a skipped QUIC datagram.
+// Preserve one actual sampled rising edge or committed LMB release across a skipped datagram.
 // The v1 wire still carries at most three genuine, monotonically sampled ticks.
 // The current tick and immediately previous state always own slots 1 and 2.
 const MAX_EDGE_AGE_TICKS = 4;
@@ -26,13 +26,19 @@ export function createInputRedundancy() {
       const prior = history.at(-1);
       const currentMask = actionMask(sample);
       const rising = currentMask & ~actionMask(prior || {});
-      // Preserve the heavy edge even if another held input bit changes.
+      // A sampled dual-bit hold -> one action bit is the genuine classified
+      // light/heavy LMB release. Neutral samples must not erase that release;
+      // unlike a held input, it no longer requires its button to remain down.
+      const committedRelease = prior?.attack && prior.heavyAttack
+        && Boolean(sample.attack) !== Boolean(sample.heavyAttack);
       // Priority stays with a more recent genuine sampled action edge.
-      if (rising) pinned = { sample, activeMask: rising & (1 << 1) ? (1 << 1) : rising };
-      // A cancelled/released hold cannot be reintroduced by the pinned slot.
+      if (committedRelease) pinned = { sample, committed: true };
+      else if (rising) pinned = { sample, activeMask: rising & (1 << 1) ? (1 << 1) : rising };
+      // A cancelled hold cannot be reintroduced. A 3->0 blur/cancel never
+      // creates a committed release; reset/reconnect clears both forms.
       if (pinned && (
         ((sample.tick - pinned.sample.tick) >>> 0) > MAX_EDGE_AGE_TICKS
-        || (currentMask & pinned.activeMask) !== pinned.activeMask
+        || (!pinned.committed && (currentMask & pinned.activeMask) !== pinned.activeMask)
       )) pinned = null;
 
       history.push(sample);

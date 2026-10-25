@@ -88,11 +88,13 @@ test("selected typed outbox preserves LMB but denies Key E Combat events under v
     );
     resume();
     await Promise.all(pendingDatagrams);
-    assert.equal(writes.length,1);
-    assert.equal(decodeInputPacket(writes[0]).samples.some(s=>s.attack),false,
-      "actual v1 movement path has dropped the unsent original action");
+    assert.deepEqual(writes.map(bytes=>decodeInputPacket(bytes).clientTick),[1,2,3,5]);
+    for(let i=0;i<3;i++)assert.deepEqual([...writes[i]],[...authored[i]],
+      "original v1 replay frames must survive the same stalled writer byte-for-byte");
+    assert.equal(decodeInputPacket(writes.at(-1)).samples.some(s=>s.attack),false,
+      "ordinary latest movement remains neutral after the preserved original action");
 
-    // The existing selected outbox model is INDEPENDENT of latest-wins movement.
+    // The selected typed proposal remains independent of v1 wire framing.
     // It is not a real network send: nextSendBatch returns byte copies only.
     const first=outbox.nextSendBatch(4);
     const decoded=first.map(x=>decodeProposedTypedGestureEvent(x.bytes));
