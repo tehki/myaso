@@ -54,6 +54,8 @@ def render(model: Path, output: Path) -> dict:
     # Headless library imports only here. Protected CI validates the source
     # without ever fetching or executing third-party asset content.
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+    # The Intel X230i Mesa EGL driver requires its software-context fallback.
+    os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
     import numpy as np
     import pyrender
     import trimesh
