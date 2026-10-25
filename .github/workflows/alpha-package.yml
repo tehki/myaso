@@ -46,6 +46,15 @@ jobs:
           (cd out && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           tar -C out -czf "myaso-alpha-${SOURCE_SHA}.tar.gz" .
           sha256sum "myaso-alpha-${SOURCE_SHA}.tar.gz" > "myaso-alpha-${SOURCE_SHA}.tar.gz.sha256"
+      - name: Verify exact-source archive and all extracted file checksums
+        run: |
+          set -euo pipefail
+          sha256sum -c "myaso-alpha-${SOURCE_SHA}.tar.gz.sha256"
+          mkdir verified-package
+          tar -C verified-package -xzf "myaso-alpha-${SOURCE_SHA}.tar.gz"
+          test "$(cat verified-package/REVISION)" = "$SOURCE_SHA"
+          (cd verified-package && sha256sum -c SHA256SUMS)
+          test -x verified-package/bin/myaso-server
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ (github.head_ref == 'codex/unified-core-combat-20261024' || github.ref == 'refs/heads/codex/unified-core-combat-20261024') && format('myaso-alpha-linux-amd64-review-{0}', env.SOURCE_SHA) || 'myaso-alpha-linux-amd64' }}
