@@ -111,6 +111,31 @@ fn recovered_dropped_heavy_tick(
         .map(|sample| sample.tick)
 }
 
+// One standard-input freshness fence per accepted QUIC connection. Reject an
+// older WHOLE frame before sample dedup consumes its holes. Old genuine action
+// samples inside a NEW frame still pass through the unchanged replay window.
+#[derive(Default)]
+struct StandardInputIngress {
+    samples: InputIngressWindow,
+    latest_accepted_packet_tick: Option<u32>,
+}
+
+impl StandardInputIngress {
+    fn ingest(&mut self, packet: &myaso_server::InputPacket) -> myaso_server::AcceptedInputBatch {
+        if self
+            .latest_accepted_packet_tick
+            .is_some_and(|previous| !is_tick_newer32(packet.client_tick, previous))
+        {
+            return myaso_server::AcceptedInputBatch::default();
+        }
+        let accepted = self.samples.ingest(packet);
+        if !accepted.is_empty() {
+            self.latest_accepted_packet_tick = Some(packet.client_tick);
+        }
+        accepted
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
     background_players: usize,
@@ -755,7 +780,7 @@ async fn handle_connection(
 
     let mut v2_enabled = false;
     let mut legacy_combat_seen = false;
-    let mut ingress = InputIngressWindow::default();
+    let mut ingress = StandardInputIngress::default();
     let mut snapshots = SnapshotSession::default();
     let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
@@ -2494,7 +2519,7 @@ mod core8a_standard_input_freshness_tests {
 
     fn apply_original_packet(
         state: &mut GameState,
-        ingress: &mut InputIngressWindow,
+        ingress: &mut StandardInputIngress,
         packet: &InputPacket,
     ) -> Vec<u32> {
         let accepted = ingress.ingest(packet);
@@ -2512,7 +2537,7 @@ mod core8a_standard_input_freshness_tests {
         assert!(state
             .world
             .add_player_at(2, 260.0, 200.0, std::f32::consts::PI));
-        let mut ingress = InputIngressWindow::default();
+        let mut ingress = StandardInputIngress::default();
         apply_original_packet(&mut state, &mut ingress, &block_packet(10, true));
         for _ in 0..12 {
             assert!(state.world.step().is_empty());
@@ -2565,5 +2590,114 @@ mod core8a_standard_input_freshness_tests {
             "newer neutral remains authoritative; delayed old block cannot change damage"
         );
         assert_eq!(state.world.fighter(2).unwrap().hp, 66.0);
+    }
+
+    fn sampled_packet(
+        packet_tick: u32,
+        samples: &[(u32, u8)],
+        move_x: i8,
+        facing: u16,
+    ) -> InputPacket {
+        let mut bytes = vec![0_u8; 16 + samples.len() * 6];
+        bytes[0] = PROTOCOL_VERSION;
+        bytes[1] = 1;
+        bytes[2] = samples.len() as u8;
+        bytes[4..6].copy_from_slice(&(packet_tick as u16).to_le_bytes());
+        bytes[8..12].copy_from_slice(&packet_tick.to_le_bytes());
+        for (index, (tick, buttons)) in samples.iter().enumerate() {
+            let offset = 16 + index * 6;
+            bytes[offset] = u8::try_from(packet_tick.wrapping_sub(*tick)).unwrap();
+            bytes[offset + 1] = move_x as u8;
+            bytes[offset + 3..offset + 5].copy_from_slice(&facing.to_le_bytes());
+            bytes[offset + 5] = *buttons;
+        }
+        decode_input_packet(&bytes).expect("real standard v1 sample bytes")
+    }
+
+    #[test]
+    fn rejected_old_frame_keeps_holes_for_old_genuine_edge_in_new_frame() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(2, 200.0, 200.0, 0.0));
+        assert!(state
+            .world
+            .add_player_at(1, 260.0, 200.0, std::f32::consts::PI));
+        let mut ingress = StandardInputIngress::default();
+        let neutral = sampled_packet(60, &[(60, 0), (59, 0), (58, 0)], 0, 0);
+        assert_eq!(
+            apply_original_packet(&mut state, &mut ingress, &neutral),
+            vec![58, 59, 60]
+        );
+        let delayed = sampled_packet(57, &[(57, 1), (56, 0), (55, 0)], 0, 0);
+        assert!(apply_original_packet(&mut state, &mut ingress, &delayed).is_empty());
+        // Exactly the original sampled tick57, not a substituted later held
+        // tick. The NEW packet's fresh control survives; the old sample has
+        // not been consumed by the rejected whole frame's dedup path.
+        let recovered = sampled_packet(61, &[(61, 0), (60, 0), (57, 1)], 0, 0);
+        assert_eq!(
+            apply_original_packet(&mut state, &mut ingress, &recovered),
+            vec![57, 61]
+        );
+        assert!(apply_original_packet(&mut state, &mut ingress, &recovered).is_empty());
+        let mut actual_hits = Vec::new();
+        for _ in 0..60 {
+            for event in state.world.step() {
+                if let CombatEvent::Hit {
+                    attacker,
+                    target,
+                    damage,
+                    hp,
+                } = event
+                {
+                    actual_hits.push((attacker, target, damage, hp));
+                }
+            }
+        }
+        assert_eq!(actual_hits, vec![(2, 1, 34, 66)]);
+    }
+
+    #[test]
+    fn stale_whole_frame_cannot_replace_current_movement_facing_or_block() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(2, 200.0, 200.0, 0.0));
+        let mut ingress = StandardInputIngress::default();
+        let current = sampled_packet(60, &[(60, 0), (59, 0), (58, 0)], 127, 0);
+        assert_eq!(
+            apply_original_packet(&mut state, &mut ingress, &current).len(),
+            3
+        );
+        let old = sampled_packet(50, &[(50, 4), (49, 4), (48, 4)], -127, u16::MAX / 2);
+        assert!(apply_original_packet(&mut state, &mut ingress, &old).is_empty());
+        let authoritative = state.world.fighter(2).unwrap().input();
+        assert_eq!(authoritative.move_x, 1.0);
+        assert_eq!(authoritative.facing_radians, 0.0);
+        assert!(!authoritative.block);
+    }
+
+    #[test]
+    fn packet_freshness_handles_u32_wrap_duplicate_headers_and_new_connection() {
+        let mut ingress = StandardInputIngress::default();
+        let before_wrap = block_packet(u32::MAX - 1, false);
+        assert_eq!(ingress.ingest(&before_wrap).len(), 3);
+        assert!(ingress.ingest(&before_wrap).is_empty());
+        let after_wrap = block_packet(0, false);
+        assert_eq!(
+            ingress
+                .ingest(&after_wrap)
+                .iter()
+                .map(|s| s.tick)
+                .collect::<Vec<_>>(),
+            vec![u32::MAX, 0]
+        );
+        assert!(ingress.ingest(&block_packet(u32::MAX - 5, true)).is_empty());
+        assert!(ingress.ingest(&after_wrap).is_empty());
+        assert_eq!(ingress.ingest(&block_packet(1, false)).len(), 1);
+
+        let mut old_connection = StandardInputIngress::default();
+        assert_eq!(old_connection.ingest(&block_packet(100, false)).len(), 3);
+        assert!(old_connection.ingest(&block_packet(10, true)).is_empty());
+        let mut fresh_connection = StandardInputIngress::default();
+        assert_eq!(fresh_connection.ingest(&block_packet(10, true)).len(), 3);
+        assert_eq!(old_connection.latest_accepted_packet_tick, Some(100));
+        assert_eq!(fresh_connection.latest_accepted_packet_tick, Some(10));
     }
 }
