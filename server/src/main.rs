@@ -1595,12 +1595,25 @@ mod tests {
         // at tick34 is first seen in a packet whose newest client tick is35.
         // Later heavy=true at tick36 is a different edge, not recovery of34.
         let mut dropped = VecDeque::new();
-        let light = InputSample { attack: true, ..action_sample(34, false) };
+        let light = InputSample {
+            attack: true,
+            ..action_sample(34, false)
+        };
         let first_packet = [action_sample(35, false), light, action_sample(33, false)];
-        assert_eq!(register_new_action_datagram(&first_packet, &mut dropped), Some(34));
-        assert_eq!(one_shot_action_mask(&light), 1, "the dropped edge was light-only");
         assert_eq!(
-            recovered_dropped_heavy_tick(&[action_sample(34, false), action_sample(36, true)], &dropped),
+            register_new_action_datagram(&first_packet, &mut dropped),
+            Some(34)
+        );
+        assert_eq!(
+            one_shot_action_mask(&light),
+            1,
+            "the dropped edge was light-only"
+        );
+        assert_eq!(
+            recovered_dropped_heavy_tick(
+                &[action_sample(34, false), action_sample(36, true)],
+                &dropped
+            ),
             None,
             "a later accepted heavy cannot prove replay of a dropped light-only tick"
         );
