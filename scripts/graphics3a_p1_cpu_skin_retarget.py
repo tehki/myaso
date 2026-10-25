@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import struct
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
@@ -441,6 +442,9 @@ def validate_asset_image(doc: dict, buffers: list[bytes], model_path: Path,
 
 
 def run_render(target_path: Path, source_archive: Path, source_suffix: str, output: Path):
+    # Select headless EGL before pyrender/PyOpenGL imports (X230i has no X display).
+    os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+    os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
     import numpy as np
     import trimesh
     import pyrender
