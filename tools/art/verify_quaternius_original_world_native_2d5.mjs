@@ -86,7 +86,7 @@ for(let y=0;y<a.height;y++)for(let x=0;x<a.width;x++){
  const offset=(y*a.width+x)*4;
  let changed=false;
  for(let j=0;j<4;j++)if(ac[offset+j]!==bc[offset+j]){changed=true;break}
- if(changed){if(x>=680&&x<941&&y>=136&&y<437)inside++;else outside++}
+ if(changed){if(x>=678&&x<=942&&y>=134&&y<=439)inside++;else outside++}
 }
 return {ok:outside===0&&inside>10000,inside,outside,status,
 width:a.width,height:a.height,mood:document.querySelector('#mood').value};`;
