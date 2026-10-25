@@ -2469,3 +2469,101 @@ mod r0_player_cap_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod core8a_standard_input_freshness_tests {
+    use super::*;
+    use myaso_server::{simulation::Action, InputPacket};
+
+    fn block_packet(tick: u32, block: bool) -> InputPacket {
+        let mut bytes = vec![0_u8; 16 + 3 * 6];
+        bytes[0] = PROTOCOL_VERSION;
+        bytes[1] = 1;
+        bytes[2] = 3;
+        bytes[4..6].copy_from_slice(&(tick as u16).to_le_bytes());
+        bytes[8..12].copy_from_slice(&tick.to_le_bytes());
+        for index in 0..3 {
+            let offset = 16 + index * 6;
+            bytes[offset] = index as u8;
+            // Defender genuinely faces the attacker to its left.
+            bytes[offset + 3..offset + 5].copy_from_slice(&(u16::MAX / 2).to_le_bytes());
+            bytes[offset + 5] = if block { 4 } else { 0 };
+        }
+        decode_input_packet(&bytes).expect("original standard v1 datagram")
+    }
+
+    fn apply_original_packet(
+        state: &mut GameState,
+        ingress: &mut InputIngressWindow,
+        packet: &InputPacket,
+    ) -> Vec<u32> {
+        let accepted = ingress.ingest(packet);
+        let ticks = accepted.iter().map(|sample| sample.tick).collect();
+        let coalesced = coalesce_accepted_input_batch(accepted.as_slice())
+            .map(|sample| (sample.tick, sample.into()));
+        apply_coalesced_input_and_read_tick(state, 2, coalesced, &mut VecDeque::new(), None);
+        ticks
+    }
+
+    #[test]
+    fn delayed_unseen_old_block_cannot_restart_parry_after_newer_neutral() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(state
+            .world
+            .add_player_at(2, 260.0, 200.0, std::f32::consts::PI));
+        let mut ingress = InputIngressWindow::default();
+        apply_original_packet(&mut state, &mut ingress, &block_packet(10, true));
+        for _ in 0..12 {
+            assert!(state.world.step().is_empty());
+        }
+        assert_eq!(state.world.fighter(2).unwrap().action, Action::Block);
+        assert!(state.world.fighter(2).unwrap().action_elapsed_ms > 125.0);
+        apply_original_packet(&mut state, &mut ingress, &block_packet(30, false));
+        assert!(state.world.step().is_empty());
+        assert_eq!(state.world.fighter(2).unwrap().action, Action::Idle);
+
+        // Begin a genuine World light, then deliver an actual older datagram
+        // whose held-block sample ticks are still UNSEEN in the replay window.
+        // No Action setter, damage injection or synthetic Parry is used.
+        assert!(state.world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                facing_radians: 0.0,
+                ..InputIntent::default()
+            }
+        ));
+        for _ in 0..7 {
+            assert!(state.world.step().is_empty());
+        }
+        let delayed_ticks =
+            apply_original_packet(&mut state, &mut ingress, &block_packet(20, true));
+        let mut actual_events = Vec::new();
+        for _ in 0..20 {
+            actual_events.extend(state.world.step());
+        }
+        assert!(
+            !actual_events.iter().any(|event| matches!(event,
+                CombatEvent::Parry { attacker: 1, target: 2 })),
+            "old held-block must not reopen 125ms parry: accepted={delayed_ticks:?}, events={actual_events:?}"
+        );
+        assert_eq!(
+            actual_events
+                .iter()
+                .filter(|event| matches!(
+                    event,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 34,
+                        hp: 66
+                    }
+                ))
+                .count(),
+            1,
+            "newer neutral remains authoritative; delayed old block cannot change damage"
+        );
+        assert_eq!(state.world.fighter(2).unwrap().hp, 66.0);
+    }
+}

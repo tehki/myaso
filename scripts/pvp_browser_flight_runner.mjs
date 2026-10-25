@@ -574,12 +574,13 @@ async function startGameServer() {
         || scenario === "uiheavydodge"
         || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
+        || scenario === "uirollknockdownffahit"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
-      // Dedicated M121 original-v1 ingress evidence is never enabled for
+      // Existing M121/M156 original-v1 ingress evidence is never enabled for
       // v2 or other production paths; the Rust server rejects nonloopback.
-      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" ? "1" : "0",
+      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uijumpattackinputloss" ? "1" : "0",
       MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS:
