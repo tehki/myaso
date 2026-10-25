@@ -18,7 +18,7 @@ P1 review is isolated in [Draft PR #1041](https://github.com/tehki/myaso/pull/10
 - Private `1280×160` preview contact sheet on X230i:
   `~/Downloads/myaso-graphics3a-p1-assets-20261025/offline-character-review/render_frames/Male_Ranger/from_repository_script/static_eight_view_contact_sheet.png`
 - Contact sheet SHA256: **`fd770b9e15cd569c68796b6dba4f2b4d150bd880a77bfa737c870f5b24947718`**.
-- **Reproduction gate passed**: the first private lookdev script and the exact [GitHub-committed](../scripts/graphics3a_p1_egl_static_review.py) standalone script produced the **identical contact-sheet SHA256** on this same X230i environment, even when run separately. This is *local reproducibility*, not guaranteed byte stability across GPUs/driver versions.
+- **Reproduction gate passed**: the first private lookdev script and the exact [GitHub-committed](../../scripts/graphics3a_p1_egl_static_review.py) standalone script produced the **identical contact-sheet SHA256** on this same X230i environment, even when run separately. This is *local reproducibility*, not guaranteed byte stability across GPUs/driver versions.
 - Exact second-run private evidence: `render_frames/Male_Ranger/from_repository_script/static-review.json` records `frames=8`, each per-frame SHA256, offline render duration, eight coverage counts, dependency checksums and explicit `HOLD_P1_OFFLINE_VISUAL_ONLY`.
 - Synthetic input-safety tests in `tests/test_graphics3a_p1_egl_static_review.py`: **six passed locally**. GitHub protected `quality` checks this same test, alongside the prior 7+9+5 Graphics P1 checks; all original Combat/Core/World checks remain mandatory.
 
