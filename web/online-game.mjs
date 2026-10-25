@@ -974,7 +974,12 @@ function simulatePrediction(stepMs) {
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial"
+    // Combat4A M41/M35: observed real wheel -> actual original v1 BLOCK
+    // sample provenance, scoped to native acceptance only. Never forge input.
+    const m41InputProbe = acceptanceScenario === "uiparrytell"
+      || acceptanceScenario === "uistun";
+    if (m41InputProbe
+      || acceptanceScenario === "uimultirecoveryspatial"
       || acceptanceScenario === "uijumprecoveryffa"
       || acceptanceScenario === "uijumppunishffa"
       || acceptanceScenario === "uimultirecoveryffa") {
@@ -982,13 +987,15 @@ function simulatePrediction(stepMs) {
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack
+          || (m41InputProbe && currentInput.block)) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
             attack: Boolean(currentInput.attack),
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
+            block: Boolean(currentInput.block),
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
