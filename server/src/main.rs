@@ -2027,7 +2027,13 @@ mod m201_original_world_contact_tests {
             world.step_into(&mut events);
             let lines = m201_flight_proof_lines(&world, &events, &mut previous);
             if events.iter().any(|event| {
-                matches!(event, CombatEvent::Parry { attacker: 1, target: 2 })
+                matches!(
+                    event,
+                    CombatEvent::Parry {
+                        attacker: 1,
+                        target: 2
+                    }
+                )
             }) {
                 assert!(!events.iter().any(|event| {
                     matches!(event, CombatEvent::Hit { .. } | CombatEvent::Block { .. })
@@ -2058,7 +2064,11 @@ mod m201_original_world_contact_tests {
         assert!(contact.contains("defenderAction=6"));
         assert!(contact.contains("defenderHp=100.0"));
         assert!(contact.contains("defenderGuard=100.0"));
-        assert_eq!(attacker.action.wire_code(), 7, "genuine parry stuns attacker");
+        assert_eq!(
+            attacker.action.wire_code(),
+            7,
+            "genuine parry stuns attacker"
+        );
         assert_eq!(defender.hp, 100.0);
         assert_eq!(defender.guard, 100.0);
     }
