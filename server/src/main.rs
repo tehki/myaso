@@ -1971,7 +1971,20 @@ mod m201_original_world_contact_tests {
         }
         let contact =
             observed.expect("real original World Block must emit read-only contact evidence");
+        let attacker = world.fighter(1).expect("original World attacker");
+        let defender = world.fighter(2).expect("original World defender");
         assert!(contact.contains(&format!("tick={}", world.tick)));
+        assert!(contact.contains(&format!("world={}", world.world_instance())));
+        assert!(contact.contains(&format!("attackerLife={}", attacker.world_incarnation())));
+        assert!(contact.contains(&format!("targetLife={}", defender.world_incarnation())));
+        assert!(contact.contains(&format!(
+            "defenderActionElapsedMs={:.1}",
+            defender.action_elapsed_ms
+        )));
+        assert!(
+            defender.action_elapsed_ms > 125.0,
+            "original World late block age must not be mistaken for parry eligibility"
+        );
         assert!(contact.contains("defenderAction=6"));
         assert!(contact.contains("defenderHp=100.0"));
         assert!(contact.contains("defenderGuard=62.0"));
