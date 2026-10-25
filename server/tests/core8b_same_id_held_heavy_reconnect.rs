@@ -359,10 +359,9 @@ fn old_boot_held_heavy_cannot_cross_fresh_world_with_reset_actor_and_lease() {
     let mut before = World::new(800.0, 600.0);
     assert!(before.add_player_at(1, 250.0, 300.0, 0.0));
     assert!(before.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
-    let mut old = SessionGestureWorldPath::from_admitted_world(
-        &before, 1, reset_lease, previous_boot,
-    )
-    .expect("old authoritative session admitted");
+    let mut old =
+        SessionGestureWorldPath::from_admitted_world(&before, 1, reset_lease, previous_boot)
+            .expect("old authoritative session admitted");
     let prior_binding = old.binding();
     assert_eq!(
         admit(
@@ -401,14 +400,16 @@ fn old_boot_held_heavy_cannot_cross_fresh_world_with_reset_actor_and_lease() {
     let mut after = World::new(800.0, 600.0);
     assert!(after.add_player_at(1, 250.0, 300.0, 0.0));
     assert!(after.add_player_at(2, 310.0, 300.0, std::f32::consts::PI));
-    let mut current = SessionGestureWorldPath::from_admitted_world(
-        &after, 1, reset_lease, current_boot,
-    )
-    .expect("fresh server session admitted");
+    let mut current =
+        SessionGestureWorldPath::from_admitted_world(&after, 1, reset_lease, current_boot)
+            .expect("fresh server session admitted");
     assert_eq!(current.binding().player_id, prior_binding.player_id);
     assert_eq!(current.binding().lease_epoch, prior_binding.lease_epoch);
     assert_ne!(current.binding().boot_nonce, prior_binding.boot_nonce);
-    assert_ne!(current.binding().world_instance, prior_binding.world_instance);
+    assert_ne!(
+        current.binding().world_instance,
+        prior_binding.world_instance
+    );
 
     assert_eq!(
         admit(
