@@ -15,6 +15,8 @@ export async function dispatchR2ReleaseLedShortBlock({
   maxHoldMs = 280, receiptGraceMs = 100, trustedWheelWaitMs = 0,
   // REVIEW-only M194: genuinely arm Firefox block BEFORE Chrome LMB down.
   preWheelHeadStartMs = 0,
+  // M151 only: keep one genuine light LMB release near trusted block onset.
+  postTrustedWheelMs = 0,
 }) {
   if (![sendAttackDown, sendWheel, awaitTrustedWheel, sendAttackUp, now, sleep]
     .every(fn => typeof fn === "function")
@@ -25,6 +27,8 @@ export async function dispatchR2ReleaseLedShortBlock({
     || trustedWheelWaitMs >= maxHoldMs
     || !Number.isFinite(preWheelHeadStartMs) || preWheelHeadStartMs < 0
     || preWheelHeadStartMs > 80
+    || !Number.isFinite(postTrustedWheelMs) || postTrustedWheelMs < 0
+    || postTrustedWheelMs > 60 || (postTrustedWheelMs > 0 && preWheelHeadStartMs > 0)
     || (sendAttackClick !== undefined && typeof sendAttackClick !== "function")
     || (sendAttackClick !== undefined && preWheelHeadStartMs === 0)
     || (preWheelHeadStartMs > 0 && trustedWheelWaitMs === 0)) {
@@ -82,6 +86,10 @@ export async function dispatchR2ReleaseLedShortBlock({
   } else {
     await Promise.race([attestation, sleep(receiptGraceMs), earlyWheelFailure]);
   }
+  // A bounded pause after actual trusted Firefox wheel moves the one genuine
+  // release into the original 125-240ms block-only contact interval.
+  // A late/missing wheel remains fatal, never a manufactured HIT or BLOCK.
+  if (postTrustedWheelMs > 0) await sleep(postTrustedWheelMs);
   const attackUpDispatchMs = ms();
   if (attackUpDispatchMs - attackDownDispatchMs > maxHoldMs) {
     throw new Error("R2 genuine LMB hold exceeded light-charge budget before release; no strike allowed");
@@ -106,7 +114,7 @@ export async function dispatchR2ReleaseLedShortBlock({
     trustedWheelObservedMs: rounded(trustedWheelObservedMs),
     receiptGraceMs,
     wheelHeadStartMs: 0,
-    postTrustedWheelMs: 0,
+    postTrustedWheelMs,
     clickHoldMs: rounded(attackUpDispatchMs - attackDownDispatchMs),
   };
 }
