@@ -37,6 +37,13 @@ def run():
         raise ValueError("Blender provenance or authority invariant failed")
     if report.get("materialReview", {}).get("roofMaterialNodesChanged", 0) < 1:
         raise ValueError("not the genuine V2 Blood & Iron roof material review")
+    alignment = report.get("doorFrameAlignment", {})
+    if (alignment.get("verifiedGenuineImportedBlenderMeshes") is not True
+            or alignment.get("unchangedOriginalMeshVertexData") is not True
+            or alignment.get("horizontalCenterOffsetMeters", 1.0) > 0.015
+            or alignment.get("depthCenterOffsetMeters", 1.0) > 0.10
+            or not 0 <= alignment.get("thresholdBottomOffsetMeters", -1.0) <= 0.09):
+        raise ValueError("cannot bake Quaternius cottage with unverified Blender door/arch alignment")
     captures = report.get("captured")
     if len(captures or []) != 2:
         raise ValueError("requires original day AND dusk source evidence")
@@ -51,6 +58,10 @@ def run():
         "noChangedRedLion":True,
         "sourceEdition":"Quaternius CC0 Standard",
         "sourceCreatorArchiveMirrorParityVerified":False,
+        "realQuaterniusDoorFrameWorldBoundsVerified": True,
+        "doorFrameCenterOffsetMeters": alignment["horizontalCenterOffsetMeters"],
+        "doorFrameDepthOffsetMeters": alignment["depthCenterOffsetMeters"],
+        "doorThresholdBottomOffsetMeters": alignment["thresholdBottomOffsetMeters"],
         "images": {},
     }
     for mood, evidence in zip(("day","dusk"),captures):
