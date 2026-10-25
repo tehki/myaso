@@ -52,6 +52,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_graphics3a_p1_outfit_review.py' -v
           python -m py_compile scripts/graphics3a_p1_egl_static_review.py tests/test_graphics3a_p1_egl_static_review.py
           python -m unittest discover -s tests -p 'test_graphics3a_p1_egl_static_review.py' -v
+          python -m py_compile scripts/graphics3a_p1_cpu_skin_retarget.py tests/test_graphics3a_p1_cpu_skin_retarget.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_cpu_skin_retarget.py' -v
 
       - name: Validate combat JavaScript
         run: |
