@@ -180,6 +180,34 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+// Strict localhost, QA-only observation of ORIGINAL server-replicated fighters.
+// This does not supply inputs, positions, authority or item state to gameplay.
+let lastRedLionFrameDrawn = false;
+if (fixedWorldEnabled && originalRedLionArt && params.get("nativeRedLionProbe") === "1"
+  && ["127.0.0.1", "localhost"].includes(location.hostname)) {
+  Object.defineProperty(window, "__MYASO_A232_NATIVE__", {
+    configurable: false, enumerable: false, writable: false,
+    value: () => {
+      const id = networkClient?.playerNetId ?? 0;
+      const raw = networkClient ? [...networkClient.state.values()] : [];
+      const fighters = raw.map(actor => ({
+        netId: actor.netId, x: actor.x, y: actor.y,
+        behindFacade: originalRedLionArt.behindFacade(actor),
+        hp: actor.hp
+      })).sort((a,b) => a.netId - b.netId);
+      return {
+        realServerSnapshot: !!networkClient && fighters.length > 0,
+        ownNetId: id, serverTick: networkClient?.latestServerTick ?? 0,
+        fighters, frontHudActorIds: visibleEnemyPositions.map(f => f.netId).sort((a,b) => a-b),
+        originalArtPhase: originalRedLionArt.state().phase,
+        redLionFrameDrawn: lastRedLionFrameDrawn,
+        camera: { x: visualCameraPosition.x, y: visualCameraPosition.y },
+        worldOptIn: true, redLionOptIn: true, presenterOnly: true,
+        noItemAuthority: true, noPortalAuthority: true
+      };
+    }
+  });
+}
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -914,6 +942,8 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   // presentation and all players completely unchanged on this render frame.
   const redLionFrame = local.initialized ? originalRedLionArt?.prepare(
     visualCameraPosition,canvas.width,canvas.height,ARENA_VIEW_ZOOM) : null;
+  if (params.get("nativeRedLionProbe") === "1" && ["127.0.0.1", "localhost"].includes(location.hostname))
+    lastRedLionFrameDrawn = !!redLionFrame;
   if (redLionFrame) {
     drawScreenLayerInZoomedGame(ctx,redLionFrame.world,
       canvas.width,canvas.height,ARENA_VIEW_ZOOM);
