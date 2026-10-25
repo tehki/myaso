@@ -1,0 +1,42 @@
+name: Graphics3B P1 four genuine Red Lion actor occlusion
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "tools/art/verify_a232_four_real_actor_occlusion.mjs"
+      - ".github/workflows/graphics3b-a232-four-real-occlusion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-rust-actors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate original renderer and local-only observer
+        run: |
+          node --check web/online-game.mjs
+          node --check tools/art/verify_a232_four_real_actor_occlusion.mjs
+          node --test tests/graphics3b-red-lion-live-art-optin.test.mjs tests/graphics3b-red-lion-camera-parity.test.mjs
+      - name: Verify genuine native Chrome Firefox drivers
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile exact original Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four genuine authenticated browsers traverse original Red Lion facade
+        run: timeout --signal=TERM --kill-after=5s 420s node tools/art/verify_a232_four_real_actor_occlusion.mjs
+      - name: Preserve original 960x540 Canvas and full HUD screenshots with SHA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-a232-real-four-rust-facade
+          path: graphics3b-a232-four-real-actor-evidence/*
+          retention-days: 7
+          if-no-files-found: ignore
