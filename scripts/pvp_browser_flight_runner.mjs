@@ -1,4 +1,4 @@
-import { hasM147PunishFeedback } from "./m147-recovery-feedback-convergence.mjs";
+import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
 import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
@@ -8262,7 +8262,11 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     // Read only the actual production-visible cue and its original observer
     // identity/index/frame timestamp. Do not serialize the entire HUD/history.
     const cue = await execute(attacker.base, attacker.sessionId, script);
-    if (cue) return cue;
+    if (cue?.actorId === expectedActorId
+      && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
+      && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
+      && ["Heavy strike committed - the long windup is readable.", "Attack committed - your windup is readable."].includes(cue.text)
+      && ["Heavy strike committed - the long windup is readable.", "Attack committed - your windup is readable."].includes(cue.latestText)) return cue;
     await sleep(10);
   }
   throw new Error("M41 native attacker never exposed a fresh original World windup");
@@ -11515,9 +11519,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
             document.querySelector(selector)?.textContent?.trim() === '100');
         return event && recovery && !recovery.hidden
           && recovery.dataset.state === 'jump-attack-recovery'
-          && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event } : null;
+          && focus === 'PUNISH TARGET #${jumpId}' && pristine ? { ...event, focusLabel: focus } : null;
       `);
-      if (cue) { recoveryCue = cue; break; }
+      if (isM147RenderedRecoveryCue(cue, jumpId)) { recoveryCue = cue; break; }
       await sleep(8);
     }
     if (!recoveryCue) {
@@ -14656,7 +14660,9 @@ async function waitForDriver(base, child, name) {
 
 async function execute(base, sessionId, script) {
   const response = await webdriver(base, "POST", `/session/${sessionId}/execute/sync`, { script, args: [] });
-  return response.value ?? response;
+  // A successful WebDriver script may intentionally return null. Preserve it;
+  // nullish fallback would turn an absent cue into the truthy response envelope.
+  return response && Object.hasOwn(response, "value") ? response.value : response;
 }
 
 async function webdriver(base, method, pathname, body) {
