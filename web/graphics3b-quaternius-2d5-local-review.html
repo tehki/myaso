@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Graphics 3B — Quaternius Blood &amp; Iron, original World9 visual comparison ONLY</title>
+<link rel="icon" href="data:,"><style>
+:root{color-scheme:dark} body{margin:0;padding:24px;background:#161b19;color:#e7e1d4;font:15px/1.5 system-ui, sans-serif}
+h1{font-size:21px;margin:0}p{max-width:960px;color:#b8bbad}
+header{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+label{display:flex;gap:8px;align-items:center}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));gap:18px;margin-top:20px}
+section{background:#202923;padding:12px;border:1px solid #36463d;border-radius:6px}
+h2{font-size:16px;margin:0 0 8px}
+canvas{width:100%;height:auto;aspect-ratio:16 / 9;background:#2b3129}
+.status{color:#d3ba8d} .caution{font-weight:600;color:#edc78d}
+</style></head>
+<body><header><h1>Greyhaven — Quaternius Blood &amp; Iron artist review</h1>
+<label>Lighting <select id="mood"><option value="day">Day</option><option value="dusk">Dusk</option></select></label>
+</header>
+<p class="caution">OPT-IN LOCALHOST ART REVIEW ONLY. The cottage is not located in World9, has no collision, and is not enterable. The original Red Lion/roof and server authority remain unchanged.</p>
+<main><section><h2>Original World9 + Graphics3C + approved Red Lion</h2><canvas id="original" width="960" height="540"></canvas></section>
+<section><h2>Identical World9 frame + independent 2.5D cottage comparison inset</h2><canvas id="comparison" width="960" height="540"></canvas></section></main>
+<p class="status" id="status">Waiting for explicit localhost ?quaterniusReview=1 opt-in…</p>
+<script type="module" src="./graphics3b-quaternius-2d5-local-review.mjs"></script>
+</body></html>
