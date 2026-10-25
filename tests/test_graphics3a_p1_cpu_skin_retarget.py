@@ -77,7 +77,7 @@ class CpuSkinRetargetTests(unittest.TestCase):
 
     def test_cubic_spline_sampling_uses_tangents(self):
         # One scalar component with zero tangents interpolates from 0 to 1.
-        keys = [[0], [0], [1], [1], [0], [0]]
+        keys = [[0], [0], [0], [0], [1], [0]]
         result = sample_track([0, 1], keys, 0.5, "translation", "CUBICSPLINE")
         self.assertAlmostEqual(result[0], 0.5, places=6)
 
