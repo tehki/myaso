@@ -1,0 +1,43 @@
+name: Graphics3B P1 Quaternius original creator archive identity gate
+
+on:
+  pull_request:
+    paths:
+      - "tools/art/verify_quaternius_official_standard_zip.py"
+      - ".github/workflows/graphics3b-quaternius-official-source-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-standard-source-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Download CC0 free Standard archive from creator's original OpenGameArt upload
+        run: |
+          mkdir -p .artifacts/quaternius-official-source
+          curl --fail --location --silent --show-error --retry 2 \
+            --connect-timeout 20 --max-time 240 \
+            --user-agent 'Mozilla/5.0 (compatible; MoonGames-CC0-ProvenanceAudit/1.0)' \
+            'https://opengameart.org/sites/default/files/medieval_village_megakitstandard.zip' \
+            -o .artifacts/quaternius-official-source/medieval_village_megakitstandard.zip
+          test -s .artifacts/quaternius-official-source/medieval_village_megakitstandard.zip
+      - name: Byte-compare official Standard models, selected bins and textures against pinned community mirror
+        run: |
+          python3 tools/art/verify_quaternius_official_standard_zip.py \
+            --zip .artifacts/quaternius-official-source/medieval_village_megakitstandard.zip \
+            --report .artifacts/quaternius-official-source/original-source-audit.json
+      - name: Retain hashes and mismatch diagnostics, never redistribute raw creator ZIP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-quaternius-official-source-audit
+          path: .artifacts/quaternius-official-source/original-source-audit.json
+          if-no-files-found: ignore
+          retention-days: 7
