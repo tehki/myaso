@@ -172,13 +172,15 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
   assert.equal(downs, 0);
 });
 
-test("M194 and actual M151/M152 guard-only scenarios retain strict real wheel-first order", () => {
+test("M194 and M152 wheel-first remain unchanged; M151 uses genuine release-anchored wheel", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const guardOnly = runner.match(/const wheelFirstGuardOnly = (\[[\s\S]*?\])\.includes\(scenario\);/);
   assert.ok(guardOnly, "only explicit native guard-only scenarios may opt in");
-  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreak", "uiguardbreakpunishffa", "uiguardbreakpunishffahit"]);
+  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreak", "uiguardbreakpunishffahit"]);
+  assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
   assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
-  assert.match(runner, /trustedWheelWaitMs: wheelFirstGuardOnly \? 190 : 0/);
+  assert.match(runner, /postTrustedWheelMs: m151ReleaseAnchoredGuardOnly \? 25 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.attack.guardDamage, 38);
@@ -252,4 +254,63 @@ test("M194 compound failure waits for wheel ACK and preserves both original erro
   assert.equal(await Promise.race([flight.then(()=>"done",()=>"failed"),tick().then(()=>"pending")]),"pending");
   const rejected=assert.rejects(flight,error=>error instanceof AggregateError&&error.errors[0]===clickError&&error.errors[1]===wheelError);
   wheelAck.reject(wheelError);await rejected;
+});
+
+test("M151 one authentic down then trusted wheel then short release keeps strict W3C ACK", async () => {
+  const trusted = deferred(), wheelAck = deferred(), releaseAck = deferred();
+  const ceiling = deferred();
+  const calls = [];
+  let time = 0;
+  const flight = dispatchR2ReleaseLedShortBlock({
+    trustedWheelWaitMs: 190, postTrustedWheelMs: 25,
+    now: () => time,
+    sleep: ms => {
+      calls.push("pause:" + ms);
+      if (ms === 190) return ceiling.promise;
+      time += ms;
+      return Promise.resolve();
+    },
+    sendAttackDown: () => { calls.push("real-down"); time = 10; },
+    sendWheel: () => { calls.push("real-wheel"); return wheelAck.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackUp: () => { calls.push("real-up"); return releaseAck.promise; },
+  });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")), ["real-down", "real-wheel"]);
+  time = 40;
+  trusted.resolve({ trusted: true, deltaY: 120 });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")),
+    ["real-down", "real-wheel", "real-up"]);
+  assert.ok(calls.includes("pause:25"));
+  assert.equal(await Promise.race([flight.then(() => "passed"), tick().then(() => "pending")]),
+    "pending", "genuine W3C release and wheel ACK are mandatory");
+  releaseAck.resolve();
+  await tick();
+  assert.equal(await Promise.race([flight.then(() => "passed"), tick().then(() => "pending")]),
+    "pending", "genuine wheel W3C ACK is still mandatory");
+  time = 82;
+  wheelAck.resolve();
+  const result = await flight;
+  assert.equal(result.postTrustedWheelMs, 25);
+  assert.equal(result.attackUpDispatchMs, 65);
+  assert.equal(result.clickHoldMs, 65);
+  assert.equal(calls.filter(x => x === "real-up").length, 1);
+});
+
+test("M151 cannot admit untrusted or absent wheel as an accepted light", async () => {
+  let upCount = 0;
+  for (const report of [null, { trusted: false, deltaY: 120 },
+    { trusted: true, deltaY: -120 }]) {
+    await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+      trustedWheelWaitMs: 190, postTrustedWheelMs: 25,
+      sendAttackDown: () => {},
+      sendWheel: () => {},
+      awaitTrustedWheel: () => report === null
+        ? Promise.reject(Error("missing genuine wheel")) : report,
+      sendAttackUp: () => { upCount++; },
+      sleep: ms => ms === 190 ? new Promise(() => {}) : Promise.resolve(),
+    }), /wheel/);
+  }
+  assert.equal(upCount, 0, "never release a credited light on missing wheel");
 });
