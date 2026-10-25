@@ -116,6 +116,12 @@ def main():
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
     scene.cycles.samples = 12
+    # Minimal Ubuntu Blender builds can lack OpenImageDenoiser.
+    # Disable optional CPU denoising instead of changing the imported art.
+    if hasattr(scene.cycles, "use_denoising"):
+        scene.cycles.use_denoising = False
+    if hasattr(bpy.context.view_layer.cycles, "use_denoising"):
+        bpy.context.view_layer.cycles.use_denoising = False
     scene.render.resolution_x = 640
     scene.render.resolution_y = 640
     scene.render.resolution_percentage = 100
