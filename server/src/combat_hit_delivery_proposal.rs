@@ -293,6 +293,22 @@ impl ProposedRecipientHitDelivery {
         Ok(())
     }
 
+    /// Read the next unwritten receipt from this SAME bounded recipient queue.
+    /// A copy is neither a write nor an ACK; the original writer alone may
+    /// advance mark_written after actual successful framed transport output.
+    pub fn next_unwritten(
+        &self,
+        session: ActorIncarnation,
+        token: &[u8; 16],
+    ) -> Result<Option<HitReceipt>, DeliveryError> {
+        self.check_authenticated_lease(session, token)?;
+        Ok(self
+            .pending
+            .iter()
+            .find(|r| r.sequence == self.written_next)
+            .copied())
+    }
+
     /// Only the SINGLE actual original reliable writer calls this after the
     /// length-framed bytes have been written successfully. Enqueue is NOT ACK.
     /// A same-sequence resend after prior successful write is idempotent.
@@ -604,6 +620,40 @@ mod tests {
             damage: 34,
             hp: 66,
         }
+    }
+
+    #[test]
+    fn next_unwritten_requires_exact_scope_and_never_advances_write_or_ack() {
+        let mut delivery = scope(2);
+        let identity = actor(2, 1, 2);
+        assert_eq!(delivery.next_unwritten(identity, &TOKEN).unwrap(), None);
+        delivery
+            .project_hit(&event(2, 1), commit(100, 0, 2, 1))
+            .unwrap();
+        let first = delivery.next_unwritten(identity, &TOKEN).unwrap().unwrap();
+        assert_eq!(first.sequence, 0);
+        assert_eq!(delivery.next_unwritten(identity, &TOKEN).unwrap(), Some(first));
+        assert_eq!(
+            delivery.ack_next(identity, &TOKEN, 1),
+            Err(DeliveryError::FutureAck)
+        );
+        assert_eq!(
+            delivery.next_unwritten(actor(2, 2, 2), &TOKEN),
+            Err(DeliveryError::ForeignScope)
+        );
+        assert_eq!(
+            delivery.next_unwritten(identity, &[239; 16]),
+            Err(DeliveryError::ForeignToken)
+        );
+        delivery.mark_written(identity, &TOKEN, 0).unwrap();
+        assert_eq!(delivery.next_unwritten(identity, &TOKEN).unwrap(), None);
+        assert_eq!(delivery.pending(), 1);
+        assert_eq!(delivery.acknowledged_next(), 0);
+        delivery.retire();
+        assert_eq!(
+            delivery.next_unwritten(identity, &TOKEN),
+            Err(DeliveryError::ScopeRetired)
+        );
     }
 
     #[test]

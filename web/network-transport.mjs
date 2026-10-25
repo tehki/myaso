@@ -37,6 +37,8 @@ export async function connectGameTransport({
 }
 
 class WebTransportGameConnection {
+  #privateHitLab = null;
+
   constructor(transport, datagramWriter, reliableWriter) {
     this.kind = "webtransport";
     this.transport = transport;
@@ -64,7 +66,8 @@ class WebTransportGameConnection {
     connection.webTransportUrl = webTransportUrl;
     pumpReader(transport.datagrams.readable.getReader(), onRealtime);
     pumpLengthPrefixedReader(reliable.readable.getReader(), packet => {
-      if (!connection.#handleGestureGrant(packet)) onReliable?.(packet);
+      if (!connection.#handleGestureGrant(packet)
+          && !connection.#privateHitLab?.receive(packet, connection)) onReliable?.(packet);
     });
     return connection;
   }
@@ -220,6 +223,21 @@ class WebTransportGameConnection {
     }
   }
 
+  async negotiatePrivateHitDeliveryLab(options) {
+    if (this.closed || this.experimentalGestureState !== "granted" || this.#privateHitLab) {
+      throw new Error("private HIT requires one current original gesture transport");
+    }
+    const { createPrivateHitDeliveryLab } = await import("./private-hit-delivery-lab.mjs");
+    if (this.closed || this.#privateHitLab) throw new Error("retired or duplicate private HIT negotiation");
+    this.#privateHitLab = createPrivateHitDeliveryLab({ ...options, transport: this });
+    void this.transport.closed.then(
+      () => this.close("original private HIT connection ended"),
+      () => this.close("original private HIT connection failed"),
+    );
+    await this.#privateHitLab.start();
+    return this.#privateHitLab;
+  }
+
   async sendReliable(bytes) {
     if (this.closed) throw new Error("WebTransport connection is closed");
     const payload = frameReliable(toUint8Array(bytes));
@@ -237,6 +255,7 @@ class WebTransportGameConnection {
   close(reason = "client close") {
     if (this.closed) return;
     this.closed = true;
+    this.#privateHitLab?.close(reason);
     this.experimentalGestureState = "closed";
     this.gestureGrantWaiter?.reject(new Error("experimental gesture transport closed"));
     this.gestureGrantWaiter = null;

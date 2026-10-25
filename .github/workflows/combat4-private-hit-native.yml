@@ -1,0 +1,77 @@
+name: Combat4 developer-loopback private HIT four-native proof (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "server/src/**"
+      - "server/tests/**"
+      - "server/Cargo.toml"
+      - "server/Cargo.lock"
+      - "web/private-hit-delivery-lab.mjs"
+      - "web/online-game.mjs"
+      - "web/authoritative-client.mjs"
+      - "web/network-transport.mjs"
+      - "src/network/m147-hit-*.mjs"
+      - "src/browser/m147-hit-receipt-feedback.mjs"
+      - "tools/art/main0_v2_knights_combat_four_native.mjs"
+      - "tests/private-hit-delivery-client.test.mjs"
+      - ".github/workflows/combat4-private-hit-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-four-native-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: chrome,firefox,chrome,firefox
+      MYASO_LIVE_GESTURE_PHYSICAL_MODE: private-hit
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
+      - name: Exact source and unchanged default plus private-feature Rust checks
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MYASO_LIVE_GESTURE_SOURCE_SHA"
+          cargo fmt --manifest-path server/Cargo.toml --all -- --check
+          cargo test --locked --manifest-path server/Cargo.toml
+          cargo test --locked --manifest-path server/Cargo.toml --features experimental-hit-delivery-lab
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets --features experimental-hit-delivery-lab -- -D warnings
+      - name: Client receipt ordering and actual native prerequisites
+        run: |
+          node --check tools/art/main0_v2_knights_combat_four_native.mjs
+          node --check web/private-hit-delivery-lab.mjs
+          node --test tests/*.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Four original browsers genuine LMB World HIT and participant-only private receipts
+        run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
+      - name: Save formatter correction for failed exact-source verification
+        if: failure()
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml --all
+          git diff --binary -- server/ > rustfmt.patch
+      - name: Preserve exact-head developer-only native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combat4-private-hit-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            .artifacts/main0-knights-combat-gesture/
+            rustfmt.patch
+          if-no-files-found: error
+          retention-days: 7

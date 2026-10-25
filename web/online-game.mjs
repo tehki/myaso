@@ -169,6 +169,10 @@ const reviewedGestureLab = gestureLabRequested
 if (gestureLabRequested && !reviewedGestureLab) {
   throw new Error("experimental server-authoritative gestures are loopback-only");
 }
+const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
+if (privateHitLabRequested && !reviewedGestureLab) {
+  throw new Error("private HIT delivery requires the reviewed loopback gesture lab");
+}
 
 const webTransportOptions = cert
   ? { serverCertificateHashes: [{ algorithm: "sha-256", value: parseSha256Hex(cert) }] }
@@ -198,6 +202,7 @@ const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
 let experimentalGestureLab = null;
+let privateHitDeliveryLab = null;
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -469,6 +474,20 @@ if (reviewedGestureLab) {
       gameClient: networkClient, canvas, windowObj: window,
       documentObj: document, getClientTick: () => clientTick >>> 0,
     });
+    if (privateHitLabRequested) {
+      privateHitDeliveryLab = await networkClient.transport.negotiatePrivateHitDeliveryLab({
+        pageUrl: window.location.href, actorId: networkClient.playerNetId,
+        onReceipt(_receipt, presentation) {
+          combatMessage = presentation.text;
+          combatMessageUntil = performance.now() + presentation.durationMs;
+          setStatus(combatMessage);
+          showCombatFeedback(presentation.feedback);
+        },
+      });
+      Object.defineProperty(window, "__MYASO_PRIVATE_HIT_PROOF__", {
+        configurable: true, value: () => privateHitDeliveryLab.snapshot,
+      });
+    }
   } catch (error) {
     networkClient?.close("original World gesture grant rejected");
     throw error;
@@ -507,6 +526,9 @@ function observeCombatState(state) {
   remoteActionAudio.observe(state, ownId, (cue, options) => audio.play(cue, options));
   const event = combatReadability.observe(state, ownId);
   if (!event) return;
+  // This private recipient scope credits damage only from its authenticated,
+  // contiguous World receipt. Snapshot HP alone cannot name the attacker.
+  if (privateHitLabRequested && ["hit-confirm", "damage-taken"].includes(event.feedback)) return;
   combatMessage = event.text;
   combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);

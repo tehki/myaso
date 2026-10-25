@@ -100,7 +100,7 @@ test("M147 spectator HP loss alone is insufficient to synthesize a hit-confirm",
 });
 
 
-test("dormant HIT foundation registers no public packet or runtime producer/consumer",()=>{
+test("HIT proposal stays outside public registries and direct default-client codec imports",()=>{
   assert.equal(Object.values(PACKET_TYPE).includes(5),false);
   assert.equal(Object.values(PACKET_TYPE).includes(6),false);
   for(const path of ["../web/authoritative-client.mjs","../web/network-transport.mjs","../web/online-game.mjs"]){

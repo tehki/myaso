@@ -13,7 +13,7 @@ import {COMBAT} from "../../src/combat/model.mjs";
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
-assert.ok(["original","held-lmb","four-combat-lifecycle"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -54,9 +54,9 @@ async function startW3C(engine,index){
 async function evaluate(s,source){return (await request(s.base,"POST","/session/"+s.id+"/execute/sync",{script:source,args:[]})).value}
 async function startOriginalRust(){
  const bin=join(root,"server","target","debug","myaso-server");
- const build=spawnSync("cargo",["build",...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
+ const build=spawnSync("cargo",["build",...(physicalMode==="private-hit"?["--features","experimental-hit-delivery-lab"]:[]),...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
- const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_FLIGHT_ACTION_PROOF:"1"},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
  child.stdout.on("data",d=>buffer+=d.toString());
  child.stderr.on("data",d=>err+=d.toString());
@@ -298,6 +298,70 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     if(e.button===0){edges.push({type,trusted:e.isTrusted,pointerType:e.pointerType,pointerId:e.pointerId,epochMs:Date.now()});
      if(edges.length>64)edges.shift();}
    },true);return true;`)));
+  if(physicalMode==="private-hit"){
+   const privateProof=a=>evaluate(a.s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;");
+   await waitFor(async()=>{
+    const all=await Promise.all(actors.map(privateProof));
+    return all.every(p=>p?.closed===false&&p.status==="granted"&&p.expected===0&&p.delivered.length===0);
+   },12000);
+   // Passive DOM mutation history retains actual first-party feedback even
+   // when the driver reads after the presentation animation has expired.
+   await Promise.all(actors.map(a=>evaluate(a.s,String.raw`
+    const history=[];const observe=()=>{
+     const event=document.querySelector('#event-text')?.textContent||'';
+     const feedback=document.querySelector('[data-combat-feedback]')?.dataset.combatFeedback||'';
+     history.push({event,feedback});if(history.length>256)history.shift();
+    };
+    new MutationObserver(observe).observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true});
+    window.__MYASO_PRIVATE_NATIVE_HUD__=history;observe();return true;`)));
+   staging.push(await stagePair(1,2));
+   rounds.push(await round([[1,2]]));
+   const worldHit=rounds[0].hits[0];
+   assert.deepEqual([worldHit.attacker,worldHit.target,worldHit.damage,worldHit.hp],[1,2,34,66]);
+   const replicas=await waitReplicas();
+   const delivery=await waitFor(async()=>{
+    const all=await Promise.all(actors.map(async a=>({actorId:a.actor.id,browser:a.s.engine,
+     proof:await privateProof(a),hud:await evaluate(a.s,"return window.__MYASO_PRIVATE_NATIVE_HUD__.map(x=>({...x}));")})));
+    return all.every(r=>r.proof?.closed===false&&r.proof.status==="granted"
+     &&r.proof.delivered.length===(r.actorId<=2?1:0)
+     &&(r.actorId>2||r.proof.controlsWritten.some(c=>c.op===3&&c.cursor===1)))?all:false;
+   },12000);
+   for(const r of delivery){
+    if(r.actorId>2){
+     assert.equal(r.proof.expected,0,"spectators consume no participant delivery sequence");
+     assert.ok(!r.proof.controlsWritten.some(c=>c.op===3&&c.cursor>0),"spectator cannot ACK somebody else's HIT");
+     assert.ok(!r.hud.some(h=>h.event==="Opponent hit - 34 HP."||h.event==="Hit taken - 34 HP."),"spectator never receives own hit attribution");
+     continue;
+    }
+    const receipt=r.proof.delivered[0];
+    assert.deepEqual([receipt.sequence,receipt.serverTick,receipt.attacker,receipt.target,receipt.damage,receipt.targetHp],
+     [0,worldHit.tick,1,2,34,66],"private reliable receipt must exactly match original World HIT, never HP-inferred ownership");
+    const text=r.actorId===1?"Opponent hit - 34 HP.":"Hit taken - 34 HP.";
+    const feedback=r.actorId===1?"hit-confirm":"damage-taken";
+    assert.equal(receipt.presentation.text,text);assert.equal(receipt.presentation.feedback,feedback);
+    assert.ok(r.hud.some(h=>h.event===text),"actual first-party HUD presents authenticated role-specific receipt");
+    assert.ok(r.hud.some(h=>h.feedback===feedback),"actual first-party HUD feedback matches receipt role");
+    assert.equal(r.proof.expected,1,"one contiguous receipt processed");
+    for(const ack of r.proof.controlsWritten.filter(c=>c.op===3)){
+     assert.ok(ack.cursor<=r.proof.delivered.length,"application ACK cannot exceed presented receipt count");
+     assert.ok(Number.isInteger(ack.presentedCount)&&ack.presentedCount>=ack.cursor,"presentation was completed before actual ACK write");
+     assert.ok(Number.isFinite(ack.writtenAtEpochMs),"actual successful control write has local ordering evidence");
+     for(const shown of r.proof.delivered.filter(h=>h.sequence<ack.cursor)){
+      assert.ok(Number.isFinite(shown.presentedAtEpochMs)&&shown.presentedAtEpochMs<=ack.writtenAtEpochMs,
+       "same-page synchronous HUD presentation precedes actual application ACK completion");
+     }
+    }
+   }
+   await sleeps(COMBAT.attack.windupMs+COMBAT.attack.activeMs+COMBAT.attack.recoveryMs+150);
+   assert.equal(hitRows().length,1,"one physical gesture cannot create a second World HIT");
+   for(const a of actors)assert.equal((await privateProof(a)).delivered.length,a.actor.id<=2?1:0);
+   const evidence={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",mode:physicalMode,
+    developerLoopbackOnly:true,publicNamespaceActivated:false,independentPhysicalHumanHosts:false,
+    staging,rounds,replicas,delivery,originalWorld:lines()};
+   await writeFile(join(output,"combat4-private-hit-four-native-world.json"),JSON.stringify(evidence,null,2)+"\n");
+   console.log("COMBAT4_PRIVATE_HIT_FOUR_NATIVE_WORLD_PASS",JSON.stringify(evidence));
+   return;
+  }
   staging.push(await stagePair(1,2),await stagePair(3,4));
   rounds.push(await round([[1,2],[2,1],[3,4],[4,3]]));
   const afterJoint=await waitReplicas();
@@ -382,7 +446,7 @@ try{
  const actors=[];
  for(let i=0;i<4;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
   assert.equal(actor.id,i+1,"genuine sequential Rust actor IDs required");
@@ -416,7 +480,7 @@ try{
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
  // True WebDriver key/pointer actions run against a fresh admitted original
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
- if(physicalMode==="four-combat-lifecycle"){
+ if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
  }else if(physicalMode==="held-lmb"){
   // A separate fresh World preserves the original held-LMB and short-LMB acceptance

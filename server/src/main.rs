@@ -1,3 +1,6 @@
+#[cfg(feature = "experimental-hit-delivery-lab")]
+mod private_hit_delivery_lab;
+
 use anyhow::{bail, Context, Result};
 use myaso_server::{
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
@@ -120,10 +123,14 @@ struct LoopbackFlightConfig {
 enum ReliablePayload {
     Bytes(Vec<u8>),
     KillEvent(KillEventPacket),
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    PrivateHit(private_hit_delivery_lab::Outgoing),
 }
 
 struct GameState {
     world: World,
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    hit_lab: Option<private_hit_delivery_lab::PrivateHitLab>,
     boot_nonce: u128,
     gesture_sessions: BTreeMap<u64, SessionGestureWorldPath>,
     replication_frame: Arc<ReplicationFrame>,
@@ -157,6 +164,8 @@ impl GameState {
         ));
         Self {
             world,
+            #[cfg(feature = "experimental-hit-delivery-lab")]
+            hit_lab: None,
             boot_nonce: 0,
             gesture_sessions: BTreeMap::new(),
             replication_frame,
@@ -321,7 +330,19 @@ async fn main() -> Result<()> {
     // Legacy v1 boot remains unchanged; only the explicit v2 lab requires OS
     // CSPRNG. No entropy failure may accidentally block a disabled v1 game.
     let boot_nonce = if v2_lab { new_server_boot_nonce()? } else { 0 };
+    let private_hit_setting = env::var("MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB").ok();
+    let hit_lab_enabled = private_hit_lab_config(
+        private_hit_setting.as_deref(),
+        cfg!(feature = "experimental-hit-delivery-lab"),
+        bind.ip().is_loopback(),
+        v2_lab,
+    )?;
     let game = SharedGame::new(flight, boot_nonce);
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    if hit_lab_enabled {
+        let mut state = game.state.lock().await;
+        state.hit_lab = Some(private_hit_delivery_lab::PrivateHitLab::new(&state.world, boot_nonce)?);
+    }
     // Accept server-side diagnostic output only on loopback and only when
     // explicitly requested by the real-browser M201 acceptance fixture.
     let flight_action_proof = match env::var("MYASO_FLIGHT_ACTION_PROOF").as_deref() {
@@ -415,6 +436,8 @@ async fn main() -> Result<()> {
             .await;
             {
                 let mut state = game.state.lock().await;
+                #[cfg(feature = "experimental-hit-delivery-lab")]
+                if let Some(lab) = &mut state.hit_lab { lab.remove(lease_epoch); }
                 if let Some(mut gesture) = state.gesture_sessions.remove(&lease_epoch) {
                     gesture.retire();
                 }
@@ -426,6 +449,18 @@ async fn main() -> Result<()> {
             }
         });
     }
+}
+
+fn private_hit_lab_config(raw: Option<&str>, compiled: bool, loopback: bool, v2: bool) -> Result<bool> {
+    let enabled = match raw {
+        Some("1") => true,
+        Some("0") | None => false,
+        _ => bail!("MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB must be 0 or 1"),
+    };
+    if enabled && (!compiled || !loopback || !v2) {
+        bail!("private HIT lab requires compiled feature, loopback and original v2 lab");
+    }
+    Ok(enabled)
 }
 
 fn parse_player_cap(raw: Option<&str>) -> Result<usize> {
@@ -636,6 +671,16 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
         state.world.step_into(&mut events);
+        #[cfg(feature = "experimental-hit-delivery-lab")]
+        {
+            let GameState { world, hit_lab, .. } = &mut *state;
+            if let Some(lab) = hit_lab {
+                if let Err(error) = lab.committed_step(world, &events) {
+                    eprintln!("private HIT delivery halted: {error}");
+                    lab.fail_all();
+                }
+            }
+        }
         // Single authoritative 60Hz World lock covers every current session.
         let GameState {
             world,
@@ -667,6 +712,7 @@ async fn handle_connection(
     flight_m121_input_proof: bool,
     game: Arc<SharedGame>,
 ) -> Result<()> {
+    let connection = Arc::new(connection);
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
     println!("session {stable_id} assigned player {player_id} from {remote}");
@@ -679,15 +725,20 @@ async fn handle_connection(
     let mut last_input_sequence = None;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     let mut pending_input_acks = VecDeque::with_capacity(MAX_PENDING_INPUT_ACKS);
-    let (mut reliable_send, _reliable_recv) = connection
+    let (mut reliable_send, mut reliable_recv) = connection
         .accept_bi()
         .await
         .context("accept reliable game stream")?;
-    let (initial_frame, mut next_kill_event_sequence) = {
+    let (initial_frame, mut next_kill_event_sequence, hit_lab_enabled) = {
         let state = game.state.lock().await;
+        #[cfg(feature = "experimental-hit-delivery-lab")]
+        let hit_lab_enabled = state.hit_lab.is_some();
+        #[cfg(not(feature = "experimental-hit-delivery-lab"))]
+        let hit_lab_enabled = false;
         (
             Arc::clone(&state.replication_frame),
             state.next_kill_event_sequence,
+            hit_lab_enabled,
         )
     };
     let initial_baseline = snapshots.build_from_frame(
@@ -726,6 +777,8 @@ async fn handle_connection(
     let mut last_reliable_sequence = initial_reliable_baseline.sequence;
     let mut reliable_deltas_since_checkpoint = 0_u8;
     let (reliable_tx, mut reliable_rx) = mpsc::channel::<ReliablePayload>(1);
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    let (private_written_tx, mut private_written_rx) = mpsc::channel(1);
     let reliable_write_delay = game.reliable_write_delay;
     let mut reliable_writer = tokio::spawn(async move {
         while let Some(payload) = reliable_rx.recv().await {
@@ -733,6 +786,24 @@ async fn handle_connection(
                 tokio::time::sleep(reliable_write_delay).await;
             }
             prepare_reliable_payload(&mut reliable_frame_buffer, &payload)?;
+            #[cfg(feature = "experimental-hit-delivery-lab")]
+            if let ReliablePayload::PrivateHit(outgoing) = &payload {
+                tokio::time::timeout(
+                    Duration::from_millis(private_hit_delivery_lab::WRITE_TIMEOUT_MS),
+                    reliable_send.write_all(&reliable_frame_buffer),
+                ).await.context("private HIT writer timeout")?.context("private HIT frame write")?;
+                if matches!(outgoing.kind, private_hit_delivery_lab::WrittenKind::Terminal) {
+                    // Terminal GAP/retirement drains this original reliable
+                    // stream through FIN before closing its private connection.
+                    tokio::time::timeout(
+                        Duration::from_millis(private_hit_delivery_lab::WRITE_TIMEOUT_MS),
+                        reliable_send.finish(),
+                    ).await.context("private HIT terminal FIN timeout")?
+                        .context("private HIT terminal FIN")?;
+                }
+                private_written_tx.send(outgoing.kind).await.context("private HIT write completion receiver")?;
+                continue;
+            }
             reliable_send
                 .write_all(&reliable_frame_buffer)
                 .await
@@ -740,6 +811,16 @@ async fn handle_connection(
         }
         Ok::<(), anyhow::Error>(())
     });
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    let _private_writer_guard = hit_lab_enabled.then(|| private_hit_delivery_lab::WriterAbortGuard(reliable_writer.abort_handle()));
+    let mut private_control_buffer = [0_u8; 34];
+    let mut private_control_used = 0_usize;
+    let mut private_control_window = tokio::time::Instant::now();
+    let mut private_control_count = 0_u32;
+    let mut private_write_pending = false;
+    let mut private_write_deadline = None;
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    let mut private_write_turn = false;
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -752,6 +833,60 @@ async fn handle_connection(
                     Err(error) => bail!("reliable writer task failed: {error}"),
                 }
             }
+            // Cancellation-safe incremental reads on the ORIGINAL bi stream.
+            // No bytes are consumed when the private compile/runtime gates are off.
+            private_read = async {
+                if hit_lab_enabled && v2_enabled && !private_write_pending {
+                    reliable_recv.read(&mut private_control_buffer[private_control_used..]).await
+                        .map_err(|error| anyhow::anyhow!("private HIT control read: {error}"))
+                } else { std::future::pending().await }
+            } => {
+                let count = private_read?.ok_or_else(|| anyhow::anyhow!("private HIT control stream closed"))?;
+                private_control_used += count;
+                if private_control_used >= 2 && u16::from_le_bytes(private_control_buffer[..2].try_into().unwrap()) != 32 {
+                    bail!("private HIT controls require exactly 32-byte frames");
+                }
+                if private_control_used == private_control_buffer.len() {
+                    if private_control_window.elapsed() >= Duration::from_secs(1) {
+                        private_control_window = tokio::time::Instant::now();
+                        private_control_count = 0;
+                    }
+                    private_control_count += 1;
+                    if private_control_count > 32 { bail!("private HIT control rate exceeded"); }
+                    #[cfg(feature = "experimental-hit-delivery-lab")]
+                    {
+                        let mut state = game.state.lock().await;
+                        let GameState { world, hit_lab, .. } = &mut *state;
+                        hit_lab.as_mut().ok_or_else(|| anyhow::anyhow!("private HIT disabled"))?
+                            .control(world, lease_epoch, &private_control_buffer[2..])?;
+                    }
+                    private_control_used = 0;
+                }
+            }
+            completion = async {
+                #[cfg(feature = "experimental-hit-delivery-lab")]
+                { private_written_rx.recv().await }
+                #[cfg(not(feature = "experimental-hit-delivery-lab"))]
+                { std::future::pending::<Option<()>>().await }
+            } => {
+                #[cfg(feature = "experimental-hit-delivery-lab")]
+                {
+                    let completion = completion.ok_or_else(|| anyhow::anyhow!("private HIT writer completion closed"))?;
+                    let mut state = game.state.lock().await;
+                    let GameState { world, hit_lab, .. } = &mut *state;
+                    hit_lab.as_mut().ok_or_else(|| anyhow::anyhow!("private HIT disabled"))?
+                        .written(world, lease_epoch, completion)?;
+                }
+                #[cfg(not(feature = "experimental-hit-delivery-lab"))]
+                let _ = completion;
+                private_write_pending = false;
+                private_write_deadline = None;
+            }
+            _ = async {
+                if let Some(deadline) = private_write_deadline {
+                    tokio::time::sleep_until(deadline).await;
+                } else { std::future::pending().await }
+            } => { bail!("private HIT reliable writer exceeded 1500ms; no delivery claimed"); }
             // Separate negotiated client uni stream, on the admitted QUIC
             // connection. No datagram or query parameter can enable v2.
             negotiation = connection.accept_uni(), if v2_lab && !v2_enabled => {
@@ -775,6 +910,11 @@ async fn handle_connection(
                             if let Some(path) = SessionGestureWorldPath::from_admitted_world(
                                 &state.world, player_id, lease_epoch, state.boot_nonce
                             ) {
+                                #[cfg(feature = "experimental-hit-delivery-lab")]
+                                {
+                                    let GameState { world, hit_lab, .. } = &mut *state;
+                                    if let Some(lab) = hit_lab { lab.admit(world, player_id, lease_epoch, Arc::clone(&connection))?; }
+                                }
                                 state.gesture_sessions.insert(lease_epoch, path);
                                 v2_enabled = true;
                                 drop(state);
@@ -1005,6 +1145,29 @@ async fn handle_connection(
                         .send_datagram(snapshot.bytes)
                         .context("send authoritative snapshot datagram")?;
                 }
+                #[cfg(feature = "experimental-hit-delivery-lab")]
+                if hit_lab_enabled {
+                    // At most one private frame on alternate existing snapshot
+                    // intervals, leaving the original snapshot/kill writer fair.
+                    private_write_turn = !private_write_turn;
+                    if private_write_turn && v2_enabled && !private_write_pending {
+                        let outgoing = {
+                            let state = game.state.lock().await;
+                            match &state.hit_lab {
+                                Some(lab) => lab.next_frame(&state.world, lease_epoch)?,
+                                None => None,
+                            }
+                        };
+                        if let Some(outgoing) = outgoing {
+                            if try_enqueue_reliable(&reliable_tx, || ReliablePayload::PrivateHit(outgoing))
+                                .map_err(|_| anyhow::anyhow!("private HIT writer unavailable"))? {
+                                private_write_pending = true;
+                                private_write_deadline = Some(tokio::time::Instant::now()
+                                    + Duration::from_millis(private_hit_delivery_lab::WRITE_TIMEOUT_MS));
+                            }
+                        }
+                    }
+                }
                 let mut kill_event_queued = false;
                 if let Some(event) = pending_kill_event {
                     match try_enqueue_reliable(&reliable_tx, || ReliablePayload::KillEvent(event)) {
@@ -1113,6 +1276,8 @@ fn prepare_reliable_frame(framed: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
 fn prepare_reliable_payload(framed: &mut Vec<u8>, payload: &ReliablePayload) -> Result<()> {
     match payload {
         ReliablePayload::Bytes(bytes) => prepare_reliable_frame(framed, bytes),
+        #[cfg(feature = "experimental-hit-delivery-lab")]
+        ReliablePayload::PrivateHit(outgoing) => prepare_reliable_frame(framed, &outgoing.bytes),
         ReliablePayload::KillEvent(event) => {
             let bytes = encode_kill_event(*event);
             prepare_reliable_frame(framed, &bytes)
@@ -1237,6 +1402,21 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_hit_activation_requires_every_independent_engineering_gate() {
+        for compiled in [false,true] {
+            for loopback in [false,true] {
+                for v2 in [false,true] {
+                    assert!(!private_hit_lab_config(None,compiled,loopback,v2).unwrap());
+                    assert!(!private_hit_lab_config(Some("0"),compiled,loopback,v2).unwrap());
+                    assert_eq!(private_hit_lab_config(Some("1"),compiled,loopback,v2).is_ok(),compiled&&loopback&&v2);
+                }
+            }
+        }
+        assert!(private_hit_lab_config(Some("true"),true,true,true).is_err());
+    }
+
 
     #[test]
     fn gesture_action_proof_keeps_actual_same_tick_admission_edges_distinct() {

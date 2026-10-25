@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { connectGameTransport } from "../web/network-transport.mjs";
 import { connectAuthoritativeClient } from "../web/authoritative-client.mjs";
 import { ProposedSharedTypedGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
+import { encodeProposedHitControl, decodeProposedHitControl, HIT_CONTROL_OP } from "../src/network/m147-hit-control-proposal.mjs";
+import { encodeHitReceipt } from "../src/network/m147-hit-receipt-codec.mjs";
 
 class OriginalQuicFixture {
   static sessions = [];
@@ -11,6 +13,7 @@ class OriginalQuicFixture {
     this.url = url;
     this.hello = null;
     this.writes = [];
+    this.reliableWrites = [];
     this.closedByClient = false;
     this.ready = Promise.resolve();
     this.closed = new Promise(resolve => { this.resolveClosed = resolve; });
@@ -25,7 +28,16 @@ class OriginalQuicFixture {
     OriginalQuicFixture.sessions.push(this);
   }
   async createBidirectionalStream() {
-    const writable = new WritableStream({ write() {} });
+    const writable = new WritableStream({ write: bytes => {
+      this.reliableWrites.push(Uint8Array.from(bytes));
+      if (bytes.length === 34 && bytes[3] === 6 && bytes[4] === HIT_CONTROL_OP.CLIENT_HELLO) {
+        const grant = new Uint8Array(34);
+        grant[0] = 32;
+        grant.set(new Uint8Array(encodeProposedHitControl({ op: HIT_CONTROL_OP.SERVER_GRANT,
+          token: new Uint8Array(16).fill(7), aux: 64 })), 2);
+        queueMicrotask(() => this.reliableSource.enqueue(grant));
+      }
+    } });
     const readable = new ReadableStream({ start: controller => { this.reliableSource = controller; } });
     return { writable, readable };
   }
@@ -54,6 +66,35 @@ const v2 = (seq, id) => {
   b[4] = seq; b[8] = id;
   return b;
 };
+
+test("private HIT uses the same granted bi stream, presents before ACK, and retires on peer close", () => withFixture(async () => {
+  const forwarded = [], presentations = [];
+  const connection = await connectGameTransport({ webTransportUrl: "https://127.0.0.1:4433/game",
+    onReliable: bytes => forwarded.push(bytes) });
+  await assert.rejects(connection.negotiatePrivateHitDeliveryLab({ pageUrl: "http://localhost", actorId: 2 }), /current/);
+  await connection.negotiateExperimentalGestureV2();
+  const lab = await connection.negotiatePrivateHitDeliveryLab({ pageUrl: "http://localhost", actorId: 2,
+    onReceipt(receipt, presentation) {
+      assert.equal(connection.transport.reliableWrites.length, 1);
+      presentations.push({ receipt, presentation });
+    } });
+  const receipt = encodeHitReceipt({ sequence: 0, serverTick: 480, attacker: 2, target: 1, damage: 34, targetHp: 66 });
+  const frame = new Uint8Array(30);
+  frame[0] = 28; frame.set(new Uint8Array(receipt), 2);
+  connection.transport.reliableSource.enqueue(frame);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(presentations.length, 1);
+  assert.equal(presentations[0].presentation.text, "Opponent hit - 34 HP.");
+  assert.equal(lab.snapshot.expected, 1);
+  assert.deepEqual(forwarded, []);
+  const ack = decodeProposedHitControl(connection.transport.reliableWrites.at(-1).subarray(2));
+  assert.equal(ack.op, HIT_CONTROL_OP.CLIENT_ACK);
+  assert.equal(ack.cursor, 1);
+  connection.transport.close();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(connection.closed, true);
+  assert.equal(lab.snapshot.status, "retired");
+}));
 async function withFixture(fn) {
   const previous = globalThis.WebTransport;
   globalThis.WebTransport = OriginalQuicFixture;
