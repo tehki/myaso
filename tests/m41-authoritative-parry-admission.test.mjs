@@ -9,10 +9,14 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.ok(start >= 0, "M41 must have a dedicated authoritative choreography branch");
   const rest = source.slice(start, source.indexOf("} else {", start));
   const genuineAttack = rest.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);");
-  const worldMessage = rest.indexOf('await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 180);');
+  const worldMessage = rest.indexOf("await waitForM41WorldWindup(attacker, 180);");
   const genuineWheel = rest.indexOf("await setArenaBlock(defender, defenderElementId, true);");
   assert.ok(genuineAttack >= 0 && worldMessage > genuineAttack && genuineWheel > worldMessage,
-    "M41 must observe real committed windup before one actual defender wheel");
+    "M41 must observe original World windup before one actual defender wheel");
+  assert.match(source, /async function waitForM41WorldWindup[\s\S]*?Heavy strike committed - the long windup is readable\./,
+    "the transient authoritative Heavy windup must be available as the first genuine stage");
+  assert.match(source, /async function waitForM41WorldWindup[\s\S]*?Attack committed - your windup is readable\./,
+    "the authoritative Light-windup fallback must remain available");
   assert.match(source, /M33 genuine short-click parry resolved unexpectedly:/,
     "a genuine HP or guard impact must remain a fatal failure");
   assert.match(source, /M41 remote parry-stun tell never appeared:/,

@@ -8211,6 +8211,26 @@ async function calibrateNativeParryIngress(
   return result;
 }
 
+async function waitForM41WorldWindup(attacker, timeoutMs) {
+  // Both hints come solely from the replicated original World action.
+  // A short genuine LMB first enters HeavyWindup before transitioning to
+  // LightWindup on release. The Heavy hint can arrive ~50ms earlier;
+  // use the first actually observed one, never infer/synthesize an action.
+  const authoritativeCues = new Set([
+    "Heavy strike committed - the long windup is readable.",
+    "Attack committed - your windup is readable.",
+  ]);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const evidence = await readUiEvidence(attacker);
+    const cue = evidence.events.find((event) => authoritativeCues.has(event));
+    if (cue) return cue;
+    await sleep(10);
+  }
+  throw new Error("M41 native attacker never exposed original World windup: "
+    + JSON.stringify(await readUiEvidence(attacker)));
+}
+
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -8272,7 +8292,10 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // do we issue the defender's ONE genuine W3C wheel-back.
       // No second attack, client-authored parry or modified World timings.
       await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
-      await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 180);
+      const authoritativeWindup = await waitForM41WorldWindup(attacker, 180);
+      console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
+        attacker: attacker.name, cue: authoritativeWindup,
+      }));
       await setArenaBlock(defender, defenderElementId, true);
     } else {
       await Promise.all([
