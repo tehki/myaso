@@ -31,7 +31,7 @@ jobs:
       - name: Install Blender for offscreen isolated art trial
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq blender python3-numpy
+          sudo apt-get install -y -qq blender python3-numpy python3-pil
           blender --version
       - name: Assemble original glTF cottage and render genuine day/dusk Blood and Iron candidates
         run: |
@@ -44,6 +44,24 @@ jobs:
           test -s .artifacts/quaternius-greyhaven/greyhaven-quaternius-cottage-dusk.png
           test -s .artifacts/quaternius-greyhaven/greyhaven-quaternius-cottage-source.blend
           test -s .artifacts/quaternius-greyhaven/quaternius-greyhaven-review-report.json
+      - name: Bake only the genuine V2 rendered original Blender frames as transparent review WebPs
+        run: |
+          node --check web/graphics3b-quaternius-2d5-local-review.mjs
+          python3 -m py_compile tools/art/bake_quaternius_greyhaven_review_sprites.py
+          python3 tools/art/bake_quaternius_greyhaven_review_sprites.py \
+            --source .artifacts/quaternius-greyhaven \
+            --dest .artifacts/quaternius-greyhaven-sprite-review
+          test -s .artifacts/quaternius-greyhaven-sprite-review/greyhaven-quaternius-2d5-review-manifest.json
+          test -s .artifacts/quaternius-greyhaven-sprite-review/greyhaven-quaternius-cottage-day-2d5-review.webp
+          test -s .artifacts/quaternius-greyhaven-sprite-review/greyhaven-quaternius-cottage-dusk-2d5-review.webp
+      - name: Retain optimized review sprites and hash/authority manifest separately from game assets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-p1-quaternius-blood-iron-2d5-visual-only-sprite-review
+          path: .artifacts/quaternius-greyhaven-sprite-review/*
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Preserve original CC0 modular building Blender source and genuine rendered previews
         if: always()
         continue-on-error: true
