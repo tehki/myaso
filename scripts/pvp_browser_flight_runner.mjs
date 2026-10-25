@@ -8244,12 +8244,14 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Move the genuine wheel 95ms later (target ~85ms before impact);
     // continue to reject every block, HP hit, missed/parried input or
     // changed 650ms stun/punish contract as before.
-    // M41 is an actual remote parry-tell raster flight. On quality
-    // #39437248971, Firefox's trusted wheel landed only 74ms before the
-    // authoritative 34HP contact (vs 105ms for the passing M41 run).
-    // Advance ONLY M41's real wheel dispatch by 12ms, targeting the middle
-    // of the unchanged 125ms server parry window. No combat or input fakes.
-    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 83 : 95;
+    // M41 remote parry-tell's exact genuine browser failure on d969d173:
+    // Chrome trusted short LMB pointerUP t320ms; Firefox trusted +120 wheel
+    // t442ms; real original World 34HP HIT displayed at t479ms. The wheel
+    // entered only ~37ms ahead of hit feedback, too late for reliable
+    // World parry admission. Stage ONLY M41's genuine wheel 48ms earlier,
+    // seeking ~85ms lead at contact, within unchanged 125ms parry window.
+    // Do not alter M33/M146, World timing, HP/guard or strict raster gates.
+    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 35 : 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
     await Promise.all([
       (async () => {
