@@ -72,15 +72,51 @@ def install_piece(name, location, yaw, source):
     return len(meshes)
 
 
+def apply_blood_iron_review_palette():
+    """Non-destructive Blender-scene PBR color grade, preserving all original source files.
+
+    Keep the source normal, roughness and base-color maps intact. A downstream
+    artist can remove these named shader nodes to recover original Quaternius.
+    """
+    changed = 0
+    for material in bpy.data.materials:
+        if not material.name.startswith("MI_RoundTiles") or not material.use_nodes:
+            continue
+        nodes = material.node_tree.nodes
+        bsdf = next((node for node in nodes if node.type == "BSDF_PRINCIPLED"), None)
+        base_color = bsdf.inputs.get("Base Color") if bsdf else None
+        if base_color is None:
+            continue
+        original_link = next(iter(base_color.links), None)
+        grade = nodes.new("ShaderNodeHueSaturation")
+        grade.name = "BloodIron_Roof_RedClay_ReviewOnly"
+        grade.label = "Review only: muted/weathered red clay roof"
+        grade.inputs["Hue"].default_value = 0.5
+        grade.inputs["Saturation"].default_value = 0.62
+        grade.inputs["Value"].default_value = 0.72
+        grade.inputs["Fac"].default_value = 1.0
+        grade.location = (bsdf.location.x - 240, bsdf.location.y - 40)
+        grade.inputs["Color"].default_value = base_color.default_value
+        if original_link is not None:
+            original_node_output = original_link.from_socket
+            material.node_tree.links.remove(original_link)
+            material.node_tree.links.new(original_node_output, grade.inputs["Color"])
+        material.node_tree.links.new(grade.outputs["Color"], base_color)
+        changed += 1
+    if changed == 0:
+        raise ValueError("Quaternius imported roof tile PBR material not found; refuse proxy paint")
+    return changed
+
+
 def render_mood(scene, mood, output, key, fill, environment):
-    key.data.energy = 1100 if mood == "day" else 720
-    key.data.color = (1.0, 0.87, 0.70) if mood == "day" else (1.0, 0.63, 0.36)
-    fill.data.energy = 550 if mood == "day" else 390
-    fill.data.color = (0.56, 0.70, 1.0) if mood == "day" else (0.32, 0.45, 0.85)
+    key.data.energy = 1100 if mood == "day" else 500
+    key.data.color = (1.0, 0.87, 0.70) if mood == "day" else (1.0, 0.52, 0.30)
+    fill.data.energy = 550 if mood == "day" else 190
+    fill.data.color = (0.56, 0.70, 1.0) if mood == "day" else (0.24, 0.37, 0.82)
     background = environment.node_tree.nodes.get("Background")
-    background.inputs["Strength"].default_value = 0.55 if mood == "day" else 0.27
+    background.inputs["Strength"].default_value = 0.55 if mood == "day" else 0.17
     background.inputs["Color"].default_value = (
-        (0.45, 0.51, 0.57, 1) if mood == "day" else (0.18, 0.23, 0.34, 1)
+        (0.45, 0.51, 0.57, 1) if mood == "day" else (0.14, 0.20, 0.35, 1)
     )
     output_file = output / ("greyhaven-quaternius-cottage-" + mood + ".png")
     scene.render.filepath = str(output_file)
@@ -112,10 +148,11 @@ def main():
         if part["model"] not in selected:
             raise ValueError("Model outside the CC0 reviewed Standard selection: " + part["model"])
         counts.append(install_piece(part["model"], part["at"], part["yawDeg"], source))
+    review_roof_materials = apply_blood_iron_review_palette()
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
-    scene.cycles.samples = 12
+    scene.cycles.samples = 24
     # Minimal Ubuntu Blender builds can lack OpenImageDenoiser.
     # Disable optional CPU denoising instead of changing the imported art.
     if hasattr(scene.cycles, "use_denoising"):
@@ -166,6 +203,12 @@ def main():
         "sourceMirrorCommit": cfg["source"]["mirrorCommit"],
         "mirrorVerifiedByteIdenticalToOfficialArchive": False,
         "sourceLicense": cfg["source"]["license"],
+        "sourceTextureFilesOverwritten": False,
+        "materialReview": {"roofMaterialNodesChanged": review_roof_materials,
+          "roofSaturation": 0.62, "roofValue": 0.72,
+          "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},
+        "dayDuskMoodLightingDistinct": True,
+        "cyclesSamplesPerFrame": 24,
     }
     (output / "quaternius-greyhaven-review-report.json").write_text(json.dumps(report, indent=2) + "\n")
     print("GRAPHICS3B_QUATERNIUS_ORIGINAL_STANDARD_BLENDER_PREVIEW_PASS " + json.dumps(report))
