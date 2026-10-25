@@ -1,0 +1,55 @@
+name: Graphics3B P1 Quaternius CC0 Greyhaven source and Blender preview
+
+on:
+  pull_request:
+    paths:
+      - ".gitmodules"
+      - "third_party/quaternius/medieval-village-megakit-standard"
+      - "assets/environment/greyhaven/quaternius-standard-preview/**"
+      - "tools/art/verify_quaternius_standard_source.mjs"
+      - "tools/art/render_quaternius_greyhaven_preview.py"
+      - ".github/workflows/graphics3b-p1-quaternius-standard-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-standard-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify original pinned 176 Standard-model glTF and real texture dependencies
+        run: |
+          node --check tools/art/verify_quaternius_standard_source.mjs
+          node tools/art/verify_quaternius_standard_source.mjs
+          python3 -m py_compile tools/art/render_quaternius_greyhaven_preview.py
+      - name: Install Blender for offscreen isolated art trial
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender
+          blender --version
+      - name: Assemble original glTF cottage and render genuine day/dusk Blood and Iron candidates
+        run: |
+          mkdir -p .artifacts/quaternius-greyhaven
+          blender --background --threads 2 --python tools/art/render_quaternius_greyhaven_preview.py -- \
+            --manifest assets/environment/greyhaven/quaternius-standard-preview/manifest.json \
+            --source third_party/quaternius/medieval-village-megakit-standard/glTF \
+            --output .artifacts/quaternius-greyhaven
+          test -s .artifacts/quaternius-greyhaven/greyhaven-quaternius-cottage-day.png
+          test -s .artifacts/quaternius-greyhaven/greyhaven-quaternius-cottage-dusk.png
+          test -s .artifacts/quaternius-greyhaven/greyhaven-quaternius-cottage-source.blend
+          test -s .artifacts/quaternius-greyhaven/quaternius-greyhaven-review-report.json
+      - name: Preserve original CC0 modular building Blender source and genuine rendered previews
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-p1-quaternius-cc0-original-modular-house-review
+          path: .artifacts/quaternius-greyhaven/*
+          retention-days: 7
+          if-no-files-found: ignore
