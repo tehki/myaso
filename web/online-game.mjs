@@ -968,11 +968,13 @@ function simulatePrediction(stepMs) {
         if (debug.m121SentSamples.length > 96) debug.m121SentSamples.shift();
       }
     }
-    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
+    // M336/M144: read-only, scenario-scoped input-plane provenance. A real DOM
     // Space+LMB without authoritative action may mean no 30Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial" || acceptanceScenario === "uijumprecoveryffa") {
+    if (acceptanceScenario === "uimultirecoveryspatial"
+      || acceptanceScenario === "uijumprecoveryffa"
+      || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;

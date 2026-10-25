@@ -11758,12 +11758,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
           }));
         }
         await sleep(jumpInputDelayMs);
-        // M336: on CI #39418435711 M145's genuine 1ms-synchronized
-        // Space+LMB was delivered to DOM but #1 never sent an authoritative
-        // action. Hold the *same* one real W3C chord through more 30Hz input
-        // sampling frames. M144 stays at 90ms; all original 60/70/150/200ms
-        // onset/recovery, damage and focus gates remain unchanged.
-        await performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90);
+        // M336/M144: real Space+LMB reached the Chrome DOM together but
+        // loaded exact-head quality #40184398389 still showed ZERO original
+        // World actions for #1 while #3 completed its light recovery.
+        // Preserve one genuine W3C chord and allow 180ms for original
+        // 30Hz input sampling, as M145 already does. Keep the unchanged
+        // strict 60/70/150/200ms onset, server phase, focus and vitals gates.
+        await performArenaPreAimedJumpAttackChord(jumpAttacker, 180);
       })(),
       // R1 M144: light commits on release and its 185ms delayed jump now
       // correctly yields #3 recovery before #1 recovery. Observe long enough
