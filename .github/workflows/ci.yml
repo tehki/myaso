@@ -41,6 +41,12 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      # P1 metadata-only validation; no downloads, vendor assets or runtime code.
+      - name: Validate Graphics 3A P1 free asset archive intake
+        run: |
+          python -m py_compile scripts/graphics3a_p1_standard_intake.py tests/test_graphics3a_p1_standard_intake.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_standard_intake.py' -v
+
       - name: Validate combat JavaScript
         run: |
           node --version
