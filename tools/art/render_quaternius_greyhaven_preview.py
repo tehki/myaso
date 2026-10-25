@@ -155,8 +155,8 @@ def apply_blood_iron_review_palette():
 def render_mood(scene, mood, output, key, fill, environment):
     key.data.energy = 1100 if mood == "day" else 500
     key.data.color = (1.0, 0.87, 0.70) if mood == "day" else (1.0, 0.52, 0.30)
-    fill.data.energy = 550 if mood == "day" else 190
-    fill.data.color = (0.56, 0.70, 1.0) if mood == "day" else (0.24, 0.37, 0.82)
+    fill.data.energy = 420 if mood == "day" else 190
+    fill.data.color = (0.82, 0.84, 0.86) if mood == "day" else (0.24, 0.37, 0.82)
     background = environment.node_tree.nodes.get("Background")
     background.inputs["Strength"].default_value = 0.55 if mood == "day" else 0.17
     background.inputs["Color"].default_value = (
@@ -229,12 +229,12 @@ def main():
     camera = bpy.data.objects.new("Greyhaven review camera", camera_data)
     scene.collection.objects.link(camera)
     # Align the review camera to the original Greyhaven painted sprite:
-    # front-facing gable, symmetric roof planes, modest top-down visibility.
+    # elevated roof/facade balance, front gable foreshortened, slight side visibility.
     # This is isolated asset-bake framing; it never changes the live World9 camera.
     camera_cfg = cfg["sample"]["cameraReview"]
     if (camera_cfg.get("projection") != "ORTHO"
             or camera_cfg.get("liveWorld9CameraChanged") is not False
-            or camera_cfg.get("position") != [0, -12, 10]
+            or camera_cfg.get("position") != [3, -12, 17]
             or camera_cfg.get("target") != [0, 0, 2.8]
             or camera_cfg.get("orthoScale") != 12.8):
         raise ValueError("unapproved Greyhaven art camera; do not bake a new game camera")
