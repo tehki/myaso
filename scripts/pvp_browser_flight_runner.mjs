@@ -1,3 +1,4 @@
+import { hasM147PunishFeedback } from "./m147-recovery-feedback-convergence.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -574,13 +575,13 @@ async function startGameServer() {
         || scenario === "uiheavydodge"
         || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
-        || scenario === "uirollknockdownffahit"
+        || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
       // Existing M121/M156 original-v1 ingress evidence is never enabled for
       // v2 or other production paths; the Rust server rejects nonloopback.
-      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" ? "1" : "0",
+      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uijumpattackinputloss" ? "1" : "0",
       MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS:
@@ -8324,8 +8325,8 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // exact remote raster/source-frame assertions still qualify the run.
     const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
-    if (scenario === "uiparrytell") {
-      // M41: avoid cross-browser wall-clock choreography. The original
+    if (scenario === "uiparrytell" || scenario === "uistun") {
+      // M35/M41: avoid cross-browser wall-clock choreography. The original
       // replicated World light-windup drives combatActionHint() on the real
       // attacker browser; only AFTER that authoritative message is observed
       // do we issue the defender's ONE genuine W3C wheel-back.
@@ -8339,7 +8340,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         attacker, 180, attemptAttackerBaseline.events.length,
       );
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
-        attacker: attacker.name, cue: authoritativeWindup,
+        scenario, attacker: attacker.name, cue: authoritativeWindup,
       }));
       await setArenaBlock(defender, defenderElementId, true);
     } else {
@@ -11543,7 +11544,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     if (!jumpState || !observerState || !closerState) {
       throw new Error(`${milestone} incomplete punish evidence: ${JSON.stringify(states)}`);
     }
-    if (jumpState.playerHp === 66 && observerState.playerHp === 100 && closerState.playerHp === 100) {
+    if (hasM147PunishFeedback(states, {
+      jumpBrowser: jumpAttacker.name, observerBrowser: observer.name, closerBrowser: closerIdle.name,
+    })) {
       hitEvidence = states;
       break;
     }

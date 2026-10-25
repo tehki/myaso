@@ -10,7 +10,7 @@ test("M156 enables only existing loopback original World action/HIT evidence, pr
   assert.ok(start>0&&end>start);
   assert.match(proof,/scenario === "uirollknockdownffahit"/);
   assert.match(proof,/\? "1" : "0"/);
-  assert.match(source,/MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" \|\| scenario === "uirollknockdownffahit" \? "1" : "0"/);
+  assert.match(source,/MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" \|\| scenario === "uirollknockdownffahit" \|\| scenario === "uijumppunishffa" \? "1" : "0"/);
   assert.match(source.slice(source.indexOf("async function startGameServer("),start),/MYASO_BIND: "127\.0\.0\.1:0"/);
   const begin=source.indexOf("async function runOnlineUiRollKnockdownFfaHitFlight(");
   const finish=source.indexOf("\nasync function ",begin+30);

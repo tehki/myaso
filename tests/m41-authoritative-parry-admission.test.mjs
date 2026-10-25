@@ -5,8 +5,8 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
 
 test("M41 native parry waits for the original replicated World windup before its real wheel", () => {
-  const start = source.indexOf('if (scenario === "uiparrytell") {', source.indexOf("async function runOnlineUiParryFlight("));
-  assert.ok(start >= 0, "M41 must have a dedicated authoritative choreography branch");
+  const start = source.indexOf('if (scenario === "uiparrytell" || scenario === "uistun") {', source.indexOf("async function runOnlineUiParryFlight("));
+  assert.ok(start >= 0, "M35 and M41 must share the qualified authoritative choreography branch");
   const rest = source.slice(start, source.indexOf("} else {", start));
   const genuineAttack = rest.indexOf("await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);");
   const worldMessage = rest.indexOf("await waitForM41WorldWindup(");

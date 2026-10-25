@@ -10,6 +10,16 @@ The confirmed before-fix regression accepted old sample ticks18/19/20 after newe
 
 M156 gameplay and timing assertions are unchanged. Its existing standard-input and original World diagnostics are now enabled only in the bounded loopback native fixture, allowing independent attribution of the intended third-party 34HP conversion. Tests execute the actual wheel and cancellation handlers for positive, negative and zero deltas, timer expiry, blur and hidden pages.
 
+## Post-bfb CI recovery candidate (validation pending)
+
+The standard writer now preserves the original encoded T/T+1/T+2 action datagrams in its existing single flush path. Ordinary movement remains latest-wins. Retention is bounded to eight original packets and 1500ms; overflow/stall retires that connection and reconnect cannot inherit its actions. This addresses the observed M230 recovery at T+3 without weakening its exact three-copy correlator or the server whole-packet freshness guard.
+
+The existing three-sample redundancy retains the genuine classified LMB release (dual-bit hold to light-only or heavy-only) through subsequent neutral samples within its unchanged four-tick limit. A dual-bit hold to neutral cancellation never creates a release. Actual client/codec/stalled-writer regressions reproduced the missing light and long-held heavy release before this correction. The encoder also preserves legitimate previous samples across uint32 rollover using bounded modular age.
+
+M35 now uses the existing M41 current-attempt original World windup observation before its one genuine wheel. Standard M147 waits within its existing bounded deadline for actual selected punisher feedback as well as actual victim HP, rather than qualifying a victim-first update before the punisher browser receives it. Damage, recovery-window, identity, guard and focus assertions remain intact. Read-only standard input/World diagnostics also cover M147 and the M156 physical click classification and exact 30Hz submissions.
+
+Native acceptance now repeats M35, M41, M156, standard M147 and one-packet M230 twice each, alongside the original stale-packet regression. Separate two-packet-loss and full-quality jobs remain required. These source changes and Node regressions are not a native PASS; final immutable workflow heads and independent 4D signoff must qualify the candidate.
+
 ## Compatibility and configuration
 
 - Original60Hz World, server damage authority, QUIC/WebTransport, current actor assignment and wire format are preserved.

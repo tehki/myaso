@@ -150,7 +150,8 @@ function updateNetworkDiagnostics(nowMs) {
 const acceptanceScenario = params.get("scenario");
 // REVIEW ONLY: bounded, read-only legacy v1 M111 input-plane chronology.
 // The observer NEVER sends Combat input, changes request latches or grants HIT.
-const m111InputProbe = acceptanceScenario === "uiheavyguardbreakpunish"
+const m111InputProbe = (acceptanceScenario === "uiheavyguardbreakpunish"
+  || acceptanceScenario === "uirollknockdownffahit")
   && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
   ? (window.__MYASO_M111_INPUT_PLANE__ = {
       physicalTerminals: [], lightReleases: [], submitted: [],
