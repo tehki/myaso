@@ -925,11 +925,18 @@ mod tests {
         for _ in 0..20 {
             let before = world.tick;
             world.step_into(&mut events);
-            assert_eq!(world.tick, before + 1, "one and only one original World step");
+            assert_eq!(
+                world.tick,
+                before + 1,
+                "one and only one original World step"
+            );
             let captured = origin
                 .capture_committed_hits_from_step(&world, world.tick, &events)
                 .unwrap();
-            assert!(captured.is_empty(), "held heavy READY cannot mint HIT credit");
+            assert!(
+                captured.is_empty(),
+                "held heavy READY cannot mint HIT credit"
+            );
             let projected =
                 project_world_tick_for_recipients(world.tick, &captured, &mut recipients).unwrap();
             assert!(projected.iter().all(|(_, receipts)| receipts.is_empty()));
@@ -980,7 +987,10 @@ mod tests {
                 assert!(projected.iter().all(|(_, receipts)| receipts.is_empty()));
             }
         }
-        assert_eq!(committed_hits, 1, "one real released heavy is one committed HIT");
+        assert_eq!(
+            committed_hits, 1,
+            "one real released heavy is one committed HIT"
+        );
         assert_eq!(world.fighter(2).unwrap().hp, 54.0);
         assert_eq!(recipients[2].pending(), 0);
         assert_eq!(recipients[2].next_sequence(), 0);
