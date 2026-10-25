@@ -135,9 +135,9 @@ def apply_blood_iron_review_palette():
         grade = nodes.new("ShaderNodeHueSaturation")
         grade.name = "BloodIron_Roof_RedClay_ReviewOnly"
         grade.label = "Review only: muted/weathered red clay roof"
-        grade.inputs["Hue"].default_value = 0.5
-        grade.inputs["Saturation"].default_value = 0.62
-        grade.inputs["Value"].default_value = 0.72
+        grade.inputs["Hue"].default_value = 0.55
+        grade.inputs["Saturation"].default_value = 0.72
+        grade.inputs["Value"].default_value = 0.68
         grade.inputs["Fac"].default_value = 1.0
         grade.location = (bsdf.location.x - 240, bsdf.location.y - 40)
         grade.inputs["Color"].default_value = base_color.default_value
@@ -270,7 +270,7 @@ def main():
         "doorFrameAlignment": door_alignment,
         "sourceTextureFilesOverwritten": False,
         "materialReview": {"roofMaterialNodesChanged": review_roof_materials,
-          "roofSaturation": 0.62, "roofValue": 0.72,
+          "roofHue": 0.55, "roofSaturation": 0.72, "roofValue": 0.68,
           "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},
         "dayDuskMoodLightingDistinct": True,
         "cameraReview": camera_cfg,
