@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from graphics3a_p1_cpu_skin_retarget import (
     accessor_values, parse_glb_bytes, quat_multiply, quat_normalize, quat_slerp,
-    retarget_trs, safe_local_path, sample_track, validate_skeleton_pair,
+    normalized_base_color_factor, retarget_trs, safe_local_path, sample_track, validate_skeleton_pair,
 )
 
 IDENTITY = [0.0, 0.0, 0.0, 1.0]
@@ -88,6 +88,14 @@ class CpuSkinRetargetTests(unittest.TestCase):
             "accessors": [{"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 2, "type": "VEC2"}],
         }
         self.assertEqual(accessor_values(doc, [payload], 0), [[1.0, 2.0], [3.0, 4.0]])
+
+    def test_glb_material_factor_defaults_to_normalized_float_values(self):
+        factor = normalized_base_color_factor({})
+        self.assertEqual(factor, (1.0, 1.0, 1.0, 1.0))
+        self.assertTrue(all(type(value) is float for value in factor))
+        self.assertEqual(normalized_base_color_factor({"baseColorFactor": [0, 1, 0.5, 1]}), (0.0, 1.0, 0.5, 1.0))
+        with self.assertRaisesRegex(ValueError, "normalized 0..1"):
+            normalized_base_color_factor({"baseColorFactor": [255, 255, 255, 255]})
 
     def test_glb_parser_reads_json_and_bin_chunks(self):
         json_chunk = json.dumps({"asset": {"version": "2.0"}, "buffers": [{"byteLength": 4}]}).encode()
