@@ -228,8 +228,12 @@ def main():
     camera_data = bpy.data.cameras.new("Greyhaven review camera (authoring only)")
     camera = bpy.data.objects.new("Greyhaven review camera", camera_data)
     scene.collection.objects.link(camera)
-    camera.location = (9, -11, 10)
-    camera.rotation_euler = (Vector((0, 0, 2.8)) - camera.location).to_track_quat("-Z", "Y").to_euler()
+    # Align the review camera to the original Greyhaven painted sprite:
+    # front-facing gable, symmetric roof planes, modest top-down visibility.
+    # This is isolated asset-bake framing; it never changes the live World9 camera.
+    camera.location = (0, -12, 10)
+    camera_target = Vector((0, 0, 2.8))
+    camera.rotation_euler = (camera_target - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera_data.type = "ORTHO"
     camera_data.ortho_scale = 12.8
     scene.camera = camera
@@ -262,6 +266,10 @@ def main():
           "roofSaturation": 0.62, "roofValue": 0.72,
           "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},
         "dayDuskMoodLightingDistinct": True,
+        "cameraReview": {"projection":"ORTHO","position":[0,-12,10],
+          "target":[0,0,2.8],"orthoScale":12.8,
+          "intent":"front-gable Blood & Iron sprite alignment; preview only",
+          "liveWorld9CameraChanged":False},
         "cyclesSamplesPerFrame": 24,
     }
     (output / "quaternius-greyhaven-review-report.json").write_text(json.dumps(report, indent=2) + "\n")
