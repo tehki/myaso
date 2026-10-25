@@ -1,17 +1,19 @@
 // Native QA orchestration only. These functions never create DOM input or
 // World state; production-visible cues gate one existing native W3C wheel.
-export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId) {
+export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId, allowHeavy = false) {
   if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0
       || !Number.isSafeInteger(expectedActorId) || expectedActorId < 1) return null;
   const actorId = Number(state?.online?.match(/player #(\d+)/)?.[1]);
   if (actorId !== expectedActorId || !Array.isArray(state?.events)
       || state.events.length < baselineEventCount) return null;
-  // Heavy charging can precede the short-click release. Dispatching a
-  // defensive wheel on that earlier cue starts Block too soon and converts
-  // an otherwise valid Parry into an ordinary guard-damage BLOCK. Require
-  // the genuine current-attempt light-windup cue, still latest on-screen.
+  // M35: earlier heavy charging starts Block too soon (BLOCK at 133ms);
+  // demand actual released-light cue. M41: previous exact-head accepted
+  // early heavy charging and waiting for Light can miss the parry entirely.
+  // Preserve that separate earlier M41 cue via an explicit fixture flag.
   const latestText = state.events.at(-1);
-  if (latestText !== "Attack committed - your windup is readable.") return null;
+  const light = latestText === "Attack committed - your windup is readable.";
+  const heavy = latestText === "Heavy strike committed - the long windup is readable.";
+  if (!light && !(allowHeavy && heavy)) return null;
   const index = state.events.length - 1;
   if (index < baselineEventCount) return null;
   const transition = state.eventTransitions?.[index];

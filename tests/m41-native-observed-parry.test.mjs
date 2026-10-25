@@ -13,9 +13,14 @@ test("scalar cue is actual fresh same-actor recorded World text, never stale his
   assert.equal(readM41ScalarWorldCue(state,0,2),null);
   assert.equal(readM41ScalarWorldCue(state,1,1).t,1176.4);
   assert.equal(readM41ScalarWorldCue(state,2,1),null);
-  assert.equal(readM41ScalarWorldCue({...state,events:[heavy],
-    eventTransitions:[{text:heavy,t:1173.0}]},0,1),null,
-    "an earlier real heavy charge cannot trigger the short-click wheel");
+  const charging={...state,events:[heavy],
+    eventTransitions:[{text:heavy,t:1173.0}]};
+  assert.equal(readM41ScalarWorldCue(charging,0,1),null,
+    "M35 never uses the preceding heavy charge");
+  assert.equal(readM41ScalarWorldCue(charging,0,1,true)?.t,1173.0,
+    "M41 retains its previously qualified earlier heavy cue");
+  assert.equal(readM41ScalarWorldCue(charging,1,1,true),null,
+    "even M41 must never use a stale attempt");
   assert.equal(readM41ScalarWorldCue({...state,eventTransitions:[{text:heavy,t:1173.0},{text:"forged",t:1176.4}]},0,1),null);
   assert.equal(readM41ScalarWorldCue({...state,eventTransitions:[]},0,1),null);
   assert.equal(readM41ScalarWorldCue({...state,events:["Opponent hit - 34 HP."]},0,1),null);

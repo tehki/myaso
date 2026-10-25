@@ -8250,13 +8250,13 @@ async function calibrateNativeParryIngress(
   return result;
 }
 
-async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, expectedActorId) {
+async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, expectedActorId, allowHeavy = false) {
   if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0
       || !Number.isSafeInteger(expectedActorId) || expectedActorId < 1) {
     throw new TypeError("M41 requires a fresh current-attempt actor-bound World cue baseline");
   }
   const script = "return (" + readM41ScalarWorldCue.toString()
-    + ")(window.__MYASO_M30_UI__, " + baselineEventCount + ", " + expectedActorId + ");";
+    + ")(window.__MYASO_M30_UI__, " + baselineEventCount + ", " + expectedActorId + ", " + allowHeavy + ");";
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     // Read only the actual production-visible cue and its original observer
@@ -8265,8 +8265,9 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     if (cue?.actorId === expectedActorId
       && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
       && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
-      && cue.text === "Attack committed - your windup is readable."
-      && cue.latestText === "Attack committed - your windup is readable.") return cue;
+      && (cue.text === "Attack committed - your windup is readable."
+        || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
+      && cue.latestText === cue.text) return cue;
     await sleep(10);
   }
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
@@ -8339,6 +8340,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
         awaitWorldCue: () => waitForM41WorldWindup(
           attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+          scenario === "uiparrytell",
         ),
         sendWheel: () => setArenaBlock(defender, defenderElementId, true),
       });
@@ -11690,7 +11692,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     focus: focusTransitions.slice(-6),
     inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
     sentSamples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
-    worldActions: actualWorldTrace.split(/\\r?\\n/)
+    worldActions: actualWorldTrace.split(/\r?\n/)
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));

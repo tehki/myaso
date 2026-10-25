@@ -952,7 +952,8 @@ function simulatePrediction(stepMs) {
     // keydown in a browser does not prove a movement bit left the client or
     // reached the Rust World. Preserve attack/release and quiet samples too.
     // QA only, original packet/World/render path remains byte-for-byte intact.
-    if (acceptanceScenario === "uidirectionallight" && !reviewedGestureLab) {
+    if ((acceptanceScenario === "uidirectionallight"
+      || acceptanceScenario === "uijumppunishffa") && !reviewedGestureLab) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.m121SentSamples ??= [];
@@ -975,6 +976,7 @@ function simulatePrediction(stepMs) {
     // submitted, with no replay, network payload or gameplay change.
     if (acceptanceScenario === "uimultirecoveryspatial"
       || acceptanceScenario === "uijumprecoveryffa"
+      || acceptanceScenario === "uijumppunishffa"
       || acceptanceScenario === "uimultirecoveryffa") {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {

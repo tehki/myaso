@@ -16,12 +16,14 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.match(rest, /awaitWorldCue: \(\) => waitForM41WorldWindup\(/);
   assert.match(rest, /sendWheel: \(\) => setArenaBlock\(defender, defenderElementId, true\)/);
   assert.match(rest, /attacker, 180, attemptAttackerBaseline\.events\.length, attackerReady\.playerNetId/);
-  assert.match(helper, /latestText !== "Attack committed - your windup is readable\."/,
-    "native wheel must wait for the current released-light windup, not earlier heavy charging");
+  assert.match(helper, /const light = latestText === "Attack committed - your windup is readable\."/,
+    "M35 must wait for the genuine light-windup cue");
+  assert.match(helper, /allowHeavy && heavy/,
+    "M41 must preserve its separately qualified earlier heavy-windup timing");
   assert.match(helper, /actorId !== expectedActorId/);
   assert.match(helper, /const index = state\.events\.length - 1/,
     "native cue must be the latest actually rendered event, never earlier history");
-  assert.match(source, /async function waitForM41WorldWindup\(attacker, timeoutMs, baselineEventCount, expectedActorId\)/);
+  assert.match(source, /async function waitForM41WorldWindup\(attacker, timeoutMs, baselineEventCount, expectedActorId, allowHeavy = false\)/);
   const poll = source.slice(source.indexOf("async function waitForM41WorldWindup("), source.indexOf("async function runOnlineUiParryFlight("));
   assert.doesNotMatch(poll, /readUiEvidence/);
   assert.match(poll, /await execute\(attacker\.base, attacker\.sessionId, script\)/);
