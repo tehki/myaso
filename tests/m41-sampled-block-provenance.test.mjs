@@ -8,6 +8,9 @@ const i = online.indexOf("function simulatePrediction(");
 const sender = online.slice(i, i + 5300);
 test("M41/M35 prove genuine short-block intent at original v1 sender, without changing it", () => {
   assert.ok(i >= 0);
+  const acceptanceGate = online.slice(online.indexOf("function recordAcceptanceState("), online.indexOf("function recordAcceptanceAction("));
+  assert.ok(acceptanceGate.includes('"uiparrytell"') && acceptanceGate.includes('"uistun"'),
+    "M41/M35 must initialize the real acceptance state, not silently return null");
   assert.match(sender, /const m41InputProbe = acceptanceScenario === "uiparrytell"\s+\|\| acceptanceScenario === "uistun"/);
   assert.match(sender, /\|\| \(m41InputProbe && currentInput\.block\)/);
   assert.match(sender, /clientTick: outgoingTick, epochMs: debug\.lastSubmittedAtEpochMs/);
