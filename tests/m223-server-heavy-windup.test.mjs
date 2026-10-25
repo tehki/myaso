@@ -107,10 +107,13 @@ test("Combat4B M188 physical held-LMB parry preserves one bounded wheel and stri
     source.indexOf("async function runOnlineUiHeavyBlockFlight("));
   // A real original World event trace at 1fa6f494 proved 405ms native parry
   // resulted in BLOCK (64 guard), not PARRY. The World timers stay unchanged;
-  // qualify the +80ms physically-delayed wheel on exact-head native CI.
-  assert.match(helper, /m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" \? 80 : 0/);
+  // qualify the +110ms physically-delayed wheel on exact-head native CI.
+  assert.match(helper, /m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" \? 110 : 0/);
   assert.match(helper, /m223WheelDelayMs = m223Plan\.wheelDelayMs \+ m188HeldLmbParryOffsetMs/);
   assert.match(helper, /m223WheelDelayMs < 0 \|\| m223WheelDelayMs > 450/);
+  // 405ms planner plus parry-only wheel retiming must preserve <=450ms bound.
+  assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:65}).wheelDelayMs+110,450);
+  assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:85}).wheelDelayMs+110,430);
   assert.match(helper, /performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
   assert.match(helper, /scrollArenaWheel\(defender, defenderElementId, 120, m223WheelDelayMs\)/);
   const block = source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
