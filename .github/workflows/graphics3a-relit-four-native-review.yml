@@ -7,6 +7,9 @@ on:
       - "web/online-game.mjs"
       - "web/assets/knights/review/**"
       - "tests/graphics3a-relit-source-select.test.mjs"
+      - "tests/graphics3a-knights-release-gate.test.mjs"
+      - "web/alpha-config.mjs"
+      - "docs/releases/knights-p0-20261023/**"
       - "tools/art/main0_knights_four_native.mjs"
       - "scripts/graphics3a_live_shadow_ground_native_review.py"
       - "tests/graphics3a-ground-shadow-airborne.test.mjs"
@@ -25,7 +28,7 @@ jobs:
       - name: Verify immutable original asset manifest and opt-in source contract
         run: |
           node --check tools/art/main0_knights_four_native.mjs
-          node --test tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-source-direction-correction.test.mjs tests/prealpha-silver-knight.test.mjs
+          node --test tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-source-direction-correction.test.mjs tests/prealpha-silver-knight.test.mjs tests/graphics3a-knights-release-gate.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs
           google-chrome --version
           firefox --version
           chromedriver --version
@@ -47,7 +50,7 @@ jobs:
       - name: Verify exact original Silver source and presentation assertions
         run: |
           python3 -m py_compile scripts/graphics3a_live_shadow_ground_native_review.py
-          node --test tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-relit-source-select.test.mjs
+          node --test tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-relit-source-select.test.mjs tests/graphics3a-knights-release-gate.test.mjs
           google-chrome --version
           chromedriver --version
       - name: Build genuine independently authoritative Rust server
