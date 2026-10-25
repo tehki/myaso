@@ -1,0 +1,44 @@
+name: Graphics3B P1 real Rust static-collision facade boundary
+
+on:
+  pull_request:
+    paths:
+      - "tools/art/verify_a232_four_real_actor_occlusion.mjs"
+      - ".github/workflows/graphics3b-a232-reviewed-collision-native.yml"
+      - "assets/world/greyhaven-alpha-solids-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-original-rust-reviewed-collision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable authored geometry and strict four-player source
+        run: |
+          node --check tools/art/verify_a232_four_real_actor_occlusion.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
+          node --test tests/graphics3b-red-lion-live-art-optin.test.mjs tests/graphics3b-red-lion-camera-parity.test.mjs
+      - name: Native Chrome Firefox and W3C drivers
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile real authoritative original Rust with pinned 23 solids
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Actual Rust collision enabled; four original fighter legal facade-depth and HUD
+        env:
+          MYASO_A232_COLLISION_REVIEW: "1"
+        run: timeout --signal=TERM --kill-after=5s 420s node tools/art/verify_a232_four_real_actor_occlusion.mjs
+      - name: Retain original Canvas and W3C screenshots plus authoritative movement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-a232-real-reviewed-collision
+          path: graphics3b-a232-four-real-actor-evidence/*
+          retention-days: 7
+          if-no-files-found: ignore

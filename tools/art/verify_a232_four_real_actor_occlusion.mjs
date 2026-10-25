@@ -10,6 +10,32 @@ import {setTimeout as delay} from "node:timers/promises";
 
 const root=process.cwd(),dir=join(root,"graphics3b-a232-four-real-actor-evidence");
 const engines=["chrome","firefox","chrome","firefox"];
+// Strictly independent alternative: four actual native browsers against
+// original Rust WITH its reviewed static collision sweep, not a JS simulation.
+const collisionReview=process.env.MYASO_A232_COLLISION_REVIEW==="1";
+let solids=null,reviewedRedLion=null;
+async function loadPinnedOriginalSolids(){
+ if(!collisionReview)return;
+ const source=JSON.parse(await readFile(join(root,"assets/world/greyhaven-alpha-solids-v1.json"),"utf8"));
+ assert.equal(source.layout_id,"moonvale-greyhaven-v10-solids-v1");
+ assert.equal(source.solids_count,23);
+ assert.equal(source.solids_sha256,"9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43");
+ assert.equal(hash(Buffer.from(JSON.stringify(source.solids))),source.solids_sha256);
+ solids=source.solids;
+ reviewedRedLion=solids.find(x=>x.id==="building:red-lion");
+ assert.deepEqual(reviewedRedLion,{
+  id:"building:red-lion",kind:"building",
+  min_x:4240,min_y:3880,max_x:4490,max_y:4050
+ });
+}
+function overlapsReviewedSolid(x,y,r=18){
+ if(!collisionReview)throw Error("this geometry audit requires original static collision mode");
+ return solids.filter(rect=>{
+  const px=x-Math.max(rect.min_x,Math.min(x,rect.max_x));
+  const py=y-Math.max(rect.min_y,Math.min(y,rect.max_y));
+  return px*px+py*py<=r*r;
+ }).map(rect=>rect.id);
+}
 const children=[],clients=[];
 let http;
 const hash=bytes=>createHash("sha256").update(bytes).digest("hex");
@@ -56,7 +82,8 @@ async function originalRust(){
  const p=spawn(join(root,"server","target","debug","myaso-server"),[],{
   cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",
    MYASO_FLIGHT_BACKGROUND_PLAYERS:"0",MYASO_FLIGHT_NEAR_PRESSURE_PLAYERS:"0",
-   MYASO_ALPHA_SPAWN:"greyhaven"},stdio:["ignore","pipe","pipe"]});
+   MYASO_ALPHA_SPAWN:"greyhaven",
+   ...(collisionReview?{MYASO_ALPHA_STATIC_COLLISION:"reviewed-static-only"}:{})},stdio:["ignore","pipe","pipe"]});
  children.push(p);let stdout="",err="";
  p.stdout.on("data",d=>stdout+=String(d));
  p.stderr.on("data",d=>err+=String(d));
@@ -65,7 +92,8 @@ async function originalRust(){
   const url=stdout.match(/listening on (https:\/\/[^\s]+)/)?.[1];
   const cert=stdout.match(/development certificate SHA-256:\s*([^\r\n]+)/)?.[1]
    ?.replace(/[^0-9a-f]/gi,"").toLowerCase();
-  return {ok:!!url&&cert?.length===64&&stdout.includes("staging-only Greyhaven spawn selected"),
+  return {ok:!!url&&cert?.length===64&&stdout.includes("staging-only Greyhaven spawn selected")&&
+   (!collisionReview||stdout.includes("staging-only Greyhaven fixed static sweep enabled")),
    value:{url,cert,tail:stdout.slice(-400)}};
  },"true private authoritative Rust",60000);
  assert.match(v.url,/^https:\/\/127\.0\.0\.1:\d+\/game$/);
@@ -152,9 +180,45 @@ async function walkTo(s,axis,target){
  }
  throw Error("actor "+id+" failed to reach Red Lion "+axis+" "+target);
 }
-const targets=[{x:4300,y:4025},{x:4420,y:4025},{x:4300,y:4130},{x:4430,y:4130}];
+const targets=collisionReview?
+ [{x:4300,y:4071},{x:4420,y:4071},{x:4300,y:4130},{x:4430,y:4130}]:
+ [{x:4300,y:4025},{x:4420,y:4025},{x:4300,y:4130},{x:4430,y:4130}];
+// Deliberately navigate to the LEGAL exterior pixel strip between the pinned
+// building's south wall (+18px fighter radius) and the World9 facade Y=4075.
+// Any attempt to pass the wall itself MUST be rejected by genuine Rust.
+async function approachLegalFacade(s){
+ assert.ok(collisionReview&&s.index<2);
+ let stationary=0;
+ for(let attempt=0;attempt<18;attempt++){
+  const before=await snapshot(s);
+  assert.ok(valid(before,s.index+1));
+  const self=before.fighters.find(f=>f.netId===s.index+1);
+  const hits=overlapsReviewedSolid(self.x,self.y);
+  assert.deepEqual(hits,[],"the ACTUAL server placed actor inside reviewed static solid");
+  if(self.behindFacade){
+   assert.ok(self.y>=4068&&self.y<4075,"facade depth must fit legal <=7px visual strip");
+   return;
+  }
+  await press(s,"w",80);
+  await delay(330); // never accidentally trigger a double-tap WASD dash
+  const after=await poll(async()=>{const v=await snapshot(s);
+   return {ok:valid(v,s.index+1)&&v.serverTick>before.serverTick,value:v}
+  },"genuine collision-enabled Rust motion",8000);
+  const next=after.fighters.find(f=>f.netId===s.index+1);
+  assert.deepEqual(overlapsReviewedSolid(next.x,next.y),[],
+   "original Rust allowed actor into source-pinned building static solid");
+  console.log("GRAPHICS3B_REVIEWED_COLLISION_STEP "+JSON.stringify({
+   actor:s.index+1,serverTick:after.serverTick,
+   start:{x:self.x,y:self.y},end:{x:next.x,y:next.y},
+   behind:next.behindFacade,originalWallSouthY:4050,radius:18}));
+  if(next.y>=self.y-1)stationary++;else stationary=0;
+  if(stationary>=4)throw Error("server collision prevents reaching World9 visual depth strip");
+ }
+ throw Error("no truthful original-Rust legal behind-facade position");
+}
 async function run(){
  await mkdir(dir,{recursive:true});
+ await loadPinnedOriginalSolids();
  const site=await staticServer(),server=await originalRust();
  for(let i=0;i<4;i++){
   const s=await startBrowser(engines[i],i);
@@ -181,7 +245,8 @@ async function run(){
   await wd(s,"POST","/session/"+s.id+"/element/"+e+"/click",{});
   await delay(700);
   await walkTo(s,"x",targets[s.index].x);
-  await walkTo(s,"y",targets[s.index].y);
+  if(collisionReview&&s.index<2)await approachLegalFacade(s);
+  else await walkTo(s,"y",targets[s.index].y);
  }
  const evidence=[];
  for(const s of clients){
@@ -194,6 +259,9 @@ async function run(){
     [1,2].every(id=>id===own||!hud.includes(id))&&
     [3,4].every(id=>id===own||hud.includes(id)),value:v};
   },"real Rust actor depth and actual HUD occlusion",30000);
+  if(collisionReview)for(const f of end.fighters)
+   assert.deepEqual(overlapsReviewedSolid(f.x,f.y),[],
+    "genuine replicated fighter overlaps pinned server-compiled reviewed solid");
   const first=baseline.find(x=>x.id===s.index+1);
   assert.ok(Math.hypot(end.camera.x-first.camera.x,end.camera.y-first.camera.y)>10,
    "source camera did not pan from genuine W3C travel");
@@ -207,10 +275,16 @@ async function run(){
   realW3CMovement:true,genuineOriginalBlenderSourceValidated:true,
   twoOriginalServerActorsBehind:[1,2],twoOriginalServerActorsInFront:[3,4],
   actualHudExclusionPassed:true,realOriginalCanvasScreenshots:true,
-  worldStaticCollisionProof:false,portalAuthorityProof:false,actualSwordAuthority:false,
+  worldStaticCollisionProof:collisionReview,reviewed23StaticOnly:collisionReview,
+  legalFacadeStripProof:collisionReview,
+  originalSolidLayoutSha256:collisionReview?
+   "9bb023c95d86821f219113d71b6e480789a72df064f083790e746d79423b3f43":null,
+  portalAuthorityProof:false,actualSwordAuthority:false,
   gameplayFpsProof:false,publicAlphaApproval:false,baseline,evidence};
  await writeFile(join(dir,"four-real-actor-source-report.json"),JSON.stringify(report,null,2)+"\n");
- console.log("GRAPHICS3B_A232_FOUR_REAL_RUST_FACADE_HUD_PASS "+
+ console.log((collisionReview?
+   "GRAPHICS3B_A232_FOUR_REAL_RUST_REVIEWED_COLLISION_FACADE_HUD_PASS ":
+   "GRAPHICS3B_A232_FOUR_REAL_RUST_FACADE_HUD_PASS ")+
   JSON.stringify(evidence.map(x=>({actor:x.own,engine:x.engine,
    screenshotSha256:x.screenshot.canvasSha256,positions:x.fighters,
    hud:x.actualHudActorIds}))));
