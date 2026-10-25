@@ -448,7 +448,24 @@ try{
   const s=await startW3C(engines[i],i);const flag="0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
-  const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
+  const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000).catch(async error=>{
+   if(physicalMode==="private-hit"){
+    // Read-only evidence from the actual first-party page and authoritative
+    // server. Never grant an actor, synthesize online state or waive failure.
+    const browser=await evaluate(s,String.raw`return {
+      pageReady:document.readyState,status:document.querySelector('#event-text')?.textContent||'',
+      actor:window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.ownPlayerNetId??null,
+      transport:window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.transportState??null,
+      privateReceipt:window.__MYASO_PRIVATE_HIT_PROOF__?.()??null,
+    };`).catch(e=>({error:String(e)}));
+    const originalWorld=readAuthoritativeWorld().split("\n")
+     .filter(line=>/session |private HIT|M201_AUTH_|listening on|admission cap/.test(line)).slice(-80);
+    const evidence={error:String(error),browser,originalWorld,requestedUrl:u.toString().replace(/cert=[^&]*/,"cert=[redacted]")};
+    await writeFile(join(output,"core8-private-native-bootstrap-failure.json"),JSON.stringify(evidence,null,2)+"\n");
+    console.error("CORE8_PRIVATE_NATIVE_BOOTSTRAP_FAILURE",JSON.stringify({browser,originalWorld}));
+   }
+   throw error;
+  });
   assert.equal(actor.id,i+1,"genuine sequential Rust actor IDs required");
   assert.ok(await evaluate(s,hook),"read-only original Canvas image observer");
   actors.push({s,actor,flag});
@@ -463,7 +480,7 @@ try{
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
   assert.ok(Object.keys(data.knightSources).some(k=>k.startsWith("silver_")&&k.endsWith("_relit.webp")),
     "require actual original Blender relit Silver WebP drawImage calls, not a fallback Combat circle");
-  assert.ok(data.roster.length>=4,"genuine same-server four human roster must be visible");
+  assert.ok(data.roster.length>=4,`genuine same-server four human roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
   assert.equal(data.canvasWidth,960);assert.equal(data.canvasHeight,540);
   assert.ok(data.floor.centerLuminance>(flag==="1"?38:15));
   assert.ok(data.floor.centerLuminance<(flag==="1"?155:39));

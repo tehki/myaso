@@ -337,6 +337,10 @@ async fn main() -> Result<()> {
         bind.ip().is_loopback(),
         v2_lab,
     )?;
+    // Keep fail-closed configuration validation in default builds as well;
+    // only the feature-gated laboratory consumes the enabled value.
+    #[cfg(not(feature = "experimental-hit-delivery-lab"))]
+    let _ = hit_lab_enabled;
     let game = SharedGame::new(flight, boot_nonce);
     #[cfg(feature = "experimental-hit-delivery-lab")]
     if hit_lab_enabled {

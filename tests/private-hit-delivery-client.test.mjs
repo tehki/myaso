@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createPrivateHitDeliveryLab } from "../web/private-hit-delivery-lab.mjs";
 import { encodeHitReceipt } from "../src/network/m147-hit-receipt-codec.mjs";
@@ -151,4 +152,21 @@ test("missing grant and server GAP retire the current lease with no replacement 
   gap.lab.receive(encodeProposedHitControl({ op: OP.SERVER_GAP, token, cursor: 0, aux: 3 }), gap.transport);
   assert.equal(gap.transport.closed, true);
   assert.equal(gap.lab.snapshot.status, "retired");
+});
+
+test("first-party private HIT bootstrap waits for genuine server-bound actor after starting frame", () => {
+  const game = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  // An actor guessed before the first actual v1 input ACK is not authenticated.
+  assert.match(game, /resolvePrivateHitActor = null/);
+  assert.match(game, /if \(resolvePrivateHitActor\)/);
+  assert.match(game, /networkClient\.playerNetId !== actorId/);
+  assert.match(game, /const actorId = await Promise\.race\(/);
+  assert.match(game, /await networkClient\.transport\.negotiatePrivateHitDeliveryLab\(/);
+  const block = game.slice(game.indexOf("if (privateHitLabRequested) {", game.indexOf("// Original first-party game-page v2 lab")),
+    game.indexOf("// Chat C1 uses the current authenticated", game.indexOf("// Original first-party game-page v2 lab")));
+  assert.match(block, /void \(async \(\) => \{/);
+  assert.doesNotMatch(block, /privateHitDeliveryLab = await networkClient\.transport\.negotiatePrivateHitDeliveryLab\(\{\s*pageUrl: window\.location\.href, actorId: networkClient\.playerNetId/);
+  assert.match(block, /networkClient\?\.close\("private HIT original admission\/negotiation failed"\)/);
+  // This suite is an additional source-order guard, not a synthetic online
+  // admission or substitute for genuine first-party Chrome/Firefox testing.
 });

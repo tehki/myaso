@@ -170,6 +170,12 @@ if (gestureLabRequested && !reviewedGestureLab) {
   throw new Error("experimental server-authoritative gestures are loopback-only");
 }
 const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
+// Private receipts require the actor proven by an actual processed-input ACK.
+// The first sender frame runs only after module initialization; awaiting that
+// ACK during module startup would deadlock real online admission.
+let resolvePrivateHitActor = null;
+const privateHitActorReady = privateHitLabRequested
+  ? new Promise(resolve => { resolvePrivateHitActor = resolve; }) : null;
 if (privateHitLabRequested && !reviewedGestureLab) {
   throw new Error("private HIT delivery requires the reviewed loopback gesture lab");
 }
@@ -446,6 +452,13 @@ networkClient = await connectAuthoritativeClient({
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
+    // Only an original processed-input ACK for this connection and a genuine
+    // replicated own actor can establish the private recipient actor binding.
+    if (resolvePrivateHitActor) {
+      const resolve = resolvePrivateHitActor;
+      resolvePrivateHitActor = null;
+      resolve(ownId);
+    }
     const preReconcileX = local.x;
     const preReconcileY = local.y;
     reconcilePrediction({
@@ -475,18 +488,46 @@ if (reviewedGestureLab) {
       documentObj: document, getClientTick: () => clientTick >>> 0,
     });
     if (privateHitLabRequested) {
-      privateHitDeliveryLab = await networkClient.transport.negotiatePrivateHitDeliveryLab({
-        pageUrl: window.location.href, actorId: networkClient.playerNetId,
-        onReceipt(_receipt, presentation) {
-          combatMessage = presentation.text;
-          combatMessageUntil = performance.now() + presentation.durationMs;
-          setStatus(combatMessage);
-          showCombatFeedback(presentation.feedback);
-        },
-      });
-      Object.defineProperty(window, "__MYASO_PRIVATE_HIT_PROOF__", {
-        configurable: true, value: () => privateHitDeliveryLab.snapshot,
-      });
+      // Real input ACKs are produced by the 30Hz original sender, which starts
+      // only after this module returns to requestAnimationFrame. Negotiate in
+      // parallel with rendering rather than await a not-yet-admitted actor here.
+      // No fabricated actor ID, online status, receipt or token is permitted.
+      void (async () => {
+        let timeoutId;
+        try {
+          const actorId = await Promise.race([
+            privateHitActorReady,
+            new Promise((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error(
+                "private HIT requires a genuine current World actor and processed-input ACK"
+              )), 3000);
+            }),
+          ]);
+          if (!actorId || networkClient.transport.closed
+              || networkClient.playerNetId !== actorId) {
+            throw new Error("private HIT actor no longer owns the original QUIC transport");
+          }
+          privateHitDeliveryLab = await networkClient.transport.negotiatePrivateHitDeliveryLab({
+            pageUrl: window.location.href, actorId,
+            onReceipt(_receipt, presentation) {
+              combatMessage = presentation.text;
+              combatMessageUntil = performance.now() + presentation.durationMs;
+              setStatus(combatMessage);
+              showCombatFeedback(presentation.feedback);
+            },
+          });
+          Object.defineProperty(window, "__MYASO_PRIVATE_HIT_PROOF__", {
+            configurable: true, value: () => privateHitDeliveryLab.snapshot,
+          });
+        } catch (error) {
+          console.error("private HIT original admission/negotiation failed", error);
+          networkClient?.close("private HIT original admission/negotiation failed");
+          networkStatus = "Private HIT laboratory admission rejected.";
+          setStatus(networkStatus);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      })();
     }
   } catch (error) {
     networkClient?.close("original World gesture grant rejected");
