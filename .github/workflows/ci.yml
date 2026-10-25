@@ -46,6 +46,8 @@ jobs:
         run: |
           python -m py_compile scripts/graphics3a_p1_standard_intake.py tests/test_graphics3a_p1_standard_intake.py
           python -m unittest discover -s tests -p 'test_graphics3a_p1_standard_intake.py' -v
+          python -m py_compile scripts/graphics3a_p1_rig_probe.py tests/test_graphics3a_p1_rig_probe.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_rig_probe.py' -v
 
       - name: Validate combat JavaScript
         run: |
