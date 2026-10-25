@@ -37,7 +37,7 @@ def run():
         raise ValueError("Blender provenance or authority invariant failed")
     camera = report.get("cameraReview", {})
     if (camera.get("projection") != "ORTHO"
-            or camera.get("position") != [0, -12, 10]
+            or camera.get("position") != [3, -12, 17]
             or camera.get("target") != [0, 0, 2.8]
             or camera.get("orthoScale") != 12.8
             or camera.get("liveWorld9CameraChanged") is not False):
