@@ -8265,17 +8265,28 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // exact remote raster/source-frame assertions still qualify the run.
     const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
-    await Promise.all([
-      (async () => {
-        if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
-        await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
-      })(),
-      (async () => {
-        if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
-        await sleep(releaseToStrikeParryDelayMs);
-        await setArenaBlock(defender, defenderElementId, true);
-      })(),
-    ]);
+    if (scenario === "uiparrytell") {
+      // M41: avoid cross-browser wall-clock choreography. The original
+      // replicated World light-windup drives combatActionHint() on the real
+      // attacker browser; only AFTER that authoritative message is observed
+      // do we issue the defender's ONE genuine W3C wheel-back.
+      // No second attack, client-authored parry or modified World timings.
+      await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
+      await waitForUiMessage(attacker, "Attack committed - your windup is readable.", 180);
+      await setArenaBlock(defender, defenderElementId, true);
+    } else {
+      await Promise.all([
+        (async () => {
+          if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
+          await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
+        })(),
+        (async () => {
+          if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+          await sleep(releaseToStrikeParryDelayMs);
+          await setArenaBlock(defender, defenderElementId, true);
+        })(),
+      ]);
+    }
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
