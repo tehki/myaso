@@ -581,7 +581,8 @@ fn m201_flight_proof_lines(
             _ => {}
         }
         // Original World event provenance at the actual collision/guard
-        // resolution tick. Loopback-only, read-only CI evidence; never a
+        // resolution tick. Separate CORE8C namespace avoids changing the strict M201
+        // phase-proof trace grammar. Loopback-only, read-only CI evidence; never a
         // recipient HIT receipt, transport ACK, or another event producer.
         let contact = match event {
             CombatEvent::Block { attacker, target } => Some(("BLOCK", *attacker, *target)),
@@ -595,7 +596,7 @@ fn m201_flight_proof_lines(
             if let (Some(source), Some(defender)) = (world.fighter(attacker), world.fighter(target))
             {
                 lines.push(format!(
-                    "M201_AUTH_CONTACT tick={tick} world={} outcome={outcome} attacker={attacker} target={target} attackerLife={} targetLife={} defenderAction={} defenderActionElapsedMs={:.1} defenderHp={:.1} defenderGuard={:.1}",
+                    "CORE8C_WORLD_CONTACT tick={tick} world={} outcome={outcome} attacker={attacker} target={target} attackerLife={} targetLife={} defenderAction={} defenderActionElapsedMs={:.1} defenderHp={:.1} defenderGuard={:.1}",
                     world.world_instance(),
                     source.world_incarnation(),
                     defender.world_incarnation(),
@@ -1961,7 +1962,7 @@ mod m201_original_world_contact_tests {
                     .iter()
                     .any(|event| matches!(event, CombatEvent::Hit { .. })));
                 observed = lines.into_iter().find(|line| {
-                    line.contains("M201_AUTH_CONTACT")
+                    line.contains("CORE8C_WORLD_CONTACT")
                         && line.contains("outcome=BLOCK")
                         && line.contains("attacker=1 target=2")
                 });
