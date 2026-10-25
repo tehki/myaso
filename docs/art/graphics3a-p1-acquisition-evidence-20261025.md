@@ -27,7 +27,7 @@ All acquired via each author's official itch.io page, its own `/download_url` fr
 | Universal Base Characters | 112 | 44 | **Two free original rigged base bodies**: `Superhero_Male_FullBody.gltf`, `Superhero_Female_FullBody.gltf`; hairstyle/eyebrow/beard variants. Full advertised six-body roster is **not** in Standard. |
 | Modular Fantasy Outfits | 121 | 48 | **Four complete free rigged outfits**: Female/Male Peasant, Female/Male Ranger; 20 modular glTF parts plus 4 full outfits; 24 equivalent FBX exports. Full advertised 12 outfits/62 parts are **not** all in Standard. |
 | Universal Animation Library 1 | 9 | 4 | `UAL1_Standard.glb` **43 actual animations** plus `UAL1_Standard_RM.glb` **43 matching root-motion variants**; corresponding FBX files. |
-| Universal Animation Library 2 | 13 | 7 | `UAL2_Standard.glb` **43 actual animations** plus `UAL2_Standard_RM.glb` **43 matching root-motion variants**, two FBX files and female mannequin .blend. |
+| Universal Animation Library 2 | 13 | 7 | `UAL2_Standard.glb` **43 actual animations** plus `UAL2_Standard_RM.glb` **43 matching root-motion variants**, two library FBX files and a female mannequin FBX/GLB/.blend. |
 | KayKit Character Animations 1.1 | 37 | 32 | **16 GLB animation groups + 16 FBX** (14 named animation groups and two mannequin files); GLB animation group counts total **173 clips** across medium and large rigs (includes variations, not asserted unique actions). |
 
 These counts came from reading actual ZIP central directories and native GLB animation JSON, **not** from inferring that all paid/source assets are in the free packs. Manufacturer headline counts (e.g. 120+ / 130+ Quaternius libraries, 12 outfits) describe broader packs, not a promise of free Standard contents.
