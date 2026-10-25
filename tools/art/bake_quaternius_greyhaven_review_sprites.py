@@ -35,6 +35,13 @@ def run():
             or report.get("authoritativeWorldCollisionOrPortalChanged") is not False
             or report.get("importedSourceModules") != 14):
         raise ValueError("Blender provenance or authority invariant failed")
+    camera = report.get("cameraReview", {})
+    if (camera.get("projection") != "ORTHO"
+            or camera.get("position") != [3, -12, 17]
+            or camera.get("target") != [0, 0, 2.8]
+            or camera.get("orthoScale") != 12.8
+            or camera.get("liveWorld9CameraChanged") is not False):
+        raise ValueError("sprite bake lacks the reviewed Greyhaven front-gable orthographic camera")
     if report.get("materialReview", {}).get("roofMaterialNodesChanged", 0) < 1:
         raise ValueError("not the genuine V2 Blood & Iron roof material review")
     alignment = report.get("doorFrameAlignment", {})
@@ -62,6 +69,7 @@ def run():
         "doorFrameCenterOffsetMeters": alignment["horizontalCenterOffsetMeters"],
         "doorFrameDepthOffsetMeters": alignment["depthCenterOffsetMeters"],
         "doorThresholdBottomOffsetMeters": alignment["thresholdBottomOffsetMeters"],
+        "cameraReview": camera,
         "images": {},
     }
     for mood, evidence in zip(("day","dusk"),captures):

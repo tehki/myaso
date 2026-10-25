@@ -136,8 +136,8 @@ def apply_blood_iron_review_palette():
         grade.name = "BloodIron_Roof_RedClay_ReviewOnly"
         grade.label = "Review only: muted/weathered red clay roof"
         grade.inputs["Hue"].default_value = 0.5
-        grade.inputs["Saturation"].default_value = 0.62
-        grade.inputs["Value"].default_value = 0.72
+        grade.inputs["Saturation"].default_value = 0.78
+        grade.inputs["Value"].default_value = 0.70
         grade.inputs["Fac"].default_value = 1.0
         grade.location = (bsdf.location.x - 240, bsdf.location.y - 40)
         grade.inputs["Color"].default_value = base_color.default_value
@@ -155,8 +155,8 @@ def apply_blood_iron_review_palette():
 def render_mood(scene, mood, output, key, fill, environment):
     key.data.energy = 1100 if mood == "day" else 500
     key.data.color = (1.0, 0.87, 0.70) if mood == "day" else (1.0, 0.52, 0.30)
-    fill.data.energy = 550 if mood == "day" else 190
-    fill.data.color = (0.56, 0.70, 1.0) if mood == "day" else (0.24, 0.37, 0.82)
+    fill.data.energy = 420 if mood == "day" else 190
+    fill.data.color = (0.82, 0.84, 0.86) if mood == "day" else (0.24, 0.37, 0.82)
     background = environment.node_tree.nodes.get("Background")
     background.inputs["Strength"].default_value = 0.55 if mood == "day" else 0.17
     background.inputs["Color"].default_value = (
@@ -228,10 +228,21 @@ def main():
     camera_data = bpy.data.cameras.new("Greyhaven review camera (authoring only)")
     camera = bpy.data.objects.new("Greyhaven review camera", camera_data)
     scene.collection.objects.link(camera)
-    camera.location = (9, -11, 10)
-    camera.rotation_euler = (Vector((0, 0, 2.8)) - camera.location).to_track_quat("-Z", "Y").to_euler()
-    camera_data.type = "ORTHO"
-    camera_data.ortho_scale = 12.8
+    # Align the review camera to the original Greyhaven painted sprite:
+    # elevated roof/facade balance, front gable foreshortened, slight side visibility.
+    # This is isolated asset-bake framing; it never changes the live World9 camera.
+    camera_cfg = cfg["sample"]["cameraReview"]
+    if (camera_cfg.get("projection") != "ORTHO"
+            or camera_cfg.get("liveWorld9CameraChanged") is not False
+            or camera_cfg.get("position") != [3, -12, 17]
+            or camera_cfg.get("target") != [0, 0, 2.8]
+            or camera_cfg.get("orthoScale") != 12.8):
+        raise ValueError("unapproved Greyhaven art camera; do not bake a new game camera")
+    camera.location = Vector(camera_cfg["position"])
+    camera_target = Vector(camera_cfg["target"])
+    camera.rotation_euler = (camera_target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    camera_data.type = camera_cfg["projection"]
+    camera_data.ortho_scale = camera_cfg["orthoScale"]
     scene.camera = camera
     key = light("daylight / fire-amber key", (1, -7, 10), 1100, 6, (1, 0.87, 0.70))
     fill = light("blue-gray sky fill", (-6, 2, 7), 550, 7, (0.56, 0.70, 1))
@@ -259,9 +270,10 @@ def main():
         "doorFrameAlignment": door_alignment,
         "sourceTextureFilesOverwritten": False,
         "materialReview": {"roofMaterialNodesChanged": review_roof_materials,
-          "roofSaturation": 0.62, "roofValue": 0.72,
+          "roofHue": 0.5, "roofSaturation": 0.78, "roofValue": 0.70,
           "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},
         "dayDuskMoodLightingDistinct": True,
+        "cameraReview": camera_cfg,
         "cyclesSamplesPerFrame": 24,
     }
     (output / "quaternius-greyhaven-review-report.json").write_text(json.dumps(report, indent=2) + "\n")

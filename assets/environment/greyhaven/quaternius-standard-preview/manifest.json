@@ -181,6 +181,22 @@
       "maximumBottomOffsetMeters": 0.09,
       "maximumDepthOffsetMeters": 0.1,
       "sourceMeshesUnchanged": true
+    },
+    "cameraReview": {
+      "projection": "ORTHO",
+      "position": [
+        3,
+        -12,
+        17
+      ],
+      "target": [
+        0,
+        0,
+        2.8
+      ],
+      "orthoScale": 12.8,
+      "intent": "elevated Greyhaven roof-and-facade sprite alignment; front gable foreshortened to match A2.32 Red Lion",
+      "liveWorld9CameraChanged": false
     }
   },
   "output": {
