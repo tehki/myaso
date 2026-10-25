@@ -893,6 +893,100 @@ mod tests {
     }
 
     #[test]
+    fn actual_original_world_46hp_heavy_hit_projects_only_to_current_participants() {
+        // The same original World READY -> release path tested for PARRY must
+        // also prove an actual unblocked 46HP HIT, not an ACK or HUD inference.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        assert!(world.add_player_at(2, 272.0, 200.0, std::f32::consts::PI));
+        assert!(world.add_player_at(3, 700.0, 500.0, std::f32::consts::PI));
+        let mut origin = ProposedWorldHitOrigin::new(&world, 91).unwrap();
+        let attacker = origin.bind_admitted(&world, 1, 101).unwrap();
+        let victim = origin.bind_admitted(&world, 2, 102).unwrap();
+        let spectator = origin.bind_admitted(&world, 3, 103).unwrap();
+        let mut recipients = vec![
+            ProposedRecipientHitDelivery::new(attacker, [1; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(victim, [2; 16], 64).unwrap(),
+            ProposedRecipientHitDelivery::new(spectator, [3; 16], 64).unwrap(),
+        ];
+
+        let mut events = Vec::new();
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        world.step_into(&mut events);
+        assert!(events.is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: 17
+            },
+        ));
+        for _ in 0..20 {
+            let before = world.tick;
+            world.step_into(&mut events);
+            assert_eq!(world.tick, before + 1, "one and only one original World step");
+            let captured = origin
+                .capture_committed_hits_from_step(&world, world.tick, &events)
+                .unwrap();
+            assert!(captured.is_empty(), "held heavy READY cannot mint HIT credit");
+            let projected =
+                project_world_tick_for_recipients(world.tick, &captured, &mut recipients).unwrap();
+            assert!(projected.iter().all(|(_, receipts)| receipts.is_empty()));
+        }
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::HeavyReady));
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+
+        let mut committed_hits = 0;
+        for _ in 0..12 {
+            let before = world.tick;
+            world.step_into(&mut events);
+            assert_eq!(world.tick, before + 1);
+            let tick = world.tick;
+            let captured = origin
+                .capture_committed_hits_from_step(&world, tick, &events)
+                .unwrap();
+            let projected =
+                project_world_tick_for_recipients(tick, &captured, &mut recipients).unwrap();
+            if !captured.is_empty() {
+                assert_eq!(captured.len(), 1, "one actual World heavy contact");
+                assert_eq!(
+                    captured[0].0,
+                    CombatEvent::Hit {
+                        attacker: 1,
+                        target: 2,
+                        damage: 46,
+                        hp: 54,
+                    }
+                );
+                assert_eq!(captured[0].1.attacker, attacker);
+                assert_eq!(captured[0].1.victim, victim);
+                assert_eq!(projected.len(), 3);
+                assert_eq!(projected[0].1, projected[1].1);
+                assert_eq!(projected[0].1.len(), 1);
+                let receipt = projected[0].1[0];
+                assert_eq!(receipt.sequence, 0);
+                assert_eq!(receipt.server_tick, tick);
+                assert_eq!((receipt.attacker, receipt.target), (1, 2));
+                assert_eq!((receipt.damage, receipt.target_hp), (46.0, 54.0));
+                assert!(projected[2].1.is_empty(), "spectator has no HIT credit");
+                assert_eq!(
+                    project_world_tick_for_recipients(tick, &captured, &mut recipients),
+                    Err(DeliveryError::ReplayedOrReorderedWorldHit)
+                );
+                committed_hits += 1;
+            } else {
+                assert!(projected.iter().all(|(_, receipts)| receipts.is_empty()));
+            }
+        }
+        assert_eq!(committed_hits, 1, "one real released heavy is one committed HIT");
+        assert_eq!(world.fighter(2).unwrap().hp, 54.0);
+        assert_eq!(recipients[2].pending(), 0);
+        assert_eq!(recipients[2].next_sequence(), 0);
+    }
+
+    #[test]
     fn stale_original_world_hit_slice_cannot_be_relabelled_as_later_tick() {
         // Only the existing original World may commit HIT. If an adapter
         // releases its tick boundary, old events cannot acquire a newer tick.
