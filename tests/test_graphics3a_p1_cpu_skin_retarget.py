@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from graphics3a_p1_cpu_skin_retarget import (
     accessor_values, parse_glb_bytes, quat_multiply, quat_normalize, quat_slerp,
-    normalized_base_color_factor, retarget_trs, safe_local_path, sample_track, validate_skeleton_pair,
+    head_geometry_detected, normalized_base_color_factor, retarget_trs, safe_local_path, sample_track, validate_skeleton_pair, vertical_extent,
 )
 
 IDENTITY = [0.0, 0.0, 0.0, 1.0]
@@ -96,6 +96,15 @@ class CpuSkinRetargetTests(unittest.TestCase):
         self.assertEqual(normalized_base_color_factor({"baseColorFactor": [0, 1, 0.5, 1]}), (0.0, 1.0, 0.5, 1.0))
         with self.assertRaisesRegex(ValueError, "normalized 0..1"):
             normalized_base_color_factor({"baseColorFactor": [255, 255, 255, 255]})
+
+    def test_skeleton_height_uses_joint_positions_not_visible_clothing_bounds(self):
+        self.assertAlmostEqual(vertical_extent([[0, 0, 0], [0, 0.9, 0], [0, 1.6, 0]]), 1.6)
+
+    def test_headless_peasant_outfit_is_not_misreported_as_a_complete_character(self):
+        self.assertTrue(head_geometry_detected(1.865, 1.60))
+        self.assertFalse(head_geometry_detected(1.563, 1.60))
+        with self.assertRaisesRegex(ValueError, "Invalid head geometry"):
+            head_geometry_detected(float("nan"), 1.6)
 
     def test_glb_parser_reads_json_and_bin_chunks(self):
         json_chunk = json.dumps({"asset": {"version": "2.0"}, "buffers": [{"byteLength": 4}]}).encode()
