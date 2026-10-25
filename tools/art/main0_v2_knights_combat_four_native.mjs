@@ -857,7 +857,7 @@ try{
  assert.equal(honestWorldHits.filter(line=>/damage=46 hp=/.test(line)).length,1,
    "held source0 LMB can commit only one 46HP original World HIT");
  assert.equal(honestWorldHits.filter(line=>/damage=34 hp=/.test(line)).length,1,
-   "short source0 LMB can commit only one 34HP original World HIT");
+   "short source0 LMB can commit only one 34HP original World HIT; exact World HIT evidence="+JSON.stringify(honestWorldHits));
  assert.ok(honestWorldHits.some(line=>
    /M201_AUTH_HIT tick=\d+ attacker=1 target=2 damage=34 hp=20/.test(line)),
    "genuine light hits the original heavy-damaged target for exactly 34 more HP");
