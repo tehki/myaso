@@ -515,3 +515,62 @@ async fn hostile_reliable_frame_length_closes_private_scope_without_unbounded_bo
         .await
         .expect("hostile 65535-byte length must fail before any body allocation/read");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn duplicate_hello_and_spoofed_server_grant_close_only_offending_original_quic_lease() {
+    // These are real original pinned QUIC game streams and actual server
+    // control decoding, not forged client-side callbacks or a second registry.
+    let (_server, url, digest) = real_server();
+    let mut survivor = admitted_seat(&url, &digest).await;
+    let survivor_token = hit_grant(&mut survivor).await;
+
+    let mut duplicate = admitted_seat(&url, &digest).await;
+    let _duplicate_token = hit_grant(&mut duplicate).await;
+    control(
+        &mut duplicate,
+        HitControl {
+            op: HitControlOp::ClientHello,
+            cursor: 0,
+            token: [0; 16],
+            aux: 0,
+        },
+    )
+    .await;
+    timeout(WAIT, duplicate.connection.closed())
+        .await
+        .expect("duplicate private HELLO must terminate only its original QUIC lease");
+
+    let mut spoof = admitted_seat(&url, &digest).await;
+    let spoof_token = hit_grant(&mut spoof).await;
+    control(
+        &mut spoof,
+        HitControl {
+            op: HitControlOp::ServerGrant,
+            cursor: 0,
+            token: spoof_token,
+            aux: 64,
+        },
+    )
+    .await;
+    timeout(WAIT, spoof.connection.closed())
+        .await
+        .expect("client-sent server grant must never create or revive authority");
+
+    // A different original admitted current lease retains independent
+    // receipt cursors and remains usable after both hostile peer closures.
+    control(
+        &mut survivor,
+        HitControl {
+            op: HitControlOp::ClientAck,
+            cursor: 0,
+            token: survivor_token,
+            aux: 0,
+        },
+    )
+    .await;
+    no_receipt(&mut survivor).await;
+    assert!(
+        survivor.connection.close_reason().is_none(),
+        "invalid private controls from other seats must not retire a good lease"
+    );
+}
