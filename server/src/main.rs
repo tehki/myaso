@@ -93,6 +93,21 @@ fn register_new_action_datagram(
     first_unseen
 }
 
+// Loopback-only M230 evidence: a sustained LMB hold legitimately produces
+// many accepted heavy=true input samples, but only the exact dropped one-shot
+// tick retransmitted by the original three-copy wire proves recovery.
+// InputIngressWindow already deduplicates each accepted tick; never count the
+// following held samples as more accepted actions or infer a second World HIT.
+fn recovered_dropped_heavy_tick(
+    accepted: &[InputSample],
+    dropped_action_ticks: &VecDeque<u32>,
+) -> Option<u32> {
+    accepted
+        .iter()
+        .find(|sample| sample.heavy_attack && dropped_action_ticks.contains(&sample.tick))
+        .map(|sample| sample.tick)
+}
+
 #[derive(Debug, Clone, Copy)]
 struct LoopbackFlightConfig {
     background_players: usize,
@@ -867,12 +882,13 @@ async fn handle_connection(
                 if game.drop_new_action_datagrams {
                     if let Some((input_tick, intent)) = coalesced.as_ref() {
                         if intent.heavy_attack {
-                            // M230: log the original *accepted* heavy sample
-                            // tick, not only the newest coalesced input tick.
-                            if let Some(heavy_sample) =
-                                accepted.iter().rev().find(|sample| sample.heavy_attack)
-                            {
-                                let action_tick = heavy_sample.tick;
+                            // M230: prove the original dropped action tick
+                            // survived ingress redundancy, not each later held
+                            // heavy sample (which would falsely look like
+                            // multiple accepted original heavy actions).
+                            if let Some(action_tick) = recovered_dropped_heavy_tick(
+                                accepted.as_slice(), &dropped_action_ticks,
+                            ) {
                                 println!(
                                     "M229_LOOPBACK_HEAVY_INPUT_ACCEPTED session={stable_id} action_tick={action_tick} client_tick={input_tick} packet_tick={} accepted_samples={}",
                                     packet.client_tick,
@@ -1286,6 +1302,49 @@ mod tests {
             jump: false,
             dash: false,
         }
+    }
+
+    #[test]
+    fn m230_recovery_logs_only_the_original_dropped_heavy_tick() {
+        // Regression for protected M108: the first real held-LMB packet is
+        // deliberately dropped at tick59; accepted redundancy contains tick59
+        // plus newer held tick60. Later 17 sustained heavy samples must never
+        // masquerade as 17 more original replayed action ticks.
+        let mut dropped = VecDeque::new();
+        let first = [
+            action_sample(59, true),
+            action_sample(58, false),
+            action_sample(57, false),
+        ];
+        assert_eq!(register_new_action_datagram(&first, &mut dropped), Some(59));
+        assert_eq!(
+            recovered_dropped_heavy_tick(
+                &[action_sample(59, true), action_sample(60, true)],
+                &dropped
+            ),
+            Some(59),
+            "the oldest accepted sample is the true original dropped heavy"
+        );
+        for newest in 61..=85 {
+            assert_eq!(
+                recovered_dropped_heavy_tick(
+                    &[action_sample(newest - 1, true), action_sample(newest, true)],
+                    &dropped
+                ),
+                None,
+                "subsequent valid held-heavy inputs are not extra replays"
+            );
+        }
+        assert_eq!(
+            recovered_dropped_heavy_tick(&[action_sample(59, false)], &dropped),
+            None,
+            "a forged same-tick nonheavy sample is not heavy acceptance"
+        );
+        assert_eq!(
+            recovered_dropped_heavy_tick(&[action_sample(59, true)], &VecDeque::new()),
+            None,
+            "an unmatched heavy action cannot claim deliberate input loss"
+        );
     }
 
     #[test]
