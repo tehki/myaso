@@ -79,7 +79,9 @@ test("M325 leaves M194's authoritative guard, HP and parry gates strict", () => 
   assert.ok(flight.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.match(r2, /wheelHeadStartMs: 0/);
   assert.match(r2, /receiptGraceMs = 100/);
-  assert.match(r2, /postTrustedWheelMs: 0/);
+  assert.match(r2, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
+  assert.ok(flight.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
+    "only authentic M151 staging opts into the bounded release window");
   assert.ok(flight.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(flight.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(flight.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
