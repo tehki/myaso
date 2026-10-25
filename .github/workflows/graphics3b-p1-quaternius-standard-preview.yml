@@ -8,6 +8,9 @@ on:
       - "assets/environment/greyhaven/quaternius-standard-preview/**"
       - "tools/art/verify_quaternius_standard_source.mjs"
       - "tools/art/render_quaternius_greyhaven_preview.py"
+      - "tools/art/bake_quaternius_greyhaven_review_sprites.py"
+      - "tools/art/verify_quaternius_original_world_native_2d5.mjs"
+      - "web/graphics3b-quaternius-2d5-local-review.*"
       - ".github/workflows/graphics3b-p1-quaternius-standard-preview.yml"
   workflow_dispatch:
 
@@ -60,6 +63,22 @@ jobs:
         with:
           name: graphics3b-p1-quaternius-blood-iron-2d5-visual-only-sprite-review
           path: .artifacts/quaternius-greyhaven-sprite-review/*
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Actual Chrome and Firefox source World9 Red Lion vs native Quaternius sprites
+        run: |
+          node --check tools/art/verify_quaternius_original_world_native_2d5.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          timeout --signal=TERM --kill-after=5s 180s node tools/art/verify_quaternius_original_world_native_2d5.mjs
+      - name: Retain genuine Chrome Firefox original World9 source Canvas screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-quaternius-2d5-original-world9-native-chrome-firefox
+          path: .artifacts/quaternius-greyhaven-browser-2d5-review/*
           retention-days: 7
           if-no-files-found: ignore
       - name: Preserve original CC0 modular building Blender source and genuine rendered previews
