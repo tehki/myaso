@@ -166,12 +166,19 @@ class ModularCharacterContractTests(unittest.TestCase):
     def test_incorrect_body_masking_fails_closed(self):
         m = example_manifest()
         m["equipment_catalog"]["hood"]["hide_body_regions"] = ["left_leg"]
-        with self.assertRaisesRegex(ValueError, "Headgear"):
+        with self.assertRaisesRegex(ValueError, "unrelated body"):
             validate_modular_manifest(m)
         m = example_manifest()
         m["equipment_catalog"]["tunic"]["hide_body_regions"] = ["torso", "torso"]
         with self.assertRaisesRegex(ValueError, "unique"):
             validate_modular_manifest(m)
+
+    def test_torso_armor_cannot_hide_head_or_an_unrelated_foot(self):
+        for mask in (["head"], ["left_foot"], ["torso", "neck"]):
+            m = example_manifest()
+            m["equipment_catalog"]["tunic"]["hide_body_regions"] = mask
+            with self.subTest(mask=mask), self.assertRaisesRegex(ValueError, "unrelated body"):
+                validate_modular_manifest(m)
 
     def test_source_ids_are_identifiers_not_paths_or_download_urls(self):
         for bad in ("../head.gltf", "https://example.com/asset", "", ".hidden"):
