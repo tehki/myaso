@@ -7,11 +7,28 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
 from graphics3a_p1_hood_motion_rules import (
     MOTION_PHASES, REQUIRED_CLIPS, MAX_SKIN_MATRIX_DIFFERENCE,
-    finite_skin_compatible, validated_motion_selection,
+    collar_follow_center, finite_skin_compatible, validated_motion_selection,
 )
 
 
 class HoodMotionGateTests(unittest.TestCase):
+    def test_animated_roll_neck_center_follows_its_actual_height(self):
+        # Rest collar camera at Y=1.58+0.05, rest neck Y=1.50.
+        # When Roll lowers neck Y to 0.80, camera must lower to 0.93.
+        self.assertEqual(collar_follow_center((0.,.8,0.),1.5,1.58),
+                         (0.,.93,0.))
+
+    def test_diagonal_posed_neck_tracks_horizontal_position(self):
+        self.assertEqual(collar_follow_center((.1,1.2,-.3),1.5,1.58),
+                         (.1,1.33,-.3))
+
+    def test_animated_camera_rejects_missing_invalid_poses(self):
+        for neck in ((0.,math.nan,0.), (0.,1.0), (math.inf,1.,0.)):
+            with self.subTest(neck=neck), self.assertRaises(ValueError):
+                collar_follow_center(neck,1.5,1.58)
+        with self.assertRaises(ValueError):
+            collar_follow_center((0.,1.,0.),1.5,1.58,-.01)
+
     def test_seven_authentic_motions_and_five_phases(self):
         clips,phases=validated_motion_selection(REQUIRED_CLIPS)
         self.assertEqual(len(clips),7)
