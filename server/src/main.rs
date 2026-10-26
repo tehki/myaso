@@ -757,9 +757,17 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
         let before_jump_stamina: BTreeMap<u32, (u8, f32)> = if flight_action_proof {
-            state.world.fighters().iter().map(|fighter| {
-                (fighter.net_id, (fighter.action.wire_code(), fighter.stamina))
-            }).collect()
+            state
+                .world
+                .fighters()
+                .iter()
+                .map(|fighter| {
+                    (
+                        fighter.net_id,
+                        (fighter.action.wire_code(), fighter.stamina),
+                    )
+                })
+                .collect()
         } else {
             BTreeMap::new()
         };
@@ -2357,13 +2365,23 @@ mod m173_world_jump_spend_proof_tests {
     fn real_original_world_jump_logs_exact_stamina_cost_from_same_tick() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
-        let before = world.fighters().iter()
-            .map(|fighter| (fighter.net_id, (fighter.action.wire_code(), fighter.stamina)))
+        let before = world
+            .fighters()
+            .iter()
+            .map(|fighter| {
+                (
+                    fighter.net_id,
+                    (fighter.action.wire_code(), fighter.stamina),
+                )
+            })
             .collect();
-        assert!(world.set_input(1, InputIntent {
-            jump: true,
-            ..InputIntent::default()
-        }));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                jump: true,
+                ..InputIntent::default()
+            }
+        ));
         world.step_into(&mut Vec::new());
         let rows = m173_original_jump_spend_lines(&world, &before);
         assert_eq!(rows.len(), 1, "exactly one real World Jump spend event");
