@@ -5,13 +5,13 @@
 //! and gesture ID repeat. This is NOT account authentication or same-CharacterId
 //! persistent reconnect: /game still issues ephemeral actor IDs.
 //! This fixture uses the original pinned, loopback-only v2 lab and Rust World.
+use myaso_server::snapshot::decode_snapshot;
 use std::{
     io::{BufRead, BufReader},
     process::{Child, Command, Stdio},
     sync::{mpsc, Arc, Mutex},
     time::{Duration, Instant},
 };
-use myaso_server::snapshot::decode_snapshot;
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
@@ -146,7 +146,10 @@ async fn seat(
             .expect("reliable frame");
         if frame.starts_with(&[2, 2]) {
             let snapshot = decode_snapshot(&frame).expect("actual original World snapshot");
-            assert!(snapshot.full, "new QUIC seat needs a full authoritative baseline");
+            assert!(
+                snapshot.full,
+                "new QUIC seat needs a full authoritative baseline"
+            );
             assert!(
                 snapshot.records.iter().any(|record| record.net_id == expected_actor),
                 "fresh server-owned actor {expected_actor} missing from its own baseline: {snapshot:?}"
