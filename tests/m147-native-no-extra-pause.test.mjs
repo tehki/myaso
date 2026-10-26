@@ -72,10 +72,10 @@ test("M147 zero-hold physical W3C click omits the driver pause tick while ordina
 test("M147 correction KeyA pulses cannot accidentally trigger genuine 240ms R2 Dash", () => {
   const stage = m147.slice(m147.indexOf("await Promise.all(["),
     m147.indexOf("const jumpBefore = baseline.find("));
-  assert.match(stage, /pulseMovementKey\(closerIdle, "a", 260\)/,
+  assert.match(stage, /pulseM147FocusStageKey\(closerIdle, "a", 260\)/,
     "original initial KeyA staging remains real");
   assert.match(stage,
-    /for \(let attempt = 0; attempt < 3[^\n]*\{[\s\S]*?await sleep\(300\);\s*await pulseMovementKey\(closerIdle, "a", 45\);/,
+    /for \(let attempt = 0; attempt < 3[^\n]*\{[\s\S]*?await sleep\(300\);\s*await pulseM147FocusStageKey\(closerIdle, "a", 45\);/,
     "each genuine corrective KeyA tap is separated from the prior KeyA by at least 300ms");
   assert.equal(DASH_DOUBLE_TAP_MS, 240, "original R2 dash interval remains unchanged");
   const accidental = createDirectionalDash();
