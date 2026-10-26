@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { readFileSync } from "node:fs";
 
 // Combat4B/4D source contract: M147 MUST use genuine pre-aimed W3C
@@ -32,4 +33,37 @@ test("M147 genuine recovery cue precedes one pause-free W3C LMB and strict World
   assert.match(m147, /punishDown\.epochMs < recovery\.epochMs/);
   assert.match(m147, /punishDown\.epochMs < recoveryCue\.epochMs/);
   assert.match(m147, /jumpState\.playerHp !== 66/);
+});
+
+test("M147 zero-hold physical W3C click omits the driver pause tick while ordinary holds remain identical", async () => {
+  const begin = flight.indexOf("async function performArenaM221GuardBreakClick(");
+  const end = flight.indexOf("async function setArenaAttackButton(", begin);
+  assert.ok(begin >= 0 && end > begin, "use the actual original native click helper");
+  const calls = [];
+  const webdriver = async (...args) => { calls.push(args); };
+  const click = vm.runInNewContext(
+    flight.slice(begin, end) + "\nperformArenaM221GuardBreakClick;",
+    { webdriver },
+  );
+  const session = { base: "http://localhost:9515", sessionId: "native", name: "firefox" };
+  await click(session, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], "POST");
+  assert.equal(calls[0][2], "/session/native/actions");
+  const actualZero = JSON.parse(JSON.stringify(calls[0][3].actions));
+  assert.deepEqual(actualZero, [{
+    type: "pointer", id: "mouse-firefox", parameters: { pointerType: "mouse" },
+    actions: [
+      { type: "pointerDown", button: 0 },
+      { type: "pointerUp", button: 0 },
+    ],
+  }], "no synthetic event, zero-ms W3C pause tick, second pointer or changed order");
+  await click(session, 10);
+  const ordinary = JSON.parse(JSON.stringify(calls[1][3].actions[0].actions));
+  assert.deepEqual(ordinary, [
+    { type: "pointerDown", button: 0 },
+    { type: "pause", duration: 10 },
+    { type: "pointerUp", button: 0 },
+  ], "normal M221 physical hold remains unchanged");
+  await assert.rejects(click(session, -1), RangeError);
 });

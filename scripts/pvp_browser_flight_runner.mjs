@@ -13188,7 +13188,10 @@ async function performArenaM221GuardBreakClick(session, clickHoldMs = 10) {
       parameters: { pointerType: "mouse" },
       actions: [
         { type: "pointerDown", button: 0 },
-        { type: "pause", duration: clickHoldMs },
+        // M147 only: a zero-duration pause is STILL an extra W3C driver tick.
+        // Deliver genuine physical DOWN/UP back-to-back on the same pointer.
+        // Positive holds elsewhere retain their original native timing.
+        ...(clickHoldMs > 0 ? [{ type: "pause", duration: clickHoldMs }] : []),
         { type: "pointerUp", button: 0 },
       ],
     }],
