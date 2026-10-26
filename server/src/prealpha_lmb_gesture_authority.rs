@@ -228,6 +228,21 @@ impl GestureAuthority {
                     server_elapsed_ms: elapsed,
                 }
             }
+            // A genuine same-lease UPGRADE may arrive after original Light
+            // has already activated (e.g. a busy browser or delayed QUIC).
+            // It is an admitted physical edge but is forever NO-COMBAT:
+            // the authoritative World has already committed to Light.
+            // REJECTED would unnecessarily retire the otherwise healthy
+            // shared browser outbox before its matching physical RELEASE.
+            GestureAction::Upgrade
+                if self.active_id == Some(event.gesture_id)
+                    && source == GestureSource::Lmb
+                    && !self.released
+                    && (self.phase == Phase::LightActive
+                        || (self.phase == Phase::LightWindup && elapsed >= LIGHT_WINDUP_MS)) =>
+            {
+                Command::None
+            }
             GestureAction::Release
                 if self.active_id == Some(event.gesture_id) && !self.released =>
             {
