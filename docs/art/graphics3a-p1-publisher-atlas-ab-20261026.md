@@ -1,6 +1,6 @@
 # Graphics 3A P1 — publisher Dark/Light atlas A/B (2026-10-26)
 
-**Scope:** owner-approved **free Standard** Quaternius Universal Base Characters; private X230i lookdev.  
+**Scope:** owner-approved **free Standard** Quaternius Universal Base Characters; private X230i lookdev.
 **Verdict:** **ROOT CAUSE LOCALIZED / BOTH STOCK ATLAS VARIANTS ART FAIL / RELEASE HARD HOLD**.
 
 ## Original-source question
