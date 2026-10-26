@@ -197,6 +197,18 @@
       "orthoScale": 12.8,
       "intent": "elevated Greyhaven roof-and-facade sprite alignment; front gable foreshortened to match A2.32 Red Lion",
       "liveWorld9CameraChanged": false
+    },
+    "gableInfill": {
+      "treatment": "source-plaster-with-timber-braces",
+      "bottomZ": 3.09,
+      "apexZ": 5.1,
+      "halfWidth": 1.85,
+      "frontFaceY": -2.07,
+      "noRoofSourceMeshEdits": true,
+      "gameplayFootprintUnchanged": true,
+      "duskWindowDoorGlowUnchanged": true,
+      "chimneySmokeUnchanged": true,
+      "visualReviewStillRequired": true
     }
   },
   "output": {
