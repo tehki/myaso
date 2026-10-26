@@ -1,5 +1,6 @@
 import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
 import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
+import { verifyM173WorldJumpSpend } from "./m173-world-stamina-proof.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -3643,6 +3644,8 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   }
 
   const baselineStamina = ready.acceptance.authoritativeStamina;
+  // Only World events after this physical attempt may qualify its jump cost.
+  const worldStaminaProofOffset = m201ServerOutput().length;
   const actionOffset = ready.acceptance.ownActionTransitions.length;
   const staminaOffset = ready.acceptance.staminaTransitions.length;
   const denialOffset = ready.acceptance?.staminaDenialTransitions?.length ?? 0;
@@ -3702,20 +3705,27 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
       minimumIndex = index;
     }
   }
-  const preSpendStamina = minimumIndex > 0 && Number.isFinite(staminaTransitions[minimumIndex - 1]?.stamina)
-    ? staminaTransitions[minimumIndex - 1].stamina
-    : baselineStamina;
-  const expectedAfterJump = preSpendStamina - COMBAT.jump.staminaCost;
-  if (minimumStamina < expectedAfterJump - 1 || minimumStamina > expectedAfterJump + 1) {
-    throw new Error(milestone + " did not spend exactly the ordinary jump cost: "
-      + JSON.stringify({
-        baselineStamina,
-        preSpendStamina,
-        minimumStamina,
-        expectedAfterJump,
-        staminaTransitions,
-      }));
+  // A snapshot taken several World ticks before the chord is not a valid
+  // pre-spend baseline: the server may regenerate stamina in the meantime.
+  // Require exact original-World same-tick before/after proof instead.
+  const worldJumpSpend = verifyM173WorldJumpSpend(
+    m201ServerOutput().slice(worldStaminaProofOffset),
+    ready.acceptance.playerNetId,
+    COMBAT.jump.staminaCost,
+  );
+  const expectedAfterJump = worldJumpSpend.after;
+  if (minimumIndex < 0 || minimumStamina < expectedAfterJump - 1
+      || minimumStamina > expectedAfterJump + 1) {
+    throw new Error(milestone + " replicated stamina disagrees with exact original World cost: "
+      + JSON.stringify({ baselineStamina, worldJumpSpend, minimumStamina, staminaTransitions }));
   }
+  console.log("M173_ORIGINAL_WORLD_JUMP_SPEND_PROOF " + JSON.stringify({
+    actor: ready.acceptance.playerNetId,
+    baselineStamina,
+    worldJumpSpend,
+    minimumStamina,
+    staminaTransitions,
+  }));
 
   const transitions = rejected.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
   const queuedIndex = transitions.findIndex((entry) =>

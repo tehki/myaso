@@ -722,6 +722,31 @@ fn m201_flight_proof_lines(
     lines
 }
 
+// Read-only loopback QA: the state immediately before the actual World step
+// is the only valid baseline for an exact stamina cost. A browser snapshot
+// taken several ticks earlier may omit intervening authoritative regeneration.
+fn m173_original_jump_spend_lines(world: &World, before: &BTreeMap<u32, (u8, f32)>) -> Vec<String> {
+    let mut lines = Vec::new();
+    for fighter in world.fighters() {
+        if fighter.net_id >= FLIGHT_BACKGROUND_NET_ID_BASE {
+            continue;
+        }
+        if let Some(&(before_action, before_stamina)) = before.get(&fighter.net_id) {
+            if before_action == 0 && fighter.action.wire_code() == 15 {
+                lines.push(format!(
+                    "M173_AUTH_JUMP_SPEND tick={} fighter={} before={:.4} after={:.4} cost={:.4}",
+                    world.tick,
+                    fighter.net_id,
+                    before_stamina,
+                    fighter.stamina,
+                    before_stamina - fighter.stamina,
+                ));
+            }
+        }
+    }
+    lines
+}
+
 async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: bool) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -731,6 +756,13 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         interval.tick().await;
         let mut state = game.state.lock().await;
         state.apply_flight_background_motion();
+        let before_jump_stamina: BTreeMap<u32, (u8, f32)> = if flight_action_proof {
+            state.world.fighters().iter().map(|fighter| {
+                (fighter.net_id, (fighter.action.wire_code(), fighter.stamina))
+            }).collect()
+        } else {
+            BTreeMap::new()
+        };
         state.world.step_into(&mut events);
         #[cfg(feature = "experimental-hit-delivery-lab")]
         {
@@ -754,6 +786,9 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
         }
         if flight_action_proof {
             for line in m201_flight_proof_lines(&state.world, &events, &mut previous_actions) {
+                println!("{line}");
+            }
+            for line in m173_original_jump_spend_lines(&state.world, &before_jump_stamina) {
                 println!("{line}");
             }
         }
@@ -2311,6 +2346,30 @@ mod tests {
             4,
             Duration::from_millis(250)
         ));
+    }
+}
+
+#[cfg(test)]
+mod m173_world_jump_spend_proof_tests {
+    use super::*;
+
+    #[test]
+    fn real_original_world_jump_logs_exact_stamina_cost_from_same_tick() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let before = world.fighters().iter()
+            .map(|fighter| (fighter.net_id, (fighter.action.wire_code(), fighter.stamina)))
+            .collect();
+        assert!(world.set_input(1, InputIntent {
+            jump: true,
+            ..InputIntent::default()
+        }));
+        world.step_into(&mut Vec::new());
+        let rows = m173_original_jump_spend_lines(&world, &before);
+        assert_eq!(rows.len(), 1, "exactly one real World Jump spend event");
+        assert!(rows[0].contains("fighter=1 "));
+        assert!(rows[0].contains("before=100.0000 after=86.0000 cost=14.0000"));
+        assert!(m173_original_jump_spend_lines(&world, &BTreeMap::new()).is_empty());
     }
 }
 
