@@ -11320,9 +11320,15 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
   const jumpServerLogOffset = m201ServerOutput().length;
+  // The owner-approved 450ms recovery extends the authoritative timeline.
+  // Sample through the genuine windup, active, full recovery AND returned
+  // idle/nearest focus; the 300ms bound is only W3C+replica observation slack.
+  // Keep every actual World phase/focus/vitals assertion unchanged.
+  const jumpLifecycleObserveMs = COMBAT.jumpAttack.windupMs
+    + COMBAT.jumpAttack.activeMs + COMBAT.jumpAttack.recoveryMs + 300;
   await Promise.all([
     performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
-    sampleUiEvidenceWhileActive(entries, 720, 8),
+    sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 8),
   ]);
 
   let evidence = await Promise.all(entries.map(readUiEvidence));

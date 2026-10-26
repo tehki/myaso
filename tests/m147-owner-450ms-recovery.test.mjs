@@ -3,6 +3,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { COMBAT } from "../src/combat/model.mjs";
 
+test("M143 samples through complete 450ms recovery without relaxing focus assertions", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = runner.indexOf('const milestone = "M143 jump recovery FFA focus"');
+  const end = runner.indexOf('const milestone = "M144 simultaneous recovery', start);
+  const m143 = runner.slice(start, end >= 0 ? end : start + 19000);
+  assert.ok(start >= 0, "M143 original real-browser scenario must exist");
+  assert.match(m143, /const jumpLifecycleObserveMs = COMBAT\.jumpAttack\.windupMs\s*\+ COMBAT\.jumpAttack\.activeMs \+ COMBAT\.jumpAttack\.recoveryMs \+ 300/);
+  assert.match(m143, /nearestReturnIndex <= punishIndex/);
+  assert.match(m143, /recoveryCleared < 0/);
+  assert.doesNotMatch(m143, /sampleUiEvidenceWhileActive\(entries, 720, 8\)/);
+});
+
 test("M147 owner-approved jump recovery is 450ms in JS and original 60Hz Rust World", () => {
   const rust = readFileSync(new URL("../server/src/simulation.rs", import.meta.url), "utf8");
   assert.equal(COMBAT.jumpAttack.recoveryMs, 450);
