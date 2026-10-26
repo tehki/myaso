@@ -4,7 +4,7 @@ OFFLINE P1 ART PROTOTYPE ONLY. No source ZIP/glTF changes, runtime export,
 blood, Combat events, physics, or production/owner GO.
 
 Prerequisite: an already clipped upper head shell. This module fails closed
-unless the entire geometric boundary is EXACTLY one simple planar loop.
+unless every geometric boundary is a validated simple non-overlapping planar loop.
 The cap uses the clipped mesh's own boundary skin influences (not guessed
 rig binding) and projects planar UVs. No sewn body collar or separated
 torso geometry is generated here.
@@ -96,67 +96,99 @@ def geometric_neck_cap(clipped, cut_y, tolerance=1e-5):
     if len(neighbors)<3 or any(len(v)!=2 for v in neighbors.values()):
         raise ValueError("Neck boundary is not one simple manifold loop")
 
-    first=min(neighbors)
-    ordered=[first]
-    previous=None
-    current=first
-    while True:
-        choices=sorted(v for v in neighbors[current] if v!=previous)
-        if not choices:
-            raise ValueError("Open or branching collar ring")
-        next_point=choices[0]
-        if next_point==first:
-            if len(ordered)!=len(neighbors):
-                raise ValueError("Multiple neck loops or premature closure")
-            break
-        if next_point in ordered or len(ordered)>=len(neighbors):
-            raise ValueError("Self-repeating cut ring")
-        ordered.append(next_point)
-        previous,current=current,next_point
+    # The real approved Base Character actually has TWO disjoint cut loops
+    # at this plane: a major neck ring and a tiny independent anterior ring.
+    # Resolve all cycles, rather than silently ignore one and claim closure.
+    loops=[]
+    remaining_vertices=set(neighbors)
+    while remaining_vertices:
+        first=min(remaining_vertices)
+        ring=[first]
+        previous=None
+        current=first
+        while True:
+            choices=sorted(v for v in neighbors[current] if v!=previous)
+            if not choices:
+                raise ValueError("Open or branching original collar ring")
+            next_point=choices[0]
+            if next_point==first:
+                break
+            if next_point not in remaining_vertices or next_point in ring:
+                raise ValueError("Source collar loop repeats vertices or connects loops")
+            ring.append(next_point)
+            previous,current=current,next_point
+        if len(ring)<3 or len(set(ring))!=len(ring):
+            raise ValueError("Degenerate or malformed source cut loop")
+        remaining_vertices.difference_update(ring)
+        area=_signed_area(ring)
+        if area<0:
+            ring.reverse()
+            area=-area
+        if area<1e-8:
+            raise ValueError("Source neck loop area too small to cap safely")
+        n=len(ring)
+        for i in range(n):
+            a,b=ring[i],ring[(i+1)%n]
+            for j in range(i+2,n):
+                if i==0 and j==n-1:continue
+                c,d=ring[j],ring[(j+1)%n]
+                if _segments_cross(a,b,c,d):
+                    raise ValueError("Self-intersecting original source neck ring")
+        loops.append((ring,area))
 
-    # The cap outward normal is -Y, equivalent to CCW in x/z coordinates.
-    area=_signed_area(ordered)
-    if area<0:
-        ordered.reverse()
-        area=-area
-    if area<1e-7:
-        raise ValueError("Neck opening is too small or degenerate")
+    def contains(point,ring):
+        # Standard even-odd projection test. Holes/nested boundaries require
+        # separate art authoring, not blind caps over one another.
+        x,z=point[0],point[2]
+        inside=False
+        for i,p in enumerate(ring):
+            q=ring[(i+1)%len(ring)]
+            if (p[2]>z)!=(q[2]>z) and x<(q[0]-p[0])*(z-p[2])/(q[2]-p[2])+p[0]:
+                inside=not inside
+        return inside
+    for i,(left,_) in enumerate(loops):
+        for right,_ in loops[i+1:]:
+            if contains(left[0],right) or contains(right[0],left):
+                raise ValueError("Nested source neck loops need artist-authored hole geometry")
+            for aidx,a in enumerate(left):
+                b=left[(aidx+1)%len(left)]
+                for cidx,c in enumerate(right):
+                    d=right[(cidx+1)%len(right)]
+                    if _segments_cross(a,b,c,d):
+                        raise ValueError("Overlapping source neck cap loops")
 
-    n=len(ordered)
-    for i in range(n):
-        a,b=ordered[i],ordered[(i+1)%n]
-        for j in range(i+2,n):
-            if i==0 and j==n-1:
-                continue
-            c,d=ordered[j],ordered[(j+1)%n]
-            if _segments_cross(a,b,c,d):
-                raise ValueError("Self-intersecting original neck loop")
-
-    # Triangulate concave planar neck rings via ears; no arbitrary fan that
-    # would potentially cross outside of a nonconvex original neck opening.
-    remaining=list(range(n))
+    ordered=[]
     triangles=[]
-    while len(remaining)>3:
-        found=False
-        for idx in range(len(remaining)):
-            a,b,c=(remaining[(idx-1)%len(remaining)],
-                   remaining[idx],remaining[(idx+1)%len(remaining)])
-            pa,pb,pc=ordered[a],ordered[b],ordered[c]
-            if _cross_2d(pa,pb,pc)<=1e-12:
-                continue
-            if any(_inside_triangle(ordered[k],pa,pb,pc,1e-12)
-                   for k in remaining if k not in (a,b,c)):
-                continue
-            triangles.append((a,b,c))
-            del remaining[idx]
-            found=True
-            break
-        if not found:
-            raise ValueError("Cannot triangulate original neck ring safely")
-    a,b,c=remaining
-    if _cross_2d(ordered[a],ordered[b],ordered[c])<=1e-12:
-        raise ValueError("Degenerate final neck-cap triangle")
-    triangles.append((a,b,c))
+    areas=[]
+    for ring,area in loops:
+        # Ear-clip each disconnected opening independently. The source's
+        # smaller anterior opening is not discarded or fused to the neck.
+        offset=len(ordered)
+        n=len(ring)
+        remaining=list(range(n))
+        while len(remaining)>3:
+            found=False
+            for idx in range(len(remaining)):
+                a,b,c=(remaining[(idx-1)%len(remaining)],
+                       remaining[idx],remaining[(idx+1)%len(remaining)])
+                pa,pb,pc=ring[a],ring[b],ring[c]
+                if _cross_2d(pa,pb,pc)<=1e-12:
+                    continue
+                if any(_inside_triangle(ring[k],pa,pb,pc,1e-12)
+                       for k in remaining if k not in (a,b,c)):
+                    continue
+                triangles.append((offset+a,offset+b,offset+c))
+                del remaining[idx]
+                found=True
+                break
+            if not found:
+                raise ValueError("Cannot triangulate source neck loop without overlaps")
+        a,b,c=remaining
+        if _cross_2d(ring[a],ring[b],ring[c])<=1e-12:
+            raise ValueError("Degenerate final neck-cap triangle")
+        triangles.append((offset+a,offset+b,offset+c))
+        ordered.extend(ring)
+        areas.append(area)
 
     # Cap duplicates positions for a planar material/normal interface. Check
     # every position-split source vertex uses the same skin weights/joints:
@@ -195,8 +227,11 @@ def geometric_neck_cap(clipped, cut_y, tolerance=1e-5):
         "boundary_vertices":n,
         "boundary_edges":len(boundary),
         "cap_triangles":len(triangles),
-        "planar_area_m2":area,
-        "method":"original_boundary_one_loop_ear_clipped_skin_matched_head_cap",
+        "planar_area_m2":sum(areas),
+        "planar_loop_count":len(loops),
+        "planar_loop_vertex_counts":[len(ring) for ring,_ in loops],
+        "planar_loop_areas_m2":areas,
+        "method":"all_original_boundary_loops_independently_ear_clipped_skin_matched_head_caps",
         "status":"OFFLINE_ART_HOLD_NO_BODY_CAP_OR_GAME_EXPORT",
     }
     # Each original cut boundary edge must occur exactly once in cap and
