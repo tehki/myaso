@@ -1,0 +1,64 @@
+name: Combat 4D M147 genuine recovery punishment independent QA (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m147-native-focus-stage.mjs"
+      - "scripts/m147-world-recovery-proof.mjs"
+      - "src/browser/left-button-charge.mjs"
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "tests/m147-world-recovery-proof.test.mjs"
+      - ".github/workflows/combat4d-m147-recovery-punish-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m147-third-party-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uijumppunishffa
+      CANDIDATE_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SOURCE }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pin exact source and preserve strict native and World tests
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SOURCE"
+          git rev-parse HEAD > candidate-source.txt
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m147-world-recovery-proof.test.mjs tests/m147-recovery-feedback-convergence.test.mjs tests/m147-native-focus-stage.test.mjs tests/m147-owner-450ms-recovery.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build the original server-authoritative World (no private features)
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict third-party genuine Firefox Light HIT before 450ms recovery exit
+        run: |
+          set -o pipefail
+          echo "COMBAT4D_M147_SOURCE_SHA=$CANDIDATE_SOURCE"
+          echo "COMBAT4D_M147_NATIVE_TRIAL=${{ matrix.trial }}"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee combat4d-m147-native.log
+      - name: Preserve immutable authentic first-failure and successful traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combat4d-m147-${{ matrix.trial }}-${{ env.CANDIDATE_SOURCE }}
+          path: |
+            candidate-source.txt
+            combat4d-m147-native.log
+          if-no-files-found: warn
