@@ -63,7 +63,7 @@ test("invalid input and audio objects fail closed", () => {
   assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:false}), false);
 });
 
-test("online keyboard is input-only before WebAudio is explicitly enabled", async () => {
+test("online keyboard first-use never triggers AudioContext; original sender is untouched", async () => {
   const { readFileSync } = await import("node:fs");
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   const start = online.indexOf('canvas.addEventListener("keydown"');
@@ -72,18 +72,16 @@ test("online keyboard is input-only before WebAudio is explicitly enabled", asyn
   const keyboard = online.slice(start, end);
   assert.match(keyboard, /keys\.add\(event\.code\)/);
   assert.match(keyboard, /jumpRequested = true/);
-  assert.doesNotMatch(keyboard, /audio\.unlock\(\)/,
-    "first WASD/Space cannot create AudioContext inside the input callback");
-  assert.doesNotMatch(keyboard, /noteKeyboardGesture/,
-    "do not defer an expensive context construction into live combat");
+  assert.doesNotMatch(keyboard, /audio\.unlock\(\)|noteKeyboardGesture/,
+    "first WASD/Space cannot create or queue AudioContext from the input callback");
   assert.match(online, /installGameAudioControls\(audio\)/,
-    "manual trusted audio controls stay available");
+    "deliberate trusted sound controls remain available");
   assert.match(online, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\)/);
-  assert.match(online, /afterSource0Audio\?\.afterOriginalSend\(currentInput\)/,
-    "existing original mouse-first source0 ordering is untouched");
+  assert.doesNotMatch(online, /afterSource0Audio/,
+    "original source0 send must never start WebAudio on a combat timer");
 });
 
-test("mouse-first release still warms sound after genuine original input submission", () => {
+test("standalone dormant after-source0 helper retains legacy deterministic unit behavior", () => {
   const h = harness();
   assert.equal(h.helper.noteRelease("light"), true);
   assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:true}), false);
