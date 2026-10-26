@@ -8,6 +8,7 @@ import { createDormantSharedUi10Sources, attachDormantSharedUi10Sources } from "
 export async function activateLoopbackGestureLab({
   gameClient, canvas, windowObj, documentObj, getClientTick,
   isJumpAttackChord = () => false,
+  enableJumpAttackReview = false,
 } = {}) {
   if (!gameClient || !canvas || !windowObj || !documentObj
       || typeof getClientTick !== "function") {
@@ -111,6 +112,7 @@ export async function activateLoopbackGestureLab({
       // exclusive authoritative JumpAttack route, fail closed rather than
       // inventing a second v1 attack writer or a false World Light.
       isJumpAttackChord,
+      enableJumpAttackReview,
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
@@ -118,7 +120,8 @@ export async function activateLoopbackGestureLab({
     let lastUpgradeScheduledGestureId = null;
     function scheduleSource0Upgrade() {
       if (!gates.lmb.snapshot.active) return;
-      const {pointerId,gestureId} = gates.lmb.snapshot;
+      const {pointerId,gestureId,jump} = gates.lmb.snapshot;
+      if (jump) return; // no Heavy upgrade follows an admitted Space chord
       // PointerEvents (normal LMB) and RMB-held MouseEvents share ONE source0
       // gesture and exactly ONE upgrade timer. Server alone arbitrates 135ms
       // light and 320ms charge; this timer is merely a hold-intent edge.

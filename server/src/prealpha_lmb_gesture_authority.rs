@@ -24,6 +24,7 @@ pub enum Phase {
     HeavyCharging,
     HeavyReady,
     HeavyActive,
+    JumpPending,
     Cancelled,
 }
 
@@ -208,6 +209,22 @@ impl GestureAuthority {
                 self.displaced_held_source = None;
                 Command::None
             }
+            // One authenticated source0 physical Space+LMB DOWN. It is an
+            // admitted *intent*, not an attack or a client-authorized Jump.
+            // Session World adapter waits for an actual 60Hz World Jump.
+            GestureAction::JumpAttack
+                if source == GestureSource::Lmb
+                    && self.phase == Phase::Idle
+                    && event.gesture_id > self.highest_gesture_id =>
+            {
+                self.active_id = Some(event.gesture_id);
+                self.active_source = Some(source);
+                self.highest_gesture_id = event.gesture_id;
+                self.press_ms = server_ms;
+                self.phase = Phase::JumpPending;
+                self.released = false;
+                Command::None
+            }
             GestureAction::Press
                 if self.phase == Phase::Idle && event.gesture_id > self.highest_gesture_id =>
             {
@@ -250,6 +267,10 @@ impl GestureAuthority {
                 if self.active_id == Some(event.gesture_id) && !self.released =>
             {
                 match self.phase {
+                    Phase::JumpPending => {
+                        self.released = true;
+                        Command::None
+                    }
                     Phase::HeavyReady => {
                         self.phase = Phase::HeavyActive;
                         self.released = true;
@@ -292,6 +313,10 @@ impl GestureAuthority {
             GestureAction::Cancel if self.active_id == Some(event.gesture_id) && !self.released => {
                 self.released = true;
                 match self.phase {
+                    Phase::JumpPending => {
+                        self.phase = Phase::Cancelled;
+                        Command::None
+                    }
                     Phase::HeavyCharging | Phase::HeavyReady => {
                         self.phase = Phase::Cancelled;
                         Command::CancelUnlandedLight

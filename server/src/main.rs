@@ -355,6 +355,15 @@ async fn main() -> Result<()> {
     if v2_lab && !bind.ip().is_loopback() {
         bail!("experimental v2 gesture ingress is loopback-only");
     }
+    // An additional review-only gate beyond the old v2 source0 protocol.
+    let jump_review = match env::var("MYASO_EXPERIMENTAL_JUMP_ATTACK_V2").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_EXPERIMENTAL_JUMP_ATTACK_V2 must be 0 or 1"),
+    };
+    if jump_review && (!v2_lab || !bind.ip().is_loopback()) {
+        bail!("JumpAttack extension requires original loopback v2 gesture ingress");
+    }
     // Legacy v1 boot remains unchanged; only the explicit v2 lab requires OS
     // CSPRNG. No entropy failure may accidentally block a disabled v1 game.
     let boot_nonce = if v2_lab { new_server_boot_nonce()? } else { 0 };
@@ -463,7 +472,10 @@ async fn main() -> Result<()> {
                 connection,
                 player_id,
                 lease_epoch,
-                v2_lab,
+                ExperimentalGestureSettings {
+                    v2_lab,
+                    jump_review,
+                },
                 flight_action_proof,
                 flight_m121_input_proof,
                 Arc::clone(&game),
@@ -807,15 +819,25 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
     }
 }
 
+#[derive(Clone, Copy)]
+struct ExperimentalGestureSettings {
+    v2_lab: bool,
+    jump_review: bool,
+}
+
 async fn handle_connection(
     connection: Connection,
     player_id: u32,
     lease_epoch: u64,
-    v2_lab: bool,
+    gesture_settings: ExperimentalGestureSettings,
     flight_action_proof: bool,
     flight_m121_input_proof: bool,
     game: Arc<SharedGame>,
 ) -> Result<()> {
+    let ExperimentalGestureSettings {
+        v2_lab,
+        jump_review,
+    } = gesture_settings;
     let connection = Arc::new(connection);
     let stable_id = connection.stable_id();
     let remote = connection.remote_address();
@@ -1028,7 +1050,7 @@ async fn handle_connection(
                         );
                         if complete && hello == V2_LAB_HELLO && !legacy_combat_seen {
                             let mut state = game.state.lock().await;
-                            if let Some(path) = SessionGestureWorldPath::from_admitted_world(
+                            if let Some(mut path) = SessionGestureWorldPath::from_admitted_world(
                                 &state.world, player_id, lease_epoch, state.boot_nonce
                             ) {
                                 #[cfg(feature = "experimental-hit-delivery-lab")]
@@ -1036,6 +1058,7 @@ async fn handle_connection(
                                     let GameState { world, hit_lab, .. } = &mut *state;
                                     if let Some(lab) = hit_lab { lab.admit(world, player_id, lease_epoch, Arc::clone(&connection))?; }
                                 }
+                                if jump_review { path.enable_jump_review(); }
                                 state.gesture_sessions.insert(lease_epoch, path);
                                 v2_enabled = true;
                                 drop(state);

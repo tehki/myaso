@@ -5,7 +5,7 @@ export const PROPOSED_GESTURE_VERSION = 2;
 export const PROPOSED_GESTURE_BYTES = 16;
 export const PROPOSED_GESTURE_EVENT_TYPE = 0x11;
 export const PROPOSED_GESTURE_ACK_TYPE = 0x12;
-export const GESTURE_ACTION = Object.freeze({ PRESS: 1, UPGRADE: 2, RELEASE: 3, CANCEL: 4 });
+export const GESTURE_ACTION = Object.freeze({ PRESS: 1, UPGRADE: 2, RELEASE: 3, CANCEL: 4, JUMP_ATTACK: 5 });
 export const GESTURE_ACK_STATUS = Object.freeze({ ACCEPTED: 1, DUPLICATE: 2, STALE: 3, REJECTED: 4 });
 
 function asView(bytes) {

@@ -28,6 +28,10 @@ pub struct SessionGestureWorldPath {
     // Physical per-source DOWN survives World Idle or another source's
     // new combat ownership; no action phase may impersonate physical UP.
     held_source_id: [Option<u32>; 2],
+    // Original World tick fences an uncommitted authenticated Space+LMB.
+    // Transport admission is NOT an attack or a grant of jump stamina.
+    pending_jump: Option<(u32, u32)>, // (gesture ID, original World receipt tick)
+    jump_review_enabled: bool,        // separately approved loopback-only server opt-in
 }
 
 impl SessionGestureWorldPath {
@@ -57,7 +61,14 @@ impl SessionGestureWorldPath {
             retired: false,
             last_gesture_id: None,
             held_source_id: [None, None],
+            pending_jump: None,
+            jump_review_enabled: false,
         })
+    }
+
+    /// Does not alter default v2; only owner-controlled loopback server can arm it.
+    pub fn enable_jump_review(&mut self) {
+        self.jump_review_enabled = true;
     }
 
     pub fn binding(&self) -> ServerActorBinding {
@@ -68,6 +79,33 @@ impl SessionGestureWorldPath {
     }
     pub fn retire(&mut self) {
         self.retired = true;
+        self.pending_jump = None;
+    }
+
+    // The original 60Hz World exclusively commits the attack. The queued
+    // authenticated packet cannot make World Jump, supply stamina, or fake a HIT.
+    // The bounded 12 World ticks cover ordinary 30Hz sampled Jump ingress
+    // without permitting an arbitrarily delayed attack on a later jump.
+    fn flush_jump_under_world_lock(&mut self, world: &mut World) {
+        let Some((gesture_id, start_tick)) = self.pending_jump else {
+            return;
+        };
+        if self.last_gesture_id != Some(gesture_id) || world.tick.saturating_sub(start_tick) > 12 {
+            self.pending_jump = None;
+            return;
+        }
+        if world
+            .fighter(self.binding.player_id)
+            .is_some_and(|f| f.action == Action::Jump)
+        {
+            // A failed stamina spend leaves no pending ability to attack a
+            // later jump. Neither ACKs nor duplicate packets retry the action.
+            let _ = world.apply_review_only_lmb_gesture_command(
+                self.binding.player_id,
+                Command::BeginJumpAttack,
+            );
+            self.pending_jump = None;
+        }
     }
 
     fn current(&self, world: &World, lease_epoch: u64, boot_nonce: u128) -> bool {
@@ -98,6 +136,14 @@ impl SessionGestureWorldPath {
         let typed = decode_typed_event(bytes).ok()?;
         let event = typed.event;
         let tick = world.tick;
+        if event.action == GestureAction::JumpAttack && !self.jump_review_enabled {
+            return Some(GestureAck {
+                status: AckStatus::Rejected,
+                sequence: event.sequence,
+                gesture_id: event.gesture_id,
+                server_tick: tick,
+            });
+        }
         // Source1 was historically Key E heavy; owner reserved E for Use.
         // Reject before actor state, replay journal, or original World mutation.
         if typed.source == GestureSource::KeyE {
@@ -128,8 +174,10 @@ impl SessionGestureWorldPath {
             // Reject a fabricated second physical DOWN for the same source,
             // without consuming the valid matching old RELEASE sequence.
             // Unknown/old replay remains governed by the original reducer.
-            if event.action == GestureAction::Press
-                && event.sequence > self.authority.highest_accepted_sequence()
+            if matches!(
+                event.action,
+                GestureAction::Press | GestureAction::JumpAttack
+            ) && event.sequence > self.authority.highest_accepted_sequence()
                 && self.held_source_id[source_index].is_some()
                 && self.held_source_id[source_index] != Some(event.gesture_id)
             {
@@ -142,10 +190,12 @@ impl SessionGestureWorldPath {
             }
             // An earlier one-hit World action must finish before new PRESS.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
-            if event.action == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
-                && world
-                    .fighter(self.binding.player_id)
-                    .is_some_and(|f| f.action == Action::Idle)
+            if matches!(
+                event.action,
+                GestureAction::Press | GestureAction::JumpAttack
+            ) && world
+                .fighter(self.binding.player_id)
+                .is_some_and(|f| f.action == Action::Idle)
             {
                 if let Some(previous) = self.last_gesture_id {
                     if event.gesture_id > previous {
@@ -173,15 +223,29 @@ impl SessionGestureWorldPath {
                         // replace the last actual World attack ID: that ID
                         // remains necessary to retire the reducer only after
                         // the authoritative fighter returns to Idle.
-                        if event.action
-                            == crate::prealpha_lmb_gesture_proposal::GestureAction::Press
-                            && matches!(decision.command, Command::BeginLightWindup)
+                        if (event.action == GestureAction::Press
+                            && matches!(decision.command, Command::BeginLightWindup))
+                            || event.action == GestureAction::JumpAttack
                         {
+                            // A new source0 press retires any expired prior
+                            // chord rather than attacking from two owners.
+                            self.pending_jump = None;
                             self.last_gesture_id = Some(event.gesture_id);
                         }
                         self.authority = proposed;
+                        if event.action == GestureAction::JumpAttack {
+                            self.pending_jump = Some((event.gesture_id, world.tick));
+                            self.flush_jump_under_world_lock(world);
+                        }
+                        if event.action == GestureAction::Cancel
+                            && self
+                                .pending_jump
+                                .is_some_and(|(id, _)| id == event.gesture_id)
+                        {
+                            self.pending_jump = None;
+                        }
                         match event.action {
-                            GestureAction::Press => {
+                            GestureAction::Press | GestureAction::JumpAttack => {
                                 self.held_source_id[source_index] = Some(event.gesture_id);
                             }
                             GestureAction::Release | GestureAction::Cancel
@@ -252,6 +316,7 @@ impl SessionGestureWorldPath {
             }
         }
         self.authority = proposed;
+        self.flush_jump_under_world_lock(world);
     }
 }
 
