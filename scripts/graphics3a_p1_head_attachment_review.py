@@ -11,6 +11,7 @@ os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
 import trimesh, pyrender
 from graphics3a_p1_head_attach_rules import (archive_uri,head_cut_from_mesh_top,remap_joint_indices,choose_head_faces,validate_upper_anchors)
 from graphics3a_p1_neck_seam_qc import neck_collar_proximity
+from graphics3a_p1_neck_surface_qc import collar_surface_proximity
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
@@ -173,6 +174,18 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  collar_diagnostic=neck_collar_proximity(
   head_world_vertices.tolist(),head_part['faces'].tolist(),
   collar_vertices.tolist(),cut_y)
+ collar_faces=[]
+ offset=0
+ for part,mesh_vertices in zip(parts,target_rest_vertices):
+  collar_faces.extend((part['faces']+offset).tolist())
+  offset+=len(mesh_vertices)
+ surface_diagnostic=collar_surface_proximity(
+  head_world_vertices.tolist(),head_part['faces'].tolist(),
+  collar_vertices.tolist(),collar_faces,cut_y)
+ print('NECK_SURFACE_REQUIRES_REVIEW',
+  'triangles',surface_diagnostic['garment_candidate_triangle_count'],
+  'p95_m',round(surface_diagnostic['surface_distance_p95_m'],5),
+  flush=True)
  print('NECK_PROXIMITY_REQUIRES_REVIEW',
   'boundary',collar_diagnostic['sampled_neck_boundary_vertices'],
   'p95_m',round(collar_diagnostic['nearest_garment_vertex_distance_p95_m'],5),
@@ -231,6 +244,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'contact_sheet_sha256':sha256(sheet_path.read_bytes()),
          'view_count':8,
          'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
+         'neck_collar_rest_pose_surface_diagnostic':surface_diagnostic,
          'limitations':'Eight private offline views and unsigned nearest-vertex collar proximity only; no accepted neck seam, game export, Art Director approval, animated seam, ground contact, or native multiplayer validation'}
  (output/'head-attachment-review.json').write_text(json.dumps(result,indent=2)+'\n')
  print('SAVED',sheet_path,'STATUS',result['status'],'SHA256',result['contact_sheet_sha256'],flush=True)
