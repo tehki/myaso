@@ -44,7 +44,14 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   const heldRelease = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
   assert.match(heldRelease, /wheelHeadStartMs: 0/);
   assert.match(heldRelease, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(guardBreak.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
-    "only authentic M151 staging opts into the bounded release window");
+  assert.match(guardBreak, /const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";/);
+  assert.match(guardBreak, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";/);
+  assert.match(guardBreak, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";/);
+  assert.ok(guardBreak.includes("trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0"),
+    "only authentic M152, M151 and M194 staging awaits genuine trusted wheel proof");
+  assert.ok(guardBreak.includes("postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0"),
+    "only authentic M151 and M194 staging opts into the bounded release window");
+  assert.equal((guardBreak.match(/postTrustedWheelMs:/g) ?? []).length, 1,
+    "exactly one scenario-scoped bounded post-wheel delay is permitted");
   assert.match(heldRelease, /receiptGraceMs = 100/);
 });
