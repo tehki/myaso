@@ -187,7 +187,11 @@ def add_authored_gable_infill(imported, spec):
             apex.get("roofSourceMeshUntouched") is not True or
             not 0.010 <= apex.get("shiftFrontFaceTowardCameraMeters", 0) <= 0.020):
         raise ValueError("roof-apex dark-seam closure no longer matches approved infill")
-    if (apex_z >= roof_bounds["z"][1] - 0.35 or
+    hidden_tip_height = apex.get("hiddenTipRoofOverlapZ", None)
+    hidden_tip_forward = apex.get("hiddenTipTowardCameraY", None)
+    if (hidden_tip_height != 0.17 or hidden_tip_forward != 0.035):
+        raise ValueError("unreviewed roof-ridge seam cap geometry")
+    if (apex_z + hidden_tip_height >= roof_bounds["z"][1] - 0.35 or
             x_half > max(abs(roof_bounds["x"][0]), abs(roof_bounds["x"][1]))):
         raise ValueError("gable infill not contained beneath the original source roof bounds")
     plaster = next((m for m in bpy.data.materials if m.name.startswith("MI_Plaster")), None)
@@ -284,9 +288,9 @@ def add_authored_gable_infill(imported, spec):
     depth = 0.09
     verts = [
         (-x_half, front_y, base_z), (x_half, front_y, base_z),
-        (0.0, front_y, apex_z),
+        (0.0, front_y - hidden_tip_forward, apex_z + hidden_tip_height),
         (-x_half, front_y + depth, base_z), (x_half, front_y + depth, base_z),
-        (0.0, front_y + depth, apex_z),
+        (0.0, front_y + depth - hidden_tip_forward, apex_z + hidden_tip_height),
     ]
     faces = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3),
              (1, 2, 5, 4), (2, 0, 3, 5)]
@@ -349,6 +353,9 @@ def add_authored_gable_infill(imported, spec):
              "roofApexSeamExtendedMeters": apex_z - apex["originalApexZ"],
              "faceMovedForwardMeters": apex["shiftFrontFaceTowardCameraMeters"],
              "sourceGableAtlasNodesDisconnected": True,
+             "roofApexHiddenTipRiseMeters": hidden_tip_height,
+             "roofApexHiddenTipForwardMeters": hidden_tip_forward,
+             "roofApexFullHeightMeters": apex_z + hidden_tip_height,
              "realBlender3DPrism": True,
              "newGableMeshName": infill.name,
              "worldVertices": [list(v) for v in verts],
