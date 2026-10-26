@@ -92,3 +92,16 @@ test("mouse-first release still warms sound after genuine original input submiss
   h.run();
   assert.deepEqual(h.events, ["schedule:50", "unlock", "play:light"]);
 });
+
+test("explicit trusted sound enable control is available without any combat gesture", async () => {
+  const { readFileSync } = await import("node:fs");
+  const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  const audio = readFileSync(new URL("../src/browser/game-audio.mjs", import.meta.url), "utf8");
+  const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(html, /<button id="audio-enable" type="button">Enable sound<\/button>/);
+  assert.match(audio, /enable\?\.addEventListener\("click", \(\) => \{\s*audio\.unlock\(\)/);
+  assert.match(audio, /enable\.hidden = audio\.isUnlocked\(\)/);
+  assert.doesNotMatch(online, /afterSource0Audio|audio\.unlock\(\)/,
+    "live keyboard, pointer and source0 writer cannot create AudioContext");
+  assert.match(online, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\)/);
+});
