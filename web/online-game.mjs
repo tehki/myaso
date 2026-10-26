@@ -403,9 +403,10 @@ canvas.addEventListener("keydown", (event) => {
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
   }
-  // Keyboard wins the input race. WebAudio startup is deferred until after
-  // the original network sender transmits this actual movement/jump input.
-  afterSource0Audio.noteKeyboardGesture(event.code, event.repeat);
+  // Input-first: do not start AudioContext inside a live WASD/Space callback,
+  // or schedule its expensive construction into the next combat frame.
+  // Explicit sound controls remain a trusted WebAudio gesture; mouse-release
+  // still has the existing after-source0 fail-soft cue path.
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
