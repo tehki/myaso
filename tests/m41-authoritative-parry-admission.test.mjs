@@ -14,7 +14,8 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.ok(aim >= 0 && dispatch > aim, "real aim completes before concurrent click/cue choreography");
   assert.match(rest, /sendAttack: \(\) => performArenaM221GuardBreakClick\(attacker, 35\)/);
   assert.match(rest, /awaitWorldCue: \(\) => waitForM41WorldWindup\(/);
-  assert.match(rest, /sendWheel: \(\) => setArenaBlock\(defender, defenderElementId, true\)/);
+  assert.match(rest, /sendWheel: \(\) => scenario === "uiparrytell"\s*\? scrollM41ViewportWheel\(defender, defenderViewport\)\s*: setArenaBlock\(defender, defenderElementId, true\)/,
+    "M41 must issue exactly one real W3C viewport wheel after actor-bound cue, while M35 preserves its original native element wheel");
   assert.match(rest, /attacker, 180, attemptAttackerBaseline\.events\.length, attackerReady\.playerNetId/);
   assert.match(helper, /const light = latestText === "Attack committed - your windup is readable\."/,
     "M35 must wait for the genuine light-windup cue");
