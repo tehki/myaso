@@ -55,3 +55,84 @@ def lower_body_with_complementary_cap(positions,normals,uv,joints,weights,faces,
     lower["status"]="OFFLINE_LOWER_BODY_SHELL_NOT_VERIFIED_UNEQUIPPED"
     return {"lower_body":lower,"torso_neck_cap":cap,
             "status":"GEOMETRIC_CLOSED_REST_POSE_ONLY_ART_HOLD"}
+
+def verify_matching_head_torso_caps(head_cap, torso_cap, tolerance=1e-5):
+    """Confirm BOTH original-source caps have matching rest geometry+skinning.
+
+    Pure geometry evidence, not collision/mesh artistic quality nor game GO.
+    """
+    if not isinstance(tolerance,(int,float)) or not math.isfinite(tolerance) or not 0<tolerance<=1e-3:
+        raise ValueError("Invalid paired neck tolerance")
+    if not isinstance(head_cap,dict) or not isinstance(torso_cap,dict):
+        raise ValueError("Two source cap meshes are required")
+    for cap in (head_cap,torso_cap):
+        for item in ("positions","normals","joints","weights","faces"):
+            if item not in cap:
+                raise ValueError("Source cap has missing vertex attributes")
+    if len(head_cap["positions"])!=len(torso_cap["positions"]):
+        raise ValueError("Head and body have different neck cut vertex counts")
+    if not head_cap["positions"]:
+        raise ValueError("Empty neck interface")
+    if len(head_cap["faces"])!=len(torso_cap["faces"]):
+        raise ValueError("Head and torso use different cap triangulation sizes")
+    if head_cap.get("planar_loop_vertex_counts")!=torso_cap.get("planar_loop_vertex_counts"):
+        raise ValueError("Head and torso boundary loops do not match")
+
+    def key(pos):
+        if len(pos)!=3 or not all(math.isfinite(float(v)) for v in pos):
+            raise ValueError("Nonfinite original boundary position")
+        return tuple(round(float(v),6) for v in pos)
+
+    def map_cap(cap):
+        n=len(cap["positions"])
+        if any(len(cap[name])!=n for name in ("normals","joints","weights")):
+            raise ValueError("Incomplete cap source attributes")
+        mapping={}
+        for i,pos in enumerate(cap["positions"]):
+            k=key(pos)
+            if k in mapping:
+                raise ValueError("Ambiguous duplicate original neck position")
+            mapping[k]=i
+        return mapping
+
+    a,b=map_cap(head_cap),map_cap(torso_cap)
+    if set(a)!=set(b):
+        raise ValueError("Head/torso border geometry is not coincident")
+    max_pos=0.
+    max_skin=0.
+    for k in a:
+        i,j=a[k],b[k]
+        p=head_cap["positions"][i];q=torso_cap["positions"][j]
+        diff=max(abs(float(p[n])-float(q[n])) for n in range(3))
+        max_pos=max(max_pos,diff)
+        if diff>tolerance:
+            raise ValueError("Opposing neck caps diverge geometrically")
+
+        infs=[]
+        for cap,n in ((head_cap,i),(torso_cap,j)):
+            inf={}
+            for joint,weight in zip(cap["joints"][n],cap["weights"][n]):
+                if not isinstance(joint,int) or not math.isfinite(float(weight)) or weight<0:
+                    raise ValueError("Invalid neck interface skin influence")
+                inf[joint]=inf.get(joint,0.)+float(weight)
+            if not .999<=sum(inf.values())<=1.001:
+                raise ValueError("Cap skin weights not normalized")
+            infs.append(inf)
+        if any(abs(infs[0].get(joint,0.)-infs[1].get(joint,0.))>tolerance
+               for joint in set(infs[0])|set(infs[1])):
+            raise ValueError("Head and torso cut edge skin weights differ")
+        max_skin=max(max_skin,max(abs(infs[0].get(jt,0.)-infs[1].get(jt,0.))
+                              for jt in set(infs[0])|set(infs[1])))
+
+        na=head_cap["normals"][i];nb=torso_cap["normals"][j]
+        if len(na)!=3 or len(nb)!=3:
+            raise ValueError("Invalid neck cap normals")
+        if abs(float(na[1])+1)>tolerance or abs(float(nb[1])-1)>tolerance:
+            raise ValueError("Head and torso cut normals are not opposite")
+    return {
+        "matching_original_neck_vertices":len(a),
+        "max_border_coordinate_delta_m":max_pos,
+        "max_joint_weight_delta":max_skin,
+        "opposing_cap_normals":True,
+        "status":"SOURCE_REST_INTERFACE_MATCH_ONLY_ART_HOLD",
+    }
