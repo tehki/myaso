@@ -48,6 +48,17 @@ export function createM147InputChronology({
     mark("charge-release-return", { classification });
   }
 
+  function audioStage(stage) {
+    if (!["audio-unlock-enter", "audio-unlock-exit", "audio-play-exit"].includes(stage)) {
+      throw new TypeError("unrecognized read-only audio stage");
+    }
+    mark(stage);
+  }
+
+  function pointerHandlerEnd() {
+    mark("pointerup-handler-end");
+  }
+
   function raf(nowMs) {
     const frameGapMs = previousRafMs === null ? null : nowMs - previousRafMs;
     previousRafMs = nowMs;
@@ -73,5 +84,5 @@ export function createM147InputChronology({
     pendingLight = false;
   }
 
-  return Object.freeze({ events, pointerUp, onLight, releaseInvocation, release, raf, sampled, sendInput });
+  return Object.freeze({ events, pointerUp, onLight, releaseInvocation, release, audioStage, pointerHandlerEnd, raf, sampled, sendInput });
 }

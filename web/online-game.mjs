@@ -315,9 +315,14 @@ function onLeftPointerUp(event) {
   }
   if (committed && !audio.isUnlocked()) {
     // Audio startup follows native pointer release, not attack classification.
+    // M147 loopback-only chronology isolates any synchronous audio cost.
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.audioStage("audio-unlock-enter");
     audio.unlock();
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.audioStage("audio-unlock-exit");
     audio.play(committed === "heavy" ? "heavy" : "light");
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.audioStage("audio-play-exit");
   }
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerHandlerEnd();
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 // W3C Pointer Events fire pointerdown/up only on transitions between zero

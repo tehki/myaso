@@ -47,3 +47,28 @@ test("bounded frames expose stalls without inventing input", () => {
   assert.equal(p.events.at(-1).clientTick, 12);
   assert.throws(() => createM147InputChronology({maxEvents:257}), RangeError);
 });
+
+
+test("audio stage chronology distinguishes synchronous release work from RAF starvation", () => {
+  let t = 100;
+  const p = createM147InputChronology({ clock: () => t, epoch: () => 1000 + t });
+  p.pointerUp({ isTrusted: true, pointerId: 3, timeStamp: 99 });
+  p.releaseInvocation();
+  p.onLight();
+  p.release("light");
+  t = 103;
+  p.audioStage("audio-unlock-enter");
+  t = 205;
+  p.audioStage("audio-unlock-exit");
+  p.audioStage("audio-play-exit");
+  p.pointerHandlerEnd();
+  t = 207;
+  p.raf(207);
+  p.sampled({ attack: true, heavyAttack: false }, 8);
+  p.sendInput({ attack: true, heavyAttack: false }, 4);
+  const find = stage => p.events.find(row => row.stage === stage);
+  assert.equal(find("audio-unlock-exit").perfMs - find("audio-unlock-enter").perfMs, 102);
+  assert.equal(find("pointerup-handler-end").perfMs, 205);
+  assert.equal(find("original-sendInput-invocation").clientTick, 4);
+  assert.throws(() => p.audioStage("packet-inject"), TypeError);
+});
