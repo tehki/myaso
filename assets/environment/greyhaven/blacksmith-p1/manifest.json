@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "title": "Graphics 3B P1 — Greyhaven Blacksmith original Blender art, source-only",
+  "title": "Graphics 3B P1 — owner correction: real Blacksmith doors, windows, forge-yard layout, closed gables",
   "license": "CC0-1.0",
   "sourceMirror": "J-Ponzo/gltf-medieval-village-megakit",
   "sourceCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
@@ -19,16 +19,16 @@
   "camera": {
     "kind": "ORTHO",
     "position": [
-      5,
-      -12,
-      17
+      6,
+      -14,
+      18
     ],
     "target": [
       0,
-      -1.1,
-      2.5
+      -1.9,
+      2.45
     ],
-    "orthoScale": 15.5,
+    "orthoScale": 18,
     "originalRuntimeCameraUnchanged": true
   },
   "modelSelection": [
@@ -40,7 +40,9 @@
     "DoorFrame_Round_WoodDark",
     "Window_Wide_Round1",
     "Prop_Chimney",
-    "Prop_Crate"
+    "Prop_Crate",
+    "Door_1_Round",
+    "WindowShutters_Wide_Round_Open"
   ],
   "parts": [
     {
@@ -134,10 +136,28 @@
       "yawDeg": 0
     },
     {
+      "model": "Door_1_Round",
+      "at": [
+        -1.513745,
+        -2.06,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
       "model": "Window_Wide_Round1",
       "at": [
         1,
         -2.04,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        1,
+        -2.067,
         0
       ],
       "yawDeg": 0
@@ -154,26 +174,50 @@
     {
       "model": "Prop_Crate",
       "at": [
-        -2.18,
-        -3.52,
+        -3.8,
+        -3.95,
         0
       ],
-      "yawDeg": 15
+      "yawDeg": -15
     }
   ],
   "authoredDetails": {
-    "forgeX": 2.6,
-    "forgeY": -3.52,
-    "anvilX": -0.35,
-    "anvilY": -3.55,
+    "forgeX": 3.45,
+    "forgeY": -4.1,
+    "anvilX": 1.55,
+    "anvilY": -4.09,
     "ashCount": 6,
     "excludeItemsAndEquipmentAuthority": true,
-    "fireCosmeticOnly": true
+    "fireCosmeticOnly": true,
+    "toolbenchX": -2,
+    "toolbenchY": -4.04
   },
   "output": {
     "day": "greyhaven-blacksmith-day.png",
     "dusk": "greyhaven-blacksmith-dusk.png",
     "sourceBlend": "greyhaven-blacksmith-original-source.blend",
     "report": "greyhaven-blacksmith-source-report.json"
+  },
+  "geometryCorrection": {
+    "revision": "blacksmith-blender-geometry-r2",
+    "requestedByOwner": true,
+    "gables": {
+      "sourceOriginalRoof": "Roof_RoundTiles_4x4",
+      "frontFaceY": -2.085,
+      "backFaceY": 2.085,
+      "baseZ": 3.09,
+      "apexZ": 5.26,
+      "hiddenRoofOverlapZ": 0.17,
+      "halfWidth": 1.85,
+      "verifiedOnlyWithActualMeshBounds": true
+    },
+    "minimumForgeRoofAabbClearanceMeters": 0.16,
+    "minimumCrateWorkbenchAabbClearanceMeters": 0.1,
+    "maximumAnvilForgeCenterDistanceMeters": 2.2,
+    "requiresActualSourceDoor": true,
+    "requiresActualSourceWindowShutters": true,
+    "sourceDoorCenterAdjustmentMeters": -0.513745,
+    "includesOriginalSourceGlassDuskLighting": true,
+    "worldRuntimeUnchanged": true
   }
 }
