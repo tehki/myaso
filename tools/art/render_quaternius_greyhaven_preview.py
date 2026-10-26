@@ -152,6 +152,113 @@ def apply_blood_iron_review_palette():
     return changed
 
 
+def add_authored_gable_infill(imported, spec):
+    """Physically close the attic aperture under the real CC0 Quaternius roof.
+
+    Keep original CC0 meshes and PBR textures immutable. New geometry is an
+    independent, editable Blender ART assembly using their source materials.
+    """
+    if (spec.get("treatment") != "source-plaster-with-timber-braces"
+            or spec.get("noRoofSourceMeshEdits") is not True
+            or spec.get("gameplayFootprintUnchanged") is not True):
+        raise ValueError("refusing unapproved gable fill/roof source change")
+    roof = imported.get("Roof_RoundTiles_4x4", [])
+    front_window = imported.get("Wall_Plaster_Window_Wide_Round", [])
+    front_door = imported.get("Wall_Plaster_Door_Round", [])
+    if not roof or not front_window or not front_door:
+        raise ValueError("source roof and both genuine Quaternius front walls required")
+    wall_window = mesh_world_bounds(front_window)
+    wall_door = mesh_world_bounds(front_door)
+    roof_bounds = mesh_world_bounds(roof)
+    base_z, apex_z = spec["bottomZ"], spec["apexZ"]
+    x_half, front_y = spec["halfWidth"], spec["frontFaceY"]
+    if not (2.90 <= base_z <= 3.20 and
+            4.80 <= apex_z <= 5.70 and
+            1.70 <= x_half <= 1.98 and
+            -2.13 <= front_y <= -2.01):
+        raise ValueError("gable triangle outside approved original front-wall envelope")
+    if (abs(wall_window["z"][1] - wall_door["z"][1]) > 0.01
+            or abs(base_z - wall_window["z"][1]) > 0.15):
+        raise ValueError("gable base does not meet actual imported original wall crown")
+    if (apex_z >= roof_bounds["z"][1] - 0.35 or
+            x_half > max(abs(roof_bounds["x"][0]), abs(roof_bounds["x"][1]))):
+        raise ValueError("gable infill not contained beneath the original source roof bounds")
+    plaster = next((m for m in bpy.data.materials if m.name.startswith("MI_Plaster")), None)
+    timber = next((m for m in bpy.data.materials if m.name.startswith("MI_WoodTrim")), None)
+    if not plaster or not timber or not plaster.use_nodes or not timber.use_nodes:
+        raise ValueError("original Quaternius plaster and timber PBR materials required")
+    # Make the gable an actual double-sided 3D triangular prism, not a
+    # billboard/image overlay or browser-side disguise of the roof aperture.
+    depth = 0.09
+    verts = [
+        (-x_half, front_y, base_z), (x_half, front_y, base_z),
+        (0.0, front_y, apex_z),
+        (-x_half, front_y + depth, base_z), (x_half, front_y + depth, base_z),
+        (0.0, front_y + depth, apex_z),
+    ]
+    faces = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3),
+             (1, 2, 5, 4), (2, 0, 3, 5)]
+    infill_data = bpy.data.meshes.new("BloodIron_Greyhaven_Gable_SourcePlasterMesh")
+    infill_data.from_pydata(verts, [], faces)
+    infill_data.update()
+    infill_data.materials.append(plaster)
+    infill = bpy.data.objects.new("BloodIron_Greyhaven_RealGablePlaster_ReviewOnly", infill_data)
+    bpy.context.scene.collection.objects.link(infill)
+
+    def timber_brace(name, start, end, thickness):
+        start, end = Vector(start), Vector(end)
+        heading = end - start
+        if heading.length < 0.3:
+            raise ValueError("zero-length timber brace")
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(start + end) * 0.5)
+        obj = bpy.context.object
+        obj.name = name
+        obj.dimensions = (thickness, thickness, heading.length)
+        obj.rotation_euler = heading.to_track_quat("Z", "Y").to_euler()
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        obj.data.materials.append(timber)
+        return obj
+
+    # Deliberately set the narrow weathered timber *inside* the existing
+    # original roof eaves, leaving the roof silhouette and original tiles intact.
+    beam_y = front_y - 0.045
+    beams = [
+        timber_brace("BloodIron_Gable_TimberSill_ReviewOnly",
+                     (-x_half, beam_y, base_z + 0.04),
+                     (x_half, beam_y, base_z + 0.04), 0.12),
+        timber_brace("BloodIron_Gable_TimberLeftRafter_ReviewOnly",
+                     (-x_half + 0.10, beam_y, base_z + 0.08),
+                     (0.0, beam_y, apex_z - 0.12), 0.10),
+        timber_brace("BloodIron_Gable_TimberRightRafter_ReviewOnly",
+                     (x_half - 0.10, beam_y, base_z + 0.08),
+                     (0.0, beam_y, apex_z - 0.12), 0.10),
+        timber_brace("BloodIron_Gable_TimberCenterPost_ReviewOnly",
+                     (0.0, beam_y - 0.005, base_z + 0.10),
+                     (0.0, beam_y - 0.005, apex_z - 0.17), 0.09),
+    ]
+    # A solid building cannot have a zero-area attic fill.
+    area = x_half * 2.0 * (apex_z - base_z) * 0.5
+    if area < 2.0:
+        raise ValueError("gable infill too small to close the roof aperture")
+    proof = {"sourceRoofModel": "Roof_RoundTiles_4x4",
+             "sourceFrontWalls": ["Wall_Plaster_Window_Wide_Round", "Wall_Plaster_Door_Round"],
+             "sourcePlasterPBR": plaster.name, "sourceTimberPBR": timber.name,
+             "realBlender3DPrism": True,
+             "newGableMeshName": infill.name,
+             "worldVertices": [list(v) for v in verts],
+             "frontFaceY": front_y, "bottomZ": base_z,
+             "apexZ": apex_z, "halfWidth": x_half,
+             "gableFaceAreaSquareMeters": area,
+             "timberBraceCount": len(beams),
+             "originalRoofAndWallMeshesUnchanged": True,
+             "unchangedDoorGlassLightingAndSmoke": True,
+             "world9PlacementUnchanged": True,
+             "gameplayCollisionUnchanged": True}
+    print("GRAPHICS3B_QUATERNIUS_REAL_BLENDER_GABLE_INFILL_PASS " +
+          json.dumps(proof, sort_keys=True))
+    return proof
+
+
 def glass_world_bounds(meshes):
     """Locate actual glass polygons in source Quaternius imported meshes."""
     verts = []
@@ -364,6 +471,7 @@ def main():
     print("GRAPHICS3B_ORIGINAL_QUATERNIUS_REAL_DOOR_ALIGNMENT_PASS " +
           json.dumps(door_alignment, sort_keys=True))
     review_roof_materials = apply_blood_iron_review_palette()
+    gable_proof = add_authored_gable_infill(imported, cfg["sample"]["gableInfill"])
     glass_switches, interior_lights, glass_proof = prepare_original_glass_dusk_lighting(imported)
     smoke_objects, smoke_lights, smoke_proof = prepare_chimney_smoke(imported)
     interior_lights.extend(smoke_lights)
@@ -435,6 +543,7 @@ def main():
         "mirrorVerifiedByteIdenticalToOfficialArchive": False,
         "sourceLicense": cfg["source"]["license"],
         "doorFrameAlignment": door_alignment,
+        "gableInfill": gable_proof,
         "sourceTextureFilesOverwritten": False,
         "duskInteriorAndChimney": {
           "actualSourceGlassLighting": glass_proof,
