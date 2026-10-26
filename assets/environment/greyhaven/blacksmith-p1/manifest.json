@@ -183,9 +183,9 @@
   ],
   "authoredDetails": {
     "forgeX": 3.45,
-    "forgeY": -4.1,
+    "forgeY": -4.5,
     "anvilX": 1.55,
-    "anvilY": -4.09,
+    "anvilY": -4.49,
     "ashCount": 6,
     "excludeItemsAndEquipmentAuthority": true,
     "fireCosmeticOnly": true,
@@ -218,6 +218,21 @@
     "requiresActualSourceWindowShutters": true,
     "sourceDoorCenterAdjustmentMeters": -0.513745,
     "includesOriginalSourceGlassDuskLighting": true,
-    "worldRuntimeUnchanged": true
+    "worldRuntimeUnchanged": true,
+    "measuredPreviousSourceRoofBounds": {
+      "x": [
+        -2.756538152694702,
+        2.756538152694702
+      ],
+      "y": [
+        -2.8215668201446533,
+        2.73990797996521
+      ],
+      "z": [
+        2.484281539916992,
+        6.733674049377441
+      ],
+      "provenance": "Native Blender #40400025300 exact-source measured failed r2 collision; r3 positioned beyond actual front eave"
+    }
   }
 }
