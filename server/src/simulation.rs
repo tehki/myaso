@@ -77,6 +77,9 @@ const JUMP_ATTACK_WINDUP_MS: f32 = 105.0;
 const JUMP_ATTACK_ACTIVE_MS: f32 = 105.0;
 // Owner-approved 450ms punishable jump-attack recovery (2026-10-26).
 const JUMP_ATTACK_RECOVERY_MS: f32 = 450.0;
+// 27 x 16.666667ms may accumulate as 449.9998 in f32. Keep the
+// exact 27-tick recovery, without shifting the timing of other actions.
+const JUMP_ATTACK_RECOVERY_ROUNDING_MS: f32 = 0.01;
 const JUMP_ATTACK_REACH: f32 = 48.0;
 const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.24;
 const JUMP_ATTACK_DAMAGE: f32 = 42.0;
@@ -1415,7 +1418,12 @@ fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
         return;
     }
 
-    if fighter.action_elapsed_ms + EPSILON < fighter.action_duration_ms {
+    let completion_epsilon_ms = if fighter.action == Action::JumpAttackRecovery {
+        JUMP_ATTACK_RECOVERY_ROUNDING_MS
+    } else {
+        EPSILON
+    };
+    if fighter.action_elapsed_ms + completion_epsilon_ms < fighter.action_duration_ms {
         return;
     }
 
