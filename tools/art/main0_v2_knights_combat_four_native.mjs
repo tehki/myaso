@@ -13,7 +13,7 @@ import {COMBAT} from "../../src/combat/model.mjs";
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
-assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit","space-guard"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -456,7 +456,10 @@ await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert,readAuthoritativeWorld}=await startOriginalRust(),host=await startStatic();
  const actors=[];
- for(let i=0;i<4;i++){
+ // This single-source0 negative test requires ONE actual browser/actor.
+ // Preserve the full four-seat standard/held/lifecycle/private qualifications.
+ const seatCount=physicalMode==="space-guard"?1:4;
+ for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
@@ -493,7 +496,7 @@ try{
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
   assert.ok(Object.keys(data.knightSources).some(k=>k.startsWith("silver_")&&k.endsWith("_relit.webp")),
     "require actual original Blender relit Silver WebP drawImage calls, not a fallback Combat circle");
-  assert.ok(data.roster.length>=4,`genuine same-server four human roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,privateFailure:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
+  assert.ok(data.roster.length>=seatCount,`genuine admitted native roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,privateFailure:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
   assert.equal(data.canvasWidth,960);assert.equal(data.canvasHeight,540);
   assert.ok(data.floor.centerLuminance>(flag==="1"?38:15));
   assert.ok(data.floor.centerLuminance<(flag==="1"?155:39));
@@ -504,7 +507,7 @@ try{
   await writeFile(join(output,name),bytes);
   trial.push({browser:s.engine,actorId:actor.id,mode:flag==="1"?"lite":"grid",data,screenshot:name,pngSha256:sha(bytes)});
  }
- assert.equal(trial.length,4,"four real native fighter sessions required");
+ assert.equal(trial.length,seatCount,"required real native fighter sessions must all start");
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
 
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
@@ -512,7 +515,133 @@ try{
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
  if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
- }else if(physicalMode==="held-lmb"){
+ }else if(physicalMode==="space-guard"){
+ // Nonrelease real native W3C / original QUIC / original 60Hz Rust World.
+ // This proves ONLY that v2 never misroutes Space+LMB into ordinary Light.
+ // JumpAttack gameplay remains unimplemented until reviewed server authority.
+ const attacker=actors[0].s,actorId=actors[0].actor.id;
+ const page=await evaluate(attacker,String.raw`
+  const c=document.querySelector("#arena");c.scrollIntoView({block:"center"});c.focus();
+  const b=c.getBoundingClientRect(),events=[];
+  for(const type of ["keydown","keyup","pointerdown","pointerup"]){
+   window.addEventListener(type,e=>{
+    if((type.startsWith("pointer")&&e.button!==0) ||
+       (type.startsWith("key")&&e.code!=="Space"))return;
+    events.push({type,trusted:e.isTrusted,code:e.code||null,
+      pointerId:e.pointerId??null,at:performance.now()});
+   },true);
+  }
+  window.__COMBAT4_SPACE_NATIVE_EDGES__=()=>events.map(e=>({...e}));
+  return {focused:document.activeElement===c,
+   x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50)};
+ `);
+ assert(page.focused,"native Space chord requires original focused game canvas");
+ const proof=()=>evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
+ const edges=()=>evaluate(attacker,"return window.__COMBAT4_SPACE_NATIVE_EDGES__?.()??[]");
+ const sendKeys=async(actions)=>request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"key",id:"native-space-chord-keyboard",actions}]
+ });
+ const sendPointer=async(actions)=>request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"pointer",id:"native-space-chord-pointer",parameters:{pointerType:"mouse"},actions}]
+ });
+ const click=async()=>sendPointer([
+  {type:"pointerMove",origin:"viewport",x:page.x,y:page.y,duration:0},
+  {type:"pointerDown",button:0},{type:"pause",duration:30},{type:"pointerUp",button:0}
+ ]);
+ const baseline=await proof();
+ assert.equal(baseline.transportState,"granted","native actor must own real 0x11 lease");
+ const beforeReceipts=baseline.acknowledged.length;
+ const beforeWorld=readAuthoritativeWorld().length;
+ let spaceDown=false;
+ try {
+  await sendKeys([{type:"keyDown",value:" "}]);spaceDown=true;
+  await click();
+  await sleeps(500);
+ } finally {
+  if(spaceDown)await sendKeys([{type:"keyUp",value:" "}]).catch(()=>{});
+ }
+ const afterSpace=await proof();
+ const noLightReceipts=afterSpace.acknowledged.slice(beforeReceipts);
+ const firstWorld=readAuthoritativeWorld().slice(beforeWorld);
+ const witnessed=await edges();
+ assert.deepEqual(witnessed.slice(0,4).map(e=>e.type),
+  ["keydown","pointerdown","pointerup","keyup"],
+  "native W3C must dispatch genuine Space+LMB DOWN/UP, no missing events");
+ assert.ok(witnessed.slice(0,4).every(e=>e.trusted),"native Space events must be trusted");
+ assert.equal(noLightReceipts.filter(e=>e.source===0&&e.action===1).length,0,
+  "Space-held LMB must NOT author ordinary typed Light PRESS");
+ assert.ok(!/M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 .*eventAction=1 status=1/.test(firstWorld),
+  "original World cannot admit a fabricated ordinary LMB Light during Space");
+ assert.ok(!/M201_AUTH_HIT tick=\d+ attacker=1 /.test(firstWorld),
+  "Space-held LMB must not cause original World Light/Heavy damage");
+ assert.equal(afterSpace.failed,false,"Space chord must not retire authenticated v2 QUIC");
+ assert.equal(afterSpace.closed,false,"Space chord keeps original actor connection open");
+ // A previously blocked chord must not poison subsequent ordinary source0.
+ await waitFor(async()=>{
+  const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
+ },8000);
+ const beforeNormal=(await proof()).acknowledged.length;
+ await click();
+ const afterNormal=await waitFor(async()=>{
+  const p=await proof(),later=p.acknowledged.slice(beforeNormal);
+  return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
+ },9000);
+ const normal=afterNormal.acknowledged.slice(beforeNormal);
+ assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
+  "ordinary post-Space LMB still commits one valid pressed/released gesture");
+ assert.equal(afterNormal.failed,false,"normal source0 must not disconnect");
+ // Second genuine W3C order: LMB down BEFORE Space, then actual physical
+ // keydown must send one same-lease CANCEL, never a synthetic RELEASE.
+ // A slow driver may legitimately let early Light contact happen before
+ // cancellation; the original World cannot retroactively erase that HIT.
+ await waitFor(async()=>{
+  const p=await proof();
+  return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
+ },9000);
+ const beforeCancelReceipts=(await proof()).acknowledged.length;
+ const beforeCancelWorld=readAuthoritativeWorld().length;
+ let pointerHeld=false, spaceHeld=false;
+ try{
+  await sendPointer([
+   {type:"pointerMove",origin:"viewport",x:page.x,y:page.y,duration:0},
+   {type:"pointerDown",button:0}
+  ]);pointerHeld=true;
+  await sendKeys([{type:"keyDown",value:" "}]);spaceHeld=true;
+ }finally{
+  if(pointerHeld)await sendPointer([{type:"pointerUp",button:0}]).catch(()=>{});
+  if(spaceHeld)await sendKeys([{type:"keyUp",value:" "}]).catch(()=>{});
+ }
+ const cancelProof=await waitFor(async()=>{
+  const p=await proof(),newReceipts=p.acknowledged.slice(beforeCancelReceipts);
+  return newReceipts.some(e=>e.source===0&&e.action===4&&e.status===1)?p:false;
+ },8000);
+ const cancelled=cancelProof.acknowledged.slice(beforeCancelReceipts);
+ const firstPress=cancelled.filter(e=>e.source===0&&e.action===1&&e.status===1);
+ const terminals=cancelled.filter(e=>e.source===0&&(e.action===3||e.action===4));
+ assert.equal(firstPress.length,1,"one real first-pressed source0 gesture");
+ assert.deepEqual(terminals.map(e=>e.action),[4],
+  "Space after LMB must CANCEL without an extra typed RELEASE");
+ assert.equal(firstPress[0].gestureId,terminals[0].gestureId,
+  "cancel belongs to original authenticated physical LMB gesture");
+ assert.equal(cancelProof.failed,false,"late Space cancel must keep QUIC lease alive");
+ assert.equal(cancelProof.closed,false,"late Space cancel must not disconnect player");
+ const cancelWorld=readAuthoritativeWorld().slice(beforeCancelWorld);
+ const damaging=cancelWorld.split("\n").filter(e=>
+  new RegExp("M201_AUTH_HIT tick=\\d+ attacker="+actorId+" ").test(e));
+ assert.ok(damaging.length<=1,"mid-hold Space may not produce double Light/Heavy World HIT");
+ const evidence={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+  mode:physicalMode,originalFirstPartyPage:true,originalQUIC:true,
+  genuineChromeOrFirefox:true,independentPhysicalHumanHosts:false,
+  physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
+  ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
+  midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
+  nativePhysicalAll:await edges(),
+  before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
+  limitation:"NO actual v2 JumpAttack demonstrated or released"};
+ await writeFile(join(output,"combat4-space-chord-real-native-original-world.json"),
+  JSON.stringify(evidence,null,2)+"\n");
+ console.log("COMBAT4_NATIVE_SPACE_CHORD_NO_FALSE_LIGHT_PASS",JSON.stringify(evidence));
+}else if(physicalMode==="held-lmb"){
   // A separate fresh World preserves the original held-LMB and short-LMB acceptance
   // below. The real game page owns every canonical source0 edge and ACK.
   const attacker=actors[0].s,attackerId=actors[0].actor.id,targetId=actors[1].actor.id;
@@ -913,12 +1042,12 @@ try{
  }));
  }
  const report={physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
-  actualOriginalClient:true,realSeparateNativeBrowserProcesses:4,independentPhysicalHumanHosts:false,
+  actualOriginalClient:true,realSeparateNativeBrowserProcesses:seatCount,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
-  trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
+  trueFourIndependentHumanOperators:false,modeIsOptional:physicalMode==="space-guard",defaultArenaPreserved:true,
   genuineFullCombatApproval:false,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
- console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot)}));
+ console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:trial.map(x=>x.browser),floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot)}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}
