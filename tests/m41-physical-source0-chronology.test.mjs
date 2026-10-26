@@ -57,3 +57,24 @@ test("M41 source observer is scenario-scoped, read-only, and precedes the one or
     "only the original 34-byte v1 packet writer is invoked");
   assert.match(source, /m41PhysicalChronology\?\.reset\(\)/);
 });
+
+test("legacy M33 uiparry records trusted physical wheel and original source0 without changing the sender", () => {
+  // M176 protected quality runs the legacy uiparry path (not uiparrytell).
+  // It must expose the SAME optional read-only provenance when a genuine
+  // short-click parry fails closed with original World damage.
+  const setup = source.slice(source.indexOf("const m41PhysicalChronology ="),
+    source.indexOf("installGameAudioControls(audio);"));
+  assert.match(setup, /acceptanceScenario === "uiparry"/,
+    "physical wheel observer must be active in the original legacy uiparry flight");
+  const recorder = source.slice(source.indexOf("function recordAcceptanceState("),
+    source.indexOf("const acceptance = window.__MYASO_ACCEPTANCE_STATE__", source.indexOf("function recordAcceptanceState(")));
+  assert.match(recorder, /"uiparry"/,
+    "legacy uiparry must publish a bounded acceptance snapshot for native failure logs");
+  const sender = source.slice(source.indexOf("function simulatePrediction("),
+    source.indexOf("function ", source.indexOf("function simulatePrediction(") + 24));
+  assert.match(sender, /const m41InputProbe =[\s\S]*?acceptanceScenario === "uiparry"/,
+    "record only actual block samples that pass through the original writer");
+  assert.ok(sender.indexOf("m41PhysicalChronology?.sendInvocation") < sender.indexOf("networkClient.sendInput("));
+  assert.equal((sender.match(/networkClient\.sendInput\(/g) ?? []).length, 1,
+    "legacy acceptance never installs a second source0 writer");
+});
