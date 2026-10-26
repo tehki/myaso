@@ -44,7 +44,9 @@ jobs:
           assert m["reviewOnly"] and not m["authoritativePlacementApproved"]
           assert not m["gameplayChanges"]
           assert (m["worldReference"]["candidateAuthoredId"],m["worldReference"]["x"],m["worldReference"]["y"])==("smith",3710,3850)
-          assert len(m["parts"])==13
+          assert len(m["parts"])==15
+          assert len(m["modelSelection"])==11
+          assert m["geometryCorrection"]["requestedByOwner"]
           for part in m["parts"]:
               assert part["model"] in m["modelSelection"]
               assert Path("third_party/quaternius/medieval-village-megakit-standard/glTF",part["model"]+".gltf").is_file()
@@ -73,11 +75,22 @@ jobs:
           from pathlib import Path
           r=json.loads(Path(".artifacts/graphics3b-blacksmith/greyhaven-blacksmith-source-report.json").read_text())
           assert r["kind"]=="graphics3b-original-blacksmith-p1-review"
-          assert len(r["genuineOriginalGlTF"])==13
+          assert len(r["genuineOriginalGlTF"])==15
           assert r["realImportedVertexCount"]>100
           assert r["artistAuthoredParts"]["originalAuthoredAnvil"]
           assert r["artistAuthoredParts"]["originalAuthoredForge"]
           assert r["artistAuthoredParts"]["originalAuthoredHammerAndTongs"]
+          assert r["artistAuthoredParts"]["anvilForgeCenterDistanceMeters"]<=2.2
+          fixes=r["ownerRequestedBlenderGeometryFix"]
+          assert fixes["authenticDoorMeshCount"]>0
+          assert fixes["authenticWindowShutterMeshCount"]>0
+          assert fixes["authenticWindowGlassMaterialSlots"]>0
+          assert fixes["realGables"]["doubleSidedTriangleClosure"]
+          assert fixes["actualCollisionFreeGeometry"]["noForgeRoofIntersection"]
+          assert fixes["actualCollisionFreeGeometry"]["noCreatorBoxToolIntersection"]
+          assert fixes["actualCollisionFreeGeometry"]["roofVsForgeClearanceMeters"]>=0.16
+          assert fixes["actualCollisionFreeGeometry"]["crateVsHammerClearanceMeters"]>=0.10
+          assert fixes["actualCollisionFreeGeometry"]["crateVsWorkbenchClearanceMeters"]>=0.10
           assert [x["mood"] for x in r["captured"]]==["day","dusk"]
           assert r["sourceOnly"] and not r["placedInRuntime"]
           assert not r["productionAuthorized"]
