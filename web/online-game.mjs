@@ -387,7 +387,6 @@ canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
   // E is reserved for future Use interaction. Combat never consumes it.
   if (event.code === "KeyE") return;
-  const firstAudioGesture = !audio.isUnlocked();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
@@ -404,9 +403,9 @@ canvas.addEventListener("keydown", (event) => {
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
   }
-  // Keyboard input also wins over the one-time audio unlock.
-  audio.unlock();
-  if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
+  // Keyboard wins the input race. WebAudio startup is deferred until after
+  // the original network sender transmits this actual movement/jump input.
+  afterSource0Audio.noteKeyboardGesture(event.code, event.repeat);
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
