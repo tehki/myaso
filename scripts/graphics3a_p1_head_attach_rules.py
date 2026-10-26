@@ -83,3 +83,22 @@ def allowed_head_mesh_names(mode: str) -> tuple[str, ...]:
     if mode == "head-only":
         return bodies
     raise ValueError("Unknown offline face-component review mode")
+
+def light_base_atlas_member(model_prefix: str, original_texture: str) -> str:
+    """Use ONLY exact alternate textures bundled in the approved Standard ZIP.
+
+    This is a private visual A/B test of publisher Dark vs Light, not
+    inferred recoloring, authoring a new atlas, or runtime asset selection.
+    """
+    marker = "Base Characters/Godot - UE/"
+    if not isinstance(model_prefix, str) or not model_prefix.endswith(marker):
+        raise ValueError("Unexpected publisher Base Character model folder")
+    atlas = {
+        "T_Superhero_Male_Dark.png": "T_Superhero_Male_Ligh.png",
+        "T_Superhero_Female_Dark_BaseColor.png": "T_Superhero_Female_Light_BaseColor.png",
+    }
+    if original_texture not in atlas:
+        raise ValueError("No approved Base Character light atlas mapping for this texture")
+    # Exact original author folder: no caller-derived URL or arbitrary filename.
+    base = model_prefix[:-len(marker)]
+    return base + "Base Characters/Textures/" + atlas[original_texture]
