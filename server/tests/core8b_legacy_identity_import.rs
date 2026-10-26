@@ -349,3 +349,117 @@ fn zero_amount_and_oversized_carried_batches_fail_closed() {
         Err(CarriedImportError::TooManyReferences)
     );
 }
+
+#[test]
+fn full_carried_manifest_rejects_cross_partition_duplicate_item() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_manifest, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let a = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Backpack,
+        amount: 4,
+    };
+    let b = LegacyCarriedStack {
+        owner: legacy(10, 2),
+        slot: CarriedSlot::Equipped(2),
+        ..a
+    };
+    assert_eq!(
+        resolve_carried_manifest(&characters, &items, &[&[a], &[b]]),
+        Err(CarriedImportError::DuplicatePhysicalItem)
+    );
+    assert_eq!(items.len(), 3);
+}
+
+#[test]
+fn full_carried_manifest_rejects_cross_partition_equipment_collision() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_manifest, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let a = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Equipped(1),
+        amount: 1,
+    };
+    let b = LegacyCarriedStack {
+        item: legacy(20, 102),
+        ..a
+    };
+    assert_eq!(
+        resolve_carried_manifest(&characters, &items, &[&[a], &[b]]),
+        Err(CarriedImportError::DuplicateEquipmentSlot)
+    );
+    let other_owner = LegacyCarriedStack {
+        owner: legacy(10, 2),
+        ..b
+    };
+    let accepted = resolve_carried_manifest(&characters, &items, &[&[a], &[other_owner]]).unwrap();
+    assert_eq!(accepted.len(), 2);
+    assert_eq!(
+        accepted[0].item,
+        item(0xBBBB_0000_0000_0000_0000_0000_0000_0001)
+    );
+    assert_eq!(
+        accepted[1].item,
+        item(0xBBBB_0000_0000_0000_0000_0000_0000_0002)
+    );
+}
+
+#[test]
+fn full_manifest_missing_mapping_cannot_publish_first_valid_partition() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_manifest, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let valid = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Backpack,
+        amount: 1,
+    };
+    let orphan = LegacyCarriedStack {
+        owner: legacy(10, 2),
+        item: legacy(20, 999),
+        slot: CarriedSlot::Backpack,
+        amount: 1,
+    };
+    assert_eq!(
+        resolve_carried_manifest(&characters, &items, &[&[valid], &[orphan]]),
+        Err(CarriedImportError::UnmappedItem)
+    );
+    assert_eq!(characters.len(), 2);
+    assert_eq!(items.len(), 3);
+}
+
+#[test]
+fn full_manifest_rejects_too_many_partitions_or_total_entries_before_allocating() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_manifest, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+        MAX_CARRIED_MANIFEST_PARTITIONS, MAX_CARRIED_MANIFEST_ROWS, MAX_CARRIED_REFERENCE_BATCH,
+    };
+    let (characters, items) = fixture_maps();
+    let valid = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Backpack,
+        amount: 1,
+    };
+    let one = [valid];
+    let too_many_partitions = vec![one.as_slice(); MAX_CARRIED_MANIFEST_PARTITIONS + 1];
+    assert_eq!(
+        resolve_carried_manifest(&characters, &items, &too_many_partitions),
+        Err(CarriedImportError::TooManyReferences)
+    );
+    let full = vec![valid; MAX_CARRIED_REFERENCE_BATCH];
+    let enough_partitions: Vec<&[LegacyCarriedStack]> =
+        vec![full.as_slice(); MAX_CARRIED_MANIFEST_ROWS / MAX_CARRIED_REFERENCE_BATCH + 1];
+    assert_eq!(
+        resolve_carried_manifest(&characters, &items, &enough_partitions),
+        Err(CarriedImportError::TooManyReferences)
+    );
+}

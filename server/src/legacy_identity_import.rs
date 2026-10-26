@@ -227,3 +227,53 @@ pub fn resolve_carried_stacks(
     }
     Ok(rows)
 }
+
+/// Maximum number of declared partitions in one carrier-only import snapshot.
+pub const MAX_CARRIED_MANIFEST_PARTITIONS: usize = 64;
+/// Maximum total carried rows in one preflight. Not a live world/item limit.
+pub const MAX_CARRIED_MANIFEST_ROWS: usize = 4096;
+
+/// Additional **read-only** cross-partition check when the caller provides
+/// all carried-item partitions in one authenticated, complete snapshot.
+///
+/// It rejects physical-item duplicates and conflicting equipment slots across
+/// independent partitions, including distinct legacy source namespaces that
+/// resolve to the same canonical owner/item. It returns no rows on failure;
+/// this is NOT a transaction, global durable scan or live authorization.
+/// Corpse/Ground/existing physical-ledger checks remain separately mandatory.
+pub fn resolve_carried_manifest(
+    characters: &CharacterImportMap,
+    items: &ItemImportMap,
+    partitions: &[&[LegacyCarriedStack]],
+) -> Result<Vec<ResolvedCarriedStack>, CarriedImportError> {
+    if partitions.len() > MAX_CARRIED_MANIFEST_PARTITIONS {
+        return Err(CarriedImportError::TooManyReferences);
+    }
+    let mut total = 0usize;
+    for partition in partitions {
+        total = total
+            .checked_add(partition.len())
+            .ok_or(CarriedImportError::TooManyReferences)?;
+        if total > MAX_CARRIED_MANIFEST_ROWS {
+            return Err(CarriedImportError::TooManyReferences);
+        }
+    }
+    let mut all = Vec::with_capacity(total);
+    let mut physical_items = BTreeSet::new();
+    let mut equipped_slots = BTreeSet::new();
+    for partition in partitions {
+        let resolved = resolve_carried_stacks(characters, items, partition)?;
+        for row in resolved {
+            if !physical_items.insert(row.item) {
+                return Err(CarriedImportError::DuplicatePhysicalItem);
+            }
+            if let CarriedSlot::Equipped(slot) = row.slot {
+                if !equipped_slots.insert((row.owner, slot)) {
+                    return Err(CarriedImportError::DuplicateEquipmentSlot);
+                }
+            }
+            all.push(row);
+        }
+    }
+    Ok(all)
+}
