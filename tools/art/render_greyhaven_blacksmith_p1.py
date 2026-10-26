@@ -260,8 +260,8 @@ def forge_and_tools(cfg):
         raise ValueError("Blacksmith asset may never grant equipment, swords or gameplay fire")
     fx, fy = cfg["forgeX"], cfg["forgeY"]
     ax, ay = cfg["anvilX"], cfg["anvilY"]
-    if not (3.20 <= fx <= 3.70 and -4.35 <= fy <= -3.85
-            and 1.35 <= ax <= 1.70 and -4.35 <= ay <= -3.85):
+    if not (3.20 <= fx <= 3.70 and -4.75 <= fy <= -4.30
+            and 1.35 <= ax <= 1.70 and -4.75 <= ay <= -4.30):
         raise ValueError("Blacksmith r2 forge/anvil cannot return beneath original roof")
     separation = math.hypot(fx-ax, fy-ay)
     if separation > 2.2 or separation < 1.50:
@@ -276,8 +276,8 @@ def forge_and_tools(cfg):
 
     # Distinct, physically modeled stone forge, not a flattened painting.
     # The yard and forge do not correspond to an authoritative map coordinate.
-    block("Smith_ForgingYard_StoneApron", (.45, -3.92, -0.10),
-          (9.7, 2.8, .18), stone, .07)
+    block("Smith_ForgingYard_StoneApron", (.45, -4.23, -0.10),
+          (9.7, 3.3, .18), stone, .07)
     for dx, dz, length in [(-0.68, .28, 1.9), (0.68, .28, 1.9),
                            (-0.68, .77, 1.9), (0.68, .77, 1.9)]:
         block("Smith_Forge_ActualStoneCourse", (fx+dx, fy+.30, dz),
