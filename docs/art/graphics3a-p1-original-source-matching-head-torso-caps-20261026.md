@@ -1,8 +1,8 @@
 # Graphics 3A P1 — Original-Source Complementary Head/Torso Neck Geometry
 
-**Date:** 2026-10-26  
-**Scope:** strictly private Quaternius original-source art/engineering; no runtime or Combat changes  
-**Owner criteria:** independent head, interchangeable armor, complete unequipped body  
+**Date:** 2026-10-26
+**Scope:** strictly private Quaternius original-source art/engineering; no runtime or Combat changes
+**Owner criteria:** independent head, interchangeable armor, complete unequipped body
 **Status:** **BOTH REST-GEOMETRY CAPS MATCH / FUNCTIONAL ART & RELEASE HOLD**
 
 ## Actual original-source result on X230i
