@@ -1,0 +1,47 @@
+name: Core 8B real QUIC seat retirement (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/core8b-real-quic-seat-retirement.yml"
+      - "server/tests/core8b_real_quic_session_replacement.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core8b-real-quic-seat-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actor-session-fence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CANDIDATE_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SOURCE }}
+      - name: Verify exact source and strict formatting
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SOURCE"
+          cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Original TLS-pinned QUIC two-seat disconnect / replacement repeat
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3; do
+            echo "CORE8B_REAL_QUIC_SEAT_TRIAL=${attempt} SHA=$CANDIDATE_SOURCE"
+            cargo test --locked --manifest-path server/Cargo.toml \
+              --test core8b_real_quic_session_replacement -- --nocapture 2>&1 \
+              | tee -a core8b-real-quic-seat.log
+          done
+      - name: Preserve exact-head actual original QUIC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8b-real-quic-seat-${{ env.CANDIDATE_SOURCE }}
+          path: core8b-real-quic-seat.log
+          if-no-files-found: warn
