@@ -80,7 +80,7 @@ export function summarizeM41CueTimeout(state, baselineEventCount, expectedActorI
       t: Number.isFinite(transitions[index]?.t) ? transitions[index].t : null,
     };
   });
-  const actorId = Number(state?.online?.match(/player #(\\d+)/)?.[1]);
+  const actorId = Number(state?.online?.match(/player #(\d+)/)?.[1]);
   return {
     timedOut: true,
     expectedActorId,
