@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "title": "Graphics 3B P1 — Greyhaven Blacksmith original Blender art, source-only",
+  "license": "CC0-1.0",
+  "sourceMirror": "J-Ponzo/gltf-medieval-village-megakit",
+  "sourceCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "reviewOnly": true,
+  "authoritativePlacementApproved": false,
+  "gameplayChanges": false,
+  "worldReference": {
+    "mapId": "moonvale-overworld",
+    "candidateAuthoredId": "smith",
+    "x": 3710,
+    "y": 3850,
+    "w": 182,
+    "h": 162,
+    "provenance": "Existing World9 authored-maps.mjs reference only; NOT authorization for replacement, entrance, pickup, collision or portal"
+  },
+  "camera": {
+    "kind": "ORTHO",
+    "position": [
+      5,
+      -12,
+      17
+    ],
+    "target": [
+      0,
+      -1.1,
+      2.5
+    ],
+    "orthoScale": 15.5,
+    "originalRuntimeCameraUnchanged": true
+  },
+  "modelSelection": [
+    "Wall_UnevenBrick_Door_Round",
+    "Wall_UnevenBrick_Window_Wide_Round",
+    "Wall_UnevenBrick_Straight",
+    "Wall_Plaster_WoodGrid",
+    "Roof_RoundTiles_4x4",
+    "DoorFrame_Round_WoodDark",
+    "Window_Wide_Round1",
+    "Prop_Chimney",
+    "Prop_Crate"
+  ],
+  "parts": [
+    {
+      "model": "Wall_UnevenBrick_Door_Round",
+      "at": [
+        -1,
+        -2,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "Wall_UnevenBrick_Window_Wide_Round",
+      "at": [
+        1,
+        -2,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "Wall_UnevenBrick_Straight",
+      "at": [
+        -1,
+        2,
+        0
+      ],
+      "yawDeg": 180
+    },
+    {
+      "model": "Wall_UnevenBrick_Straight",
+      "at": [
+        1,
+        2,
+        0
+      ],
+      "yawDeg": 180
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        -2,
+        -1,
+        0
+      ],
+      "yawDeg": 90
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        -2,
+        1,
+        0
+      ],
+      "yawDeg": 90
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        2,
+        -1,
+        0
+      ],
+      "yawDeg": -90
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        2,
+        1,
+        0
+      ],
+      "yawDeg": -90
+    },
+    {
+      "model": "Roof_RoundTiles_4x4",
+      "at": [
+        0,
+        0,
+        3
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "DoorFrame_Round_WoodDark",
+      "at": [
+        -1,
+        -2.025,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        1,
+        -2.04,
+        0
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "Prop_Chimney",
+      "at": [
+        1.2,
+        0.72,
+        4.05
+      ],
+      "yawDeg": 0
+    },
+    {
+      "model": "Prop_Crate",
+      "at": [
+        -2.18,
+        -3.52,
+        0
+      ],
+      "yawDeg": 15
+    }
+  ],
+  "authoredDetails": {
+    "forgeX": 2.6,
+    "forgeY": -3.52,
+    "anvilX": -0.35,
+    "anvilY": -3.55,
+    "ashCount": 6,
+    "excludeItemsAndEquipmentAuthority": true,
+    "fireCosmeticOnly": true
+  },
+  "output": {
+    "day": "greyhaven-blacksmith-day.png",
+    "dusk": "greyhaven-blacksmith-dusk.png",
+    "sourceBlend": "greyhaven-blacksmith-original-source.blend",
+    "report": "greyhaven-blacksmith-source-report.json"
+  }
+}
