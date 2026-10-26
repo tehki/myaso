@@ -80,6 +80,8 @@ def run():
             or gable.get("gableFineBumpLinked") is not True
             or gable.get("worldPositionWeatheringNoise") != 9.5
             or not 0.14 <= gable.get("roofApexSeamExtendedMeters", 0) <= 0.20
+            or gable.get("roofApexHiddenTipRiseMeters") != 0.17
+            or gable.get("roofApexHiddenTipForwardMeters") != 0.035
             or gable.get("flatRoughnessUnlinked") is not True
             or gable.get("plainGableMaterialName") != "BloodIron_Greyhaven_PlainGablePlaster_ReviewOnly"
             or gable.get("gableFaceAreaSquareMeters", 0) < 2.0
@@ -116,6 +118,8 @@ def run():
         "gableSourceMatchedWeathered": True,
         "gableNoDarkApexAtlasStain": True,
         "gableApexSeamExtendedMeters": gable["roofApexSeamExtendedMeters"],
+        "gableApexHiddenTipRiseMeters": gable["roofApexHiddenTipRiseMeters"],
+        "gableApexHiddenTipForwardMeters": gable["roofApexHiddenTipForwardMeters"],
         "gableWeatheringWorldScale": gable["worldPositionWeatheringNoise"],
         "gableWeatheredDarkRGBA": gable["weatheredDarkRGBA"],
         "gableWeatheredLightRGBA": gable["weatheredLightRGBA"],
