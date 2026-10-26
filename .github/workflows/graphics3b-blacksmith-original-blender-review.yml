@@ -1,0 +1,96 @@
+name: Graphics3B P1 original Blacksmith genuine Blender art review
+
+on:
+  pull_request:
+    paths:
+      - "assets/environment/greyhaven/blacksmith-p1/**"
+      - "tools/art/render_greyhaven_blacksmith_p1.py"
+      - "docs/art/GRAPHICS3B_P1_ORIGINAL_BLACKSMITH_BLENDER.md"
+      - ".github/workflows/graphics3b-blacksmith-original-blender-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  blacksmith-real-source-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: recursive
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify source-only boundaries and exact original Quaternius archive pin
+        run: |
+          set -euo pipefail
+          test "$(git -C third_party/quaternius/medieval-village-megakit-standard rev-parse HEAD)" = 21104b4045261c28fc312360841ed1a7b0ac8782
+          git diff --name-only origin/main...HEAD > /tmp/graphics3b-blacksmith-paths.txt
+          if grep -E '^(server/|src/|web/|tests/|scripts/|assets/world/)' /tmp/graphics3b-blacksmith-paths.txt; then
+            echo "Blacksmith art review may not introduce gameplay or World authority files" >&2
+            exit 1
+          fi
+          node tools/art/verify_quaternius_standard_source.mjs
+          python3 -m py_compile tools/art/render_greyhaven_blacksmith_p1.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("assets/environment/greyhaven/blacksmith-p1/manifest.json").read_text())
+          assert m["sourceCommit"]=="21104b4045261c28fc312360841ed1a7b0ac8782"
+          assert m["reviewOnly"] and not m["authoritativePlacementApproved"]
+          assert not m["gameplayChanges"]
+          assert (m["worldReference"]["candidateAuthoredId"],m["worldReference"]["x"],m["worldReference"]["y"])==("smith",3710,3850)
+          assert len(m["parts"])==13
+          for part in m["parts"]:
+              assert part["model"] in m["modelSelection"]
+              assert Path("third_party/quaternius/medieval-village-megakit-standard/glTF",part["model"]+".gltf").is_file()
+          print("GRAPHICS3B_BLACKSMITH_PINNED_SOURCE_AND_WORLD_BOUNDARY_PASS")
+          PY
+      - name: Install original Blender and review dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender python3-numpy python3-pil
+          blender --version
+      - name: Render genuine source-authored Blacksmith day, dusk and editable scene
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/graphics3b-blacksmith
+          timeout --signal=TERM --kill-after=10s 900s blender --background --threads 2 \
+            --python tools/art/render_greyhaven_blacksmith_p1.py -- \
+            --manifest assets/environment/greyhaven/blacksmith-p1/manifest.json \
+            --source third_party/quaternius/medieval-village-megakit-standard/glTF \
+            --output .artifacts/graphics3b-blacksmith
+          for file in greyhaven-blacksmith-day.png greyhaven-blacksmith-dusk.png \
+                      greyhaven-blacksmith-original-source.blend greyhaven-blacksmith-source-report.json; do
+            test -s ".artifacts/graphics3b-blacksmith/$file"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path(".artifacts/graphics3b-blacksmith/greyhaven-blacksmith-source-report.json").read_text())
+          assert r["kind"]=="graphics3b-original-blacksmith-p1-review"
+          assert len(r["genuineOriginalGlTF"])==13
+          assert r["realImportedVertexCount"]>100
+          assert r["artistAuthoredParts"]["originalAuthoredAnvil"]
+          assert r["artistAuthoredParts"]["originalAuthoredForge"]
+          assert r["artistAuthoredParts"]["originalAuthoredHammerAndTongs"]
+          assert [x["mood"] for x in r["captured"]]==["day","dusk"]
+          assert r["sourceOnly"] and not r["placedInRuntime"]
+          assert not r["productionAuthorized"]
+          print("GRAPHICS3B_BLACKSMITH_ORIGINAL_BLENDER_GEOMETRY_AND_DAY_DUSK_PASS")
+          PY
+          {
+            printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+            sha256sum .artifacts/graphics3b-blacksmith/*
+          } > .artifacts/graphics3b-blacksmith/source-sha256-evidence.txt
+          cat .artifacts/graphics3b-blacksmith/source-sha256-evidence.txt
+      - name: Upload genuine original Blender source and visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-p1-original-blacksmith-native-blender-review
+          path: .artifacts/graphics3b-blacksmith/*
+          retention-days: 7
+          if-no-files-found: ignore
