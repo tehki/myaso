@@ -33,6 +33,7 @@ import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
+import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
@@ -12748,38 +12749,18 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 }
 
 async function performArenaDirectionalLight(session, elementId, strafeKey, xOffset = 200) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
-        type: "key",
-        id: `keyboard-${session.name}`,
-        actions: [
-          { type: "keyDown", value: strafeKey },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "keyUp", value: strafeKey },
-        ],
-      },
-      {
-        type: "pointer",
-        id: `mouse-${session.name}`,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pause", duration: 30 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 150 },
-        ],
-      },
-    ],
+  // Physical 7-tick W3C chord. Aim first, then press strafe and LMB in the
+  // same native tick; keep strafe until after the genuine LMB release. This
+  // prevents driver-induced pre-strike drift without altering World reach.
+  const plan = planM121DirectionalW3cActions({
+    elementId,
+    keyboardId: `keyboard-${session.name}`,
+    pointerId: `mouse-${session.name}`,
+    strafeKey,
+    xOffset,
   });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, plan);
 }
-
 
 async function performArenaRunHold(session, elementId, movementKey, xOffset = 200, holdMs = 900) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
