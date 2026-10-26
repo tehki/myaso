@@ -175,7 +175,39 @@ try{
   key:"Space",before:jumpBefore,after:jumpAfter,draws:jumpAfter-jumpBefore};
  assert.ok(genuineJumpSource.draws>=3,
    "real native Space must paint original Silver Jump source WebP frames");
+ // Original first-party negative wheel is Roll (positive wheel is guard).
+ // Use a real W3C wheel input targeted at the visible original Canvas;
+ // do not synthesize WheelEvent, force fighter action or paint fake art.
  await sleeps(2400);
+ const wheelPoint=await evaluate(motionSession,String.raw`
+const canvas=document.querySelector('#arena'),r=canvas.getBoundingClientRect();
+const left=Math.max(0,r.left),top=Math.max(0,r.top);
+const right=Math.min(innerWidth,r.right),bottom=Math.min(innerHeight,r.bottom);
+if(!canvas||right-left<20||bottom-top<20)return null;
+return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
+`);
+ assert.ok(wheelPoint&&Number.isInteger(wheelPoint.x)&&Number.isInteger(wheelPoint.y),
+   "real original Canvas must be visible for native W3C Roll wheel input");
+ const rollBefore=await evaluate(motionSession,
+   "return window.__arenaLiteNative?.knightSources?.['silver_roll.webp']||0;");
+ assert.ok(Number.isInteger(rollBefore)&&rollBefore>=0);
+ await request(motionSession.base,"POST",motionActionPath,{actions:[{
+  type:"wheel",id:"graphics3c-authentic-roll",actions:[{
+   type:"scroll",origin:"viewport",x:wheelPoint.x,y:wheelPoint.y,
+   deltaX:0,deltaY:-120,duration:0
+  }]
+ }]});
+ const rollAfter=await waitFor(async()=>{
+  const draws=await evaluate(motionSession,
+   "return window.__arenaLiteNative?.knightSources?.['silver_roll.webp']||0;");
+  return Number.isInteger(draws)&&draws-rollBefore>=3?draws:null;
+ },4500);
+ const genuineRollSource={browser:motionSession.engine,actorId:actors[0].actor.id,
+  wheelDeltaY:-120,atlas:"silver_roll.webp",
+  before:rollBefore,after:rollAfter,draws:rollAfter-rollBefore};
+ assert.ok(genuineRollSource.draws>=3,
+   "native negative wheel must render original Silver Roll source atlas");
+ await sleeps(500);
  const trial=[];
  for(const {s,actor,flag} of actors){
   const data=await evaluate(s,stats);
@@ -227,6 +259,7 @@ try{
   genuineW3cSilverLocomotionVerified:true,
   genuineW3cLocomotion:{browser:motionSession.engine,actorId:actors[0].actor.id,key:"KeyD",...genuineMotionSource},
   genuineW3cSilverJumpVerified:true,genuineW3cJump:genuineJumpSource,
+  genuineW3cSilverRollVerified:true,genuineW3cRoll:genuineRollSource,
   allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,optionalTerrainEnabled:false,
@@ -236,6 +269,7 @@ try{
  console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
   genuineW3cLocomotion:report.genuineW3cLocomotion,
   genuineW3cJump:report.genuineW3cJump,
+  genuineW3cRoll:report.genuineW3cRoll,
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
   floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
   presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms)}));

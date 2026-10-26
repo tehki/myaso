@@ -38,6 +38,19 @@ function validate(path,players){
    "Jump report must provide true source-atlas drawImage deltas");
  assert.ok(r.genuineW3cJump.draws>=3,
    "real Space gesture must draw the original Blender Silver Jump atlas");
+ assert.equal(r.genuineW3cSilverRollVerified,true,
+   "real browser-native negative wheel must show original Silver Roll atlas");
+ assert.equal(r.genuineW3cRoll?.browser,engines[0]);
+ assert.equal(r.genuineW3cRoll?.actorId,1);
+ assert.equal(r.genuineW3cRoll?.wheelDeltaY,-120);
+ assert.equal(r.genuineW3cRoll?.atlas,"silver_roll.webp",
+   "original Roll source intentionally uses untouched native WebP, not fabricated relit");
+ for(const key of ["before","after","draws"])
+  assert.ok(Number.isInteger(r.genuineW3cRoll[key])&&r.genuineW3cRoll[key]>=0,
+    "original Roll counts must be authentic nonnegative integers");
+ assert.equal(r.genuineW3cRoll.draws,r.genuineW3cRoll.after-r.genuineW3cRoll.before);
+ assert.ok(r.genuineW3cRoll.draws>=3,
+   "negative wheel must generate new genuine Silver Roll drawImage calls");
  assert.equal(r.allFiveClipsVisuallyValidated,false);
  assert.equal(r.trueFourIndependentHumanOperators,false);
  assert.equal(r.modeIsOptional,false);

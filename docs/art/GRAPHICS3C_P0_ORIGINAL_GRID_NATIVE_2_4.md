@@ -18,6 +18,8 @@ The strict native checker verifies all six original full Canvas PNGs and all six
 
 ## What still needs separate acceptance
 
+The original Roll motion is now independently exercised with a genuine W3C wheel scroll (deltaY=-120) over the visible first-party Canvas. It requires at least three additional original `silver_roll.webp` drawImage calls compared to the pre-gesture baseline, separately in each 2-player and 4-player Rust session. The Roll source atlas deliberately remains unrelit and unmodified. A 2D browser observer does not by itself verify Rust action input timing, 350ms roll duration fidelity, live multi-host responsiveness or all five art motions.
+
 The native source-animation probe additionally sends a genuine first-party W3C `Space` keyDown/pause/keyUp after locomotion settles. It requires at least three new original `silver_jump_relit.webp` drawImage calls **above the pre-gesture count**, in both separately started Rust Worlds. This does not modify authority, imply source-ground shadow pixels are checked by this probe, or qualify all five clips. Grounded-shadow animation retains its independent native 3A QA.
 
 A genuine W3C KeyD keyDown/keyUp now additionally moves actor #1 with the original focused Canvas, and requires at least eight authentic Blender-source relit walk-or-sprint WebP drawImage calls; the report records the actual counts. This verifies one real browser-driven Silver locomotion animation, NOT all five clips or World input-tick causality. No injected DOM keyboard events, fake fighter packets or gameplay source changes are used.
