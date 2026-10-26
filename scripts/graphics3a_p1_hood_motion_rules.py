@@ -51,3 +51,18 @@ def finite_skin_compatible(max_abs_matrix_diff, max_abs_bind_error, max_abs_join
     if max_abs_skinned_vertex_position>100:
         raise ValueError("Animated hood vertex escaped world sanity bounds")
     return True
+
+def collar_follow_center(posed_neck_xyz, rest_neck_y, rest_head_cut_y, clearance=0.05):
+    """Frame the existing collar review at the animated neck, not rest Y.
+
+    The original rest cut anchor remains the same; only the offline camera
+    tracks the actual posed neck. This never modifies game camera/control.
+    """
+    if len(posed_neck_xyz)!=3:
+        raise ValueError("Three-dimensional animated neck joint required")
+    values=tuple(float(x) for x in posed_neck_xyz)
+    if not all(math.isfinite(v) for v in (*values,rest_neck_y,rest_head_cut_y,clearance)):
+        raise ValueError("Nonfinite neck tracking input")
+    if not 0<=clearance<=.5:
+        raise ValueError("Collar lookdev clearance outside permitted bounds")
+    return (values[0], values[1]+float(rest_head_cut_y)+clearance-float(rest_neck_y), values[2])
