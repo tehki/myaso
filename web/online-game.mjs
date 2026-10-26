@@ -202,7 +202,8 @@ const audio = createGameAudio();
 const afterSource0Audio = createAfterSource0Audio({ audio });
 // Acceptance-only physical wheel -> sampled Block -> original v1 invocation.
 const m41PhysicalChronology = acceptanceScenario === "uiparrytell"
-  || acceptanceScenario === "uistun" ? createM41PhysicalInputChronology() : null;
+  || acceptanceScenario === "uistun"
+  || acceptanceScenario === "uiparry" ? createM41PhysicalInputChronology() : null;
 installGameAudioControls(audio);
 const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
@@ -639,7 +640,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrytell", "uistun", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uidirectionallight", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrytell", "uistun", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uidirectionallight", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -1003,7 +1004,8 @@ function simulatePrediction(stepMs) {
     // Combat4A M41/M35: observed real wheel -> actual original v1 BLOCK
     // sample provenance, scoped to native acceptance only. Never forge input.
     const m41InputProbe = acceptanceScenario === "uiparrytell"
-      || acceptanceScenario === "uistun";
+      || acceptanceScenario === "uistun"
+      || acceptanceScenario === "uiparry";
     if (acceptanceScenario === "uimultirecoveryspatial"
       || acceptanceScenario === "uijumprecoveryffa"
       || acceptanceScenario === "uijumppunishffa"
