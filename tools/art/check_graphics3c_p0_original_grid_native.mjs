@@ -61,6 +61,16 @@ function validate(path,players){
  assert.equal(r.presentationClockDebtSampled,true);
  assert.equal(r.browserFrameTimingIsCallbackNotGpu,true);
  assert.equal(r.trials.length,players);
+ const expectedAdvisory={
+  callbackThresholdMs:33,renderDebtThresholdMs:33,
+  callbackOverBudget:r.trials.filter(t=>t.data.frameIntervalP95Ms>33).map(t=>({
+   browser:t.browser,actorId:t.actorId,p95Ms:t.data.frameIntervalP95Ms})),
+  renderDebtOverBudget:r.trials.filter(t=>t.data.presentationDebtP95Ms>33).map(t=>({
+   browser:t.browser,actorId:t.actorId,p95Ms:t.data.presentationDebtP95Ms})),
+  gpuPresentQualified:false,independentPhysicalHosts:false,performanceReleaseGo:false,
+ };
+ assert.deepEqual(r.performanceAdvisory,expectedAdvisory,
+  "genuine callback and render-gap performance holds must not be omitted or overwritten");
  for(let i=0;i<players;i++){
   const t=r.trials[i];
   assert.equal(t.actorId,i+1);
@@ -101,6 +111,17 @@ assert.equal(two.sourceCommit,four.sourceCommit,"different source hashes cannot 
 const checkedOutHead=execFileSync("git",["-C",fileURLToPath(new URL("../../",import.meta.url)),"rev-parse","HEAD"],{encoding:"utf8"}).trim();
 assert.match(checkedOutHead,/^[0-9a-f]{40}$/,"strict native QA requires an actual Git source head");
 assert.equal(two.sourceCommit,checkedOutHead,"native screenshots must be captured from the exact checked-out source SHA");
+// Nonrelease advisory remains a HOLD even when the original graphics evidence is green.
+const observedOverBudget=[
+ ...two.performanceAdvisory.callbackOverBudget.map(x=>({worldSeats:2,metric:"callbackP95",...x})),
+ ...two.performanceAdvisory.renderDebtOverBudget.map(x=>({worldSeats:2,metric:"renderDebtP95",...x})),
+ ...four.performanceAdvisory.callbackOverBudget.map(x=>({worldSeats:4,metric:"callbackP95",...x})),
+ ...four.performanceAdvisory.renderDebtOverBudget.map(x=>({worldSeats:4,metric:"renderDebtP95",...x})),
+];
+console.log("GRAPHICS3C_PERFORMANCE_RELEASE_HOLD "+JSON.stringify({
+ exactHead:checkedOutHead,thresholdMs:33,observedOverBudget,
+ gpuPresentQualified:false,independentPhysicalHosts:false,performanceReleaseGo:false,
+}));
 console.log("GRAPHICS3C_P0_REAL_GRID_FULL_CANVAS_PASS "+JSON.stringify({
  exactHead:two.sourceCommit,sessions:6,worlds:2,engines,realSilver:true,optionalTerrain:false,
  independentHumans:false,gpuPresent:false,presentationClockDebtSampled:true,

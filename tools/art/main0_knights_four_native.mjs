@@ -260,6 +260,16 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
  }
  assert.equal(trial.length,engines.length,"2/4 real native fighter sessions required");
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
+ // Original live browser visual PASS is not a GPU present-frame performance GO.
+ // Preserve observed 2-vsync callback and real source render-gap debt separately.
+ const performanceAdvisory={
+  callbackThresholdMs:33,renderDebtThresholdMs:33,
+  callbackOverBudget:trial.filter(t=>t.data.frameIntervalP95Ms>33).map(t=>({
+   browser:t.browser,actorId:t.actorId,p95Ms:t.data.frameIntervalP95Ms})),
+  renderDebtOverBudget:trial.filter(t=>t.data.presentationDebtP95Ms>33).map(t=>({
+   browser:t.browser,actorId:t.actorId,p95Ms:t.data.presentationDebtP95Ms})),
+  gpuPresentQualified:false,independentPhysicalHosts:false,performanceReleaseGo:false,
+ };
  const report={sourceCommit:process.env.MYASO_KNIGHTS_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:engines.length,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,
@@ -271,7 +281,7 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,optionalTerrainEnabled:false,
   includesGpuPresentLatency:false,presentationClockDebtSampled:true,
-  browserFrameTimingIsCallbackNotGpu:true,trials:trial};
+  browserFrameTimingIsCallbackNotGpu:true,performanceAdvisory,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
  console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
   genuineW3cLocomotion:report.genuineW3cLocomotion,
@@ -279,7 +289,8 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
   genuineW3cRoll:report.genuineW3cRoll,
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
   floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
-  presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms)}));
+  presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms),
+  performanceAdvisory}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}
