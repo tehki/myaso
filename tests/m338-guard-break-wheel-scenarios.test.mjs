@@ -44,8 +44,15 @@ test("M338 connects before guard-break W3C input and preserves genuine wheel pro
   assert.ok(flight.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.match(r2, /receiptGraceMs = 100/);
   assert.match(r2, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(flight.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
-    "only authentic M151 staging opts into the bounded release window");
+  assert.match(flight, /const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";/);
+  assert.match(flight, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";/);
+  assert.match(flight, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";/);
+  assert.ok(flight.includes("trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0"),
+    "only authentic M152, M151 and M194 staging awaits genuine trusted wheel proof");
+  assert.ok(flight.includes("postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0"),
+    "only authentic M151 and M194 staging opts into the bounded release window");
+  assert.equal((flight.match(/postTrustedWheelMs:/g) ?? []).length, 1,
+    "exactly one scenario-scoped bounded post-wheel delay is permitted");
   assert.ok(flight.includes("b.playerGuard < expectedGuards[index]") || flight.includes("defenderResult.playerGuard !== 0"));
   assert.ok(!observer.includes("dispatchEvent("));
 });

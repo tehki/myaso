@@ -80,8 +80,15 @@ test("M325 leaves M194's authoritative guard, HP and parry gates strict", () => 
   assert.match(r2, /wheelHeadStartMs: 0/);
   assert.match(r2, /receiptGraceMs = 100/);
   assert.match(r2, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(flight.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
-    "only authentic M151 staging opts into the bounded release window");
+  assert.match(flight, /const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";/);
+  assert.match(flight, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";/);
+  assert.match(flight, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";/);
+  assert.ok(flight.includes("trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0"),
+    "only authentic M152, M151 and M194 staging awaits genuine trusted wheel proof");
+  assert.ok(flight.includes("postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0"),
+    "only authentic M151 and M194 staging opts into the bounded release window");
+  assert.equal((flight.match(/postTrustedWheelMs:/g) ?? []).length, 1,
+    "exactly one scenario-scoped bounded post-wheel delay is permitted");
   assert.ok(flight.includes("awaitTrustedWheel: () => challenge.wait()"));
   assert.ok(flight.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(flight.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
