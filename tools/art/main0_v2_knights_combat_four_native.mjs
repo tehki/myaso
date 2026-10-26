@@ -9,7 +9,7 @@ import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
-import {hasOriginalWorldActionTransition as worldTransition} from "../../src/combat/original-world-action-trace.mjs";
+import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
@@ -633,18 +633,24 @@ try{
  const journal=readAuthoritativeWorld().slice(start);
  const hits=journal.split("\n").filter(line=>/^M201_AUTH_HIT tick=\d+ attacker=1 target=2 /.test(line));
  assert.deepEqual(hits,[hit.line],"exactly one authoritative 42 HP hit; no double strike");
- const requiredWorldActions=[[0,15],[15,16],[16,17],[17,18]].map(([from,to])=>({
-   from,to,observed:worldTransition(journal,1,from,to)
+ const actualStaminaBefore=own(ready[0],1)?.stamina;
+ const actualStaminaAfter=own(hit.both[0],1)?.stamina;
+ const worldJumpEntry=classifyOriginalWorldJumpAttackEntry(journal,1,{
+  startingStamina:actualStaminaBefore,observedStamina:actualStaminaAfter,
+ });
+ const remainingWorldTransitions=[[16,17],[17,18]].map(([from,to])=>({
+  from,to,observed:worldTransition(journal,1,from,to)
  }));
- if(requiredWorldActions.some(x=>!x.observed)){
-  const evidence={missing:requiredWorldActions.filter(x=>!x.observed),worldJournal:journal,
+ if(!worldJumpEntry||remainingWorldTransitions.some(x=>!x.observed)){
+  const evidence={entryClassification:worldJumpEntry,stamina:{
+    before:actualStaminaBefore,after:actualStaminaAfter},
+   missing:remainingWorldTransitions.filter(x=>!x.observed),worldJournal:journal,
    receipt:hit.added,attackerReplica:hit.both[0],victimReplica:hit.both[1]};
   await writeFile(join(output,"combat4-two-native-action-FIRST-RED.json"),JSON.stringify(evidence,null,2)+"\n");
   console.error("COMBAT4_TWO_NATIVE_ACTION_FIRST_RED",JSON.stringify(evidence));
  }
- assert.ok(worldTransition(journal,1,0,15)&&worldTransition(journal,1,15,16)
-  &&worldTransition(journal,1,16,17)&&worldTransition(journal,1,17,18),
-  "original World Jump→Windup→Active→Recovery required");
+ assert.ok(worldJumpEntry&&remainingWorldTransitions.every(x=>x.observed),
+  "real World Jump→Windup (separate ticks OR authenticated same-observer 0→16), then Active→Recovery required");
  assert.equal(worldTransition(journal,1,0,1),false,
   "no competing ordinary Light attack");
  const physical=await evaluate(attacker,"return window.__COMBAT4_JUMP_TWO_PHYSICAL__?.()??[]");
@@ -660,6 +666,7 @@ try{
   actualActorIds:actors.map(x=>x.actor.id),
   staging:{before:before[0],staged:staged[0],ready:ready[0],range,movementAttempts},
   nativePhysical:physical,typedReceipts:hit.added,authoritativeHit:hit.line,
+  worldJumpEntry,originalWorldStamina:{before:actualStaminaBefore,after:actualStaminaAfter},
   worldJournal:journal,attackerReplica:hit.both[0],victimReplica:hit.both[1],
   limitation:"two genuine browsers one local host; not WAN or two independent humans"};
  await writeFile(join(output,"combat4-two-native-jump-world-hit.json"),
