@@ -6,12 +6,33 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from graphics3a_p1_head_attach_rules import (
-    allowed_head_mesh_names, archive_uri, choose_head_faces, head_cut_from_mesh_top,
+    allowed_head_mesh_names, archive_uri, choose_head_faces, head_cut_from_mesh_top, light_base_atlas_member,
     remap_joint_indices, validate_upper_anchors,
 )
 
 
 class HeadAttachmentRulesTests(unittest.TestCase):
+    def test_publisher_light_skin_atlases_use_fixed_vendor_filenames(self):
+        prefix = "Universal Base Characters[Standard]/Base Characters/Godot - UE/"
+        self.assertEqual(
+            light_base_atlas_member(prefix, "T_Superhero_Male_Dark.png"),
+            "Universal Base Characters[Standard]/Base Characters/Textures/T_Superhero_Male_Ligh.png",
+        )
+        self.assertEqual(
+            light_base_atlas_member(prefix, "T_Superhero_Female_Dark_BaseColor.png"),
+            "Universal Base Characters[Standard]/Base Characters/Textures/T_Superhero_Female_Light_BaseColor.png",
+        )
+
+    def test_light_atlas_cannot_be_requested_for_eyes_or_arbitrary_material(self):
+        prefix = "Universal Base Characters[Standard]/Base Characters/Godot - UE/"
+        for value in ("T_Eye_Brown.png", "../../evil.png", "http://example.invalid/m.png"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                light_base_atlas_member(prefix, value)
+
+    def test_light_atlas_rejects_unknown_archive_prefix(self):
+        with self.assertRaises(ValueError):
+            light_base_atlas_member("../unknown/", "T_Superhero_Male_Dark.png")
+
     def test_original_face_parts_remain_the_default(self):
         self.assertEqual(
             allowed_head_mesh_names("all"),
