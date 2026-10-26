@@ -68,3 +68,18 @@ def validate_upper_anchors(base_points, outfit_points, names, tolerance: float =
             raise ValueError(f"Upper skeleton anchor {name} differs by {distance:.4f}m")
         result[name] = distance
     return result
+
+def allowed_head_mesh_names(mode: str) -> tuple[str, ...]:
+    """Explicit review-only filtering for separate Quaternius face parts.
+
+    The source's entire body/head skin mesh stays present even when eyebrow
+    or eye accessories are isolated. This does not edit or accept game assets.
+    """
+    bodies = ("SuperHero_Male", "Superhero_Female")
+    if mode == "all":
+        return ("Eyebrows", "Eyes", *bodies)
+    if mode == "without-eyebrows":
+        return ("Eyes", *bodies)
+    if mode == "head-only":
+        return bodies
+    raise ValueError("Unknown offline face-component review mode")
