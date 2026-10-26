@@ -34,6 +34,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
@@ -1069,12 +1070,18 @@ async function prepareHeavyCounterplayFlight(
   entries,
   label,
   { attackerName = "chrome", defenderName = "firefox", movementMs = 180,
-    nativeBoundedApproach = false } = {},
+    nativeBoundedApproach = false, m121Direction = null } = {},
 ) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const attacker = entries.find((entry) => entry.name === attackerName);
-  const defender = entries.find((entry) => entry.name === defenderName);
+  // Genuine actor order is authoritative. For M121 alone, bind W3C roles
+  // from the observed player IDs instead of assuming Chrome must be #1.
+  const nativeRoles = m121Direction === null
+    ? null : selectM121NativeRoles(ready, m121Direction);
+  const attacker = entries.find((entry) =>
+    entry.name === (nativeRoles?.attackerName ?? attackerName));
+  const defender = entries.find((entry) =>
+    entry.name === (nativeRoles?.defenderName ?? defenderName));
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
   const defenderReady = ready.find((entry) => entry.browser === defender?.name);
   if (!attacker || !defender || !attackerReady || !defenderReady) {
@@ -1703,19 +1710,29 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
 }
 
 async function runOnlineUiDirectionalLightFlight(entries) {
+  const requestedDirection = process.env.MYASO_M121_DIRECTION ?? "right";
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M121 directional light",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 150,
-      nativeBoundedApproach: true },
+    { movementMs: 150, nativeBoundedApproach: true,
+      m121Direction: requestedDirection },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   // In screen-space coordinates, left of a right-facing fighter is W/up; left
-  // of a left-facing fighter is S/down.
+  // of a left-facing fighter is S/down. Strictly fail if actual observed
+  // server-assigned roles do not match this trial's demanded direction.
   const strafeKey = attackRight ? "w" : "s";
   const strafeCode = attackRight ? "KeyW" : "KeyS";
   const attackOffset = attackRight ? 200 : -200;
+  if (attackRight !== (requestedDirection === "right")
+    || strafeCode !== (requestedDirection === "left" ? "KeyS" : "KeyW")) {
+    throw new Error("M121 native requested direction disagrees with actual actor geometry");
+  }
+  console.log("M121_NATIVE_DIRECTION_REQUIREMENT " + JSON.stringify({
+    requestedDirection, attacker: attacker.name, defender: defender.name,
+    movementCode, strafeCode, attackRight,
+  }));
 
   const { planM121NativeGeometry } = await import("./m121-native-geometry-plan.mjs");
   // The original fixed approach can leave a real 94.15px separation, beyond
