@@ -69,7 +69,13 @@ def run():
             or gable.get("sourceRoofModel") != "Roof_RoundTiles_4x4"
             or gable.get("sourcePlasterPBR", "").startswith("MI_Plaster") is not True
             or gable.get("sourceTimberPBR", "").startswith("MI_WoodTrim") is not True
-            or gable.get("timberBraceCount") != 4
+            or gable.get("timberBraceCount") != 3
+            or gable.get("userRequestedPlainWall") is not True
+            or gable.get("originalSourcePlasterMaterialUnchanged") is not True
+            or gable.get("flatBaseColorUnlinked") is not True
+            or gable.get("flatNormalUnlinked") is not True
+            or gable.get("flatRoughnessUnlinked") is not True
+            or gable.get("plainGableMaterialName") != "BloodIron_Greyhaven_PlainGablePlaster_ReviewOnly"
             or gable.get("gableFaceAreaSquareMeters", 0) < 2.0
             or gable.get("originalRoofAndWallMeshesUnchanged") is not True
             or gable.get("unchangedDoorGlassLightingAndSmoke") is not True
@@ -98,6 +104,10 @@ def run():
         "realSourcePBRGableInfillInBlender": True,
         "gableTimberBraceCount": gable["timberBraceCount"],
         "originalRoofAndWallMeshesUnchanged": True,
+        "gablePlainPlasterNoUVTexture": True,
+        "gableSourcePlasterUnchanged": True,
+        "gableCenterPostRemoved": True,
+        "gablePlainWallRGBA": gable["plainPlasterWallRGBA"],
         "duskWindowAndDoorGlassFromGenuineBlender": True,
         "duskProceduralSmokeFromSourceChimney": True,
         "chimneySmokeAnimatedInGame": False,
