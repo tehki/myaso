@@ -11555,12 +11555,34 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
               && focus === 'PUNISH TARGET #' + victimId && pristine
               ? { ...entry, focusLabel: focus } : null;
           };
+          // Independent original-browser snapshots can arrive 9–22ms
+          // after Firefox first renders recovery. Require SAME real focus,
+          // recovery state and pristine vitals for 30ms; do not fabricate
+          // contact or relax native/World assertions. Fail on timeout.
           let poll;
+          let stableCue = null;
+          let stableSince = null;
           const check = () => {
             const cue = inspect();
-            if (cue || performance.now() - started >= timeoutMs) {
+            const now = performance.now();
+            if (cue) {
+              if (!stableCue || stableCue.epochMs !== cue.epochMs
+                  || stableCue.focusLabel !== cue.focusLabel) {
+                stableCue = cue;
+                stableSince = now;
+              }
+              if (now - stableSince >= 30) {
+                clearInterval(poll);
+                done(cue);
+                return;
+              }
+            } else {
+              stableCue = null;
+              stableSince = null;
+            }
+            if (now - started >= timeoutMs) {
               clearInterval(poll);
-              done(cue ?? null);
+              done(null);
             }
           };
           poll = setInterval(check, 4);
