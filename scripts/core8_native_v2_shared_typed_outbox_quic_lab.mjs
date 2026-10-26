@@ -35,7 +35,7 @@ async function wd(method,path,body) {
   if(!response.ok||result.value?.error) throw Error(method+" "+path+" "+JSON.stringify(result).slice(0,500));
   return result.value;
 }
-function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback) {
+function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropAckSequence,callback) {
   (async()=>{
     const hash=new Uint8Array(pin.match(/../g).map(x=>parseInt(x,16)));
     const wt=new WebTransport(endpoint,{serverCertificateHashes:[{algorithm:"sha-256",value:hash}]});
@@ -110,9 +110,9 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
           // ACK loss means World already admitted original PRESS, but the
           // Core8A sender never saw the receipt. Do not mutate the packet,
           // World, replay cache, browser queue, or forge an ACK.
-          if(dropFirstAck && new DataView(b.buffer,b.byteOffset,b.byteLength)
-            .getUint32(4,true)===1 && lab.droppedAcks.length===0) {
-            lab.droppedAcks.push({sequence:1,status:b[2]});
+          if(dropAckSequence !== 0 && new DataView(b.buffer,b.byteOffset,b.byteLength)
+            .getUint32(4,true)===dropAckSequence && lab.droppedAcks.length===0) {
+            lab.droppedAcks.push({sequence:dropAckSequence,status:b[2]});
             continue;
           }
           const receipt=q.receiveAck(b,token);
@@ -191,7 +191,8 @@ try {
     script:"("+initBrowser.toString()+").apply(null,arguments)",args:[info.url,info.pin,
       "http://127.0.0.1:"+httpPort+"/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
       process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1",
-      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1"],
+      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1" ? 1 :
+        (process.env.CORE8A_LAB_DROP_FIRST_RELEASE_ACK === "1" ? 2 : 0)],
   });
   assert(boot.ok,JSON.stringify(boot));
   // Synchronize the READ-ONLY original Rust 60Hz World flight observer.
@@ -209,7 +210,8 @@ try {
   const heldKeyE = process.env.CORE8A_LAB_STANDALONE_KEYE_HELD === "1";
   if(heldKeyE) {
     assert(process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS !== "1" &&
-      process.env.CORE8A_LAB_DROP_FIRST_ACK !== "1",
+      process.env.CORE8A_LAB_DROP_FIRST_ACK !== "1" &&
+      process.env.CORE8A_LAB_DROP_FIRST_RELEASE_ACK !== "1",
       "standalone E retirement evidence must not mask dropped source0 packets");
     // Native physical KeyE may be observed, but has NO Combat producer.
     await wd("POST",base+"/actions",{actions:[{
@@ -299,7 +301,10 @@ try {
   }]});
   const lossTest=process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1";
   const ackLossTest=process.env.CORE8A_LAB_DROP_FIRST_ACK === "1";
-  assert(!(lossTest && ackLossTest),"loss modes must stay independent");
+  const releaseAckLossTest=process.env.CORE8A_LAB_DROP_FIRST_RELEASE_ACK === "1";
+  const ackLossSequence=ackLossTest ? 1 : releaseAckLossTest ? 2 : 0;
+  assert(Number(lossTest)+Number(ackLossTest)+Number(releaseAckLossTest)<=1,
+    "loss modes must stay independent");
   if(lossTest) {
     // Actual W3C edges have all been placed on the ONE real sender queue.
     // Only seq1 was deliberately lost; seq2 genuine LMB RELEASE reached the
@@ -334,7 +339,7 @@ try {
       });
     }
   }
-  if(ackLossTest) {
+  if(ackLossSequence !== 0) {
     // The Rust server admitted every distinct event and began original World
     // light windup, but the browser withheld its own first ACK from the
     // single authentic queue. All other live ACKs are processed normally.
@@ -346,20 +351,21 @@ try {
       return {...v,ok:v.acks?.length===1&&v.snapshot?.pending===1
         &&v.droppedAcks?.length===1};
     });
-    assert.deepEqual(before.droppedAcks,[{sequence:1,status:1}],
-      "must discard ONLY authentic server ACCEPTED for already-admitted seq1");
-    assert.deepEqual(before.acks.map(x=>x.sequence).sort((a,b)=>a-b),[2]);
+    assert.deepEqual(before.droppedAcks,[{sequence:ackLossSequence,status:1}],
+      "must discard ONLY authentic ACCEPTED for already-admitted edge");
+    assert.deepEqual(before.acks.map(x=>x.sequence).sort((a,b)=>a-b),
+      [ackLossSequence===1 ? 2 : 1]);
     const retry=await wd("POST",base+"/execute/async",{
       script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
       args:[],
     });
-    assert.deepEqual(retry,{sequence:1,gestureId:1,source:0,attempt:2},
-      "the original outbox must retry byte-identical accepted PRESS, never a new World action");
+    assert.deepEqual(retry,{sequence:ackLossSequence,gestureId:1,source:0,attempt:2},
+      "the original outbox must retry the identical accepted edge, never a new World action");
     await poll("actual original server DUPLICATE after ACK loss",async()=>{
       const v=await wd("POST",base+"/execute/sync",{
         script:"return {acks:window.lab.acks,snapshot:window.lab.snapshot};",args:[],
       });
-      return {...v,ok:v.acks?.some(a=>a.sequence===1&&a.status===2)
+      return {...v,ok:v.acks?.some(a=>a.sequence===ackLossSequence&&a.status===2)
         &&v.snapshot?.pending===0};
     });
   }
@@ -369,7 +375,7 @@ try {
       args:[],
     });
     return {...x,ok:x.acks?.length===2 && x.snapshot?.pending===0
-      &&x.acks?.every(a=>a.status===(ackLossTest&&a.sequence===1?2:1))
+      &&x.acks?.every(a=>a.status===(ackLossSequence!==0&&a.sequence===ackLossSequence?2:1))
       &&output.includes("M201_AUTH_ACTION")&&output.includes("fighter=1 from=1 to=2")};
   });
   assert.deepEqual(accepted.events.map(x=>x.name),
@@ -379,10 +385,10 @@ try {
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===1).map(x=>[x.sequence,x.gestureId,x.source,x.action]),
     [[1,1,0,1],[2,1,0,3]]);
   assert.deepEqual(accepted.sent.filter(x=>x.attempt===2).map(x=>x.sequence),
-    lossTest?[1,2]:ackLossTest?[1]:[]);
+    lossTest?[1,2]:ackLossSequence?[ackLossSequence]:[]);
   assert.deepEqual(accepted.acks.map(x=>[x.sequence,x.gestureId,x.source,x.status]).sort((a,b)=>a[0]-b[0]),
-    [[1,1,0,ackLossTest?2:1],[2,1,0,1]]);
-  assert.deepEqual(accepted.droppedAcks,ackLossTest?[{sequence:1,status:1}]:[]);
+    [[1,1,0,ackLossSequence===1?2:1],[2,1,0,ackLossSequence===2?2:1]]);
+  assert.deepEqual(accepted.droppedAcks,ackLossSequence?[{sequence:ackLossSequence,status:1}]:[]);
   assert.equal(accepted.sent.some(edge=>edge.source!==0),false,
     "physical E cannot become a Combat source or consume outbox ordering");
   assert(accepted.acks.every(ack=>ack.source===0),
@@ -400,10 +406,11 @@ try {
     "replayed PRESS and lost ACK may never execute a second authoritative light action");
   assert.equal(accepted.errors.length,0);
   console.log(lossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_LOSS_REPLAY_PASS":
+    releaseAckLossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_RELEASE_ACK_LOSS_DUPLICATE_PASS":
     ackLossTest?"CORE8_NATIVE_ONE_SHARED_OUTBOX_ACK_LOSS_DUPLICATE_PASS":
     "CORE8_NATIVE_ONE_SHARED_OUTBOX_WORLD_PASS",JSON.stringify({
     actualChromeW3C:true,actualQUIC:true,actualCore8AOutbox:true,
-    lossTest,ackLossTest,dropped:accepted.dropped,droppedAcks:accepted.droppedAcks,
+    lossTest,ackLossTest,releaseAckLossTest,dropped:accepted.dropped,droppedAcks:accepted.droppedAcks,
     events:accepted.events.map(x=>x.name),sent:accepted.sent,acks:accepted.acks,
     snapshot:accepted.snapshot,
     worldAction:output.split("\n").find(x=>x.includes("M201_AUTH_ACTION")&&x.includes("fighter=1 from=1 to=2")),
