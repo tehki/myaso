@@ -10,6 +10,7 @@ os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
 import trimesh, pyrender
 from graphics3a_p1_head_attach_rules import (archive_uri,head_cut_from_mesh_top,remap_joint_indices,choose_head_faces,validate_upper_anchors)
+from graphics3a_p1_neck_seam_qc import neck_collar_proximity
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
@@ -160,6 +161,22 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  if cut_y is None: cut_y=head_cut_from_mesh_top(outfit_top)
  head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top)
  if not head: raise ValueError("No safe head meshes qualified")
+ # Diagnostic only: rest-pose cut boundary to actual garment vertices.
+ # Nearest-vertex distance is unsigned and cannot approve a collar seam.
+ body_heads=[part for part in head if part['name'].lower().startswith('superhero_')]
+ if len(body_heads)!=1: raise ValueError("Expected exactly one attached Base Character head/body mesh")
+ head_part=body_heads[0]
+ head_world=target_world[head_part['node']]
+ head_h=np.c_[head_part['positions'],np.ones(len(head_part['positions']))]
+ head_world_vertices=(head_world@head_h.T).T[:,:3]
+ collar_vertices=np.concatenate(target_rest_vertices,axis=0)
+ collar_diagnostic=neck_collar_proximity(
+  head_world_vertices.tolist(),head_part['faces'].tolist(),
+  collar_vertices.tolist(),cut_y)
+ print('NECK_PROXIMITY_REQUIRES_REVIEW',
+  'boundary',collar_diagnostic['sampled_neck_boundary_vertices'],
+  'p95_m',round(collar_diagnostic['nearest_garment_vertex_distance_p95_m'],5),
+  flush=True)
  parts.extend(head)
  # bounds from combined parts in rest pose
  verts=[]
@@ -213,7 +230,8 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'head_meshes':[{'name':part['name'],'vertex_count':len(part['positions']),'face_count':len(part['faces'])} for part in head],
          'contact_sheet_sha256':sha256(sheet_path.read_bytes()),
          'view_count':8,
-         'limitations':'Eight private offline views only; no game export, Art Director acceptance, ground contact, or native multiplayer validation'}
+         'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
+         'limitations':'Eight private offline views and unsigned nearest-vertex collar proximity only; no accepted neck seam, game export, Art Director approval, animated seam, ground contact, or native multiplayer validation'}
  (output/'head-attachment-review.json').write_text(json.dumps(result,indent=2)+'\n')
  print('SAVED',sheet_path,'STATUS',result['status'],'SHA256',result['contact_sheet_sha256'],flush=True)
 
