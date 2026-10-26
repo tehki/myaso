@@ -35,6 +35,10 @@ else try{
     manifest.gablePlainPlasterNoUVTexture!==true||
     manifest.gableSourcePlasterUnchanged!==true||
     manifest.gableCenterPostRemoved!==true||
+    manifest.gableSourceMatchedWeathered!==true||
+    manifest.gableNoDarkApexAtlasStain!==true||
+    !(manifest.gableApexSeamExtendedMeters>=0.14&&manifest.gableApexSeamExtendedMeters<=0.20)||
+    manifest.gableWeatheringWorldScale!==9.5||
     manifest.originalRoofAndWallMeshesUnchanged!==true)
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={},imageInfo={};
