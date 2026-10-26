@@ -25,11 +25,34 @@ A 3D **nearest-vertex** distance is **not** a signed closest-surface distance, a
 
 The helper **always** emits `ART_DIRECTOR_SEAM_INSPECTION_REQUIRED`, and fails closed on missing neck boundary, absent collar geometry, degenerate/nonmanifold cut triangles and nonfinite coordinates.
 
-## Source-data qualification not yet performed
+## Original-source qualification — completed on X230i 2026-10-26
 
-At this checkpoint, the X230i private-assets machine did not respond to a new remote command. Therefore **no new real Male/Female Peasant collar p50/p95 or clearance numbers are claimed**. Prior real-source lookdev images and their verified SHA256 values remain recorded in [Peasant head-attachment evidence](graphics3a-p1-peasant-head-attachment-20261025.md).
+X230i reconnected and both new exact-script source-data runs finished successfully, using the verified publisher free Standard ZIPs and original binary geometry with private reduced-resolution lookdev textures. The original meshes and license/archive proofs are unchanged. The actual sampled pose was **UAL1 `Walk_Loop` at 50% (approximately 0.667 s)**, and the diagnostic measures the **target rest pose**, not a signed gap in the animated pose.
 
-The next genuine qualification is to run the **updated exact-head** offline reviewer with both private original Peasant and Base Character models on X230i, record its per-gender `neck_collar_rest_pose_geometry_diagnostic`, inspect close-up neck seam at cardinal and diagonal facings, and repeat across several real UAL1 animation phases. Do not turn off the guard if it reports invalid or absent geometry. Then obtain Graphics Art Director review.
+| Real-source collar diagnostic (meters) | Male Peasant | Female Peasant |
+|---|---:|---:|
+| Outfit mesh top Y | 1.558654785 | 1.518432975 |
+| Head cut Y (outfit top + 0.02) | 1.578654785 | 1.538432975 |
+| All open head-boundary vertices | 274 | 268 |
+| Boundary vertices sampled near collar | **205** | **199** |
+| Outfit vertices eligible in collar band | 4,195 | 6,266 |
+| Nearest-vertex distance minimum | 0.019887 m | 0.024719 m |
+| Nearest-vertex distance median (p50) | **0.085897 m** | **0.080666 m** |
+| Nearest-vertex distance p95 | **0.110404 m** | **0.118367 m** |
+| Nearest-vertex distance maximum | 0.128442 m | 0.123118 m |
+| Sampled vertices with nearest vertex over 2 cm | 99.02% | 100.00% |
+| Sampled vertices with nearest vertex over 5 cm | 74.15% | 73.37% |
+
+**Interpretation: ART HOLD.** These numbers can indicate poor collar alignment or simply sparse/offset vertex topology; no visible seam size, watertightness, penetration or garment clipping is established from them. Do not relabel p95 as an actual geometric gap. The next qualification must measure nearest **surface** distance and inspect real close-up collar views at multiple clip phases and eight facings. A small vertex distance would also not prove correctness, because meshes can overlap.
+
+Private evidence is in each X230i `private_head_review_outputs/<Male_Peasant|Female_Peasant>/seam_diagnostic_20261026/head-attachment-review.json`, including the exact source-archive hashes and `neck_collar_rest_pose_geometry_diagnostic`.
+
+Both live-source renders emitted eight views and **reproduced the original contact-sheet hashes** from the previous private prototype:
+
+- Male Peasant: `e3897e4addfb5c651631b00e2b7d3cb4fb463e5e227e7077bfc101c1d8bc287c`.
+- Female Peasant: `52db765d080ee610ceeb21ed0ef039303f841cdbb547bd35bc126a7d3d2a0a35`.
+
+The private assets and rendered PNGs remain **outside the repository**. Exactly **10/10** synthetic collar tests passed on Serj; both private source-data render runs exited successfully. This confirms a functioning diagnostic pipeline, **not** an accepted Peasant head seam.
 
 ## Release boundaries
 
