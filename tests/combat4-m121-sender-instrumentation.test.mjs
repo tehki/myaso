@@ -60,4 +60,23 @@ test("M121 observer follows exactly original v1 30Hz movement sender without add
   step(); step();
   assert.equal(sent.length, 3, "original sender cadence is unchanged in v2 lab");
   assert.equal(debug.m121SentSamples.length, before, "v1 M121 probe must be dormant in v2 review");
+  // M147 active read-only probe must be able to observe the SAME original
+  // sender and 30Hz cadence. The isolated M121 VM deliberately omits it
+  // above to guard against undeclared diagnostic dependencies.
+  ctx.reviewedGestureLab = false;
+  const sampled = [];
+  const observedSends = [];
+  ctx.m147InputProbe = {
+    sampled(packet, predictedStep) { sampled.push({ packet: { ...packet }, predictedStep }); },
+    sendInput(packet, tick) { observedSends.push({ packet: { ...packet }, tick }); },
+  };
+  step(); step();
+  assert.deepEqual(sampled.map((event) => event.predictedStep), [7, 8],
+    "M147 active read-only probe observes every original 60Hz prediction");
+  assert.deepEqual(observedSends.map((event) => event.tick), [104],
+    "M147 observes, but must not introduce another 30Hz network writer");
+  assert.equal(sent.length, 4, "both diagnostic modes preserve one original sender");
+  assert.equal(sent.at(-1).tick, observedSends[0].tick);
+  assert.equal(debug.m121SentSamples.length, before + 1,
+    "M121 original v1 sender probe remains observable beside active M147");
 });
