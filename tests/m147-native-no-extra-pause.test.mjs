@@ -65,5 +65,5 @@ test("M147 zero-hold physical W3C click omits the driver pause tick while ordina
     { type: "pause", duration: 10 },
     { type: "pointerUp", button: 0 },
   ], "normal M221 physical hold remains unchanged");
-  await assert.rejects(click(session, -1), RangeError);
+  await assert.rejects(click(session, -1), { name: "RangeError" });
 });
