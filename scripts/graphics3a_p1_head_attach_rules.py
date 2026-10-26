@@ -91,8 +91,10 @@ def light_base_atlas_member(model_prefix: str, original_texture: str) -> str:
     inferred recoloring, authoring a new atlas, or runtime asset selection.
     """
     marker = "Base Characters/Godot - UE/"
-    if not isinstance(model_prefix, str) or not model_prefix.endswith(marker):
-        raise ValueError("Unexpected publisher Base Character model folder")
+    if (not isinstance(model_prefix, str) or not model_prefix.endswith(marker)
+            or model_prefix.startswith("/") or "\\" in model_prefix
+            or ".." in model_prefix.split("/")):
+        raise ValueError("Unexpected or unsafe publisher Base Character model folder")
     atlas = {
         "T_Superhero_Male_Dark.png": "T_Superhero_Male_Ligh.png",
         "T_Superhero_Female_Dark_BaseColor.png": "T_Superhero_Female_Light_BaseColor.png",
