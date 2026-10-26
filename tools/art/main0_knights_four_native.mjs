@@ -76,13 +76,26 @@ async function startStatic(){
 }
 const hook=String.raw`
 const canvas=document.querySelector("#arena");if(!canvas)return false;
-window.__arenaLiteNative={frames:[],drawDurationMs:[],last:null,knightWebPDraws:0,knightSources:{}};
+window.__arenaLiteNative={frames:[],drawDurationMs:[],last:null,knightWebPDraws:0,knightSources:{},
+ networkHudTimeline:[],lastNetworkHudAtMs:-1};
 const proto=CanvasRenderingContext2D.prototype,real=proto.drawImage;
 proto.drawImage=function(...args){
  const isFloorBlit=this.canvas===canvas&&args[0] instanceof HTMLCanvasElement&&args[0].width===960&&args[0].height===540;
  const floorStartMs=isFloorBlit?performance.now():null;
  if(isFloorBlit){
    const obj=window.__arenaLiteNative;const t=performance.now();obj.frames.push(t);if(obj.frames.length>600)obj.frames.shift();
+   // Read-only chronological HUD receipts from the exact original Canvas
+   // draw path, bounded to 64 samples at >=400ms intervals per browser.
+   // The HUD updates independently; this is NOT a synchronized packet trace.
+   if(obj.lastNetworkHudAtMs<0||t-obj.lastNetworkHudAtMs>=400){
+     const rawHud=document.querySelector("#network-diagnostics")?.textContent||"";
+     if(rawHud.includes("Input→ACK p50")&&rawHud.includes("Snapshots p50")
+       &&rawHud.includes("Extra render lag p50")){
+       obj.networkHudTimeline.push({atMs:Math.round(t),frameNumber:obj.frames.length,rawHud});
+       if(obj.networkHudTimeline.length>64)obj.networkHudTimeline.shift();
+       obj.lastNetworkHudAtMs=t;
+     }
+   }
    if(!obj.last){
      const src=args[0],pixels=src.getContext("2d").getImageData(0,0,960,540).data;
      let sum=0,n=0;for(let y=135;y<405;y+=4)for(let x=240;x<720;x+=4){const i=(y*960+x)*4;sum+=pixels[i]*.2126+pixels[i+1]*.7152+pixels[i+2]*.0722;n++}
@@ -116,7 +129,8 @@ knightWebPDraws:x.knightWebPDraws,knightSources:x.knightSources,
 knightsFlag:new URLSearchParams(location.search).get("knights"),knightArt:new URLSearchParams(location.search).get("knightArt"),
 roster:[...document.querySelectorAll("#scoreboard-list li")].map(li=>li.textContent?.trim()||""),
 status:document.querySelector("#event-text")?.textContent||"",innerWidth:innerWidth,innerHeight:innerHeight,
-canvasWidth:document.querySelector("#arena")?.width,canvasHeight:document.querySelector("#arena")?.height,diagnosticsText:document.querySelector("#network-diagnostics")?.textContent||""};`;
+canvasWidth:document.querySelector("#arena")?.width,canvasHeight:document.querySelector("#arena")?.height,diagnosticsText:document.querySelector("#network-diagnostics")?.textContent||"",
+networkHudTimeline:x.networkHudTimeline.map(v=>({...v}))};`;
 await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert}=await startOriginalRust(),host=await startStatic();

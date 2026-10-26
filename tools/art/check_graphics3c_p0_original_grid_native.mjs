@@ -112,6 +112,24 @@ function validate(path,players){
    inputAckSamples:Number(sample[1]),
    source:"original?netstats=1",timeAlignedCausality:false,gpuPresentQualified:false,
   },"network observations must match unchanged original HUD text");
+  // Independent source-HUD timeline verification; *never* accept a fabricated
+  // summary or infer precise network/RAF causality from 500ms HUD refreshes.
+  const tl=t.data.networkHudTimeline;
+  assert.ok(Array.isArray(tl)&&tl.length>=3&&tl.length<=64,
+    "native original browser must capture bounded HUD timeline receipts");
+  for(let n=0;n<tl.length;n++){
+   const row=tl[n];
+   assert.ok(Number.isInteger(row.atMs)&&row.atMs>=0);
+   assert.ok(Number.isInteger(row.frameNumber)&&row.frameNumber>=1&&row.frameNumber<=600);
+   assert.equal(typeof row.rawHud,"string");
+   for(const k of ["Input→ACK p50","Snapshots p50","Extra render lag p50","Render catch-ups"])
+    assert.ok(row.rawHud.includes(k),"only actual original netstats HUD receipts are accepted");
+   if(n)assert.ok(row.atMs>tl[n-1].atMs&&row.atMs-tl[n-1].atMs>=350,
+    "source HUD chronology must be monotonic and bounded in sampling cadence");
+   const measure="(collecting…|\\d+ms)";
+   assert.ok(row.rawHud.match(new RegExp("Snapshots p50\\s+"+measure+"\\s*·\\s*p95\\s+"+measure)));
+   assert.ok(row.rawHud.match(new RegExp("Extra render lag p50\\s+"+measure+"\\s*·\\s*p95\\s+"+measure)));
+  }
   const full=readFileSync(join(path,t.fullCanvasScreenshot));
   assert.equal(full.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
   assert.equal(full.readUInt32BE(16),960);
@@ -138,6 +156,22 @@ const observedOverBudget=[
 console.log("GRAPHICS3C_PERFORMANCE_RELEASE_HOLD "+JSON.stringify({
  exactHead:checkedOutHead,thresholdMs:33,observedOverBudget,
  gpuPresentQualified:false,independentPhysicalHosts:false,performanceReleaseGo:false,
+ // Distinct browser-native local monotonic clocks. These readings are sampled
+ // from displayed 500ms HUD summaries, not server packet/event timestamps.
+ hudTimelineSummary:[
+  ...two.trials.map(t=>({worldSeats:2,browser:t.browser,actorId:t.actorId,
+   samples:t.data.networkHudTimeline.length,
+   firstLocalMs:t.data.networkHudTimeline[0].atMs,
+   lastLocalMs:t.data.networkHudTimeline.at(-1).atMs,
+   observedSourceGapP95Ms:t.data.networkHudTimeline.map(x=>x.rawHud.match(/Extra render lag p50[^|]*p95\\s+(\\d+)ms/)?.[1]).filter(Boolean).map(Number),
+  })),
+  ...four.trials.map(t=>({worldSeats:4,browser:t.browser,actorId:t.actorId,
+   samples:t.data.networkHudTimeline.length,
+   firstLocalMs:t.data.networkHudTimeline[0].atMs,
+   lastLocalMs:t.data.networkHudTimeline.at(-1).atMs,
+   observedSourceGapP95Ms:t.data.networkHudTimeline.map(x=>x.rawHud.match(/Extra render lag p50[^|]*p95\\s+(\\d+)ms/)?.[1]).filter(Boolean).map(Number),
+  })),
+ ],
  networkUiCoSamples:[
   ...two.trials.map(t=>({worldSeats:2,browser:t.browser,actorId:t.actorId,
    frameCallbackP95Ms:t.data.frameIntervalP95Ms,
