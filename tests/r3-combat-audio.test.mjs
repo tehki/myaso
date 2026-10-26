@@ -136,6 +136,8 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
         "online first keyboard action must not synchronously create AudioContext");
       assert.doesNotMatch(keyboard, /noteKeyboardGesture/,
         "no delayed AudioContext startup from live combat keyboard input");
+      assert.doesNotMatch(source, /afterSource0Audio/,
+        "native combat cannot queue first-use WebAudio from pointerUP or source0 send");
     } else {
       assert.match(source, /audio\.unlock\(\)/, "offline audio keeps its trusted-gesture unlock");
     }
@@ -156,10 +158,10 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
     if (name === "online-game") {
       assert.doesNotMatch(pointerUp, /audio\.unlock\(/,
         "first-use WebAudio must not freeze genuine online pointerUP before source0 send");
-      assert.match(pointerUp, /afterSource0Audio\?\.noteRelease\(committed\)/,
-        "real first release must remain eligible for its own delayed audio");
-      assert.ok(source.indexOf("networkClient.sendInput(") < source.indexOf("afterSource0Audio?.afterOriginalSend(currentInput)"),
-        "the existing single QUIC writer must run before presentation initialization");
+      assert.match(source, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\)/,
+        "the existing single QUIC sender remains unchanged");
+      assert.match(source, /installGameAudioControls\(audio\)/,
+        "trusted UI activation remains available before combat");
     } else {
       assert.ok(pointerUp.indexOf("leftButtonCharge.release(") < pointerUp.indexOf("audio.unlock()"),
         "offline first-use audio unlock must follow classification");
