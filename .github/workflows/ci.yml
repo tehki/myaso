@@ -60,6 +60,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_graphics3a_p1_skin_paint_ab.py' -v
           python -m py_compile scripts/graphics3a_p1_hood_review_rules.py tests/test_graphics3a_p1_hood_review_rules.py
           python -m unittest discover -s tests -p 'test_graphics3a_p1_hood_review_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_hood_motion_rules.py scripts/graphics3a_p1_hood_motion_review.py tests/test_graphics3a_p1_hood_motion_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_hood_motion_rules.py' -v
           python -m py_compile scripts/graphics3a_p1_neck_seam_qc.py tests/test_graphics3a_p1_neck_seam_qc.py
           python -m unittest discover -s tests -p 'test_graphics3a_p1_neck_seam_qc.py' -v
           python -m py_compile scripts/graphics3a_p1_neck_surface_qc.py tests/test_graphics3a_p1_neck_surface_qc.py
