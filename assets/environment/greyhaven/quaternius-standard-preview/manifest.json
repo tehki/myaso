@@ -199,25 +199,56 @@
       "liveWorld9CameraChanged": false
     },
     "gableInfill": {
-      "treatment": "plain-plaster-wall",
+      "treatment": "source-matched-weathered-plaster",
       "bottomZ": 3.09,
-      "apexZ": 5.1,
+      "apexZ": 5.26,
       "halfWidth": 1.85,
-      "frontFaceY": -2.07,
+      "frontFaceY": -2.085,
       "noRoofSourceMeshEdits": true,
       "gameplayFootprintUnchanged": true,
       "duskWindowDoorGlowUnchanged": true,
       "chimneySmokeUnchanged": true,
       "visualReviewStillRequired": true,
       "plainWallRGBA": [
-        0.55,
-        0.45,
-        0.34,
+        0.385,
+        0.29,
+        0.195,
         1
       ],
-      "removeCenterPost": true,
       "preserveEdgeAndSillTimbers": true,
-      "originalPlasterTextureUnchanged": true
+      "originalPlasterTextureUnchanged": true,
+      "weatheredPlaster": {
+        "method": "world-position-fine-noise",
+        "noiseScale": 9.5,
+        "darkRGBA": [
+          0.342,
+          0.252,
+          0.163,
+          1
+        ],
+        "lightRGBA": [
+          0.42,
+          0.327,
+          0.225,
+          1
+        ],
+        "originalLowerFacadeReferenceRGB": [
+          151,
+          133,
+          107
+        ],
+        "subtleWeathering": true,
+        "noLargeStains": true,
+        "originalSourceImageAtlasUnchanged": true
+      },
+      "apexSeamClosure": {
+        "purpose": "fill shadow slit at top below original gable roofline",
+        "originalApexZ": 5.1,
+        "correctedApexZ": 5.26,
+        "shiftFrontFaceTowardCameraMeters": 0.015,
+        "roofSourceMeshUntouched": true
+      },
+      "noCenterPost": true
     }
   },
   "output": {
