@@ -548,16 +548,37 @@ try{
  const focused=await evaluate(attacker,
   "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
  assert.equal(focused,true,"original gameplay canvas must own native WASD");
- const movementMs=Math.min(190,Math.max(75,Math.round((t0.x-a0.x-55)*1000/215)));
- await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-  actions:[{type:"key",id:"jump-two-stage",actions:[
-   {type:"keyDown",value:"d"},{type:"pause",duration:movementMs},{type:"keyUp",value:"d"}]}]});
- const staged=await waitFor(async()=>{
+ // Stage by ORIGINAL server positions, not an assumed WebDriver movement time.
+ // Every correction is actual W3C D/A with a full release + 320ms between
+ // presses, preventing accidental double-tap Dash in the game controller.
+ const movementAttempts=[];
+ let staged=null;
+ for(let n=0;n<5;n++){
   const both=await Promise.all([proof(attacker),proof(victim)]);
-  const a=own(both[0],1),t=own(both[0],2);
-  return a?.action===0&&t?.action===0&&Math.abs(a.y-t.y)<=5
-   && t.x-a.x>=38&&t.x-a.x<=62&&a.x>a0.x+20&&t.hp===100?both:false;
- },7000);
+  const a=own(both[0],1),t=own(both[0],2),gap=t?.x-a?.x;
+  if(a?.action===0&&t?.action===0&&t.hp===100
+      && Math.abs(a.y-t.y)<=5&&gap>=38&&gap<=62
+      &&a.x>a0.x+20){staged=both;break;}
+  if(!a||!t||a.action!==0||t.action!==0)break;
+  const desired=54,delta=gap-desired,key=delta>0?"d":"a";
+  const duration=Math.max(35,Math.min(180,Math.round(Math.abs(delta)*1000/215)));
+  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+   actions:[{type:"key",id:"jump-two-stage-"+n,actions:[
+    {type:"keyDown",value:key},{type:"pause",duration},{type:"keyUp",value:key}]}]});
+  await sleeps(330);
+  const after=await proof(attacker);
+  movementAttempts.push({n,key,duration,before:{x:a.x,y:a.y,gap},
+    after:{x:own(after,1)?.x,y:own(after,1)?.y,gap:own(after,2)?.x-own(after,1)?.x}});
+ }
+ if(!staged){
+  const diagnostic={error:"five genuine W3C movement corrections could not establish original World JumpAttack reach",
+   movementAttempts,initial:before[0],attacker:await proof(attacker),victim:await proof(victim),
+   originalWorld:readAuthoritativeWorld().split("\n").filter(x=>/M201_AUTH_|session /.test(x)).slice(-65)};
+  await writeFile(join(output,"combat4-two-native-staging-FIRST-RED.json"),
+   JSON.stringify(diagnostic,null,2)+"\n");
+  console.error("COMBAT4_TWO_NATIVE_STAGING_FIRST_RED",JSON.stringify(diagnostic));
+  throw Error("real server-owned 2-player positioning incomplete; no JumpAttack was attempted");
+ }
  await sleeps(180);
  const ready=await Promise.all([proof(attacker),proof(victim)]);
  const a1=own(ready[0],1),t1=own(ready[0],2),range=t1.x-a1.x;
@@ -612,6 +633,15 @@ try{
  const journal=readAuthoritativeWorld().slice(start);
  const hits=journal.split("\n").filter(line=>/^M201_AUTH_HIT tick=\d+ attacker=1 target=2 /.test(line));
  assert.deepEqual(hits,[hit.line],"exactly one authoritative 42 HP hit; no double strike");
+ const requiredWorldActions=[[0,15],[15,16],[16,17],[17,18]].map(([from,to])=>({
+   from,to,observed:worldTransition(journal,1,from,to)
+ }));
+ if(requiredWorldActions.some(x=>!x.observed)){
+  const evidence={missing:requiredWorldActions.filter(x=>!x.observed),worldJournal:journal,
+   receipt:hit.added,attackerReplica:hit.both[0],victimReplica:hit.both[1]};
+  await writeFile(join(output,"combat4-two-native-action-FIRST-RED.json"),JSON.stringify(evidence,null,2)+"\n");
+  console.error("COMBAT4_TWO_NATIVE_ACTION_FIRST_RED",JSON.stringify(evidence));
+ }
  assert.ok(worldTransition(journal,1,0,15)&&worldTransition(journal,1,15,16)
   &&worldTransition(journal,1,16,17)&&worldTransition(journal,1,17,18),
   "original World Jump→Windup→Active→Recovery required");
@@ -628,7 +658,7 @@ try{
   originalWorld:true,originalAuthenticatedQUIC:true,
   distinctNativeBrowserProcesses:2,independentHumanWAN:false,
   actualActorIds:actors.map(x=>x.actor.id),
-  staging:{before:before[0],staged:staged[0],ready:ready[0],range,movementMs},
+  staging:{before:before[0],staged:staged[0],ready:ready[0],range,movementAttempts},
   nativePhysical:physical,typedReceipts:hit.added,authoritativeHit:hit.line,
   worldJournal:journal,attackerReplica:hit.both[0],victimReplica:hit.both[1],
   limitation:"two genuine browsers one local host; not WAN or two independent humans"};
