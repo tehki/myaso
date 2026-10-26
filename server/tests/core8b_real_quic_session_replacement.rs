@@ -11,6 +11,7 @@ use std::{
     sync::{mpsc, Arc, Mutex},
     time::{Duration, Instant},
 };
+use myaso_server::snapshot::decode_snapshot;
 use tokio::time::{sleep, timeout};
 use wtransport::{
     endpoint::endpoint_side, tls::Sha256Digest, ClientConfig, Connection, Endpoint, RecvStream,
@@ -77,7 +78,12 @@ struct Seat {
     _send: SendStream,
     _recv: RecvStream,
 }
-async fn seat(url: &str, hash: &Sha256Digest) -> Seat {
+async fn seat(
+    url: &str,
+    hash: &Sha256Digest,
+    expected_actor: u32,
+    retired_actor: Option<u32>,
+) -> Seat {
     let deadline = Instant::now() + WAIT;
     let (endpoint, conn) = loop {
         assert!(
@@ -126,6 +132,7 @@ async fn seat(url: &str, hash: &Sha256Digest) -> Seat {
         .expect("hello FIN timeout")
         .expect("finish hello");
     let mut granted = false;
+    let mut saw_initial_snapshot = false;
     for _ in 0..24 {
         let mut size = [0u8; 2];
         timeout(WAIT, recv.read_exact(&mut size))
@@ -137,7 +144,26 @@ async fn seat(url: &str, hash: &Sha256Digest) -> Seat {
             .await
             .expect("reliable frame timeout")
             .expect("reliable frame");
+        if frame.starts_with(&[2, 2]) {
+            let snapshot = decode_snapshot(&frame).expect("actual original World snapshot");
+            assert!(snapshot.full, "new QUIC seat needs a full authoritative baseline");
+            assert!(
+                snapshot.records.iter().any(|record| record.net_id == expected_actor),
+                "fresh server-owned actor {expected_actor} missing from its own baseline: {snapshot:?}"
+            );
+            if let Some(retired) = retired_actor {
+                assert!(
+                    snapshot.records.iter().all(|record| record.net_id != retired),
+                    "retired actor {retired} leaked into fresh authoritative baseline: {snapshot:?}"
+                );
+            }
+            saw_initial_snapshot = true;
+        }
         if frame == GRANTED {
+            assert!(
+                saw_initial_snapshot,
+                "v2 grant was observed without authoritative World baseline"
+            );
             granted = true;
             break;
         }
@@ -211,8 +237,8 @@ async fn observed(lines: &Arc<Mutex<Vec<String>>>, needle: &str) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn old_quic_disconnect_releases_one_seat_and_fresh_source0_cursor_is_independent() {
     let (server, url, digest) = server();
-    let old = seat(&url, &digest).await;
-    let _spectator = seat(&url, &digest).await;
+    let old = seat(&url, &digest, 1, None).await;
+    let _spectator = seat(&url, &digest, 2, None).await;
     observed(&server.lines, " assigned player 1 ").await;
     observed(&server.lines, " assigned player 2 ").await;
     observed(&server.lines, " fighter=1 action=0").await;
@@ -225,7 +251,7 @@ async fn old_quic_disconnect_releases_one_seat_and_fresh_source0_cursor_is_indep
 
     // MYASO_MAX_PLAYERS=2 and the spectator still holds seat2. A new
     // actor3 can only be admitted after actor1's old permit is released.
-    let fresh = seat(&url, &digest).await;
+    let fresh = seat(&url, &digest, 3, Some(1)).await;
     observed(&server.lines, " assigned player 3 ").await;
     observed(&server.lines, " fighter=3 action=0").await; // arm original observer first
     accepted_press(&fresh.conn).await; // SAME source0 seq1, new lease
