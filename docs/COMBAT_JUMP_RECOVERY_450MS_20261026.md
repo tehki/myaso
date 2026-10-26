@@ -1,7 +1,9 @@
 # Combat decision — 450 ms jump-attack recovery
 
-**Approved by the game owner:** 26 October 2026  
-**Scope:** M147 actionable recovery-punish opportunity following a jump attack  
+**Approved by the game owner:** 26 October 2026
+
+**Scope:** M147 actionable recovery-punish opportunity following a jump attack
+
 **Status:** Gameplay balance change awaiting exact-head native/QA validation; release HARD HOLD
 
 The authoritative Rust World and the JavaScript combat model now use **450 ms** for `JumpAttackRecovery` (previously 290 ms). At the original 60 Hz server tick this is 27 World steps. This extends the interval in which an opponent can deliberately recognize and land a legitimate recovery punishment.
