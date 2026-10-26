@@ -1125,7 +1125,7 @@ async function prepareHeavyCounterplayFlight(
       distanceAfter: distance(ownAfter, targetAfter),
       originalLightReach: COMBAT.attack.reach,
       unchangedCollisionRadius: COMBAT.fighterRadius,
-      // Sender samples are exact original 30Hz sendInput payload fields.
+      // Sender samples are exact original 60Hz sendInput payload fields.
       // Do not equate a DOM KeyD event with admitted server movement.
       sampledOriginalV1: (after.acceptance?.m121SentSamples ?? [])
         .filter((sample) => Number.isFinite(before.acceptance?.m121SentSamples?.at(-1)?.clientTick)
@@ -1819,7 +1819,7 @@ async function runOnlineUiDirectionalLightFlight(entries) {
     hp: { attacker: attackerResult.playerHp, victim: defenderResult.playerHp },
   }));
 
-  // Combat 4A: a genuine short physical LMB can reach the 30Hz sender
+  // Combat 4A: a genuine short physical LMB can reach the 60Hz sender
   // but be absent from the original authenticated v1 accepted batch.
   // Diagnostic only: never replay a click or treat transport acceptance as HIT.
   const releaseSentTicks = (attackerResult.acceptance?.m121SentSamples ?? [])
@@ -11598,7 +11598,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     // M147: once the genuine recovery cue is visibly present, dispatch one
     // real, pre-aimed W3C pointer DOWN/UP without an additional pause tick.
     // Even a 5ms requested pause can cost a whole headless driver tick before
-    // the original 30Hz sender samples release. The physical release remains
+    // the original 60Hz sender samples release. The physical release remains
     // genuine and the strict original World HIT-before-exit gate is unchanged.
     await performArenaM221GuardBreakClick(observer, 0);
   } finally {
@@ -11705,6 +11705,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       punishDown: punishDowns[0], punishUp: punishUps[0] },
     victimUiRecovery: { entry: recovery, exit: idle },
     inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    browserInputChronology: (observerState.m147InputPlane ?? []).slice(-32),
     source0Samples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
     originalWorldEvents: beforeLifecycleWorldTrace.split(/\r?\n/)
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
@@ -11775,6 +11776,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     recovery: { entry: recovery, exit: idle },
     focus: focusTransitions.slice(-6),
     inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    browserInputChronology: (observerState.m147InputPlane ?? []).slice(-32),
     sentSamples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
     worldActions: actualWorldTrace.split(/\r?\n/)
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
@@ -11926,7 +11928,7 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
         // loaded exact-head quality #40184398389 still showed ZERO original
         // World actions for #1 while #3 completed its light recovery.
         // Preserve one genuine W3C chord and allow 180ms for original
-        // 30Hz input sampling, as M145 already does. Keep the unchanged
+        // 60Hz input sampling, as M145 already does. Keep the unchanged
         // strict 60/70/150/200ms onset, server phase, focus and vitals gates.
         await performArenaPreAimedJumpAttackChord(jumpAttacker, 180);
       })(),
@@ -14565,6 +14567,8 @@ async function readUiEvidence(session) {
       keyTransitions: (state.keyTransitions ?? []).slice(),
       pointers: state.pointers.slice(),
       wheels: (state.wheels ?? []).slice(),
+      m147InputPlane: (window.__MYASO_M147_INPUT_PLANE__ ?? [])
+        .slice(-96).map((x) => ({ ...x })),
       m111InputPlane: window.__MYASO_M111_INPUT_PLANE__ ? {
         physicalTerminals: (window.__MYASO_M111_INPUT_PLANE__.physicalTerminals ?? []).slice().map((x) => ({ ...x })),
         lightReleases: (window.__MYASO_M111_INPUT_PLANE__.lightReleases ?? []).slice().map((x) => ({ ...x })),
@@ -14575,7 +14579,7 @@ async function readUiEvidence(session) {
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
-        // Original M121 30Hz v1 input sender trace, copied READ-ONLY from the
+        // Original M121 60Hz v1 input sender trace, copied READ-ONLY from the
         // real page to the WebDriver observer; no cross-plane inference.
         m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
           .slice(-96).map((entry) => ({ ...entry })),

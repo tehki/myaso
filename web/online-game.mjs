@@ -3,6 +3,7 @@ import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
+import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
@@ -158,8 +159,15 @@ const m111InputProbe = (acceptanceScenario === "uiheavyguardbreakpunish"
     })
   : null;
 const server = params.get("server");
-const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
+// Original M147, genuine Firefox only: bounded local browser-stage timestamps.
+// Both the page and authoritative server must be loopback. No public telemetry.
+const m147InputProbe = acceptanceScenario === "uijumppunishffa"
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(server).hostname)
+  ? createM147InputChronology() : null;
+if (m147InputProbe) window.__MYASO_M147_INPUT_PLANE__ = m147InputProbe.events;
+const cert = params.get("cert");
 // Opt-in NONRELEASE: the actual game page and the ORIGINAL pinned Rust World
 // must both be loopback. Public /web/ and official lobby never select v2.
 const gestureLabRequested = params.get("gestureLab") === "1";
@@ -228,6 +236,7 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    m147InputProbe?.onLight();
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -288,10 +297,13 @@ function onLeftPointerUp(event) {
   }
   if (event.button !== 0) return;
   if (reviewedGestureLab) return; // v2 capture owns physical terminal
+  m147InputProbe?.pointerUp(event);
   updateMouse(event);
+  m147InputProbe?.releaseInvocation();
   const committed = leftButtonCharge.release(event.pointerId);
   // Only the matching physical pointer may retire the current gesture.
   if (committed === null) return;
+  m147InputProbe?.release(committed);
   leftButtonDown = false;
   leftButtonPressMovement = null;
   if (m111InputProbe && committed) {
@@ -505,7 +517,7 @@ if (reviewedGestureLab) {
       documentObj: document, getClientTick: () => clientTick >>> 0,
     });
     if (privateHitLabRequested) {
-      // Real input ACKs are produced by the 30Hz original sender, which starts
+      // Real input ACKs are produced by the 60Hz original sender, which starts
       // only after this module returns to requestAnimationFrame. Negotiate in
       // parallel with rendering rather than await a not-yet-admitted actor here.
       // No fabricated actor ID, online status, receipt or token is permitted.
@@ -943,12 +955,13 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
+  m147InputProbe?.sampled(currentInput, predictionStep + 1);
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M121: read-only source-of-truth on the EXACT original 30Hz sender. W3C
+    // M121: read-only source-of-truth on the nominal 60Hz v1 sender. W3C
     // keydown in a browser does not prove a movement bit left the client or
     // reached the Rust World. Preserve attack/release and quiet samples too.
     // QA only, original packet/World/render path remains byte-for-byte intact.
@@ -971,7 +984,7 @@ function simulatePrediction(stepMs) {
       }
     }
     // M336/M144: read-only, scenario-scoped input-plane provenance. A real DOM
-    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // Space+LMB without authoritative action may mean no 60Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
     // Combat4A M41/M35: observed real wheel -> actual original v1 BLOCK
@@ -1002,7 +1015,7 @@ function simulatePrediction(stepMs) {
       }
     }
     if (m111InputProbe) {
-      // Exactly the final original 30Hz frame that will be passed to the
+      // Exactly the final original 60Hz frame that will be passed to the
       // unchanged v1 sender below; no synthetic latching or packet mutation.
       m111InputProbe.submitted.push({
         epochMs: Date.now(), clientTick: outgoingTick,
@@ -1015,6 +1028,7 @@ function simulatePrediction(stepMs) {
         m111InputProbe.submitted.shift();
       }
     }
+    m147InputProbe?.sendInput(currentInput, outgoingTick);
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
@@ -2066,6 +2080,7 @@ function createArenaLayer() {
 
 function frame(now) {
   if (document.hidden) return;
+  m147InputProbe?.raf(now);
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);
