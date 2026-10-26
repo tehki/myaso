@@ -16,6 +16,16 @@ function validate(path,players){
  assert.equal(r.realSeparateNativeBrowserProcesses,players);
  assert.equal(r.independentPhysicalHumanHosts,false);
  assert.equal(r.authenticSilverKnightIntegrationVerified,true);
+ assert.equal(r.genuineW3cSilverLocomotionVerified,true,
+   "source-backed W3C movement must be demonstrated in the actual browser");
+ assert.equal(r.genuineW3cLocomotion?.browser,engines[0]);
+ assert.equal(r.genuineW3cLocomotion?.actorId,1);
+ assert.equal(r.genuineW3cLocomotion?.key,"KeyD");
+ for(const clipCount of ["walk","sprint"])
+  assert.ok(Number.isInteger(r.genuineW3cLocomotion[clipCount])
+    && r.genuineW3cLocomotion[clipCount]>=0,"trustworthy nonnegative source locomotion clip count");
+ assert.ok(r.genuineW3cLocomotion.walk+r.genuineW3cLocomotion.sprint>=8,
+   "the actual 2/4-seat browser must draw original relit walk or sprint WebP");
  assert.equal(r.allFiveClipsVisuallyValidated,false);
  assert.equal(r.trueFourIndependentHumanOperators,false);
  assert.equal(r.modeIsOptional,false);

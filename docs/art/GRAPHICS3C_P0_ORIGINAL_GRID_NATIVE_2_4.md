@@ -18,6 +18,8 @@ The strict native checker verifies all six original full Canvas PNGs and all six
 
 ## What still needs separate acceptance
 
+A genuine W3C KeyD keyDown/keyUp now additionally moves actor #1 with the original focused Canvas, and requires at least eight authentic Blender-source relit walk-or-sprint WebP drawImage calls; the report records the actual counts. This verifies one real browser-driven Silver locomotion animation, NOT all five clips or World input-tick causality. No injected DOM keyboard events, fake fighter packets or gameplay source changes are used.
+
 Four processes on a single CI machine are not four independently operated human hosts. Passive samples do not establish GPU compositor presentation FPS or true 60FPS. Source render-gap target debt is now read from the authentic diagnostics UI. This does not trace precise Rust snapshot TX/packet ingress times or correlate each presentation frame with a server event. Core8A/8C and 3C own separately measured transport timing. This source probe also cannot establish five exercised original motions, original light/heavy/parry/guard/knockdown telegraph contrast, actor reconnect/bfcache restore, actual 14 fully clickable controls, or one RAF with four visible bodies when some original actors are legitimately offscreen. Those remain explicit UNVERIFIED items.
 
 Main retains exact protected quality, authoritative Combat M-series, human multiplayer, SHA package, stage and release GO. This new child must independently pass native Chrome/Firefox and protected quality on its exact head. Neither the earlier #1044 green results nor any parent #1036 results qualify this QA-changed commit. Default original grid remains unchanged, no terrain/buildings promoted.

@@ -130,6 +130,30 @@ try{
   assert.ok(await evaluate(s,hook),"read-only original Canvas image observer");
   actors.push({s,actor,flag});
  }
+ // Real W3C keyboard input, never document.dispatchEvent or fabricated
+ // World positions. Verify one authenticated Silver fighter actually paints
+ // an original walk/sprint WebP, not just the idle atlas.
+ const motionSession=actors[0].s;
+ assert.equal(await evaluate(motionSession,
+   "const canvas=document.querySelector('#arena');canvas.focus();return document.activeElement===canvas;"),
+   true,"original Canvas must own focus before real keyboard movement");
+ const motionActionPath="/session/"+motionSession.id+"/actions";
+ const motionSource={type:"key",id:"graphics3c-authentic-movement",actions:[{type:"keyDown",value:"d"}]};
+ await request(motionSession.base,"POST",motionActionPath,{actions:[motionSource]});
+ let genuineMotionSource;
+ try{
+  genuineMotionSource=await waitFor(async()=>{
+   const data=await evaluate(motionSession,
+    "const x=window.__arenaLiteNative?.knightSources||{};return {walk:x['silver_walk_relit.webp']||0,sprint:x['silver_sprint_relit.webp']||0};");
+   return data&&data.walk+data.sprint>=8?data:null;
+  },4500);
+ }finally{
+  await request(motionSession.base,"POST",motionActionPath,{
+   actions:[{type:"key",id:"graphics3c-authentic-movement",actions:[{type:"keyUp",value:"d"}]}]
+  });
+ }
+ assert.ok(genuineMotionSource.walk+genuineMotionSource.sprint>=8,
+   "genuine native KeyD must cause a source-authentic Silver locomotion WebP draw");
  await sleeps(2400);
  const trial=[];
  for(const {s,actor,flag} of actors){
@@ -178,13 +202,17 @@ try{
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
  const report={sourceCommit:process.env.MYASO_KNIGHTS_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:engines.length,independentPhysicalHumanHosts:false,
-  authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
+  authenticSilverKnightIntegrationVerified:true,
+  genuineW3cSilverLocomotionVerified:true,
+  genuineW3cLocomotion:{browser:motionSession.engine,actorId:actors[0].actor.id,key:"KeyD",...genuineMotionSource},
+  allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,optionalTerrainEnabled:false,
   includesGpuPresentLatency:false,presentationClockDebtSampled:true,
   browserFrameTimingIsCallbackNotGpu:true,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
  console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
+  genuineW3cLocomotion:report.genuineW3cLocomotion,
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
   floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
   presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms)}));
