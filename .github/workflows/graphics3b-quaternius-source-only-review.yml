@@ -1,0 +1,47 @@
+name: Graphics3B P1 Quaternius source-only portability
+
+on:
+  pull_request:
+    paths:
+      - ".gitmodules"
+      - "third_party/quaternius/medieval-village-megakit-standard"
+      - "assets/environment/greyhaven/quaternius-standard-preview/**"
+      - "tools/art/verify_quaternius_standard_source.mjs"
+      - "tools/art/render_quaternius_greyhaven_preview.py"
+      - "tools/art/bake_quaternius_greyhaven_review_sprites.py"
+      - ".github/workflows/graphics3b-quaternius-source-only-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-cc0-authoring-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify unchanged official-source-pinned glTF mirror and approved authoring source
+        run: |
+          set -euo pipefail
+          test "$(git -C third_party/quaternius/medieval-village-megakit-standard rev-parse HEAD)" = 21104b4045261c28fc312360841ed1a7b0ac8782
+          test "$(git hash-object assets/environment/greyhaven/quaternius-standard-preview/manifest.json)" = 42bfe1c4243551791d4e30561fd43d8c33c1c671
+          test "$(git hash-object tools/art/render_quaternius_greyhaven_preview.py)" = 3c8b2cdeb1d312717b935188047680251eac2443
+          test "$(git hash-object tools/art/bake_quaternius_greyhaven_review_sprites.py)" = 920058c866c2e35257b6d6223b769f38571623bc
+          node --check tools/art/verify_quaternius_standard_source.mjs
+          node tools/art/verify_quaternius_standard_source.mjs
+          python3 -m py_compile tools/art/render_quaternius_greyhaven_preview.py tools/art/bake_quaternius_greyhaven_review_sprites.py tools/art/verify_quaternius_official_standard_zip.py
+      - name: Preserve strict asset-only extraction boundary
+        run: |
+          set -euo pipefail
+          git diff --name-only origin/main...HEAD > /tmp/quaternius-changed-paths.txt
+          if grep -E '^(server/|src/|web/|tests/|scripts/|assets/world/)' /tmp/quaternius-changed-paths.txt; then
+            echo "Forbidden runtime World/Combat/portal/authority path in source-only art PR" >&2
+            exit 1
+          fi
+          test -s /tmp/quaternius-changed-paths.txt
+          printf 'GRAPHICS3B_QUATERNIUS_SOURCE_ONLY_PORTABILITY_PASS\n'

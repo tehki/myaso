@@ -1,0 +1,266 @@
+{
+  "schema": 1,
+  "title": "Quaternius Medieval Village MegaKit — Greyhaven Blood & Iron architecture review",
+  "source": {
+    "author": "Quaternius",
+    "originalPage": "https://quaternius.com/packs/medievalvillagemegakit.html",
+    "creatorPublishedStandard": "https://opengameart.org/content/medieval-village-megakit",
+    "officialEdition": "Standard (free, 176 source models)",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "mirror": "https://github.com/J-Ponzo/gltf-medieval-village-megakit",
+    "mirrorCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+    "mirrorOnlyGlTF": true,
+    "mirroredArchiveByteParityVerified": false
+  },
+  "scope": {
+    "status": "artist-preview-only",
+    "runtimeOptInOnly": true,
+    "preserveOriginalRedLion": true,
+    "noOriginalRoofChange": true,
+    "noLiveCollisionAuthority": true,
+    "noCombatChange": true,
+    "noServerChange": true,
+    "noItemsOrSwords": true,
+    "noProductionActivation": true
+  },
+  "selection": [
+    "Wall_Plaster_Window_Wide_Round",
+    "Wall_Plaster_Door_Round",
+    "Wall_UnevenBrick_Straight",
+    "Wall_Plaster_WoodGrid",
+    "Wall_Plaster_Straight",
+    "Door_1_Round",
+    "DoorFrame_Round_WoodDark",
+    "Window_Wide_Round1",
+    "Roof_RoundTiles_4x4",
+    "Prop_Chimney",
+    "Prop_Crate"
+  ],
+  "sample": {
+    "id": "greyhaven-quaternius-masonry-cottage-review",
+    "unscaledLocalUnits": "Quaternius glTF meters; authoring-only, not World9 coords",
+    "buildingFootprint": [
+      4,
+      4
+    ],
+    "parts": [
+      {
+        "model": "Wall_Plaster_Window_Wide_Round",
+        "at": [
+          -1,
+          -2,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Wall_Plaster_Door_Round",
+        "at": [
+          1,
+          -2,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Wall_UnevenBrick_Straight",
+        "at": [
+          -1,
+          2,
+          0
+        ],
+        "yawDeg": 180
+      },
+      {
+        "model": "Wall_UnevenBrick_Straight",
+        "at": [
+          1,
+          2,
+          0
+        ],
+        "yawDeg": 180
+      },
+      {
+        "model": "Wall_Plaster_WoodGrid",
+        "at": [
+          -2,
+          -1,
+          0
+        ],
+        "yawDeg": 90
+      },
+      {
+        "model": "Wall_Plaster_WoodGrid",
+        "at": [
+          -2,
+          1,
+          0
+        ],
+        "yawDeg": 90
+      },
+      {
+        "model": "Wall_Plaster_Straight",
+        "at": [
+          2,
+          -1,
+          0
+        ],
+        "yawDeg": -90
+      },
+      {
+        "model": "Wall_Plaster_Straight",
+        "at": [
+          2,
+          1,
+          0
+        ],
+        "yawDeg": -90
+      },
+      {
+        "model": "DoorFrame_Round_WoodDark",
+        "at": [
+          1,
+          -2.02,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Door_1_Round",
+        "at": [
+          0.486255,
+          -2.05,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Window_Wide_Round1",
+        "at": [
+          -1,
+          -2.04,
+          0
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Roof_RoundTiles_4x4",
+        "at": [
+          0,
+          0,
+          3
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Prop_Chimney",
+        "at": [
+          1.25,
+          0.7,
+          4.05
+        ],
+        "yawDeg": 0
+      },
+      {
+        "model": "Prop_Crate",
+        "at": [
+          -1.6,
+          -3.15,
+          0
+        ],
+        "yawDeg": 20
+      }
+    ],
+    "doorFrameAlignment": {
+      "doorModel": "Door_1_Round",
+      "frameModel": "DoorFrame_Round_WoodDark",
+      "localDoorCenterX": 0.5137433372,
+      "localFrameCenterX": 0,
+      "maximumCenterOffsetMeters": 0.015,
+      "maximumBottomOffsetMeters": 0.09,
+      "maximumDepthOffsetMeters": 0.1,
+      "sourceMeshesUnchanged": true
+    },
+    "cameraReview": {
+      "projection": "ORTHO",
+      "position": [
+        3,
+        -12,
+        17
+      ],
+      "target": [
+        0,
+        0,
+        2.8
+      ],
+      "orthoScale": 12.8,
+      "intent": "elevated Greyhaven roof-and-facade sprite alignment; front gable foreshortened to match A2.32 Red Lion",
+      "liveWorld9CameraChanged": false
+    },
+    "gableInfill": {
+      "treatment": "source-matched-weathered-plaster",
+      "bottomZ": 3.09,
+      "apexZ": 5.26,
+      "halfWidth": 1.85,
+      "frontFaceY": -2.085,
+      "noRoofSourceMeshEdits": true,
+      "gameplayFootprintUnchanged": true,
+      "duskWindowDoorGlowUnchanged": true,
+      "chimneySmokeUnchanged": true,
+      "visualReviewStillRequired": true,
+      "plainWallRGBA": [
+        0.385,
+        0.29,
+        0.195,
+        1
+      ],
+      "preserveEdgeAndSillTimbers": true,
+      "originalPlasterTextureUnchanged": true,
+      "weatheredPlaster": {
+        "method": "world-position-fine-noise",
+        "noiseScale": 9.5,
+        "darkRGBA": [
+          0.342,
+          0.252,
+          0.163,
+          1
+        ],
+        "lightRGBA": [
+          0.42,
+          0.327,
+          0.225,
+          1
+        ],
+        "originalLowerFacadeReferenceRGB": [
+          151,
+          133,
+          107
+        ],
+        "subtleWeathering": true,
+        "noLargeStains": true,
+        "originalSourceImageAtlasUnchanged": true
+      },
+      "apexSeamClosure": {
+        "purpose": "fill shadow slit at top below original gable roofline",
+        "originalApexZ": 5.1,
+        "correctedApexZ": 5.26,
+        "shiftFrontFaceTowardCameraMeters": 0.015,
+        "roofSourceMeshUntouched": true,
+        "hiddenTipRoofOverlapZ": 0.17,
+        "hiddenTipTowardCameraY": 0.035,
+        "sourceTimberAndTilesUnaffected": true
+      },
+      "noCenterPost": true
+    }
+  },
+  "output": {
+    "render": [
+      "greyhaven-quaternius-cottage-day.png",
+      "greyhaven-quaternius-cottage-dusk.png"
+    ],
+    "sourceBlend": "greyhaven-quaternius-cottage-source.blend",
+    "pngTransparent": true,
+    "finalArtApproved": false
+  }
+}
