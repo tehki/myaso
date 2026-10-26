@@ -30,8 +30,10 @@ class HeadAttachmentRulesTests(unittest.TestCase):
                 light_base_atlas_member(prefix, value)
 
     def test_light_atlas_rejects_unknown_archive_prefix(self):
-        with self.assertRaises(ValueError):
-            light_base_atlas_member("../unknown/", "T_Superhero_Male_Dark.png")
+        for prefix in ("../unknown/", "../Base Characters/Godot - UE/",
+                       "/root/Base Characters/Godot - UE/"):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                light_base_atlas_member(prefix, "T_Superhero_Male_Dark.png")
 
     def test_original_face_parts_remain_the_default(self):
         self.assertEqual(
