@@ -120,6 +120,9 @@ test("M41 timeout retains bounded original event provenance without treating pas
     .recentEvents[0].text.length, 100, "bounded event text");
   const script = m41NativeAsyncCueScript();
   assert.match(script, /timeoutEvidence\(state, baseline, actorId, performance.now\(\) - started\)/);
+  assert.ok(script.includes("done(cue ?? null)"), "native timeout response stays null");
+  assert.ok(script.includes("window.__MYASO_M41_LAST_TIMEOUT__ = timeoutEvidence"),
+    "bounded failure-only read-only browser snapshot is retained separately");
   assert.doesNotMatch(script, /dispatchEvent\(|new PointerEvent\(|\.click\(/);
 });
 
