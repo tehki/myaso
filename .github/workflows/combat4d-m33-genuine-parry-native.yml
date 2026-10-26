@@ -42,6 +42,7 @@ jobs:
           # Keep the first red intact. A second success cannot erase a failed attempt.
           set +e
           result=0
+          echo "COMBAT4D_M33_SOURCE_SHA=$(git rev-parse HEAD)"
           for trial in 1 2; do
             echo "COMBAT4D_M33_TRIAL_START trial=${trial} scenario=uiparry"
             timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs > "combat4d-m33-trial-${trial}.log" 2>&1
@@ -55,6 +56,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: combat4d-m33-native-${{ github.sha }}
+          name: combat4d-m33-native-${{ github.event.pull_request.head.sha || github.sha }}
           path: combat4d-m33-trial-*.log
           if-no-files-found: warn
