@@ -1,8 +1,8 @@
 # Main 0 — Pre-Alpha 0.1 Final Acceptance Packet
 
-**Status: INCOMPLETE TEMPLATE — NOT RELEASE AUTHORIZATION.**  
-**Canonical candidate:** [PR #1036](https://github.com/tehki/myaso/pull/1036), starting review checkpoint `78634ecc797ee0024a574f46ad0ea22ba9e76f4a`; final source is the package `REVISION` and exact-head GitHub acceptance record.  
-**Protected main at review:** `6fa59b649112c272bcbc018b4a32bf963f9a5bba`.  
+**Status: INCOMPLETE TEMPLATE — NOT RELEASE AUTHORIZATION.**
+**Canonical candidate:** [PR #1036](https://github.com/tehki/myaso/pull/1036), starting review checkpoint `78634ecc797ee0024a574f46ad0ea22ba9e76f4a`; final source is the package `REVISION` and exact-head GitHub acceptance record.
+**Protected main at review:** `6fa59b649112c272bcbc018b4a32bf963f9a5bba`.
 **Rule:** Do not merge, deploy, enable public experimental protocols, or alter production configuration using this document. Main 0 and the owner retain release authority.
 
 This packet makes the outstanding operational evidence explicit. It does not itself prove that any gate has passed. Complete it against one immutable candidate and one separately authorized non-production environment.
