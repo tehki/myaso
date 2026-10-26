@@ -130,8 +130,12 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
     const source = readFileSync(new URL("../web/" + name + ".mjs", import.meta.url), "utf8");
     assert.match(source, /installGameAudioControls\(audio\)/);
     if (name === "online-game") {
-      assert.match(source, /afterSource0Audio\.noteKeyboardGesture\(event\.code, event\.repeat\)/,
-        "online keyboard-first WebAudio startup must occur after genuine source0 send");
+      const keyboard = source.slice(source.indexOf('canvas.addEventListener("keydown"'),
+        source.indexOf('window.addEventListener("keyup"'));
+      assert.doesNotMatch(keyboard, /audio\.unlock\(\)/,
+        "online first keyboard action must not synchronously create AudioContext");
+      assert.doesNotMatch(keyboard, /noteKeyboardGesture/,
+        "no delayed AudioContext startup from live combat keyboard input");
     } else {
       assert.match(source, /audio\.unlock\(\)/, "offline audio keeps its trusted-gesture unlock");
     }
