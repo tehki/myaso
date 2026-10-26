@@ -1,7 +1,7 @@
 # Graphics 3A P1 — Collar Cut & Head Attachment Diagnostic
 
-**Date:** 2026-10-26  
-**Authority:** Graphics 3A (offline-only)  
+**Date:** 2026-10-26
+**Authority:** Graphics 3A (offline-only)
 **Status:** **HOLD — diagnostic code validated; real private-source measurement pending**
 
 ## Purpose
