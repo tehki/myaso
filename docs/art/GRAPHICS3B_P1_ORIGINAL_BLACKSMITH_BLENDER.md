@@ -25,3 +25,20 @@ An `actual source-backed Blender` PASS establishes imported geometry, source man
 **Next permitted step:** Graphics Orchestrator 3 and Main0 select a P1 integration branch while World9/Core8C/Physics6 agree canonical `smith` display/occlusion/footprint and entrance behavior. Graphics3B then installs *only* the approved source-backed sprites in existing World9 opt-in rendering with genuine native Chrome/Firefox multiplayer checks. Main0 alone authorizes merge or deployment.
 
 G0 Blood & Iron gore surface compatibility is planning only. G1 runtime gore remains blocked.
+
+
+## Owner visual corrections — authentic Blender R2 (October 26, 2026)
+
+This draft intentionally remains visually **unaccepted** until the owner inspects the new rendered images. The previous genuine Blender and Chrome/Firefox checks passed source authenticity but did not establish artist acceptance; the owner observed absent door/window, remote anvil, prop–crate overlap, an open roof-to-wall triangular slit and forge–roof intersection.
+
+The new **editable native Blender scene** uses the same original pinned CC0 Standard Quaternius modules with two *additional genuine source meshes* (15 imported modules total):
+
+- Import `Door_1_Round.gltf` at the existing Quaternius door-frame center alignment (source intrinsic +0.513745m center offset), rather than leaving an empty entrance. Retain `DoorFrame_Round_WoodDark`.
+- Import genuinely open `WindowShutters_Wide_Round_Open.gltf` on `Window_Wide_Round1.gltf`, and keep scene-only warm emission on the **real imported glass shader** at dusk, returning its original PBR for daytime.
+- Create **two true Blender triangular masonry prisms**, one at the front and one at the rear, with oak sill/rafters, calibrated to the actual imported source roof and door/window wall crown. An occluding painted triangle would not close the geometry. Keep source roof meshes untouched.
+- Shift the forge's masonry/hood/stack physically outside the original roof's projected bounding geometry; move the anvil to a 1.9m working-center distance, close enough to work between horn and hearth.
+- Move the original creator crate away from the toolbench. Put the Blender-modelled hammer and tongs on the bench and measure actual creator crate vs. real hammer and bench meshes. Nothing should hide intersecting geometry behind a camera-only repair.
+
+**Fail-closed actual Blender geometry audit:** compute evaluated *world-coordinate bounding boxes* from genuine imported glTF roof/crate and actual authored forge/hammer/bench objects after parent transforms. Require roof–forge horizontal AABB clearance ≥0.16m and crate–tool/bench clearance ≥0.10m. Verify original roof Z envelope contains both full-height gable tips, authentic door/shutter imported meshes are nonempty and same-run real window glass material slots exist. Record actual numeric clearances and world bounds in the archived source report, then run genuine Blender day+dusk RGBA, real W3C Chrome/Firefox canvas readback and screenshot acceptance. Geometry tests do not replace owner visual judgement.
+
+**Runtime remains prohibited:** no `src/`, `web/`, `server/`, `assets/world/`, Rust/Combat changes, no World9 `smith` replacement authorization, no doors/portals/item pickup/collision contract, no merge/deploy. Source-derived 3D geometry is not a real network authority test.
