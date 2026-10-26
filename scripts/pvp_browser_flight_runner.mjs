@@ -11676,7 +11676,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     victimUiRecovery: { entry: recovery, exit: idle },
     inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
     source0Samples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
-    originalWorldEvents: beforeLifecycleWorldTrace.split(/\\r?\\n/)
+    originalWorldEvents: beforeLifecycleWorldTrace.split(/\r?\n/)
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));
