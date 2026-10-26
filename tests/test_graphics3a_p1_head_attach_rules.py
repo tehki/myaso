@@ -6,12 +6,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from graphics3a_p1_head_attach_rules import (
-    archive_uri, choose_head_faces, head_cut_from_mesh_top,
+    allowed_head_mesh_names, archive_uri, choose_head_faces, head_cut_from_mesh_top,
     remap_joint_indices, validate_upper_anchors,
 )
 
 
 class HeadAttachmentRulesTests(unittest.TestCase):
+    def test_original_face_parts_remain_the_default(self):
+        self.assertEqual(
+            allowed_head_mesh_names("all"),
+            ("Eyebrows", "Eyes", "SuperHero_Male", "Superhero_Female"),
+        )
+
+    def test_isolating_accessories_always_keeps_original_head_mesh(self):
+        for mode in ("without-eyebrows", "head-only"):
+            with self.subTest(mode=mode):
+                names = allowed_head_mesh_names(mode)
+                self.assertIn("SuperHero_Male", names)
+                self.assertIn("Superhero_Female", names)
+                self.assertNotIn("Eyebrows", names)
+        self.assertNotIn("Eyes", allowed_head_mesh_names("head-only"))
+
+    def test_unknown_face_component_mode_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unknown"):
+            allowed_head_mesh_names("omit-all")
+
     def test_zip_dependency_stays_local(self):
         self.assertEqual(
             archive_uri("Base Characters/Godot - UE/", "T_Eye_Brown.png"),
