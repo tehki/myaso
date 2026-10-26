@@ -144,10 +144,19 @@ test("R3 shared audio is wired to both runtimes without delaying light attacks",
       "first-use AudioContext startup cannot postpone a native pointerUP");
     assert.match(pointerUp, /const committed = leftButtonCharge\.release\(event\.pointerId\)/,
       "release classification completes before audio startup");
-    assert.ok(pointerUp.indexOf("leftButtonCharge.release(") < pointerUp.indexOf("audio.unlock()"),
-      "audio unlock must follow the 80ms light/heavy classification");
-    assert.match(pointerUp, /audio\.play\(committed === "heavy" \? "heavy" : "light"\)/,
-      "first trusted release can unlock and play its committed cue");
+    if (name === "online-game") {
+      assert.doesNotMatch(pointerUp, /audio\.unlock\(/,
+        "first-use WebAudio must not freeze genuine online pointerUP before source0 send");
+      assert.match(pointerUp, /afterSource0Audio\?\.noteRelease\(committed\)/,
+        "real first release must remain eligible for its own delayed audio");
+      assert.ok(source.indexOf("networkClient.sendInput(") < source.indexOf("afterSource0Audio?.afterOriginalSend(currentInput)"),
+        "the existing single QUIC writer must run before presentation initialization");
+    } else {
+      assert.ok(pointerUp.indexOf("leftButtonCharge.release(") < pointerUp.indexOf("audio.unlock()"),
+        "offline first-use audio unlock must follow classification");
+      assert.match(pointerUp, /audio\.play\(committed === "heavy" \? "heavy" : "light"\)/,
+        "offline release continues to initialize and play its committed cue");
+    }
   }
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(online, /remoteActionAudio\.observe/);
