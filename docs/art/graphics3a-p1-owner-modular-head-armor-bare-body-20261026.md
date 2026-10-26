@@ -1,11 +1,11 @@
 # 🌕⚔️ MYASO.IO — Character Modularity: Project Owner's Conditional Acceptance
 
-**Owner decision:** October 26, 2026  
-**Department:** Graphics 3A — Characters & Animation  
-**Project:** https://github.com/tehki/myaso  
-**Draft integration:** https://github.com/tehki/myaso/pull/1041  
-**Graphics Orchestrator:** https://github.com/tehki/myaso/issues/1030  
-**Priority:** P1 Graphics work; **NOT** a new Combat Pre-Alpha gate  
+**Owner decision:** October 26, 2026
+**Department:** Graphics 3A — Characters & Animation
+**Project:** https://github.com/tehki/myaso
+**Draft integration:** https://github.com/tehki/myaso/pull/1041
+**Graphics Orchestrator:** https://github.com/tehki/myaso/issues/1030
+**Priority:** P1 Graphics work; **NOT** a new Combat Pre-Alpha gate
 **Status:** DIRECTION ACCEPTED CONDITIONALLY / FUNCTIONALITY UNVERIFIED / ART & RELEASE HOLD
 
 ## 1. What the owner accepted
@@ -13,7 +13,7 @@
 The current Quaternius Peasant + Ranger Hood appearance is an acceptable **temporary starting direction**, **only if the eventual character system can**:
 
 1. **Lose its head.** The character has a removable, independently skinned head, explicit neck attachment/separation geometry, coherent eyes/hair/headgear behavior, and a clean intact/separated presentation. The eventual action is combat-related, but **Graphics 3A is only constructing the asset and presentation interface now**. No decapitation mechanics or events are authorized or implemented in this task.
-2. **Wear different armor.** Replaceable clothing/armor, not a single baked mesh, with named slot attachments, source rig compatibility, predictable visual ordering and visibility/masking of body surfaces beneath gear. Items can be equipped, replaced and removed while remaining animatable.
+2. **Wear different armor.** Replaceable clothing/armor, not a single baked mesh, with named slot attachments, source rig compatibility, predictable visual ordering and **slot-restricted** visibility/masking of body surfaces beneath gear. Items can be equipped, replaced and removed while remaining animatable.
 3. **Have no equipment at all.** A standalone fully modeled unequipped humanoid body, with all body regions present even when **every garment, hood, helmet and armor slot is empty**. No permanent baked-on clothing and no hollow/missing regions where outfit parts were removed.
 
 These conditions are **not present-day feature acceptance**. Do not call the models accepted for production until the actual geometries and states are demonstrated with real original-source renders and then in the game.
@@ -57,7 +57,7 @@ Thus **ALL THREE owner conditions remain open** for original-source visual and g
 
 `scripts/graphics3a_p1_modular_source_audit.py` checks read-only glTF mesh roles and reports `ART_HOLD_NO_PRODUCTION_ASSERTION`; its status **never** claims naked-base, swappable-gear or severable-head verification.
 
-**Verification:** **17/17 synthetic modular-contract tests** and **8/8 synthetic source-audit tests** passed on Serj (25/25), Python compile passed. These are additive to the mandatory `quality` workflow, without weakening any prior CI step. Prior Graphics P1 suite had 144 source-only tests; with these 25, the total count is **169 source-only tests**. The separate prior **70 real UAL1 hood poses** remain a rig-only pass and are not misrepresented as modular/decapitation acceptance.
+**Verification:** **18/18 synthetic modular-contract tests** and **8/8 synthetic source-audit tests** passed on Serj (26/26), Python compile passed. These are additive to the mandatory `quality` workflow, without weakening any prior CI step. Prior Graphics P1 suite had 144 source-only tests; with these 26, the total count is **170 source-only tests**. The separate prior **70 real UAL1 hood poses** remain a rig-only pass and are not misrepresented as modular/decapitation acceptance.
 
 ## 5. Ordered Graphics 3A development, no Combat interruption
 
