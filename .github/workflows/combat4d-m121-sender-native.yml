@@ -8,7 +8,9 @@ on:
       - "server/src/simulation.rs"
       - "scripts/pvp_browser_flight_runner.mjs"
       - "scripts/m121-native-geometry-plan.mjs"
+      - "scripts/m121-native-direction-roles.mjs"
       - "tests/m121-native-geometry-plan.test.mjs"
+      - "tests/m121-native-direction-roles.test.mjs"
       - "tests/combat4-m121-sender-instrumentation.test.mjs"
       - "tests/combat4-m121-authoritative-ingress-proof.test.mjs"
       - ".github/workflows/combat4d-m121-sender-native.yml"
@@ -24,16 +26,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        trial: [1, 2]
+        include:
+          - trial: 1
+            direction: right
+          - trial: 2
+            direction: left
     env:
       MYASO_PVP_SCENARIO: uidirectionallight
+      MYASO_M121_DIRECTION: ${{ matrix.direction }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Original sender read-only invariants and native drivers
         run: |
-          node --test tests/m121-native-geometry-plan.test.mjs
+          node --test tests/m121-native-direction-roles.test.mjs tests/m121-native-geometry-plan.test.mjs
           node --test tests/combat4-m121-sender-instrumentation.test.mjs tests/combat4-m121-authoritative-ingress-proof.test.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node --check web/online-game.mjs
