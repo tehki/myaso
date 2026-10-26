@@ -34,6 +34,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
@@ -11477,9 +11478,12 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // Bring both rivals inside normal light-attack distance from Firefox, but
   // move #3 farther inward so ordinary focus still prefers the idle right-side
   // rival. The later recovery override must therefore be what selects #1.
+  // M147: one real W3C keyboard action bounds the PHYSICAL hold, unlike
+  // separate keyDown/keyUp HTTP requests that stretched 210/260ms to >1s.
+  // Keep original World positions, normal focus and strict proof unchanged.
   await Promise.all([
-    pulseMovementKey(jumpAttacker, "d", 210),
-    pulseMovementKey(closerIdle, "a", 260),
+    pulseM147FocusStageKey(jumpAttacker, "d", 210),
+    pulseM147FocusStageKey(closerIdle, "a", 260),
   ]);
   await sleep(80);
 
@@ -11491,7 +11495,7 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     // Separate every additional physical tap by >240ms: no synthetic
     // movement, no change to World authority, and no false focus acceptance.
     await sleep(300);
-    await pulseMovementKey(closerIdle, "a", 45);
+    await pulseM147FocusStageKey(closerIdle, "a", 45);
     await sleep(55);
     baseline = await Promise.all(entries.map(readUiEvidence));
     observerBefore = baseline.find((entry) => entry.browser === observer.name);
@@ -12512,6 +12516,15 @@ async function pulseMovementKey(session, value, durationMs) {
 // M121: one genuine W3C keyboard transaction avoids a 150ms held
 // approach accidentally lasting ~700ms due to two separate driver roundtrips.
 // Original server geometry, HP and authoritative hit requirements unchanged.
+// M147 is a read-only native staging harness, not a production input path.
+// The entire physical key press and release must share one W3C transaction.
+async function pulseM147FocusStageKey(session, key, durationMs) {
+  const actions = planM147NativeFocusKeyActions({
+    keyboardId: `keyboard-${session.name}`, key, durationMs,
+  });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, actions);
+}
+
 async function pulseMovementKeyBoundedW3c(session, value, durationMs) {
   if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 250) {
     throw new RangeError("M121 bounded native approach outside staging budget");
