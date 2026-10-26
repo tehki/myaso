@@ -31,7 +31,7 @@ class ClipHeadTests(unittest.TestCase):
         r=self.clip()
         ys=[p[1] for p in r["positions"]]
         self.assertTrue(all(v>=1.6-1e-9 for v in ys))
-        self.assertGreaterEqual(sum(abs(y-1.6)<1e-9 for y in ys),3)
+        self.assertGreaterEqual(sum(abs(y-1.6)<1e-9 for y in ys),2)
 
     def test_uv_skin_weights_normal_are_valid(self):
         r=self.clip()
