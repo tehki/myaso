@@ -134,3 +134,96 @@ pub fn parse_item_db_key(bytes: [u8; 16]) -> Option<ItemId> {
 pub fn positive_pg_bigint(value: u64) -> Option<i64> {
     i64::try_from(value).ok().filter(|&n| n > 0)
 }
+
+// ---------------------- Dormant Magic carried-item preflight ----------------
+// Only Backpack and Equipment from Magic 2B are covered. Real corpses/ground
+// require independent location/zone/receipt semantics; they MUST NOT be
+// represented as an inventory owner or silently dropped during migration.
+
+use std::collections::BTreeSet;
+
+/// Bounds work for ONE staging partition. This does not establish global
+/// physical uniqueness across partitions, source namespaces or other writers.
+pub const MAX_CARRIED_REFERENCE_BATCH: usize = 1024;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum CarriedSlot {
+    Backpack,
+    /// Tag is opaque until Magic 2B supplies an explicit reviewed slot codec.
+    Equipped(u8),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LegacyCarriedStack {
+    pub owner: LegacyKey,
+    pub item: LegacyKey,
+    pub slot: CarriedSlot,
+    pub amount: u16,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedCarriedStack {
+    pub owner: CharacterId,
+    pub item: ItemId,
+    pub slot: CarriedSlot,
+    pub amount: u16,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CarriedImportError {
+    UnmappedOwner,
+    UnmappedItem,
+    InvalidStackAmount,
+    DuplicatePhysicalItem,
+    DuplicateEquipmentSlot,
+    TooManyReferences,
+}
+
+/// Read-only preflight for one complete carrier partition (the caller must
+/// decide and verify that partition's completeness). A failure returns NO
+/// partial result. The mappings are assumed to be separately vetted; presence
+/// alone is NOT authentication nor proof of durable allocation.
+///
+/// Full Magic domain validation must additionally check permitted equipment
+/// slots and kind/stackability, and a complete global import must enforce item
+/// uniqueness across corpse/ground, other partitions and the existing ledger.
+/// The returned rows are NOT committed locations and authorize no live write.
+pub fn resolve_carried_stacks(
+    characters: &CharacterImportMap,
+    items: &ItemImportMap,
+    entries: &[LegacyCarriedStack],
+) -> Result<Vec<ResolvedCarriedStack>, CarriedImportError> {
+    if entries.len() > MAX_CARRIED_REFERENCE_BATCH {
+        return Err(CarriedImportError::TooManyReferences);
+    }
+    let mut rows = Vec::with_capacity(entries.len());
+    let mut physical_items = BTreeSet::new();
+    let mut equipped_slots = BTreeSet::new();
+
+    for entry in entries {
+        if entry.amount == 0 {
+            return Err(CarriedImportError::InvalidStackAmount);
+        }
+        let owner = characters
+            .canonical_for(entry.owner)
+            .ok_or(CarriedImportError::UnmappedOwner)?;
+        let item = items
+            .canonical_for(entry.item)
+            .ok_or(CarriedImportError::UnmappedItem)?;
+        if !physical_items.insert(item) {
+            return Err(CarriedImportError::DuplicatePhysicalItem);
+        }
+        if let CarriedSlot::Equipped(slot) = entry.slot {
+            if !equipped_slots.insert((owner, slot)) {
+                return Err(CarriedImportError::DuplicateEquipmentSlot);
+            }
+        }
+        rows.push(ResolvedCarriedStack {
+            owner,
+            item,
+            slot: entry.slot,
+            amount: entry.amount,
+        });
+    }
+    Ok(rows)
+}

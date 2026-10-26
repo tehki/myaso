@@ -124,3 +124,11 @@ Test in this order: **pure Rust contract tests → integration with authenticate
 **No approval here for:** production login provider, persistent world DB deployment, account migration, full loot, PvP balancing changes, MOCMP wallets, live-value currency, public QUIC private HIT extension, weakening acceptance or merging any existing draft PR.
 
 **Gate remains HARD HOLD until all owners sign off and end-to-end evidence is green.**
+
+## 7. Non-activating Magic carried-item reference preflight (Core 8B X1 review extension)
+
+The dormant `legacy_identity_import::resolve_carried_stacks` helper validates **one complete, bounded staging partition** of Magic-style Backpack/Equipped stack references *only after* separately supplied character/item mappings have been staged. Each row supplies a namespaced legacy owner and physical item ID, a Backpack or opaque Equipped slot, and its original nonzero `u16` amount. It returns full-width canonical character/item IDs without changing any registry, World, item ledger, on-disk state, or network actor binding.
+
+This preflight refuses an unmapped owner or item, the same physical item in two positions/owners, two distinct items in one owner's equipment slot, a zero stack amount or more than 1,024 rows in one batch. All failure cases return **no partial resolved rows**. The equipment slot byte is explicitly **opaque**: Magic 2B must review its slot enum encoding, item kind/stackability and permitted slot semantics before any actual integration. No character or item is authenticated or allocated by its appearance in a mapping.
+
+**Scope boundary:** duplicates in a different partition or any Corpse/Ground record are **not** caught by this preflight. Global physical uniqueness, corpse ID mapping, cross-zone coordinates/leases, zero vs nonstackable amount rules, and the `ItemStack` kind are deliberately outside this helper; they need one authoritative full-import ledger check. Nothing here is a durable transaction or an approved `loot_transaction` writer. Never pass a partially validated migration to a live system or interpret this local proof as support for account login, real money, game progression, or full loot.

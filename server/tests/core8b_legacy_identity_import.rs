@@ -142,3 +142,210 @@ fn import_staging_does_not_mint_or_activate_a_persistent_session() {
         .is_err());
     assert_eq!(import.canonical_for(legacy(3, 9)), Some(canonical));
 }
+
+fn fixture_maps() -> (CharacterImportMap, ItemImportMap) {
+    let mut characters = CharacterImportMap::default();
+    let mut items = ItemImportMap::default();
+    characters
+        .stage_batch(&[
+            (
+                legacy(10, 1),
+                character(0xAAAA_0000_0000_0000_0000_0000_0000_0001),
+            ),
+            (
+                legacy(10, 2),
+                character(0xAAAA_0000_0000_0000_0000_0000_0000_0002),
+            ),
+        ])
+        .unwrap();
+    items
+        .stage_batch(&[
+            (
+                legacy(20, 101),
+                item(0xBBBB_0000_0000_0000_0000_0000_0000_0001),
+            ),
+            (
+                legacy(20, 102),
+                item(0xBBBB_0000_0000_0000_0000_0000_0000_0002),
+            ),
+            (
+                legacy(20, 103),
+                item(0xBBBB_0000_0000_0000_0000_0000_0000_0003),
+            ),
+        ])
+        .unwrap();
+    (characters, items)
+}
+
+#[test]
+fn carried_stack_preflight_maps_full_ids_and_preserves_quantity_without_minting() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_stacks, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let rows = resolve_carried_stacks(
+        &characters,
+        &items,
+        &[
+            LegacyCarriedStack {
+                owner: legacy(10, 1),
+                item: legacy(20, 101),
+                slot: CarriedSlot::Backpack,
+                amount: u16::MAX,
+            },
+            LegacyCarriedStack {
+                owner: legacy(10, 2),
+                item: legacy(20, 102),
+                slot: CarriedSlot::Equipped(1),
+                amount: 1,
+            },
+        ],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        rows[0].owner,
+        character(0xAAAA_0000_0000_0000_0000_0000_0000_0001)
+    );
+    assert_eq!(
+        rows[0].item,
+        item(0xBBBB_0000_0000_0000_0000_0000_0000_0001)
+    );
+    assert_eq!(rows[0].amount, u16::MAX);
+    assert_eq!(rows[1].slot, CarriedSlot::Equipped(1));
+    assert_eq!(characters.len(), 2); // read-only lookup; NO admission or mutation
+    assert_eq!(items.len(), 3);
+}
+
+#[test]
+fn orphan_character_or_item_aborts_whole_carried_preflight() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_stacks, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let valid = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Backpack,
+        amount: 5,
+    };
+    assert_eq!(
+        resolve_carried_stacks(
+            &characters,
+            &items,
+            &[
+                valid,
+                LegacyCarriedStack {
+                    owner: legacy(10, 999),
+                    item: legacy(20, 102),
+                    ..valid
+                },
+            ]
+        ),
+        Err(CarriedImportError::UnmappedOwner)
+    );
+    assert_eq!(
+        resolve_carried_stacks(
+            &characters,
+            &items,
+            &[
+                valid,
+                LegacyCarriedStack {
+                    item: legacy(20, 999),
+                    ..valid
+                },
+            ]
+        ),
+        Err(CarriedImportError::UnmappedItem)
+    );
+    assert_eq!(characters.len(), 2);
+    assert_eq!(items.len(), 3);
+}
+
+#[test]
+fn double_location_same_item_is_rejected_even_between_owners() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_stacks, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    assert_eq!(
+        resolve_carried_stacks(
+            &characters,
+            &items,
+            &[
+                LegacyCarriedStack {
+                    owner: legacy(10, 1),
+                    item: legacy(20, 101),
+                    slot: CarriedSlot::Backpack,
+                    amount: 1,
+                },
+                LegacyCarriedStack {
+                    owner: legacy(10, 2),
+                    item: legacy(20, 101),
+                    slot: CarriedSlot::Equipped(1),
+                    amount: 1,
+                },
+            ]
+        ),
+        Err(CarriedImportError::DuplicatePhysicalItem)
+    );
+}
+
+#[test]
+fn equipment_slot_collision_is_rejected_per_character_only() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_stacks, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+    };
+    let (characters, items) = fixture_maps();
+    let first = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Equipped(1),
+        amount: 1,
+    };
+    let second = LegacyCarriedStack {
+        item: legacy(20, 102),
+        ..first
+    };
+    assert_eq!(
+        resolve_carried_stacks(&characters, &items, &[first, second]),
+        Err(CarriedImportError::DuplicateEquipmentSlot)
+    );
+    let other_character = LegacyCarriedStack {
+        owner: legacy(10, 2),
+        ..second
+    };
+    let accepted = resolve_carried_stacks(&characters, &items, &[first, other_character]).unwrap();
+    assert_eq!(accepted.len(), 2);
+}
+
+#[test]
+fn zero_amount_and_oversized_carried_batches_fail_closed() {
+    use myaso_server::legacy_identity_import::{
+        resolve_carried_stacks, CarriedImportError, CarriedSlot, LegacyCarriedStack,
+        MAX_CARRIED_REFERENCE_BATCH,
+    };
+    let (characters, items) = fixture_maps();
+    let valid = LegacyCarriedStack {
+        owner: legacy(10, 1),
+        item: legacy(20, 101),
+        slot: CarriedSlot::Backpack,
+        amount: 2,
+    };
+    assert_eq!(
+        resolve_carried_stacks(
+            &characters,
+            &items,
+            &[LegacyCarriedStack { amount: 0, ..valid }]
+        ),
+        Err(CarriedImportError::InvalidStackAmount)
+    );
+    assert_eq!(
+        resolve_carried_stacks(
+            &characters,
+            &items,
+            &vec![valid; MAX_CARRIED_REFERENCE_BATCH + 1]
+        ),
+        Err(CarriedImportError::TooManyReferences)
+    );
+}
