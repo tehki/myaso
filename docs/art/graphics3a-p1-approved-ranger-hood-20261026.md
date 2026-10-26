@@ -1,15 +1,15 @@
 # Graphics 3A P1 — Approved Publisher Ranger Hood on Peasant Character
 
-**Date:** 2026-10-26  
-**PR:** #1041 — Draft  
-**Authority:** Graphics 3A art-review only  
+**Date:** 2026-10-26
+**PR:** #1041 — Draft
+**Authority:** Graphics 3A art-review only
 **Verdict:** **TECHNICAL PASS; VISUAL IMPROVEMENT; ART/RELEASE HOLD**
 
 ## Source and licensing boundary
 
 This review uses only the owner's already-approved free **Standard** Quaternius Modular Fantasy Outfits and Universal Base Characters and UAL1 animation library. Nothing was purchased or added to the live game. Source files remain in the private X230i archive, no original glTF/BIN/texture bytes, preview PNGs or derivative materials are committed.
 
-**Publisher source ZIP:** `Modular Character Outfits - Fantasy[Standard].zip`  
+**Publisher source ZIP:** `Modular Character Outfits - Fantasy[Standard].zip`
 **Original ZIP SHA-256:** `c3468b18871cc8c8f05ab14df7712baf22cb9f389cbd870babf130e595187f70`
 
 | Character | Original author hood glTF source | GLTF member SHA-256 |
