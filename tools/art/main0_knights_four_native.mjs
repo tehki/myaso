@@ -223,6 +223,31 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
   data.presentationBoundedCatchups=Number(catchUps[1]);
   data.presentationDebtSamples=Number(sampleCount[1]);
   assert.ok(data.presentationDebtP95Ms>=data.presentationDebtP50Ms&&data.presentationDebtSamples>=12);
+  // Read the unchanged first-party `?netstats=1` HUD at the same browser
+  // inspection point as the native Canvas callback/render-gap metrics.
+  // Snapshot, RTT and ACK jitter use different bounded source windows;
+  // this is a co-sample for diagnosis, NOT causal/time-aligned proof.
+  const value="(collecting…|\\d+ms)";
+  const ack=data.diagnosticsText.match(new RegExp("Input→ACK p50\\s+"+value+"\\s*·\\s*p95\\s+"+value));
+  const jitter=data.diagnosticsText.match(new RegExp("Jitter p95\\s+"+value));
+  const snapshots=data.diagnosticsText.match(new RegExp("Snapshots p50\\s+"+value+"\\s*·\\s*p95\\s+"+value));
+  const inputSamples=data.diagnosticsText.match(/\\|\\s+Samples\\s+(\\d+)(?:\\s*\\||$)/);
+  assert.ok(ack&&jitter&&snapshots&&inputSamples,
+    "original source network HUD must contain actual ACK, jitter, snapshot and sample diagnostics");
+  const ms=s=>s==="collecting…"?null:Number(s.slice(0,-2));
+  data.networkUiCoSample={
+   inputAckP50Ms:ms(ack[1]),inputAckP95Ms:ms(ack[2]),
+   ackJitterP95Ms:ms(jitter[1]),
+   snapshotGapP50Ms:ms(snapshots[1]),snapshotGapP95Ms:ms(snapshots[2]),
+   inputAckSamples:Number(inputSamples[1]),
+   source:"original?netstats=1",
+   timeAlignedCausality:false,gpuPresentQualified:false,
+  };
+  for(const [key,value] of Object.entries(data.networkUiCoSample)){
+   if(key.endsWith("Ms"))assert.ok(value===null||(Number.isFinite(value)&&value>=0),
+     "original source network observation must be nonnegative or collecting");
+  }
+  assert.ok(Number.isInteger(data.networkUiCoSample.inputAckSamples)&&data.networkUiCoSample.inputAckSamples>=0);
   assert.equal(data.knightsFlag,"1","all four must use original authenticated source Silver renderer");
   assert.equal(data.knightArt,"relit","all four opt into original Blender 3A relit reference");
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
@@ -290,6 +315,7 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
   floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
   presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms),
+  networkUiCoSamples:trial.map(x=>({browser:x.browser,actorId:x.actorId,...x.data.networkUiCoSample})),
   performanceAdvisory}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}

@@ -95,6 +95,23 @@ function validate(path,players){
   assert.ok(Number.isInteger(t.data.presentationDebtP95Ms)&&t.data.presentationDebtP95Ms>=t.data.presentationDebtP50Ms);
   assert.ok(Number.isInteger(t.data.presentationBoundedCatchups)&&t.data.presentationBoundedCatchups>=0);
   assert.ok(t.data.diagnosticsText.includes("Render catch-ups")&&t.data.diagnosticsText.includes("Extra render lag p50"));
+  // Independently reparse original game text so a future QA report cannot
+  // replace measured transport/snapshot fields with invented zero values.
+  const observed=t.data.diagnosticsText;
+  const timeValue="(collecting…|\\d+ms)";
+  const ak=observed.match(new RegExp("Input→ACK p50\\s+"+timeValue+"\\s*·\\s*p95\\s+"+timeValue));
+  const ji=observed.match(new RegExp("Jitter p95\\s+"+timeValue));
+  const sn=observed.match(new RegExp("Snapshots p50\\s+"+timeValue+"\\s*·\\s*p95\\s+"+timeValue));
+  const sample=observed.match(/\\|\\s+Samples\\s+(\\d+)(?:\\s*\\||$)/);
+  assert.ok(ak&&ji&&sn&&sample,"original HUD co-sample requires genuine network telemetry");
+  const observedMs=s=>s==="collecting…"?null:Number(s.slice(0,-2));
+  assert.deepEqual(t.data.networkUiCoSample,{
+   inputAckP50Ms:observedMs(ak[1]),inputAckP95Ms:observedMs(ak[2]),
+   ackJitterP95Ms:observedMs(ji[1]),
+   snapshotGapP50Ms:observedMs(sn[1]),snapshotGapP95Ms:observedMs(sn[2]),
+   inputAckSamples:Number(sample[1]),
+   source:"original?netstats=1",timeAlignedCausality:false,gpuPresentQualified:false,
+  },"network observations must match unchanged original HUD text");
   const full=readFileSync(join(path,t.fullCanvasScreenshot));
   assert.equal(full.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
   assert.equal(full.readUInt32BE(16),960);
@@ -121,6 +138,16 @@ const observedOverBudget=[
 console.log("GRAPHICS3C_PERFORMANCE_RELEASE_HOLD "+JSON.stringify({
  exactHead:checkedOutHead,thresholdMs:33,observedOverBudget,
  gpuPresentQualified:false,independentPhysicalHosts:false,performanceReleaseGo:false,
+ networkUiCoSamples:[
+  ...two.trials.map(t=>({worldSeats:2,browser:t.browser,actorId:t.actorId,
+   frameCallbackP95Ms:t.data.frameIntervalP95Ms,
+   extraRenderGapP95Ms:t.data.presentationDebtP95Ms,
+   ...t.data.networkUiCoSample})),
+  ...four.trials.map(t=>({worldSeats:4,browser:t.browser,actorId:t.actorId,
+   frameCallbackP95Ms:t.data.frameIntervalP95Ms,
+   extraRenderGapP95Ms:t.data.presentationDebtP95Ms,
+   ...t.data.networkUiCoSample})),
+ ],
 }));
 console.log("GRAPHICS3C_P0_REAL_GRID_FULL_CANVAS_PASS "+JSON.stringify({
  exactHead:two.sourceCommit,sessions:6,worlds:2,engines,realSilver:true,optionalTerrain:false,
