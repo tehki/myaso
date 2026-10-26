@@ -199,7 +199,7 @@
       "liveWorld9CameraChanged": false
     },
     "gableInfill": {
-      "treatment": "source-plaster-with-timber-braces",
+      "treatment": "plain-plaster-wall",
       "bottomZ": 3.09,
       "apexZ": 5.1,
       "halfWidth": 1.85,
@@ -208,7 +208,16 @@
       "gameplayFootprintUnchanged": true,
       "duskWindowDoorGlowUnchanged": true,
       "chimneySmokeUnchanged": true,
-      "visualReviewStillRequired": true
+      "visualReviewStillRequired": true,
+      "plainWallRGBA": [
+        0.55,
+        0.45,
+        0.34,
+        1
+      ],
+      "removeCenterPost": true,
+      "preserveEdgeAndSillTimbers": true,
+      "originalPlasterTextureUnchanged": true
     }
   },
   "output": {
