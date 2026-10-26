@@ -144,7 +144,7 @@ async fn seat(
             .await
             .expect("reliable frame timeout")
             .expect("reliable frame");
-        if frame.starts_with(&[2, 2]) {
+        if frame.starts_with(&[myaso_server::PROTOCOL_VERSION, 2]) {
             let snapshot = decode_snapshot(&frame).expect("actual original World snapshot");
             assert!(
                 snapshot.full,
