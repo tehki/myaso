@@ -41,7 +41,7 @@ import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
-import { dispatchM41ObservedParry, readM41ScalarWorldCue, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
+import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
