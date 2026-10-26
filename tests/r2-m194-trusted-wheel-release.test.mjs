@@ -221,7 +221,8 @@ test("M194 first-red late-HIT counterexample uses physical release-anchored guar
   now=75;wheelAck.resolve();
   const proof=await flight;
   assert.equal(proof.attackUpDispatchMs,60);
-  assert.equal(proof.clickHoldMs,55);
+  assert.equal(proof.clickHoldMs,60,
+    "physical source0 click budget starts before the real native DOWN ACK, not after it");
   assert.equal(proof.postTrustedWheelMs,25);
   const predictedContactAgeMs=(proof.attackUpDispatchMs - proof.trustedWheelObservedMs) + COMBAT.attack.windupMs;
   assert.equal(predictedContactAgeMs,160);
