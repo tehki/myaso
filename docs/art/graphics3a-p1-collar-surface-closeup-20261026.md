@@ -44,6 +44,24 @@ The current source prototype selects Base Character body-head faces by triangle 
 
 The next proper art step is an **offline Blender-authored head/neck construction**, with a deliberately resolved collar band and topology (cut/clip and cap, hidden seam beneath a modeled scarf/cowl/high collar, or a better-matching licensed head), material matching and controlled skinning. Inspect real source mesh normals, UVs, hair/headgear compatibility and facial shading. Then measure collision-free surfaces and inspect multiple actual animation phases, each at cardinal and diagonal camera facings. Keep P1 HOLD until the Art Director approves a genuinely better-looking source result.
 
+
+## Optional geometry correction experiment — same day
+
+The original Base Character head extraction discarded entire triangles whose *centroids* were below the collar plane. The eight-facing close-ups revealed obvious sawtooth neck edges. A new **optional** `--cut-method plane` path now clips the source head triangles exactly at the cutoff, interpolates position/normal/UV and top-four skin influences at intersected edges, and welds matching resulting attributes to restore shared-edge topology. `--cut-method centroid` **remains the default**, preserving reproducibility and avoiding a silent art change.
+
+- [`scripts/graphics3a_p1_head_plane_clip.py`](../../scripts/graphics3a_p1_head_plane_clip.py) is source-only; [12 synthetic tests](../../tests/test_graphics3a_p1_head_plane_clip.py) pass on Serj, including valid cut-plane vertices, shared faces and interpolated weights/UVs. Tests are additive to the protected quality workflow.
+- On X230i the first non-welded prototype duplicated every triangle corner, making the boundary diagnostic inefficient. That trial was **stopped**, and the output generator changed to weld matching vertex attributes. The corrected welded version completed for both original private Peasant meshes.
+- In the original-source `Walk_Loop` half-phase at the same 512px collar camera, the *welded plane-cut* review contact sheets were:
+  - Male Peasant SHA256 `abfd4b1d75902dcfe95d2dab80f41adb9eaed84e1a46df714d91e5eaa47038c5`.
+  - Female Peasant SHA256 `a2bd0db76c83d8a2f431293f70d5267220e9feffa6d9f2f047ebbf6827a3a094`.
+- Closest garment-*surface* p95 remains **10.99 cm male / 11.84 cm female** to rounding. A cleaner cut boundary does **not** mean the collar geometry is attached, capped, welded to the garment or free of gaps.
+- **Visual comparison:** both jaw/neck outlines now terminate along a cleaner near-horizontal plane with fewer polygon-tooth artifacts. The base heads are still conspicuously bald/basic, with persistent dark triangular regions on scalp/face, and apparent skin/collar separation. This is an **improved diagnostic preview only — ART FAIL / HOLD**, not an approved character.
+
+The plane clip remains **open** (no watertight bottom neck cap), uses an approximate top-four skin influence interpolation for newly generated boundary vertices, and requires proper Blender-authored seam/collar/neck topology, normals, UV and materials, posed continuity across animation phases, and Art Director review. No glTF export or game integration has been added.
+
+**Full private evidence paths on X230i:**
+`~/Downloads/myaso-graphics3a-p1-assets-20261025/private_head_review_outputs/<Male_Peasant|Female_Peasant>/collar_planeclip_welded_20261026/`.
+
 ## Checks
 
 - `scripts/graphics3a_p1_neck_surface_qc.py`: exact closest-point-on-triangle (point/edge/face region) for open head-cut boundary against all nondegenerate outfit triangles overlapping collar Y band; conservative triangle-AABB pruning; explicit ART HOLD result.
