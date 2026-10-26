@@ -1,0 +1,84 @@
+name: Graphics3B P1 Quaternius genuine Blender source review
+
+on:
+  pull_request:
+    paths:
+      - ".gitmodules"
+      - "third_party/quaternius/medieval-village-megakit-standard"
+      - "assets/environment/greyhaven/quaternius-standard-preview/**"
+      - "tools/art/render_quaternius_greyhaven_preview.py"
+      - "tools/art/bake_quaternius_greyhaven_review_sprites.py"
+      - ".github/workflows/graphics3b-quaternius-native-blender-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  approved-original-blender-art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact reviewed source commit and original pinned glTF
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Qualify original Quaternius CC0 source and unmodified approved art
+        run: |
+          set -euo pipefail
+          test "$(git -C third_party/quaternius/medieval-village-megakit-standard rev-parse HEAD)" = 21104b4045261c28fc312360841ed1a7b0ac8782
+          test "$(git hash-object assets/environment/greyhaven/quaternius-standard-preview/manifest.json)" = 42bfe1c4243551791d4e30561fd43d8c33c1c671
+          test "$(git hash-object tools/art/render_quaternius_greyhaven_preview.py)" = 3c8b2cdeb1d312717b935188047680251eac2443
+          test "$(git hash-object tools/art/bake_quaternius_greyhaven_review_sprites.py)" = 920058c866c2e35257b6d6223b769f38571623bc
+          node tools/art/verify_quaternius_standard_source.mjs
+          python3 -m py_compile tools/art/render_quaternius_greyhaven_preview.py tools/art/bake_quaternius_greyhaven_review_sprites.py
+      - name: Install genuine Blender rendering dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender python3-numpy python3-pil
+          blender --version
+      - name: Assemble original glTF in editable Blender and render day and dusk
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/quaternius-greyhaven
+          timeout --signal=TERM --kill-after=10s 900s blender --background --threads 2 \
+            --python tools/art/render_quaternius_greyhaven_preview.py -- \
+            --manifest assets/environment/greyhaven/quaternius-standard-preview/manifest.json \
+            --source third_party/quaternius/medieval-village-megakit-standard/glTF \
+            --output .artifacts/quaternius-greyhaven
+          for f in greyhaven-quaternius-cottage-day.png greyhaven-quaternius-cottage-dusk.png \
+                   greyhaven-quaternius-cottage-source.blend quaternius-greyhaven-review-report.json; do
+            test -s ".artifacts/quaternius-greyhaven/$f"
+          done
+      - name: Derive actual alpha-preserving day and dusk review sprites
+        run: |
+          set -euo pipefail
+          python3 tools/art/bake_quaternius_greyhaven_review_sprites.py \
+            --source .artifacts/quaternius-greyhaven \
+            --dest .artifacts/quaternius-greyhaven-sprite-review
+          for f in greyhaven-quaternius-cottage-day-2d5-review.webp \
+                   greyhaven-quaternius-cottage-dusk-2d5-review.webp \
+                   greyhaven-quaternius-2d5-review-manifest.json; do
+            test -s ".artifacts/quaternius-greyhaven-sprite-review/$f"
+          done
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "approved_art_commit=9fcf1da2ade6afb455d8514cacb8c179bd6a9b52"
+            echo "quaternius_standard_gitlink=$(git -C third_party/quaternius/medieval-village-megakit-standard rev-parse HEAD)"
+            sha256sum .artifacts/quaternius-greyhaven/* .artifacts/quaternius-greyhaven-sprite-review/*
+          } > .artifacts/quaternius-greyhaven-native-source-evidence.txt
+          cat .artifacts/quaternius-greyhaven-native-source-evidence.txt
+          echo "GRAPHICS3B_QUATERNIUS_NATIVE_BLENDER_DAY_DUSK_SPRITE_PASS"
+      - name: Retain genuinely rendered source, PNG previews, review WebP and hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-quaternius-native-original-blender-day-dusk
+          path: |
+            .artifacts/quaternius-greyhaven/*
+            .artifacts/quaternius-greyhaven-sprite-review/*
+            .artifacts/quaternius-greyhaven-native-source-evidence.txt
+          retention-days: 7
+          if-no-files-found: ignore
