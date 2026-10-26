@@ -247,10 +247,33 @@ def prepare_chimney_smoke(imported):
     nodes.clear()
     output = nodes.new("ShaderNodeOutputMaterial")
     volume = nodes.new("ShaderNodeVolumePrincipled")
-    volume.inputs["Color"].default_value = (0.65, 0.59, 0.54, 1)
-    volume.inputs["Density"].default_value = 0.53
-    volume.inputs["Anisotropy"].default_value = 0.12
-    material.node_tree.links.new(volume.outputs["Volume"], output.inputs["Volume"])
+    volume.inputs["Color"].default_value = (0.60, 0.53, 0.48, 1)
+    volume.inputs["Anisotropy"].default_value = 0.10
+    # Unbroken homogeneous density would look like a cotton-ball sphere.
+    # Blender-native 4D noise gives each original-geometry-anchored wisp a
+    # genuinely different irregular density field, with transparent gaps.
+    coords = nodes.new("ShaderNodeTexCoord")
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.noise_dimensions = "4D"
+    noise.inputs["Scale"].default_value = 4.3
+    noise.inputs["Detail"].default_value = 2.6
+    noise.inputs["Roughness"].default_value = 0.62
+    random = nodes.new("ShaderNodeObjectInfo")
+    variation = nodes.new("ShaderNodeMath")
+    variation.operation = "MULTIPLY"
+    variation.inputs[1].default_value = 6.0
+    colorramp = nodes.new("ShaderNodeValToRGB")
+    colorramp.color_ramp.elements[0].position = 0.33
+    colorramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)
+    colorramp.color_ramp.elements[1].position = 0.71
+    colorramp.color_ramp.elements[1].color = (0.42, 0.42, 0.42, 1.0)
+    links = material.node_tree.links
+    links.new(coords.outputs["Generated"], noise.inputs["Vector"])
+    links.new(random.outputs["Random"], variation.inputs[0])
+    links.new(variation.outputs[0], noise.inputs["W"])
+    links.new(noise.outputs["Fac"], colorramp.inputs["Fac"])
+    links.new(colorramp.outputs["Color"], volume.inputs["Density"])
+    links.new(volume.outputs["Volume"], output.inputs["Volume"])
     puff_list = []
     for i in range(6):
         height = 0.20 + 0.26 * i
@@ -270,16 +293,17 @@ def prepare_chimney_smoke(imported):
     smoke_lamp.shadow_soft_size = 0.85
     smoke_light = bpy.data.objects.new(smoke_lamp.name, smoke_lamp)
     bpy.context.scene.collection.objects.link(smoke_light)
-    smoke_light.location = (base_x, base_y - 0.26, top_z + 0.79)
+    smoke_light.location = (base_x + 0.10, base_y - 0.18, top_z + 1.02)
     proof = {"anchorOriginalSourceModel": "Prop_Chimney",
              "actualSourceChimneyTopMeters": top_z,
              "actualSourceChimneyCenter": [base_x, base_y],
              "proceduralVolumePuffs": len(puff_list),
-             "renderVolumeDensity": 0.53,
-             "duskSoftSmokeFillWatts": 95.0,
+             "proceduralVolumeNoise4D": True,
+             "renderVolumeDensityMax": 0.42,
+             "duskSoftSmokeFillWatts": 46.0,
              "duskOnly": True, "animatedInGame": False,
              "sourceGLTFUnmodified": True}
-    return puff_list, [(smoke_light, 95.0)], proof
+    return puff_list, [(smoke_light, 46.0)], proof
 
 
 def render_mood(scene, mood, output, key, fill, environment,
