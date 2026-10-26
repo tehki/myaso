@@ -786,6 +786,21 @@ try{
    a:p?.replicatedFighters?.find(f=>f.netId===1)??null,
    t:p?.replicatedFighters?.find(f=>f.netId===2)??null};
  };
+ // The original World heavy-return-to-Idle receipt only covers attacker #1;
+ // defender #2 may still be in authentic damage recovery. Wait for BOTH
+ // replicated World actors to be Idle before genuine physical Light staging.
+ // Bounded read-only wait; preserve every strict stage/HP/reach assertion.
+ const idleBeforeLight=await waitFor(async()=>{
+  const pair=await readOriginalPair();
+  return pair.a?.action===0&&pair.t?.action===0?pair:false;
+ },5000).catch(async error=>{
+  const pair=await readOriginalPair().catch(()=>null);
+  console.error("COMBAT4C_POST_HEAVY_IDLE_WAIT_FAILED",JSON.stringify({
+   error:String(error),pair,originalWorldTail:readAuthoritativeWorld().slice(-2200),
+  }));
+  throw error;
+ });
+ console.log("COMBAT4C_POST_HEAVY_BOTH_IDLE",JSON.stringify(idleBeforeLight));
  let stage=null;
  for(let attempt=0;attempt<6;attempt++){
   const before=await readOriginalPair(),{a,t}=before;
