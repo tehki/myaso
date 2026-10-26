@@ -8365,7 +8365,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // exact remote raster/source-frame assertions still qualify the run.
     const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
-    if (scenario === "uiparrytell" || scenario === "uistun") {
+    if (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry") {
       const attemptAttackerBaseline = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
       if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
         throw new Error("M41 could not record current-attempt original World cue baseline");
@@ -8380,7 +8380,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
           scenario === "uiparrytell",
         ),
-        sendWheel: () => scenario === "uiparrytell"
+        // M33 now uses the original actor-bound windup gate and one real
+        // viewport-center native Firefox wheel, keeping M35 unchanged.
+        sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
           ? scrollM41ViewportWheel(defender, defenderViewport)
           : setArenaBlock(defender, defenderElementId, true),
       });
