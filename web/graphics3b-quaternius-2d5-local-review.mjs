@@ -39,6 +39,8 @@ else try{
     manifest.gableNoDarkApexAtlasStain!==true||
     !(manifest.gableApexSeamExtendedMeters>=0.14&&manifest.gableApexSeamExtendedMeters<=0.20)||
     manifest.gableWeatheringWorldScale!==9.5||
+    manifest.gableApexHiddenTipRiseMeters!==0.17||
+    manifest.gableApexHiddenTipForwardMeters!==0.035||
     manifest.originalRoofAndWallMeshesUnchanged!==true)
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={},imageInfo={};
