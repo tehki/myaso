@@ -14,6 +14,7 @@ from graphics3a_p1_neck_seam_qc import neck_collar_proximity
 from graphics3a_p1_neck_surface_qc import collar_surface_proximity
 from graphics3a_p1_head_plane_clip import clip_skinned_mesh_y
 from graphics3a_p1_skin_paint_ab import (NEUTRAL_MIN_RGB_MEAN, NEUTRAL_MAX_RGB_MEAN, NEUTRAL_MAX_CHANNEL_SPAN, skin_sample_is_valid, skin_reference_uv)
+from graphics3a_p1_hood_review_rules import (approved_hood_member, verified_hood_bind_anchors)
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
@@ -163,7 +164,61 @@ def target_parts(target,tbuf,path):
    parts.append({'node':ni,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,'joints':joints,
     'weights':weights,'uv':uv,'faces':faces,'material':cache[mi]})
  return parts
-def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original'):
+def load_private_publisher_hood(archive,target_model_name,target,target_mesh_node,target_world):
+ """Add original approved free Standard Ranger hood mesh for offline P1 lookdev.
+
+ Source vendor ZIP remains local and unchanged. The target rig drives this
+ original skinned material mesh; no glTF or gameplay sprite is exported.
+ """
+ if not archive.is_file():raise FileNotFoundError(archive)
+ with ZipFile(archive) as zip:
+  member=approved_hood_member(target_model_name,zip.namelist())
+  doc=json.loads(zip.read(member));prefix=member.rsplit("/",1)[0]+"/"
+  buffers=[zip.read(archive_uri(prefix,b["uri"])) for b in doc["buffers"]]
+ validate_skeleton_pair(doc,target)
+ hood_world=world_matrices(doc,{},np)
+ nodes=[i for i,n in enumerate(doc["nodes"]) if "mesh" in n and "skin" in n]
+ if len(nodes)!=1:raise ValueError("Unexpected publisher Ranger hood mesh node count")
+ ni=nodes[0]
+ if np.max(np.abs(hood_world[ni]-target_world[target_mesh_node]))>1e-5:
+  raise ValueError("Ranger hood rest mesh space is not aligned to Peasant")
+ hood_names=[doc["nodes"][i]["name"] for i in doc["skins"][doc["nodes"][ni]["skin"]]["joints"]]
+ target_names=[target["nodes"][i]["name"] for i in target["skins"][target["nodes"][target_mesh_node]["skin"]]["joints"]]
+ remap=np.asarray(remap_joint_indices(hood_names,target_names),dtype=int)
+ hj,tj=joint_map(doc),joint_map(target)
+ anchors=("Head","neck_01","spine_03","clavicle_l","clavicle_r")
+ delta=verified_hood_bind_anchors(
+  {name:hood_world[hj[name]][:3,3].tolist() for name in anchors},
+  {name:target_world[tj[name]][:3,3].tolist() for name in anchors},
+  anchors)
+ bind_error=float(np.max(np.abs(skin_matrices(doc,buffers,hood_world,ni,np)-np.eye(4))))
+ if bind_error>5e-4:raise ValueError("Ranger hood skin inverse bind matrices do not match")
+ parts=[];materials={}
+ for p in doc["meshes"][doc["nodes"][ni]["mesh"]]["primitives"]:
+  if p.get("mode",4)!=4:raise ValueError("Ranger hood primitive is not triangles")
+  a=p["attributes"]
+  required=("POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0")
+  if any(key not in a for key in required):raise ValueError("Ranger hood primitive lacks required skinned data")
+  pos=np.asarray(accessor_values(doc,buffers,a["POSITION"]),float)
+  normals=np.asarray(accessor_values(doc,buffers,a["NORMAL"]),float)
+  uv=np.asarray(accessor_values(doc,buffers,a["TEXCOORD_0"]),float)
+  js=np.asarray(accessor_values(doc,buffers,a["JOINTS_0"]),int)
+  weights=np.asarray(accessor_values(doc,buffers,a["WEIGHTS_0"]),float)
+  faces=np.asarray(accessor_values(doc,buffers,p["indices"]),int).reshape(-1,3)
+  if js.min()<0 or js.max()>=len(remap):raise ValueError("Unmapped Ranger hood vertex bone")
+  if np.any(~np.isfinite(pos)) or np.any(~np.isfinite(weights)) or np.any(weights<0):
+   raise ValueError("Ranger hood source geometry contains unsafe values")
+  if faces.min()<0 or faces.max()>=len(pos):raise ValueError("Ranger hood source triangle out of bounds")
+  weights/=np.maximum(weights.sum(axis=1)[:,None],1e-12)
+  mat=mat_for(doc,buffers,archive,prefix,p.get("material"),materials)
+  parts.append(dict(node=target_mesh_node,name=target_model_name.rsplit(".",1)[0]+"_Ranger_Hood",
+   positions=pos,normals=normals,uv=uv,joints=remap[js],weights=weights,faces=faces,material=mat))
+  print("P1_PRIVATE_APPROVED_HOOD",member,"vertices",len(pos),"faces",len(faces),
+   "bind_error",bind_error,"max_anchor_delta",max(delta.values()),flush=True)
+ if not parts:raise ValueError("Approved Ranger hood had no renderable parts")
+ return parts,member
+
+def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',approved_hood_archive=None):
  target,tbuf=load_gltf(target_path)
  base,bbuf,prefix=read_base(base_archive,suffix)
  target_node=next(i for i,n in enumerate(target['nodes']) if 'mesh' in n and 'skin' in n)
@@ -203,6 +258,12 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  if cut_y is None: cut_y=head_cut_from_mesh_top(outfit_top)
  head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top,cut_method,face_parts,body_atlas,head_paint)
  if not head: raise ValueError("No safe head meshes qualified")
+ hood_member=None
+ if approved_hood_archive is not None:
+  hood_parts,hood_member=load_private_publisher_hood(approved_hood_archive,target_path.name,
+    target,target_node,target_world)
+  head.extend(hood_parts)
+
  # Diagnostic only: rest-pose cut boundary to actual garment vertices.
  # Nearest-vertex distance is unsigned and cannot approve a collar seam.
  body_heads=[part for part in head if part['name'].lower().startswith('superhero_')]
@@ -296,6 +357,8 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'head_face_component_mode':face_parts,
          'body_atlas_variant':body_atlas,
          'head_paint_variant':head_paint,
+         'approved_ranger_hood_member':hood_member,
+         'approved_ranger_hood_archive_sha256':sha256(approved_hood_archive.read_bytes()) if hood_member else None,
          'frame_size_px':view_size,
          'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
          'neck_collar_rest_pose_surface_diagnostic':surface_diagnostic,
@@ -320,15 +383,17 @@ def main():
  p.add_argument('--face-parts',choices=('all','without-eyebrows','head-only'),default='all')
  p.add_argument('--body-atlas',choices=('original','publisher-light'),default='original')
  p.add_argument('--head-paint',choices=('original','neutral-to-skin-prototype'),default='original')
+ p.add_argument('--approved-hood-archive',type=Path,default=None,
+                help='Original private publisher Modular Fantasy Standard ZIP; experimental hood overlay only')
  a=p.parse_args()
- for file in [a.target_model,a.base_archive,a.animation_archive]:
+ for file in [a.target_model,a.base_archive,a.animation_archive]+([a.approved_hood_archive] if a.approved_hood_archive else []):
   if not file.is_file(): raise FileNotFoundError(file)
  if not 0 <= a.fraction <= 1: raise ValueError("Clip fraction must be 0..1")
  repo=Path(__file__).resolve().parents[1]
  if a.output.resolve().is_relative_to(repo):
   raise ValueError("No generated vendor images may be written inside the repository")
  render(a.target_model,a.base_archive,a.base_model_suffix,a.animation_archive,a.animation_model_suffix,
-        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint)
+        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint,a.approved_hood_archive)
 
 if __name__=='__main__':
  main()
