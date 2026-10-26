@@ -354,12 +354,14 @@ function readStorage() {
 
 // Both offline and authoritative online clients share the same accessible control.
 export function installGameAudioControls(audio, root = globalThis.document) {
+  const enable = root?.querySelector("#audio-enable");
   const toggle = root?.querySelector("#audio-toggle");
   const slider = root?.querySelector("#audio-volume");
   const musicToggle = root?.querySelector("#music-toggle");
   const musicSlider = root?.querySelector("#music-volume");
   if (!toggle || !slider) return;
   function sync() {
+    if (enable) enable.hidden = audio.isUnlocked();
     toggle.textContent = audio.isMuted() ? "Effects off" : "Effects on";
     toggle.setAttribute("aria-pressed", String(!audio.isMuted()));
     slider.value = String(Math.round(audio.getVolume() * 100));
@@ -369,6 +371,13 @@ export function installGameAudioControls(audio, root = globalThis.document) {
     }
     if (musicSlider) musicSlider.value = String(Math.round(audio.getMusicVolume() * 100));
   }
+  // A separate trusted UI gesture can initialize the expensive AudioContext
+  // without delaying an actual combat input or source0 network frame.
+  enable?.addEventListener("click", () => {
+    audio.unlock();
+    audio.play("ui");
+    sync();
+  });
   toggle.addEventListener("click", () => {
     audio.unlock();
     audio.setMuted(!audio.isMuted());
