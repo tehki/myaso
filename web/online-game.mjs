@@ -400,8 +400,8 @@ canvas.addEventListener("keydown", (event) => {
   }
   // Input-first: do not start AudioContext inside a live WASD/Space callback,
   // or schedule its expensive construction into the next combat frame.
-  // Explicit sound controls remain a trusted WebAudio gesture; mouse-release
-  // still has the existing after-source0 fail-soft cue path.
+  // First-use sound is activated through explicit trusted UI controls.
+  // Silent-by-default initial Combat input can never freeze input transmission.
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
