@@ -8304,6 +8304,11 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     && (cue.text === "Attack committed - your windup is readable."
       || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
     && cue.latestText === cue.text) return cue;
+  // Preserve the original fail-closed gate; only emit a bounded read-only
+  // snapshot when the browser never observed an admissible fresh World cue.
+  if (cue?.timedOut === true) {
+    console.log("M41_NATIVE_CUE_TIMEOUT " + JSON.stringify(cue));
+  }
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
 
