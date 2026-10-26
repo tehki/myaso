@@ -8,6 +8,8 @@ import { decodeSnapshot, SNAPSHOT_FIELDS } from "../src/network/snapshot-codec.m
 import { decodeInputAck } from "../src/network/input-ack-codec.mjs";
 import { decodeKillEvent } from "../src/network/kill-event-codec.mjs";
 import { encodeInputPacket } from "../src/network/input-codec.mjs";
+import { createInputRedundancy } from "../src/network/input-redundancy.mjs";
+import { decodeProposedGestureAck } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 import { isSequenceNewer16 } from "../src/network/sequence.mjs";
 import { connectGameTransport } from "./network-transport.mjs";
 
@@ -21,6 +23,9 @@ export async function connectAuthoritativeClient({
   onReliableSnapshot,
   onKillEvent,
   onProtocolError,
+  // REVIEW-ONLY: original v2 ACK never equals Combat HIT. The callback
+  // receives the SAME QUIC transport identity that negotiated the grant.
+  onExperimentalGestureAck,
 } = {}) {
   const state = new Map();
   const snapshotResult = createSnapshotApplyResult();
@@ -30,7 +35,7 @@ export async function connectAuthoritativeClient({
   const diagnostics = createNetworkDiagnostics();
   const ackGate = createOwnSnapshotAckGate();
   const remoteInterpolator = createRemoteInterpolator();
-  const inputSamples = [];
+  const inputRedundancy = createInputRedundancy();
   let inputSequence = 0;
   let latestSnapshotSequence = 0xffff;
   let acknowledgedSnapshotSequence = 0xffff;
@@ -55,6 +60,24 @@ export async function connectAuthoritativeClient({
       const bytes = asUint8Array(packet);
       if (bytes.length < 2) return;
       const packetType = bytes[1];
+      if (bytes[0] === 2 && packetType === 0x12) {
+        // Never let a stale QUIC actor or a public/v1 connection settle the
+        // pending current-lease typed source0/source1 outbox.
+        if (transport.kind !== "webtransport" ||
+            transport.experimentalGestureState !== "granted" ||
+            typeof onExperimentalGestureAck !== "function") {
+          transport.close("unsolicited typed gesture ACK");
+          throw new Error("typed ACK received without a current reviewed grant and owner");
+        }
+        try {
+          decodeProposedGestureAck(bytes); // strict 16B v2 header/status/IDs
+          onExperimentalGestureAck(bytes.slice(), transport);
+        } catch (error) {
+          transport.close("invalid typed gesture ACK");
+          throw error;
+        }
+        return;
+      }
       if (packetType === PACKET_TYPE.SNAPSHOT) {
         const sequence = bytes[4] | (bytes[5] << 8);
         if (latestSnapshotSequence !== 0xffff && !isSequenceNewer16(sequence, latestSnapshotSequence)) return;
@@ -152,14 +175,13 @@ export async function connectAuthoritativeClient({
       dash: Boolean(sample.dash),
     };
     predictionHistory.push(normalized.tick, normalized);
-    inputSamples.push(normalized);
-    if (inputSamples.length > NETWORK.inputRedundancy) inputSamples.shift();
+    const redundantSamples = inputRedundancy.push(normalized);
     const packet = encodeInputPacket({
       sequence: inputSequence,
       ackSnapshotSequence: acknowledgedSnapshotSequence,
       clientTick: normalized.tick,
       ackServerTick: latestServerTick,
-      samples: [...inputSamples].reverse(),
+      samples: redundantSamples,
     });
     inputSequence = (inputSequence + 1) & 0xffff;
     transport.sendRealtimeOwned(new Uint8Array(packet));
@@ -173,6 +195,21 @@ export async function connectAuthoritativeClient({
     remoteInterpolator,
     diagnostics,
     sendInput,
+    // Experimental loopback-only functions deliberately do not activate
+    // through the game's default sampled v1 combat path. A future original UI
+    // adapter must first own the one authenticated negotiated QUIC lease.
+    negotiateExperimentalGestureV2(options) {
+      if (transport.kind !== "webtransport") {
+        throw new Error("original typed Combat requires native QUIC transport");
+      }
+      return transport.negotiateExperimentalGestureV2(options);
+    },
+    sendExperimentalGestureEdge(bytes) {
+      if (transport.kind !== "webtransport") {
+        throw new Error("original typed Combat requires native QUIC transport");
+      }
+      return transport.sendExperimentalGestureEdge(bytes);
+    },
     close(reason) { transport.close(reason); },
     get playerNetId() { return playerNetId; },
     get processedClientTick() { return ackGate.lastAppliedClientTick; },

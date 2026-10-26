@@ -1,0 +1,31 @@
+name: Core 8A dormant Pre-Alpha v2 LMB outbox review
+
+on:
+  pull_request:
+    paths:
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs"
+      - "tests/prealpha-lmb-gesture-proposal.test.mjs"
+      - "docs/CORE8A_PREALPHA_GESTURE_OUTBOX_REVIEW.md"
+      - ".github/workflows/core8a-prealpha-v2-gesture-outbox-proposal.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  review-only-edge-outbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Check exact source original Combat proposal and new Core outbox
+        run: |
+          node --check src/network/prealpha-lmb-gesture-proposal.mjs
+          node --check src/network/prealpha-lmb-gesture-outbox-proposal.mjs
+          node --check tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs
+          git show --format= --check HEAD -- src/network/prealpha-lmb-gesture-outbox-proposal.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs docs/CORE8A_PREALPHA_GESTURE_OUTBOX_REVIEW.md .github/workflows/core8a-prealpha-v2-gesture-outbox-proposal.yml
+      - name: Unchanged v1 and 15 focused strict edge replay lease tests
+        run: node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs

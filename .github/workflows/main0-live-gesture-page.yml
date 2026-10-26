@@ -1,0 +1,29 @@
+name: Main 0 original-game physical LMB KeyE loopback v2 smoke (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "tests/main0-live-gesture-page.test.mjs"
+      - ".github/workflows/main0-live-gesture-page.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-page-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Real original page source with physical event outbox unit smoke
+        run: |
+          node --check web/online-game.mjs
+          node --check web/prealpha-gesture-live-lab.mjs
+          node --check tests/main0-live-gesture-page.test.mjs
+          node --test tests/main0-live-gesture-page.test.mjs

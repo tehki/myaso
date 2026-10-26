@@ -48,7 +48,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   const pressAt = flight.indexOf("performArenaAttackHold(lightAttacker, lightArena, 200, 45)");
   const waitAt = flight.indexOf("await lightChallenge.wait()");
   const delayAt = flight.indexOf("await sleep(jumpInputDelayMs)");
-  const chordAt = flight.indexOf("performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90)");
+  const chordAt = flight.indexOf("performArenaPreAimedJumpAttackChord(jumpAttacker, 180)");
   assert.ok(challengeAt < armAt && armAt < pressAt);
   assert.ok(pressAt < waitAt && waitAt < delayAt && delayAt < chordAt);
   assert.ok(flight.includes('spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_RELEASE "'));

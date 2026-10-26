@@ -1,0 +1,108 @@
+name: Core8 authenticated gesture to World loopback lab (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "server/src/prealpha_authenticated_gesture.rs"
+      - "server/src/prealpha_lmb_gesture_authority.rs"
+      - "server/src/lib.rs"
+      - "server/tests/prealpha_authenticated_gesture_to_world.rs"
+      - "server/tests/combat4c_busy_cross_source_world.rs"
+      - "server/tests/combat4c_release_only_source_ownership.rs"
+      - "server/tests/prealpha_boot_nonce_authority.rs"
+      - "server/tests/core8b_same_id_held_heavy_reconnect.rs"
+      - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
+      - "scripts/core8_native_v2_quic_gesture_lab.mjs"
+      - "scripts/core8_native_v2_keye_heavy_world_lab.mjs"
+      - "scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs"
+      - "scripts/ui10-native-real-world-shared-gesture-review.mjs"
+      - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
+      - "src/browser/prealpha-keye-source-review.mjs"
+      - "src/browser/prealpha-shared-ui10-sources-review.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "src/network/prealpha-shared-source-allocator-proposal.mjs"
+      - ".github/workflows/core8-prealpha-auth-gesture-world-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-world-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Rust formatting exact HEAD
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Combat4D independent E retirement and same-source LMB replay (original QUIC World)
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_retired_keye_cannot_steal_or_commit_a_held_lmb_heavy -- --exact --nocapture
+          cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats combat4d_native_cancelled_old_lmb_release_cannot_commit_newer_same_source_gesture -- --exact --nocapture
+      - name: Actual Rust World 135/320 session-bound typed gesture and ABA regressions
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_authenticated_gesture_to_world -- --nocapture
+      - name: Combat 4C real World busy-source replay and subsequent attack regression
+        run: cargo test --locked --manifest-path server/Cargo.toml --test combat4c_busy_cross_source_world -- --nocapture
+      - name: Combat4C Main-selected release-only actual World physical-source fail-first
+        run: cargo test --locked --manifest-path server/Cargo.toml --test combat4c_release_only_source_ownership -- --nocapture
+      - name: Fresh-process OS CSPRNG boot nonce and server World auth gate
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_boot_nonce_authority -- --nocapture
+      - name: Core8B same-ID held-heavy reincarnation stale-terminal original World
+        run: cargo test --locked --manifest-path server/Cargo.toml --test core8b_same_id_held_heavy_reconnect -- --nocapture
+      - name: Real original Rust QUIC 4 distinct admitted seats + fifth denied and World light
+        run: cargo test --locked --manifest-path server/Cargo.toml --test prealpha_four_real_quic_gesture_seats -- --nocapture
+      - name: Server binary real QUIC transport integration compiles
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Genuine Chromium real W3C fast-click and QUIC session v2 ACK to original World
+        run: |
+          node --check scripts/core8_native_v2_quic_gesture_lab.mjs
+          google-chrome --version
+          chromedriver --version
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_quic_gesture_lab.mjs
+      - name: Genuine Chromium physical E never enters Combat; original Rust World stays idle
+        run: |
+          node --check scripts/core8_native_v2_keye_heavy_world_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_keye_heavy_world_lab.mjs
+      - name: Genuine Chromium shared outbox source0 LMB to World; E emits no Combat source
+        run: |
+          node --check scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: One real Core8A outbox lost LMB PRESS original QUIC admission fence and ordered replay
+        env:
+          CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: One real Core8A outbox genuine server ACK loss and duplicate retransmit without extra hit
+        env:
+          CORE8A_LAB_DROP_FIRST_ACK: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Genuine W3C held E causes no Combat; same actor accepts source0 LMB afterward
+        env:
+          CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: UI10 real LMB source0 only; E no-Combat, original Rust World
+        run: |
+          node --check scripts/ui10-native-real-world-shared-gesture-review.mjs
+          node --test tests/ui10-prealpha-lmb-dom-review.test.mjs tests/ui10-shared-typed-sources-review.test.mjs
+          timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 real LMB PRESS loss; E cannot steal ordered World replay
+        env:
+          CORE8A_LAB_DROP_FIRST_LMB_PRESS: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 source0 World PRESS lost-ACK -> DUPLICATE, no extra HIT
+        env:
+          CORE8A_LAB_DROP_FIRST_ACK: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: UI10 held E causes no Combat; same actor accepts physical LMB afterward
+        env:
+          CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
+        run: timeout --signal=TERM --kill-after=5s 90s node scripts/ui10-native-real-world-shared-gesture-review.mjs
+      - name: Strict Rust Clippy across original game and experimental integration
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings

@@ -1,0 +1,57 @@
+name: Combat 4D M121 true v1 movement sender and native World (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m121-native-geometry-plan.mjs"
+      - "scripts/m121-native-direction-roles.mjs"
+      - "tests/m121-native-geometry-plan.test.mjs"
+      - "tests/m121-native-direction-roles.test.mjs"
+      - "tests/combat4-m121-sender-instrumentation.test.mjs"
+      - "tests/combat4-m121-authoritative-ingress-proof.test.mjs"
+      - ".github/workflows/combat4d-m121-sender-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m121-directional:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - trial: 1
+            direction: right
+          - trial: 2
+            direction: left
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+      MYASO_M121_DIRECTION: ${{ matrix.direction }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Original sender read-only invariants and native drivers
+        run: |
+          node --test tests/m121-native-direction-roles.test.mjs tests/m121-native-geometry-plan.test.mjs
+          node --test tests/combat4-m121-sender-instrumentation.test.mjs tests/combat4-m121-authoritative-ingress-proof.test.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Regression-test authoritative M121 release direction before native flight
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo test --locked --manifest-path server/Cargo.toml m121_ -- --nocapture
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict original M121 native Chrome Firefox genuine directional World and HUD
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

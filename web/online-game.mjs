@@ -3,6 +3,9 @@ import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
+import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
+import { createM41PhysicalInputChronology } from "../src/browser/m41-physical-input-chronology.mjs";
+import { createAfterSource0Audio } from "../src/browser/after-source0-audio.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
@@ -13,7 +16,9 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
+import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
+import { activateLoopbackGestureLab } from "./prealpha-gesture-live-lab.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -111,6 +116,16 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+// Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
+// Knights via the official lobby knights=1. Direct legacy Combat test URLs
+// and rollback without this flag keep original Combat-circle visuals.
+// Unsupported Silver animations always fall back to the original tells.
+// Visual-art review only: default original SHA-pinned five-clip Pre-Alpha.
+// A separate explicit knights=1&knightArt=relit previews only authentic
+// source-lit locomotion; the server roster and Combat stay authoritative.
+const knightSprites = params.get("knights") === "1"
+  ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "relit" ? "relit" : "original"})
+  : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
@@ -136,9 +151,46 @@ function updateNetworkDiagnostics(nowMs) {
     + ` | Samples ${s.inputAckSamples}`;
 }
 const acceptanceScenario = params.get("scenario");
+// REVIEW ONLY: bounded, read-only legacy v1 M111 input-plane chronology.
+// The observer NEVER sends Combat input, changes request latches or grants HIT.
+const m111InputProbe = (acceptanceScenario === "uiheavyguardbreakpunish"
+  || acceptanceScenario === "uirollknockdownffahit")
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  ? (window.__MYASO_M111_INPUT_PLANE__ = {
+      physicalTerminals: [], lightReleases: [], submitted: [],
+    })
+  : null;
 const server = params.get("server");
-const cert = params.get("cert");
 if (!server) throw new Error("online mode requires ?server=https://host:port/game");
+// Original M147, genuine Firefox only: bounded local browser-stage timestamps.
+// Both the page and authoritative server must be loopback. No public telemetry.
+const m147InputProbe = acceptanceScenario === "uijumppunishffa"
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(server).hostname)
+  ? createM147InputChronology() : null;
+if (m147InputProbe) window.__MYASO_M147_INPUT_PLANE__ = m147InputProbe.events;
+const cert = params.get("cert");
+// Opt-in NONRELEASE: the actual game page and the ORIGINAL pinned Rust World
+// must both be loopback. Public /web/ and official lobby never select v2.
+const gestureLabRequested = params.get("gestureLab") === "1";
+const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const reviewedGestureLab = gestureLabRequested
+  && loopbackHosts.has(window.location.hostname)
+  && loopbackHosts.has(new URL(server).hostname);
+if (gestureLabRequested && !reviewedGestureLab) {
+  throw new Error("experimental server-authoritative gestures are loopback-only");
+}
+const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
+// Private receipts require the actor proven by an actual processed-input ACK.
+// The first sender frame runs only after module initialization; awaiting that
+// ACK during module startup would deadlock real online admission.
+let resolvePrivateHitActor = null;
+let privateHitProcessedAckActor = null;
+const privateHitActorReady = privateHitLabRequested
+  ? new Promise(resolve => { resolvePrivateHitActor = resolve; }) : null;
+if (privateHitLabRequested && !reviewedGestureLab) {
+  throw new Error("private HIT delivery requires the reviewed loopback gesture lab");
+}
 
 const webTransportOptions = cert
   ? { serverCertificateHashes: [{ algorithm: "sha-256", value: parseSha256Hex(cert) }] }
@@ -146,6 +198,11 @@ const webTransportOptions = cert
 
 const keys = new Set();
 const audio = createGameAudio();
+// Presentation may warm up only AFTER the real original combat input is authored.
+const afterSource0Audio = createAfterSource0Audio({ audio });
+// Acceptance-only physical wheel -> sampled Block -> original v1 invocation.
+const m41PhysicalChronology = acceptanceScenario === "uiparrytell"
+  || acceptanceScenario === "uistun" ? createM41PhysicalInputChronology() : null;
 installGameAudioControls(audio);
 const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
@@ -167,6 +224,8 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+let experimentalGestureLab = null;
+let privateHitDeliveryLab = null;
 let animationFrameId = 0;
 let predictionStep = 0;
 let clientTick = 0;
@@ -184,9 +243,19 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.onLight();
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
+    // Read-only M111 observation stays after the original movement latch.
+    // Original R1 requires that no instrumentation intervene between the
+    // onLight edge and this release-direction capture.
+    if (m111InputProbe) {
+      m111InputProbe.lightReleases.push({
+        epochMs: Date.now(), actionAtRelease: local.action,
+      });
+      if (m111InputProbe.lightReleases.length > 32) m111InputProbe.lightReleases.shift();
+    }
     if (local.action === COMBAT_ACTION.jump) queueStaminaDenial("jump-attack");
     else if (!pendingStaminaDenial && (jumpRequested || keys.has("Space"))) queueStaminaDenial("jump-attack-chord");
     else if (rightButtonGesture.isRunning() && ["KeyW", "KeyA", "KeyS", "KeyD"].some((code) => keys.has(code))) {
@@ -219,6 +288,7 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
+    if (reviewedGestureLab) return; // v2 capture owns edge, no sampled attack
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
@@ -233,15 +303,28 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
-  leftButtonDown = false;
+  if (reviewedGestureLab) return; // v2 capture owns physical terminal
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerUp(event);
   updateMouse(event);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.releaseInvocation();
   const committed = leftButtonCharge.release(event.pointerId);
+  // Only the matching physical pointer may retire the current gesture.
+  if (committed === null) return;
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.release(committed);
+  leftButtonDown = false;
   leftButtonPressMovement = null;
-  if (committed && !audio.isUnlocked()) {
-    // Audio startup follows native pointer release, not attack classification.
-    audio.unlock();
-    audio.play(committed === "heavy" ? "heavy" : "light");
+  if (m111InputProbe && committed) {
+    m111InputProbe.physicalTerminals.push({
+      epochMs: Date.now(), trusted: event.isTrusted,
+      pointerId: event.pointerId, classification: committed,
+    });
+    if (m111InputProbe.physicalTerminals.length > 32) m111InputProbe.physicalTerminals.shift();
   }
+  // Initial AudioContext construction consumed 410ms inside real M147
+  // pointerUP. Keep genuine release/Light synchronous; defer first-use audio
+  // until AFTER the unmodified original v1 sender accepts its release sample.
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.noteRelease(committed);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerHandlerEnd();
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
 // W3C Pointer Events fire pointerdown/up only on transitions between zero
@@ -250,7 +333,7 @@ canvas.addEventListener("pointerup", onLeftPointerUp);
 const CHORDED_LEFT_POINTER_ID = -1;
 let chordedLeftDown = false;
 canvas.addEventListener("mousedown", (event) => {
-  if (event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
+  if (reviewedGestureLab || event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
   canvas.focus();
   updateMouse(event);
   leftButtonDown = true;
@@ -261,7 +344,7 @@ canvas.addEventListener("mousedown", (event) => {
   });
 });
 function onChordedLeftMouseUp(event) {
-  if (event.button !== 0 || !chordedLeftDown) return;
+  if (reviewedGestureLab || event.button !== 0 || !chordedLeftDown) return;
   chordedLeftDown = false;
   leftButtonDown = false;
   updateMouse(event);
@@ -272,22 +355,29 @@ canvas.addEventListener("mouseup", onChordedLeftMouseUp);
 window.addEventListener("mouseup", onChordedLeftMouseUp);
 
 window.addEventListener("pointerup", onLeftPointerUp);
+// One pointer-owned cancellation path; pointercancel may report button=-1.
+// Never clear a newer LMB gesture for stale pointer capture loss.
+function cancelActiveLeftPointer(pointerId) {
+  if (reviewedGestureLab) return false; // selected v2 gate owns its own input
+  if (!leftButtonCharge.cancel(pointerId)) return false;
+  leftButtonDown = false;
+  leftButtonPressMovement = null;
+  chordedLeftDown = false;
+  return true;
+}
 canvas.addEventListener("pointercancel", (event) => {
   if (event.button === 1) middleBlockHeld = false;
-  if (event.button === 0) {
-    leftButtonDown = false;
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
-  }
+  cancelActiveLeftPointer(event.pointerId);
 });
 canvas.addEventListener("lostpointercapture", (event) => {
   if (event.button === 1) middleBlockHeld = false;
   if (event.pointerId !== undefined && !(event.buttons & 1)) {
-    leftButtonPressMovement = null;
-    leftButtonCharge.cancel(event.pointerId);
+    cancelActiveLeftPointer(event.pointerId);
   }
 });
 canvas.addEventListener("wheel", (event) => {
+  const m41WheelToken = typeof m41PhysicalChronology !== "undefined"
+    ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
   canvas.focus();
   if (event.deltaY < 0) {
@@ -298,11 +388,14 @@ canvas.addEventListener("wheel", (event) => {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
     audio.play("guard");
   }
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.wheelEnd(m41WheelToken);
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
+  // E is reserved for future Use interaction. Combat never consumes it.
+  if (event.code === "KeyE") return;
   const firstAudioGesture = !audio.isUnlocked();
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && local.action === COMBAT_ACTION.idle
@@ -312,8 +405,6 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
     audio.play("jump");
@@ -322,17 +413,40 @@ canvas.addEventListener("keydown", (event) => {
   }
   // Keyboard input also wins over the one-time audio unlock.
   audio.unlock();
-  if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
-canvas.addEventListener("keyup", (event) => keys.delete(event.code));
+// Key release can occur after focus moves to an in-page control.
+// Canvas keydown remains focus scoped; window observes real bubbling keyup.
+window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", releaseInputs);
+// Chat composer focus must release held game inputs, not trap a charge.
+canvas.addEventListener("blur", releaseInputs);
 document.addEventListener("visibilitychange", handleVisibilityChange);
+// A voluntary tab/navigation exit should promptly retire its server-owned
+// gameplay admission lease. Losing OS/browser process still uses QUIC timeout.
+window.addEventListener("pagehide", () => networkClient?.close("pagehide"));
+// The closed transport cannot be reused if the browser restores a BFCache page.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) window.location.reload();
+});
+
+
 
 setStatus("Connecting to authoritative server…");
 networkClient = await connectAuthoritativeClient({
   webTransportUrl: server,
   webTransportOptions,
+  onExperimentalGestureAck(bytes, lease) {
+    if (!experimentalGestureLab || experimentalGestureLab.lease !== lease) {
+      networkClient?.close("late gesture ACK has no current owner");
+      throw new Error("typed ACK without same-connection gesture owner");
+    }
+    const result = experimentalGestureLab.outbox.receiveAck(bytes, lease);
+    experimentalGestureLab.noteAck(result);
+    if (!result.transportSettled) {
+      experimentalGestureLab.fail("World rejected or retired typed gesture edge");
+    }
+  },
   onProtocolError(error) {
     console.warn("authoritative protocol error", error);
     networkStatus = "Protocol error - invalid realtime packet ignored.";
@@ -342,6 +456,14 @@ networkClient = await connectAuthoritativeClient({
     if (!ownId) return;
     const own = state.get(ownId);
     if (own) {
+      // Reconciliation's onAck can legally wait for a later snapshot. The
+      // original processed-input ACK plus this matching World snapshot is
+      // sufficient to prove the session-assigned actor without faking ACKs.
+      if (resolvePrivateHitActor && privateHitProcessedAckActor === ownId) {
+        const resolve = resolvePrivateHitActor;
+        resolvePrivateHitActor = null;
+        resolve(ownId);
+      }
       // Initial player state is available before the first aligned input ACK.
       if (networkStatus.startsWith("Connecting")) {
         networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
@@ -358,10 +480,24 @@ networkClient = await connectAuthoritativeClient({
   onKillEvent(event) {
     recordKillEvent(event);
   },
+  onProcessedAck(ack) {
+    // Native 0x03 comes from the original pinned server, not client input.
+    // It is observed before the transport stores its own playerNetId; the
+    // next real World snapshot must confirm the same actor before HIT grant.
+    if (privateHitLabRequested && Number.isInteger(ack.playerNetId)
+        && ack.playerNetId > 0) privateHitProcessedAckActor = ack.playerNetId;
+  },
   onAck(ack) {
     const ownId = networkClient?.playerNetId;
     const own = ownId ? networkClient.state.get(ownId) : null;
     if (!own) return;
+    // Only an original processed-input ACK for this connection and a genuine
+    // replicated own actor can establish the private recipient actor binding.
+    if (resolvePrivateHitActor && privateHitProcessedAckActor === ownId) {
+      const resolve = resolvePrivateHitActor;
+      resolvePrivateHitActor = null;
+      resolve(ownId);
+    }
     const preReconcileX = local.x;
     const preReconcileY = local.y;
     reconcilePrediction({
@@ -380,6 +516,84 @@ networkClient = await connectAuthoritativeClient({
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
+
+// Original first-party game-page v2 lab: this is the ONLY experimental
+// source0 LMB-only Combat gesture path. Key E is reserved for Use. A denied grant
+// closes the connection: there is NEVER a fallback phantom v1 attack.
+if (reviewedGestureLab) {
+  try {
+    experimentalGestureLab = await activateLoopbackGestureLab({
+      gameClient: networkClient, canvas, windowObj: window,
+      documentObj: document, getClientTick: () => clientTick >>> 0,
+    });
+    if (privateHitLabRequested) {
+      // Real input ACKs are produced by the 60Hz original sender, which starts
+      // only after this module returns to requestAnimationFrame. Negotiate in
+      // parallel with rendering rather than await a not-yet-admitted actor here.
+      // No fabricated actor ID, online status, receipt or token is permitted.
+      void (async () => {
+        let timeoutId;
+        try {
+          const actorId = await Promise.race([
+            privateHitActorReady,
+            new Promise((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error(
+                "private HIT requires a genuine current World actor and processed-input ACK"
+              )), 3000);
+            }),
+          ]);
+          if (!actorId || networkClient.transport.closed
+              || networkClient.playerNetId !== actorId) {
+            throw new Error("private HIT actor no longer owns the original QUIC transport");
+          }
+          privateHitDeliveryLab = await networkClient.transport.negotiatePrivateHitDeliveryLab({
+            pageUrl: window.location.href, actorId,
+            onReceipt(_receipt, presentation) {
+              combatMessage = presentation.text;
+              combatMessageUntil = performance.now() + presentation.durationMs;
+              setStatus(combatMessage);
+              showCombatFeedback(presentation.feedback);
+            },
+          });
+          Object.defineProperty(window, "__MYASO_PRIVATE_HIT_PROOF__", {
+            configurable: true, value: () => privateHitDeliveryLab.snapshot,
+          });
+        } catch (error) {
+          // Only in the explicitly opted-in loopback laboratory: preserve the
+          // actual browser rejection class for native CI without ever exposing
+          // private capability bytes, lease tokens or synthetic online state.
+          Object.defineProperty(window, "__MYASO_PRIVATE_HIT_FAILURE__", {
+            configurable: true, value: Object.freeze({
+              message: String(error?.message ?? error),
+              boundActor: networkClient?.playerNetId ?? null,
+              gestureGrant: networkClient?.transport?.experimentalGestureState ?? null,
+            }),
+          });
+          console.error("private HIT original admission/negotiation failed", error);
+          networkClient?.close("private HIT original admission/negotiation failed");
+          networkStatus = "Private HIT laboratory admission rejected.";
+          setStatus(networkStatus);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      })();
+    }
+  } catch (error) {
+    networkClient?.close("original World gesture grant rejected");
+    throw error;
+  }
+}
+
+// Chat C1 uses the current authenticated WebTransport connection and separate
+// bounded reliable streams. Public requests require the operator-served
+// chatC1=1 config; localhost chatC1Preview=1 remains nonproduction-only.
+// Never let a missing/failed chat stream block damage, input or rendering.
+void import("../src/browser/chat-c1-activation.mjs")
+  .then(({ isChatC1Eligible, activateChatC1Preview }) =>
+    isChatC1Eligible(window.location)
+      ? activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient })
+      : null)
+  .catch(() => { /* Chat is optional, authoritative Combat continues. */ });
 
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
@@ -402,6 +616,9 @@ function observeCombatState(state) {
   remoteActionAudio.observe(state, ownId, (cue, options) => audio.play(cue, options));
   const event = combatReadability.observe(state, ownId);
   if (!event) return;
+  // This private recipient scope credits damage only from its authenticated,
+  // contiguous World receipt. Snapshot HP alone cannot name the attacker.
+  if (privateHitLabRequested && ["hit-confirm", "damage-taken"].includes(event.feedback)) return;
   combatMessage = event.text;
   combatMessageUntil = now + event.durationMs;
   setStatus(combatMessage);
@@ -422,7 +639,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
+  if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrytell", "uistun", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uidirectionallight", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
     || fighterKnockdownPunishNetId(state, ownId)
@@ -460,7 +677,9 @@ function recordAcceptanceState(state, ownId) {
       acceptance.serverTick,
     );
   }
-  if (acceptanceScenario === "uiparrypunishffahit"
+  if (acceptanceScenario === "uidirectionallight"
+    || acceptanceScenario === "uijumprecoveryffa"
+    || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
     || acceptanceScenario === "uimultiknockdownffa"
     || acceptanceScenario === "uimultiknockdownffahit"
@@ -691,6 +910,8 @@ function updateMouse(event) {
 
 function releaseInputs() {
   keys.clear();
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.reset();
   dashGesture.clearTaps();
   dashRequested = false;
   dashMove = null;
@@ -731,8 +952,8 @@ function sampleInput() {
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   const leftChargeHeld = leftButtonCharge.isCharging();
-  currentInput.attack = attackRequested || leftChargeHeld;
-  currentInput.heavyAttack = heavyAttackRequested || leftChargeHeld;
+  currentInput.attack = !reviewedGestureLab && (attackRequested || leftChargeHeld);
+  currentInput.heavyAttack = !reviewedGestureLab && (heavyAttackRequested || leftChargeHeld);
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
@@ -746,33 +967,89 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.sampled(currentInput, predictionStep + 1);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.sampled(currentInput, predictionStep + 1);
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
     const outgoingTick = clientTick;
     markStaminaDenialSubmitted(outgoingTick, currentInput);
-    // M336: read-only, scenario-scoped input-plane provenance. A real DOM
-    // Space+LMB without authoritative action may mean no 30Hz input sampled
+    // M121: read-only source-of-truth on the nominal 60Hz v1 sender. W3C
+    // keydown in a browser does not prove a movement bit left the client or
+    // reached the Rust World. Preserve attack/release and quiet samples too.
+    // QA only, original packet/World/render path remains byte-for-byte intact.
+    if ((acceptanceScenario === "uidirectionallight"
+      || acceptanceScenario === "uijumppunishffa") && !reviewedGestureLab) {
+      const debug = window.__MYASO_ACCEPTANCE_STATE__;
+      if (debug) {
+        debug.m121SentSamples ??= [];
+        debug.m121SentSamples.push({
+          clientTick: outgoingTick, epochMs: Date.now(),
+          moveX: currentInput.moveX, moveY: currentInput.moveY,
+          attack: Boolean(currentInput.attack),
+          heavyAttack: Boolean(currentInput.heavyAttack),
+          keyD: keys.has("KeyD"), keyA: keys.has("KeyA"),
+          keyW: keys.has("KeyW"), keyS: keys.has("KeyS"),
+          focus: document.activeElement?.id ?? null,
+          predictedAction: local.action,
+        });
+        if (debug.m121SentSamples.length > 96) debug.m121SentSamples.shift();
+      }
+    }
+    // M336/M144: read-only, scenario-scoped input-plane provenance. A real DOM
+    // Space+LMB without authoritative action may mean no 60Hz input sampled
     // during the genuine W3C hold. Record what the production sender actually
     // submitted, with no replay, network payload or gameplay change.
-    if (acceptanceScenario === "uimultirecoveryspatial") {
+    // Combat4A M41/M35: observed real wheel -> actual original v1 BLOCK
+    // sample provenance, scoped to native acceptance only. Never forge input.
+    const m41InputProbe = acceptanceScenario === "uiparrytell"
+      || acceptanceScenario === "uistun";
+    if (acceptanceScenario === "uimultirecoveryspatial"
+      || acceptanceScenario === "uijumprecoveryffa"
+      || acceptanceScenario === "uijumppunishffa"
+      || acceptanceScenario === "uimultirecoveryffa"
+      || m41InputProbe) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.lastSubmittedClientTick = outgoingTick;
         debug.lastSubmittedAtEpochMs = Date.now();
-        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack) {
+        if (currentInput.attack || currentInput.jump || currentInput.heavyAttack
+          || (m41InputProbe && currentInput.block)) {
           debug.inputSubmissions ??= [];
           debug.inputSubmissions.push({
             clientTick: outgoingTick, epochMs: debug.lastSubmittedAtEpochMs,
             attack: Boolean(currentInput.attack),
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
+            block: Boolean(currentInput.block),
+            // Trust and callback timestamps originate in the game listener;
+            // actual World Block/PARRY still requires independent Rust proof.
+            m41PhysicalInput: m41InputProbe && currentInput.block
+              && typeof m41PhysicalChronology !== "undefined"
+              ? m41PhysicalChronology?.sendInvocation(outgoingTick, currentInput) : null,
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
       }
     }
+    if (m111InputProbe) {
+      // Exactly the final original 60Hz frame that will be passed to the
+      // unchanged v1 sender below; no synthetic latching or packet mutation.
+      m111InputProbe.submitted.push({
+        epochMs: Date.now(), clientTick: outgoingTick,
+        attack: Boolean(currentInput.attack),
+        heavyAttack: Boolean(currentInput.heavyAttack),
+        jump: Boolean(currentInput.jump),
+        localPredictedAction: local.action,
+      });
+      if (m111InputProbe.submitted.length > 96) {
+        m111InputProbe.submitted.shift();
+      }
+    }
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.sendInput(currentInput, outgoingTick);
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+    // No synchronous audio startup is permitted before this genuine v1 send.
+    if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
     runningAttackRequested = false;
@@ -909,7 +1186,12 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
     const recoveryTell = entity.netId === recoveryFocusNetId;
     drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
   }
-  if (ownId && local.initialized) drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  // Presentation only: bind the local Silver animation cache to the same
+  // authenticated server actor identity already used for remote Knights.
+  if (ownId && local.initialized) {
+    local.netId = ownId;
+    drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  }
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
   // not world geometry. Keep their original unscaled 42px/34px readability
@@ -1082,7 +1364,10 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   const knockedDown = action === COMBAT_ACTION.knockdown;
   const lift = airborne ? 18 : 0;
   ctx.translate(x, y - lift);
-  ctx.rotate((fighter.facing ?? 0) + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0) + (knockedDown ? Math.PI / 2 : 0));
+  const presentationRotation = (fighter.facing ?? 0)
+    + (action === COMBAT_ACTION.dodge ? Math.PI * 0.35 : 0)
+    + (knockedDown ? Math.PI / 2 : 0);
+  ctx.rotate(presentationRotation);
   const localCharge = remote ? 0 : leftButtonCharge.progress();
   const heavyWindup = action === COMBAT_ACTION.heavyAttackWindup;
   const heavyActive = action === COMBAT_ACTION.heavyAttackActive;
@@ -1120,20 +1405,33 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
   }
   if (remote && guardBreakSpatialPresentation(fighter).visible) drawGuardBreakTell();
   if (remote && recoveryTell) drawRecoveryTell();
-  ctx.fillStyle = shadow;
-  ctx.beginPath();
-  ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#13110d";
-  ctx.beginPath();
-  ctx.arc(7, -5, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#c8b684";
-  ctx.fillRect(12, -2, 26, 4);
+  // Only the already-authenticated player roster is passed here. Remote
+  // is a viewpoint, never an NPC role. No costume or weapon ownership is
+  // generated; source-missing actions retain the original honest Combat tell.
+  const drewKnight = knightSprites?.draw(ctx, fighter, {
+    remote, actorKind: "player", rotation: presentationRotation,
+    visualLift: lift, nowMs: performance.now(),
+  }) ?? false;
+  if (!drewKnight) {
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(0, 0, COMBAT.fighterRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#13110d";
+    ctx.beginPath();
+    ctx.arc(7, -5, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // No physical sword exists in this release; omit the legacy prototype
+    // sword-shaped rectangle while the Silver Knight feature is enabled.
+    if (showPrototypeWeaponStroke(Boolean(knightSprites))) {
+      ctx.fillStyle = "#c8b684";
+      ctx.fillRect(12, -2, 26, 4);
+    }
+  }
   if (remote && action !== COMBAT_ACTION.dead && damageTell) {
     drawDamageTell();
   }
@@ -1802,6 +2100,7 @@ function createArenaLayer() {
 
 function frame(now) {
   if (document.hidden) return;
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.raf(now);
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);

@@ -9,24 +9,26 @@ const flight = source.slice(
   source.indexOf("async function runOnlineUiDirectionalLightFlight("),
 );
 
-test("M204 schedules one genuine wheel during the FIRST heavy key hold, before E release", () => {
-  const keyDown = flight.indexOf('setMovementKey(attacker, "e", true).then(');
+test("M204 schedules one genuine wheel during the FIRST physical LMB heavy hold", () => {
+  const keyDown = flight.indexOf('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset).then(');
   const commit = flight.indexOf("windup = await awaitM223HeavyWindup({");
   assert.ok(flight.includes("serverLogOffset = m201ServerOutput().length"));
-  assert.ok(flight.includes("windupObservedEpochMs + 170"));
+  assert.ok(flight.includes("windupObservedEpochMs + 170 + releaseHoldShiftMs"));
+  assert.ok(flight.includes("M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs"));
   assert.ok(flight.includes("wheelTargetEpochMs - Date.now()"));
   assert.ok(!flight.includes("await sleep(90);"));
   assert.ok(!flight.includes("await sleep(120);"));
   const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
   const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 15);");
   const sUp = flight.indexOf('await setMovementKey(defender, "s", false);');
-  const keyUp = flight.indexOf('await setMovementKey(attacker, "e", false);');
+  const keyUp = flight.lastIndexOf('const delivered = await lmbOutcome;');
   assert.ok(keyDown >= 0 && commit > keyDown && sDown > commit
     && dodge > sDown && sUp > dodge && keyUp > sUp);
   assert.equal(flight.match(/await performArenaTimedPointerDodge\(/g)?.length, 1);
   assert.ok(!flight.includes("await pressArenaPerpendicularDodgeAfterPause("));
   assert.ok(flight.includes("finally {"));
   assert.ok(!flight.includes('await pulseMovementKey(attacker, "e", heavyKeyPulseMs);'));
+  assert.ok(!flight.includes('setMovementKey(attacker, "e"'));
 });
 
 test("M204 preserves clean 100 HP and real perpendicular wheel/keyboard proof", () => {

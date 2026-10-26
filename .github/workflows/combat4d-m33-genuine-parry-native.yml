@@ -1,0 +1,61 @@
+name: Combat 4D M33 genuine short-click parry independent regression (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m41-native-observed-parry.mjs"
+      - "scripts/m41-viewport-wheel.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/left-button-charge.mjs"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - ".github/workflows/combat4d-m33-genuine-parry-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m33-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYASO_PVP_SCENARIO: uiparry
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Original browser and authoritative server preflight
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          node --test tests/r1-parry-short-click.test.mjs tests/m41-authoritative-parry-admission.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Run two independent genuine M33 Chrome Firefox short-click parry attempts
+        shell: bash
+        run: |
+          # Keep the first red intact. A second success cannot erase a failed attempt.
+          set +e
+          result=0
+          echo "COMBAT4D_M33_SOURCE_SHA=$(git rev-parse HEAD)"
+          for trial in 1 2; do
+            echo "COMBAT4D_M33_TRIAL_START trial=${trial} scenario=uiparry"
+            timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs > "combat4d-m33-trial-${trial}.log" 2>&1
+            code=$?
+            cat "combat4d-m33-trial-${trial}.log"
+            echo "COMBAT4D_M33_TRIAL_EXIT trial=${trial} code=${code}"
+            if [ "${code}" -ne 0 ]; then result=1; fi
+          done
+          exit "${result}"
+      - name: Preserve both exact-source first-failure native logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combat4d-m33-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: combat4d-m33-trial-*.log
+          if-no-files-found: warn

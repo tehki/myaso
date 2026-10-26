@@ -1,0 +1,46 @@
+name: Core 8A P0 review one v2 event ACK and KeyE wire choice
+
+on:
+  pull_request:
+    paths:
+      - "tests/fixtures/core8a-one-v2-gesture-wire-review.mjs"
+      - "tests/fixtures/core8a-p723-selected-family-v2.golden"
+      - "tests/core8a-one-v2-gesture-wire-review.test.mjs"
+      - "tests/core8a-p723-shared-source-allocator-review.test.mjs"
+      - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-shared-source-allocator-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "server/tests/core8a_single_v2_wire_choice_review.rs"
+      - "server/tests/core8a_v2_unnegotiated_real_quic.rs"
+      - "docs/CORE8A_PREALPHA_ONE_GESTURE_WIRE_DECISION_P723.md"
+      - ".github/workflows/core8a-prealpha-one-v2-wire-review.yml"
+      - "server/src/prealpha_lmb_gesture_proposal.rs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  one-wire-cross-language-review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Reject invalid JS and prove actual Core8A outbox byte compatibility
+        run: |
+          node --check tests/fixtures/core8a-one-v2-gesture-wire-review.mjs
+          node --test tests/core8a-one-v2-gesture-wire-review.test.mjs
+          node --test tests/core8a-p723-shared-source-allocator-review.test.mjs
+          node --test tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs
+          node --test tests/prealpha-core8a-combat4-outbox-world-interop.test.mjs
+      - name: Original strict Rust formatting
+        run: cargo fmt --all --check --manifest-path server/Cargo.toml
+      - name: Independent actual Rust Combat4 codec bytes and KeyE future tag negative
+        run: cargo test --locked --manifest-path server/Cargo.toml --test core8a_single_v2_wire_choice_review -- --nocapture
+      - name: Actual pinned Rust QUIC server MUST reject non-negotiated v2 without harming original two-player INPUT_ACK
+        run: cargo test --locked --manifest-path server/Cargo.toml --test core8a_v2_unnegotiated_real_quic -- --nocapture
+      - name: Preserve original Rust all-target lint
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings

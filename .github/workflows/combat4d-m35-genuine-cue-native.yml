@@ -1,0 +1,63 @@
+name: Combat 4D M35 genuine actor-bound stun cue repeat (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m41-native-observed-parry.mjs"
+      - "scripts/m41-viewport-wheel.mjs"
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - "tests/m41-authoritative-parry-admission.test.mjs"
+      - ".github/workflows/combat4d-m35-genuine-cue-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-m35-cue-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uistun
+      CANDIDATE_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SOURCE }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Exact-source original cue/physical input and native prerequisites
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SOURCE"
+          git rev-parse HEAD > candidate-source.txt
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m41-authoritative-parry-admission.test.mjs tests/m41-native-observed-parry.test.mjs tests/native-webdriver-null-cue.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build unmodified original Rust World
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Genuine actor-bound World windup cue then real defensive W3C event
+        run: |
+          set -o pipefail
+          echo "COMBAT4D_M35_SOURCE_SHA=$CANDIDATE_SOURCE"
+          echo "COMBAT4D_M35_TRIAL=${{ matrix.trial }}"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee combat4d-m35-native.log
+      - name: Preserve independent pass and first-red evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combat4d-m35-${{ matrix.trial }}-${{ env.CANDIDATE_SOURCE }}
+          path: |
+            candidate-source.txt
+            combat4d-m35-native.log
+          if-no-files-found: warn

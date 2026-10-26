@@ -109,6 +109,9 @@ test("M231 only wraps genuine M108 and preserves pre-existing M229/M230 strict c
     runner.indexOf("async function prepareHeavyCounterplayFlight("));
   assert.ok(original.includes("attackerResult.opponentHp !== 54"));
   assert.ok(original.includes("defenderResult.playerHp !== 54"));
-  assert.ok(original.includes('keydown:KeyE'));
+  assert.ok(original.includes('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)'));
+  assert.ok(original.includes('requireM188NativeHeldLmb(attackerResult.pointers, attackRight, "M106")'));
+  assert.ok(original.includes('retired E cannot produce heavy Combat'));
+  assert.ok(!original.includes('pulseMovementKey(attacker, "e"'));
   assert.ok(original.includes("Opponent hit - 46 HP."));
 });

@@ -1,0 +1,33 @@
+name: UI10 Pre-Alpha proposed v2 LMB native DOM review (DORMANT)
+
+on:
+  pull_request:
+    paths:
+      - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
+      - "tests/ui10-prealpha-lmb-dom-review.test.mjs"
+      - "scripts/ui10-prealpha-lmb-native-review.mjs"
+      - ".github/workflows/ui10-prealpha-lmb-native-review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-pointer-dormant-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify untouched production and all v2 source regression gates
+        run: |
+          node --check src/browser/prealpha-lmb-dom-gesture-review.mjs
+          node --check scripts/ui10-prealpha-lmb-native-review.mjs
+          node --test tests/prealpha-lmb-gesture-proposal.test.mjs tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/ui10-prealpha-lmb-dom-review.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Genuine Chrome and Firefox DOM pointer edges on separate loopback QA only
+        run: timeout --signal=TERM --kill-after=5s 130s node scripts/ui10-prealpha-lmb-native-review.mjs

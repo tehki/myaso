@@ -25,6 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -41,12 +42,22 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      # Source-only art gate runs before browser Combat milestones and does
+      # not waive any mandatory Rust, Combat, networking or W3C validation.
+      - name: Validate Graphics 3A Ready-Five release gate
+        run: |
+          node --check web/alpha-config.mjs
+          node --check web/knight-sprites.mjs
+          node --test tests/prealpha-silver-knight.test.mjs tests/graphics3a-ground-shadow-airborne.test.mjs tests/graphics3a-knights-release-gate.test.mjs
+
       - name: Validate combat JavaScript
         run: |
           node --version
           node --check src/combat/model.mjs
           node --check web/game.mjs
           node --test tests/combat-model.test.mjs
+      - name: Validate complete Node and source-contract regression
+        run: node --test tests/*.test.mjs
 
       - name: Validate R3 low-latency combat audio
         run: |
@@ -82,7 +93,7 @@ jobs:
           node --check src/browser/left-button-charge.mjs
           node --check web/online-game.mjs
           node --check web/game.mjs
-          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs
+          node --test tests/r2-combat-controls.test.mjs tests/r1-lmb-charge-heavy.test.mjs tests/combat-keye-reserved-use.test.mjs tests/combat4a-simplify-focus-cancellation.test.mjs
 
       - name: Validate realtime networking JavaScript
         run: |
@@ -193,6 +204,7 @@ jobs:
 
       - name: Validate M188 repeated real heavy counterplay windows
         run: |
+          node --test tests/m188-native-heavy-control.test.mjs tests/m223-server-heavy-windup.test.mjs
           # Three fresh Chrome/Firefox sessions for each real defensive read.
           # Preserve unchanged 100 HP / -64 guard heavy block and parry stun.
           for scenario in uiheavyblock uiheavyparry; do
@@ -436,6 +448,7 @@ jobs:
         env:
           MYASO_PVP_SCENARIO: "uidirectionallight"
         run: |
+          node --test tests/m121-native-geometry-plan.test.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           node scripts/pvp_browser_flight_runner.mjs
 
@@ -1120,7 +1133,7 @@ jobs:
       - name: Check whitespace
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           git diff --check "$BASE_SHA" "$HEAD_SHA" -- . \
             ':(exclude)CODING_AGENT_CONSTITUTION_v1.3.md' \

@@ -1,0 +1,28 @@
+name: Combat 4D M111 original World chronology (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/combat4d-world-chronology.mjs'
+      - 'scripts/pvp_browser_flight_runner.mjs'
+      - 'tests/combat4d-world-chronology.test.mjs'
+      - '.github/workflows/combat4d-world-chronology.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prove-world-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR candidate (not synthetic merge ref)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Show immutable tested SHA
+        run: git rev-parse HEAD
+      - name: Run deterministic original M111 World chronology regression
+        run: node --test tests/combat4d-world-chronology.test.mjs

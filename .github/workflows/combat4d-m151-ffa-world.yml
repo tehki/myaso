@@ -1,0 +1,47 @@
+name: Combat 4D M151 original three-player guard-break World (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "web/online-game.mjs"
+      - "server/src/simulation.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/combat4d-m151-ffa-world.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-real-three-browser-ffa-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [uiguardbreakpunishffa, uiguardbreakpunishffahit]
+    env:
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Validate original source and actual Chrome Firefox native drivers
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile unchanged original authoritative Rust World before native FFA
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: M151 first genuine three-browser original FFA guard-break
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: M151 second genuine three-browser original FFA guard-break
+        if: always()
+        run: timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

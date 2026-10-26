@@ -75,7 +75,11 @@ const JUMP_STAMINA_COST: f32 = 14.0;
 const JUMP_MOVE_MULTIPLIER: f32 = 1.08;
 const JUMP_ATTACK_WINDUP_MS: f32 = 105.0;
 const JUMP_ATTACK_ACTIVE_MS: f32 = 105.0;
-const JUMP_ATTACK_RECOVERY_MS: f32 = 290.0;
+// Owner-approved 450ms punishable jump-attack recovery (2026-10-26).
+const JUMP_ATTACK_RECOVERY_MS: f32 = 450.0;
+// 27 x 16.666667ms may accumulate as 449.9998 in f32. Keep the
+// exact 27-tick recovery, without shifting the timing of other actions.
+const JUMP_ATTACK_RECOVERY_ROUNDING_MS: f32 = 0.01;
 const JUMP_ATTACK_REACH: f32 = 48.0;
 const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.24;
 const JUMP_ATTACK_DAMAGE: f32 = 42.0;
@@ -228,6 +232,7 @@ struct ActionEdges {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fighter {
     pub net_id: u32,
+    world_incarnation: u64,
     pub x: f32,
     pub y: f32,
     pub spawn_x: f32,
@@ -242,6 +247,9 @@ pub struct Fighter {
     pub recently_interacted_with: Option<u32>,
     latest_input: InputIntent,
     pending_attack: bool,
+    // Direction belongs to the one-shot light release, not a later neutral
+    // movement frame arriving before the next authoritative 60Hz World step.
+    pending_attack_lateral: Option<f32>,
     pending_heavy_attack: bool,
     pending_dodge: bool,
     pending_kick: bool,
@@ -251,6 +259,14 @@ pub struct Fighter {
     attack_input_was_down: bool,
     heavy_attack_input_was_down: bool,
     charging_heavy: bool,
+    // Only genuine review-v2 owned action may accept preview commands;
+    // normal v1 LMB attack intents must never be hijacked by this bridge.
+    gesture_review_owns_light: bool,
+    // Original admitted LMB light direction; one scalar in the existing World.
+    gesture_review_light_lateral: f32,
+    // Dormant reviewed v2 gesture ownership; no network/runtime callers.
+    // Original v1 input release handling is unchanged when this is false.
+    gesture_review_owns_held_charge: bool,
     block_input_was_down: bool,
     dodge_input_was_down: bool,
     kick_input_was_down: bool,
@@ -278,9 +294,14 @@ pub struct Fighter {
 }
 
 impl Fighter {
-    fn new(net_id: u32, x: f32, y: f32, facing: f32) -> Self {
+    pub fn world_incarnation(&self) -> u64 {
+        self.world_incarnation
+    }
+
+    fn new(net_id: u32, x: f32, y: f32, facing: f32, world_incarnation: u64) -> Self {
         Self {
             net_id,
+            world_incarnation,
             x,
             y,
             spawn_x: x,
@@ -295,6 +316,7 @@ impl Fighter {
             recently_interacted_with: None,
             latest_input: InputIntent::default(),
             pending_attack: false,
+            pending_attack_lateral: None,
             pending_heavy_attack: false,
             pending_dodge: false,
             pending_kick: false,
@@ -304,6 +326,9 @@ impl Fighter {
             attack_input_was_down: false,
             heavy_attack_input_was_down: false,
             charging_heavy: false,
+            gesture_review_owns_light: false,
+            gesture_review_light_lateral: 0.0,
+            gesture_review_owns_held_charge: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
             kick_input_was_down: false,
@@ -335,7 +360,25 @@ impl Fighter {
         self.latest_input
     }
 
-    fn latch_action_edges(&mut self, input: InputIntent) {
+    fn latch_action_edges(&mut self, input: InputIntent, release_motion: Option<(f32, f32, f32)>) {
+        // Preserve only the actual original v1 directional light-release
+        // provenance. A subsequent neutral packet in this same World tick
+        // must not turn genuine W+LMB LEFT SWEEP into generic light. Do not
+        // modify locomotion, facing, action timing or packet admission.
+        if input.attack
+            && !input.heavy_attack
+            && (!self.latest_input.attack || self.latest_input.heavy_attack)
+        {
+            // Original QUIC batch coalescing keeps latest neutral movement,
+            // but the selected one-shot attack may belong to an earlier
+            // accepted sample in the SAME datagram. Use that authenticated
+            // sample solely to choose the attack variant (never locomotion).
+            let (move_x, move_y, facing) = release_motion
+                .filter(|(x, y, angle)| x.is_finite() && y.is_finite() && angle.is_finite())
+                .unwrap_or((input.move_x, input.move_y, input.facing_radians));
+            let facing = normalize_angle(facing);
+            self.pending_attack_lateral = Some(facing.sin() * move_x - facing.cos() * move_y);
+        }
         // A completed LMB charge sends ONE of the release modes below. When
         // press and release arrive between two server ticks, pending edges
         // must not OR the prior dual-bit HOLD back into this newer input.
@@ -373,6 +416,7 @@ impl Fighter {
 
     fn clear_pending_actions(&mut self) {
         self.pending_attack = false;
+        self.pending_attack_lateral = None;
         self.pending_heavy_attack = false;
         self.pending_dodge = false;
         self.pending_kick = false;
@@ -481,8 +525,19 @@ impl Fighter {
     }
 
     fn set_action(&mut self, action: Action, duration_ms: f32) {
+        if !matches!(
+            action,
+            Action::AttackWindup
+                | Action::AttackLeftWindup
+                | Action::AttackRightWindup
+                | Action::HeavyAttackWindup
+        ) {
+            self.gesture_review_owns_light = false;
+            self.gesture_review_light_lateral = 0.0;
+        }
         if action != Action::HeavyAttackWindup {
             self.charging_heavy = false;
+            self.gesture_review_owns_held_charge = false;
         }
         if !matches!(
             action,
@@ -534,7 +589,7 @@ pub enum CombatEvent {
     MatchReset,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct World {
     pub width: f32,
     pub height: f32,
@@ -543,6 +598,26 @@ pub struct World {
     winner: Option<u32>,
     reset_at_ms: f32,
     fighters: Vec<Fighter>,
+    next_world_incarnation: u64,
+    world_instance: u64,
+}
+
+// Cloning an entire World creates a NEW owner; never alias the source
+// instance epoch across independent authoritative World objects.
+impl Clone for World {
+    fn clone(&self) -> Self {
+        Self {
+            width: self.width,
+            height: self.height,
+            now_ms: self.now_ms,
+            tick: self.tick,
+            winner: self.winner,
+            reset_at_ms: self.reset_at_ms,
+            fighters: self.fighters.clone(),
+            next_world_incarnation: self.next_world_incarnation,
+            world_instance: reserve_world_instance(),
+        }
+    }
 }
 
 impl Default for World {
@@ -552,6 +627,16 @@ impl Default for World {
 }
 
 impl World {
+    pub fn world_instance(&self) -> u64 {
+        self.world_instance
+    }
+
+    fn new_incarnation(&mut self) -> u64 {
+        let n = self.next_world_incarnation;
+        self.next_world_incarnation = n.checked_add(1).expect("World actor life epoch exhausted");
+        n
+    }
+
     pub fn new(width: f32, height: f32) -> Self {
         assert!(width > FIGHTER_RADIUS * 2.0);
         assert!(height > FIGHTER_RADIUS * 2.0);
@@ -563,6 +648,8 @@ impl World {
             winner: None,
             reset_at_ms: 0.0,
             fighters: Vec::new(),
+            next_world_incarnation: 1,
+            world_instance: reserve_world_instance(),
         }
     }
 
@@ -613,11 +700,13 @@ impl World {
             Ok(_) => return false,
             Err(index) => index,
         };
+        let world_incarnation = self.new_incarnation();
         let fighter = Fighter::new(
             net_id,
             clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
             clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
             facing,
+            world_incarnation,
         );
         self.fighters.insert(insertion_index, fighter);
         true
@@ -632,6 +721,20 @@ impl World {
     }
 
     pub fn set_input(&mut self, net_id: u32, input: InputIntent) -> bool {
+        self.set_input_with_light_release_motion(net_id, input, None)
+    }
+
+    /// Original authenticated input ingress may coalesce an action-bearing
+    /// release with a newer neutral movement sample from the same datagram.
+    /// Retain the trusted light sample's (move_x, move_y, facing) for action
+    /// selection only; latest input still owns movement and facing. This
+    /// does not introduce a second set_input or another attack producer.
+    pub fn set_input_with_light_release_motion(
+        &mut self,
+        net_id: u32,
+        input: InputIntent,
+        release_motion: Option<(f32, f32, f32)>,
+    ) -> bool {
         if self.winner.is_some() {
             return false;
         }
@@ -639,9 +742,126 @@ impl World {
             return false;
         };
         let input = normalize_input(input);
-        self.fighters[index].latch_action_edges(input);
+        self.fighters[index].latch_action_edges(input, release_motion);
         self.fighters[index].latest_input = input;
         true
+    }
+
+    /// REVIEW-ONLY bridge for the separately authenticated LMBGesture v2
+    /// reducer. There are NO runtime callers and v1 input wire is unchanged.
+    /// Core8A/8C must later bind commands to the real player lease and world
+    /// tick, arbitrate Space/RMB/roll/parry, and never let a
+    /// remote caller directly select a command or an actor.
+    pub fn apply_review_only_lmb_gesture_command(
+        &mut self,
+        net_id: u32,
+        command: crate::prealpha_lmb_gesture_authority::Command,
+    ) -> bool {
+        use crate::prealpha_lmb_gesture_authority::Command;
+        if self.winner.is_some() {
+            return false;
+        }
+        let Ok(index) = self.fighter_index(net_id) else {
+            return false;
+        };
+        let fighter = &mut self.fighters[index];
+        if fighter.action == Action::Dead {
+            return false;
+        }
+        match command {
+            Command::BeginLightWindup
+                if fighter.action == Action::Idle
+                    && !fighter.latest_input.block
+                    && !fighter.latest_input.dodge
+                    && !fighter.latest_input.kick
+                    && !fighter.latest_input.jump
+                    && !fighter.latest_input.dash =>
+            {
+                let lateral = fighter.facing.sin() * fighter.latest_input.move_x
+                    - fighter.facing.cos() * fighter.latest_input.move_y;
+                fighter.begin_light_attack(lateral);
+                fighter.gesture_review_owns_light = true;
+                fighter.gesture_review_light_lateral = lateral;
+                true
+            }
+            Command::UpgradeHeldHeavy { server_elapsed_ms }
+                if matches!(
+                    fighter.action,
+                    Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                ) && fighter.gesture_review_owns_light
+                    && fighter.action_elapsed_ms + EPSILON < ATTACK_WINDUP_MS
+                    && (fighter.action_elapsed_ms - server_elapsed_ms as f32).abs()
+                        <= SERVER_DT_MS + 2.0 =>
+            {
+                // Already-active or already-landed light NEVER upgrades.
+                // Keep the actual original World windup time, not a client
+                // timestamp, and hold until server-approved heavy RELEASE.
+                let elapsed = fighter.action_elapsed_ms;
+                fighter.attack_hit_targets.clear();
+                fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+                fighter.action_elapsed_ms = elapsed;
+                fighter.charging_heavy = true;
+                fighter.gesture_review_owns_held_charge = true;
+                true
+            }
+            Command::ResumeLight { server_elapsed_ms }
+                if fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_light
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON < HEAVY_ATTACK_WINDUP_MS
+                    && (fighter.action_elapsed_ms - server_elapsed_ms as f32).abs()
+                        <= SERVER_DT_MS + 2.0 =>
+            {
+                let elapsed = fighter.action_elapsed_ms;
+                // Resume the originally admitted light variant; newer neutral
+                // locomotion never reclassifies an already-owned LMB action.
+                let lateral = fighter.gesture_review_light_lateral;
+                fighter.begin_light_attack(lateral);
+                // An undercharged RELEASE can never reset original light
+                // time, add a second damage window, or secretly become heavy.
+                fighter.action_elapsed_ms = elapsed;
+                true
+            }
+            Command::ReleaseHeavy
+                if fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_held_charge
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS =>
+            {
+                fighter.attack_hit_targets.clear();
+                fighter.set_action(Action::HeavyAttackActive, HEAVY_ATTACK_ACTIVE_MS);
+                true
+            }
+            Command::CancelUnlandedLight
+                if fighter.gesture_review_owns_light
+                    && (matches!(
+                        fighter.action,
+                        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                    ) || (fighter.action == Action::HeavyAttackWindup
+                        && fighter.charging_heavy))
+                    && fighter.attack_hit_targets.is_empty() =>
+            {
+                fighter.set_action(Action::Idle, 0.0);
+                fighter.clear_pending_actions();
+                true
+            }
+            Command::ActivateLight => matches!(
+                fighter.action,
+                Action::AttackActive
+                    | Action::AttackLeftActive
+                    | Action::AttackRightActive
+                    | Action::AttackRecovery
+                    | Action::AttackLeftRecovery
+                    | Action::AttackRightRecovery
+            ),
+            Command::HeavyReady => {
+                fighter.action == Action::HeavyAttackWindup
+                    && fighter.gesture_review_owns_held_charge
+                    && fighter.charging_heavy
+                    && fighter.action_elapsed_ms + EPSILON >= HEAVY_ATTACK_WINDUP_MS
+            }
+            _ => false,
+        }
     }
 
     pub fn step(&mut self) -> Vec<CombatEvent> {
@@ -674,6 +894,8 @@ impl World {
         for fighter in &mut self.fighters {
             if fighter.action == Action::Dead {
                 if self.now_ms >= fighter.respawn_at_ms {
+                    fighter.world_incarnation =
+                        reserve_actor_life(&mut self.next_world_incarnation);
                     respawn_fighter(fighter);
                     events.push(CombatEvent::Respawn {
                         fighter: fighter.net_id,
@@ -739,6 +961,7 @@ impl World {
             fighter.clear_pending_actions();
             fighter.guard_regen_blocked_until_ms = 0.0;
             fighter.stamina_regen_blocked_until_ms = 0.0;
+            fighter.world_incarnation = reserve_actor_life(&mut self.next_world_incarnation);
             respawn_fighter(fighter);
         }
     }
@@ -846,8 +1069,9 @@ fn begin_requested_action(
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = false;
             fighter.buffered_light_attack = true;
-            fighter.buffered_attack_lateral =
-                fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+            fighter.buffered_attack_lateral = fighter.pending_attack_lateral.unwrap_or(
+                fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y,
+            );
         }
         return;
     }
@@ -869,6 +1093,13 @@ fn begin_requested_action(
         return;
     }
 
+    // The proposed lease-authorized v2 gesture reducer owns held READY
+    // independently of old v1 button snapshots. Without this explicit fence,
+    // a missing v1 attack+heavy pair would cancel the authenticated charge.
+    // The normal legacy path below remains unchanged for all active clients.
+    if fighter.charging_heavy && fighter.gesture_review_owns_held_charge {
+        return;
+    }
     // Combo attack+heavy flags are a sustained LMB charge. The server owns
     // the 320ms windup; reaching READY never emits an attack while held.
     if fighter.charging_heavy {
@@ -903,8 +1134,9 @@ fn begin_requested_action(
                     fighter.set_action(Action::Idle, 0.0);
                 }
             } else {
-                let lateral =
-                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+                let lateral = fighter.pending_attack_lateral.unwrap_or(
+                    fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y,
+                );
                 fighter.begin_light_attack(lateral);
             }
             return;
@@ -924,6 +1156,8 @@ fn begin_requested_action(
     // only during its unlanded windup. Running light may upgrade as well.
     // Once active, already-hit or recovering, the second action is rejected.
     if edges.heavy_attack
+        && input.attack
+        && input.heavy_attack
         && matches!(
             fighter.action,
             Action::AttackWindup
@@ -938,8 +1172,13 @@ fn begin_requested_action(
                 ATTACK_WINDUP_MS
             })
     {
+        // Only an uninterrupted held-LMB light may upgrade before contact.
+        // The standalone heavy bit formerly used for E never qualifies.
+        let light_elapsed_ms = fighter.action_elapsed_ms;
         fighter.attack_hit_targets.clear();
         fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
+        fighter.action_elapsed_ms = light_elapsed_ms;
+        fighter.charging_heavy = true;
         return;
     }
 
@@ -1036,14 +1275,10 @@ fn begin_requested_action(
         return;
     }
 
-    if edges.heavy_attack && fighter.action == Action::Idle {
-        fighter.attack_hit_targets.clear();
-        fighter.set_action(Action::HeavyAttackWindup, HEAVY_ATTACK_WINDUP_MS);
-        return;
-    }
-
     if edges.attack && fighter.action == Action::Idle {
-        let lateral = fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y;
+        let lateral = fighter
+            .pending_attack_lateral
+            .unwrap_or(fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y);
         fighter.begin_light_attack(lateral);
         return;
     }
@@ -1183,7 +1418,12 @@ fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
         return;
     }
 
-    if fighter.action_elapsed_ms + EPSILON < fighter.action_duration_ms {
+    let completion_epsilon_ms = if fighter.action == Action::JumpAttackRecovery {
+        JUMP_ATTACK_RECOVERY_ROUNDING_MS
+    } else {
+        EPSILON
+    };
+    if fighter.action_elapsed_ms + completion_epsilon_ms < fighter.action_duration_ms {
         return;
     }
 
@@ -1652,6 +1892,24 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
     value.max(min).min(max)
 }
 
+// Ephemeral nonreusable World and fighter-life identifiers; process scoped.
+static NEXT_GESTURE_WORLD_INSTANCE: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+fn reserve_world_instance() -> u64 {
+    NEXT_GESTURE_WORLD_INSTANCE
+        .fetch_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |n| n.checked_add(1),
+        )
+        .expect("World owner instance epoch exhausted")
+}
+fn reserve_actor_life(next: &mut u64) -> u64 {
+    let n = *next;
+    *next = n.checked_add(1).expect("World actor life epoch exhausted");
+    n
+}
+
 #[cfg(test)]
 mod r2_combat_control_tests {
     use super::*;
@@ -1711,6 +1969,116 @@ mod r2_combat_control_tests {
     }
 
     #[test]
+    fn combat4b_p0_undercharged_release_retains_original_pointerdown_direction() {
+        // The existing dormant source-tagged bridge starts a directional light
+        // on LMB pointerDOWN. An undercharged upgrade->release must resume
+        // THAT light, even if movement changes before the real release.
+        // No second action classifier, hit owner, client clock, or wire.
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        for (direction_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            let mut world = World::new(800.0, 600.0);
+            assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_y: direction_y,
+                    ..InputIntent::default()
+                }
+            ));
+            assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup,));
+            assert_eq!(world.fighter(1).unwrap().action, expected);
+            assert!(world.step().is_empty());
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::UpgradeHeldHeavy {
+                    server_elapsed_ms: SERVER_DT_MS as u64,
+                },
+            ));
+
+            // True neutral/reversed movement belongs to movement simulation,
+            // not to reclassification of an already-authorized light.
+            assert!(world.set_input(1, InputIntent::default()));
+            for _ in 0..4 {
+                assert!(world.step().is_empty());
+            }
+            assert!(world.apply_review_only_lmb_gesture_command(
+                1,
+                Command::ResumeLight {
+                    server_elapsed_ms: world.now_ms as u64,
+                },
+            ));
+            assert_eq!(
+                world.fighter(1).unwrap().action,
+                expected,
+                "undercharged LMB must resume original directional light, not classify latest neutral",
+            );
+            assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy,));
+        }
+    }
+
+    #[test]
+    fn combat4b_p0_cancelled_upgrade_cannot_leak_direction_or_late_hit() {
+        use crate::prealpha_lmb_gesture_authority::Command;
+
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 220.0, 260.0, 0.0));
+        assert!(world.add_player_at(2, 290.0, 260.0, std::f32::consts::PI));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
+        assert!(world.step().is_empty());
+        assert!(world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::UpgradeHeldHeavy {
+                server_elapsed_ms: SERVER_DT_MS as u64,
+            },
+        ));
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::CancelUnlandedLight));
+        assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        assert!(!world.apply_review_only_lmb_gesture_command(
+            1,
+            Command::ResumeLight {
+                server_elapsed_ms: world.now_ms as u64,
+            },
+        ));
+        assert!(!world.apply_review_only_lmb_gesture_command(1, Command::ReleaseHeavy));
+        for _ in 0..24 {
+            assert!(
+                world.step().is_empty(),
+                "cancelled LMB must not deal late damage"
+            );
+        }
+        assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+
+        // Only a NEW accepted gesture can establish a new attack origin.
+        // The cancelled leftward origin must not leak into a fresh right.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: 1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.apply_review_only_lmb_gesture_command(1, Command::BeginLightWindup));
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::AttackRightWindup,
+            "new opposite-side gesture must not inherit cancelled left direction"
+        );
+    }
+
+    #[test]
     fn held_lmb_converts_only_an_unlanded_light_windup() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
@@ -1726,6 +2094,7 @@ mod r2_combat_control_tests {
         world.set_input(
             1,
             InputIntent {
+                attack: true,
                 heavy_attack: true,
                 ..InputIntent::default()
             },
@@ -1733,6 +2102,35 @@ mod r2_combat_control_tests {
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
         assert!(world.fighter(1).unwrap().attack_hit_targets.is_empty());
+    }
+
+    #[test]
+    fn retired_keyboard_heavy_bit_cannot_upgrade_an_unlanded_light() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                ..InputIntent::default()
+            },
+        ));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackWindup);
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        ));
+        world.step();
+        assert_eq!(
+            world.fighter(1).unwrap().action,
+            Action::AttackWindup,
+            "orphaned heavy bit cannot hijack an existing LMB light"
+        );
+        assert!(!world.fighter(1).unwrap().charging_heavy);
     }
 
     #[test]
@@ -1756,6 +2154,7 @@ mod r2_combat_control_tests {
         world.set_input(
             1,
             InputIntent {
+                attack: true,
                 heavy_attack: true,
                 run: true,
                 move_x: 1.0,
@@ -1777,16 +2176,18 @@ mod r2_combat_control_tests {
                 Action::AttackWindup,
             ),
             (
+                // An unready orphaned heavy-only terminal cannot start E Combat.
                 InputIntent {
                     heavy_attack: true,
                     ..InputIntent::default()
                 },
-                Action::HeavyAttackWindup,
+                Action::Idle,
             ),
             (InputIntent::default(), Action::Idle),
         ] {
             let mut world = World::new(800.0, 600.0);
             assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 315.0, 300.0, std::f32::consts::PI));
             assert!(world.set_input(
                 1,
                 InputIntent {
@@ -1797,12 +2198,18 @@ mod r2_combat_control_tests {
             ));
             // Both WebTransport datagrams arrived before one 60Hz world.step.
             assert!(world.set_input(1, release));
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(
                 world.fighter(1).unwrap().action,
                 expected,
-                "latest release intent must beat pending held bits"
+                "light-only release survives; unready heavy-only or cancel stays inert"
             );
+            if expected == Action::Idle {
+                for _ in 0..24 {
+                    assert!(world.step().is_empty());
+                }
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
         }
     }
 
@@ -1810,7 +2217,8 @@ mod r2_combat_control_tests {
     fn release_edge_survives_following_neutral_sample_before_server_tick() {
         // WebTransport carries redundant samples and multiple distinct 60 Hz
         // client inputs may be consumed before one authoritative world tick.
-        // Hold -> release -> neutral must resolve exactly once, not cancel.
+        // Light-only release survives neutral. An unready heavy-only sample
+        // cannot synthesize standalone keyboard/E heavy from an orphaned bit.
         for (release, expected) in [
             (
                 InputIntent {
@@ -1820,15 +2228,17 @@ mod r2_combat_control_tests {
                 Action::AttackWindup,
             ),
             (
+                // An unready orphaned heavy-only terminal cannot start E Combat.
                 InputIntent {
                     heavy_attack: true,
                     ..InputIntent::default()
                 },
-                Action::HeavyAttackWindup,
+                Action::Idle,
             ),
         ] {
             let mut world = World::new(800.0, 600.0);
-            world.add_player_at(1, 250.0, 300.0, 0.0);
+            assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+            assert!(world.add_player_at(2, 315.0, 300.0, std::f32::consts::PI));
             world.set_input(
                 1,
                 InputIntent {
@@ -1839,14 +2249,20 @@ mod r2_combat_control_tests {
             );
             world.set_input(1, release);
             world.set_input(1, InputIntent::default());
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(world.fighter(1).unwrap().action, expected);
-            world.step();
+            assert!(world.step().is_empty());
             assert_eq!(
                 world.fighter(1).unwrap().action,
                 expected,
-                "the release must not repeat or turn into a cancelled charge"
+                "newer neutral must not repeat a light or arm an unready heavy"
             );
+            if expected == Action::Idle {
+                for _ in 0..24 {
+                    assert!(world.step().is_empty());
+                }
+                assert_eq!(world.fighter(2).unwrap().hp, 100.0);
+            }
         }
     }
 
@@ -1895,6 +2311,85 @@ mod r2_combat_control_tests {
             Action::Idle,
             "direct hold -> neutral is cancellation, not an attack"
         );
+    }
+
+    #[test]
+    fn m121_real_light_release_preserves_direction_through_same_tick_neutral() {
+        // Native browser / original QUIC proof: held source tick63, W+LMB
+        // release tick66, neutral tick67 all land before the next World step.
+        // The light must use release-time strafe, while actual locomotion
+        // continues using the latest neutral input. No instant fake hit.
+        for (release_y, expected) in [
+            (-1.0, Action::AttackLeftWindup),
+            (1.0, Action::AttackRightWindup),
+        ] {
+            for hold_stepped in [false, true] {
+                let mut world = World::new(800.0, 600.0);
+                assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+                let hold = InputIntent {
+                    attack: true,
+                    heavy_attack: true,
+                    ..InputIntent::default()
+                };
+                assert!(world.set_input(1, hold));
+                if hold_stepped {
+                    world.step();
+                    assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+                }
+                assert!(world.set_input(
+                    1,
+                    InputIntent {
+                        attack: true,
+                        move_y: release_y,
+                        ..InputIntent::default()
+                    }
+                ));
+                assert!(world.set_input(1, InputIntent::default()));
+                world.step();
+                let fighter = world.fighter(1).unwrap();
+                assert_eq!(
+                    fighter.action, expected,
+                    "release-time lateral survives newer neutral input"
+                );
+                assert_eq!(
+                    fighter.input().move_y,
+                    0.0,
+                    "the original latest neutral still owns locomotion"
+                );
+                world.step();
+                assert_eq!(
+                    world.fighter(1).unwrap().action,
+                    expected,
+                    "the same release must not commit a duplicate strike"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn m121_one_shot_direction_is_retained_if_next_input_changes_movement() {
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
+        // A genuine short press/release can be observed as a lone attack
+        // frame followed immediately by unrelated movement in the same tick.
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                move_y: -1.0,
+                ..InputIntent::default()
+            }
+        ));
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: 1.0,
+                ..InputIntent::default()
+            }
+        ));
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::AttackLeftWindup);
+        assert_eq!(world.fighter(1).unwrap().input().move_y, 1.0);
     }
 
     #[test]
@@ -2064,7 +2559,7 @@ mod r2_combat_control_tests {
     }
 
     #[test]
-    fn cancelled_charge_never_strikes_and_existing_e_heavy_remains_authoritative() {
+    fn cancelled_lmb_charge_rejects_orphan_heavy_and_preserves_real_charge() {
         let mut world = World::new(800.0, 600.0);
         assert!(world.add_player_at(1, 250.0, 300.0, 0.0));
         world.set_input(
@@ -2079,6 +2574,35 @@ mod r2_combat_control_tests {
         world.set_input(1, InputIntent::default());
         world.step();
         assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        // A retired keyboard E heavy-only sample is inert.
+        world.set_input(
+            1,
+            InputIntent {
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        for _ in 0..24 {
+            assert!(world.step().is_empty());
+            assert_eq!(world.fighter(1).unwrap().action, Action::Idle);
+        }
+        world.set_input(1, InputIntent::default());
+        world.step();
+        // The generic heavy bit remains valid inside a genuine held LMB.
+        world.set_input(
+            1,
+            InputIntent {
+                attack: true,
+                heavy_attack: true,
+                ..InputIntent::default()
+            },
+        );
+        world.step();
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
+        assert!(world.fighter(1).unwrap().charging_heavy);
+        for _ in 0..24 {
+            assert!(world.step().is_empty());
+        }
         world.set_input(
             1,
             InputIntent {
@@ -2087,8 +2611,7 @@ mod r2_combat_control_tests {
             },
         );
         world.step();
-        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackWindup);
-        assert!(!world.fighter(1).unwrap().charging_heavy);
+        assert_eq!(world.fighter(1).unwrap().action, Action::HeavyAttackActive);
     }
 
     #[test]

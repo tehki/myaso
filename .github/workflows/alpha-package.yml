@@ -17,11 +17,16 @@ permissions:
 
 jobs:
   linux-alpha:
-    if: (github.event_name == 'pull_request' && github.head_ref == 'feature/r0-open-trust-layer-multiplayer-alpha') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # Canonical PR artifacts are review-only; this job has no deployment step.
+    if: (github.event_name == 'pull_request' && (github.head_ref == 'feature/r0-open-trust-layer-multiplayer-alpha' || github.head_ref == 'codex/unified-core-combat-20261024')) || (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/unified-core-combat-20261024'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
       - name: Verify R0 alpha launcher
         run: node --test tests/r0-alpha-config.test.mjs
       - name: Build authoritative release
@@ -31,17 +36,28 @@ jobs:
       - name: Package verified public assets and server binary
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           mkdir -p out/bin out/public
           install -m 0755 server/target/release/myaso-server out/bin/myaso-server
           cp -a web out/public/web
           cp -a src out/public/src
           cp -a ops out/ops
-          printf '%s\n' "${GITHUB_SHA}" > out/REVISION
-          tar -C out -czf "myaso-alpha-${GITHUB_SHA}.tar.gz" .
-          sha256sum "myaso-alpha-${GITHUB_SHA}.tar.gz" > "myaso-alpha-${GITHUB_SHA}.tar.gz.sha256"
+          printf '%s\n' "${SOURCE_SHA}" > out/REVISION
+          (cd out && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          tar -C out -czf "myaso-alpha-${SOURCE_SHA}.tar.gz" .
+          sha256sum "myaso-alpha-${SOURCE_SHA}.tar.gz" > "myaso-alpha-${SOURCE_SHA}.tar.gz.sha256"
+      - name: Verify exact-source archive and all extracted file checksums
+        run: |
+          set -euo pipefail
+          sha256sum -c "myaso-alpha-${SOURCE_SHA}.tar.gz.sha256"
+          mkdir verified-package
+          tar -C verified-package -xzf "myaso-alpha-${SOURCE_SHA}.tar.gz"
+          test "$(cat verified-package/REVISION)" = "$SOURCE_SHA"
+          (cd verified-package && sha256sum -c SHA256SUMS)
+          test -x verified-package/bin/myaso-server
       - uses: actions/upload-artifact@v4
         with:
-          name: myaso-alpha-linux-amd64
+          name: ${{ (github.head_ref == 'codex/unified-core-combat-20261024' || github.ref == 'refs/heads/codex/unified-core-combat-20261024') && format('myaso-alpha-linux-amd64-review-{0}', env.SOURCE_SHA) || 'myaso-alpha-linux-amd64' }}
           path: |
             myaso-alpha-*.tar.gz
             myaso-alpha-*.tar.gz.sha256

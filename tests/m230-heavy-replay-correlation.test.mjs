@@ -80,7 +80,12 @@ test("M230 remains a read-only post-M108 strict 46HP proof", () => {
   const begin = server.indexOf("let accepted = ingress.ingest(&packet);");
   const section = server.slice(begin, server.indexOf("let server_tick = {", begin));
   assert.ok(section.includes("if game.drop_new_action_datagrams"));
-  assert.ok(section.includes("accepted.iter().rev().find(|sample| sample.heavy_attack)"));
+  assert.ok(section.includes("recovered_dropped_heavy_tick("));
+  assert.ok(section.includes("accepted.as_slice(), &dropped_action_ticks"));
+  const filter = server.slice(server.indexOf("fn recovered_dropped_heavy_tick("),
+    server.indexOf("struct LoopbackFlightConfig"));
+  assert.ok(filter.includes("sample.heavy_attack && dropped_action_ticks.contains(&sample.tick)"),
+    "only the exact dropped input tick may generate M229 replay evidence");
   assert.ok(section.includes("action_tick={action_tick}"));
   assert.ok(section.includes("client_tick={input_tick}"));
 });

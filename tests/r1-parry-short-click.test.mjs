@@ -15,7 +15,7 @@ test("M33 and M146 perform complete genuine short LMB before parry, never chargi
   const wheel = flight.indexOf("await setArenaBlock(defender, defenderElementId, true)", releaseDelay);
   const proof = flight.indexOf("await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline)", wheel);
   assert.ok(dispatch >= 0 && tap > dispatch && lead > tap && releaseDelay > lead && wheel > releaseDelay && proof > wheel);
-  assert.match(flight, /const releaseToStrikeParryDelayMs = scenario === "uiparrytell" \? 83 : 95/);
+  assert.match(flight, /const releaseToStrikeParryDelayMs = 95/);
   assert.match(flight, /Any actual -38 guard block or 34 HP hit remains a terminal failure/);
   assert.ok(flight.includes("const parryIngress = await calibrateNativeParryIngress("));
   // Preserve genuine input and fail-closed outcomes; only staged native
@@ -89,4 +89,21 @@ test("M33 records trusted native wheel and pointer latency without synthetic inp
   assert.match(calibration, /wheelLeadMs: Math.max\(0, skewMs\)/);
   assert.ok(!calibration.includes("dispatchEvent("));
   assert.ok(!calibration.includes("new WheelEvent("));
+});
+
+test("M35 and M41 expose loopback original World contact proof without synthetic parry", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("MYASO_FLIGHT_ACTION_PROOF:");
+  const end = source.indexOf("MYASO_FLIGHT_M121_INPUT_PROOF:", start);
+  assert.ok(start > 0 && end > start, "reuse the existing loopback-only server diagnostics");
+  const gated = source.slice(start, end);
+  assert.ok(gated.includes('scenario === "uistun" || scenario === "uiparrytell"'));
+  assert.ok(gated.includes('scenario === "uiheavyblock" || scenario === "uiheavyparry"'));
+  assert.ok(gated.includes(') ? "1" : "0"'), "other scenarios remain diagnostics-off");
+  assert.ok(source.includes('MYASO_BIND: "127.0.0.1:0"'));
+  const parry = source.slice(source.indexOf("async function runOnlineUiParryFlight("),
+    source.indexOf("async function runOnlineUiParryPunishFfaFocusFlight("));
+  assert.ok(parry.includes("await setArenaBlock(defender, defenderElementId, true)"));
+  assert.ok(parry.includes('throw new Error("M33 genuine short-click parry resolved unexpectedly: "'));
+  assert.ok(!gated.includes("MYASO_FLIGHT_M121_INPUT_PROOF"));
 });

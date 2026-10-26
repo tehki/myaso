@@ -10,6 +10,9 @@
  * transfers ownership of a fresh binary payload to the transport hot path and
  * avoids the extra browser-side copy for WebTransport datagrams.
  */
+import { createV1InputReplayWindow } from "../src/network/v1-input-replay-window.mjs";
+import { decodeProposedTypedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
+
 export async function connectGameTransport({
   webTransportUrl,
   webTransportOptions,
@@ -35,6 +38,8 @@ export async function connectGameTransport({
 }
 
 class WebTransportGameConnection {
+  #privateHitLab = null;
+
   constructor(transport, datagramWriter, reliableWriter) {
     this.kind = "webtransport";
     this.transport = transport;
@@ -43,6 +48,16 @@ class WebTransportGameConnection {
     this.latestRealtime = null;
     this.realtimeFlush = null;
     this.closed = false;
+    this.v1ReplayWindow = createV1InputReplayWindow({
+      onStall: () => this.close("original v1 replay writer stalled for 1500ms"),
+    });
+    // Typed Combat edges are never fed to the latest-wins sampled input queue.
+    this.experimentalGestureState = "off";
+    this.gestureGrantWaiter = null;
+    this.gestureWriteQueue = Promise.resolve();
+    // This is a transport safety ceiling, not a Combat retry policy.
+    // The one-lease outbox may independently bound or retry genuine edges.
+    this.pendingGestureEdges = 0;
   }
 
   static async connect({ webTransportUrl, webTransportOptions, onRealtime, onReliable }) {
@@ -51,9 +66,122 @@ class WebTransportGameConnection {
     const datagramWriter = transport.datagrams.writable.getWriter();
     const reliable = await transport.createBidirectionalStream();
     const reliableWriter = reliable.writable.getWriter();
+    const connection = new WebTransportGameConnection(transport, datagramWriter, reliableWriter);
+    connection.webTransportUrl = webTransportUrl;
     pumpReader(transport.datagrams.readable.getReader(), onRealtime);
-    pumpLengthPrefixedReader(reliable.readable.getReader(), onReliable);
-    return new WebTransportGameConnection(transport, datagramWriter, reliableWriter);
+    pumpLengthPrefixedReader(reliable.readable.getReader(), packet => {
+      if (!connection.#handleGestureGrant(packet)
+          && !connection.#privateHitLab?.receive(packet, connection)) onReliable?.(packet);
+    });
+    return connection;
+  }
+
+  #handleGestureGrant(packet) {
+    const bytes = toUint8Array(packet);
+    if (bytes.length < 2 || bytes[0] !== 2 || bytes[1] !== 0x13) return false;
+    const waiter = this.gestureGrantWaiter;
+    if (this.experimentalGestureState !== "pending" || !waiter ||
+        bytes.length !== 4 || bytes[2] !== 0 || bytes[3] !== 0) {
+      waiter?.reject(new Error("unexpected or malformed experimental gesture grant"));
+      this.gestureGrantWaiter = null;
+      this.close("invalid experimental gesture grant");
+      return true;
+    }
+    this.gestureGrantWaiter = null;
+    this.experimentalGestureState = "granted";
+    waiter.resolve(true);
+    return true;
+  }
+
+  // Only a LOCAL loopback original-Rust flight may negotiate this experimental
+  // server-issued capability. In particular this cannot activate public R2.
+  // The existing WebTransport bidi stream and original server actor stay shared.
+  async negotiateExperimentalGestureV2({ timeoutMs = 3000 } = {}) {
+    if (this.closed || this.experimentalGestureState !== "off") {
+      throw new Error("experimental gesture handshake requires a fresh connection");
+    }
+    const host = new URL(this.webTransportUrl).hostname;
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) {
+      throw new Error("experimental gesture grant is loopback-only");
+    }
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000) {
+      throw new RangeError("bounded handshake timeout required");
+    }
+    this.experimentalGestureState = "pending";
+    let resolveGrant, rejectGrant;
+    const acknowledged = new Promise((resolve, reject) => {
+      resolveGrant = resolve; rejectGrant = reject;
+    });
+    // Prevent an unhandled rejected handshake if the QUIC uni write itself fails.
+    void acknowledged.catch(() => {});
+    this.gestureGrantWaiter = { resolve: resolveGrant, reject: rejectGrant };
+    const timeout = setTimeout(() => {
+      this.gestureGrantWaiter?.reject(new Error("original Rust v2 grant timed out"));
+      this.gestureGrantWaiter = null;
+    }, timeoutMs);
+    try {
+      const stream = await this.transport.createUnidirectionalStream();
+      const writer = stream.getWriter();
+      try {
+        // Original server accepts exactly this 8-byte HELLO on the admitted
+        // existing connection, then returns 02 13 00 00 on its bidi stream.
+        await writer.write(Uint8Array.from([2, 0x10, 77, 89, 65, 83, 79, 49]));
+        await writer.close();
+      } finally { try { writer.releaseLock(); } catch {} }
+      await acknowledged;
+      return true;
+    } catch (error) {
+      this.close("experimental gesture grant not confirmed");
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // Each accepted gesture edge is preserved as an individual datagram, never
+  // overwritten by the movement sampler's latestRealtime slot. This is only
+  // transport delivery, NOT an authoritative Combat hit or admission ACK.
+  sendExperimentalGestureEdge(bytes) {
+    if (this.closed || this.experimentalGestureState !== "granted") {
+      throw new Error("gesture datagram requires current server grant");
+    }
+    const payload = toUint8Array(bytes);
+    // Owner retired source1 Key E from Combat. Reject even handcrafted old
+    // source1 bytes BEFORE they can occupy the one bounded QUIC writer queue.
+    // Rust admission independently rejects them before World mutation.
+    if (payload.length !== 16 || payload[0] !== 2 || payload[1] !== 0x11
+        || payload[3] !== 0) {
+      throw new TypeError("only source0 LMB typed 16-byte Combat events accepted");
+    }
+    // Use the SAME selected 0x11 codec as the current LMB producer/World.
+    // A forged source0 with invalid action, zero sequence or gesture ID must
+    // not consume one of the bounded real QUIC writer slots.
+    decodeProposedTypedGestureEvent(payload);
+    // Never let a stalled datagram writer accumulate arbitrarily many
+    // outstanding 16-byte gesture events/promises. Overflow is not an ACK,
+    // not a skipped RELEASE, and must retire the whole same-QUIC lease.
+    if (this.pendingGestureEdges >= 64) {
+      this.close("experimental gesture queue overflow");
+      throw new RangeError("bounded experimental gesture queue overflow");
+    }
+    const owned = payload.slice();
+    this.pendingGestureEdges += 1;
+    const send = this.gestureWriteQueue.then(async () => {
+      if (this.closed || this.experimentalGestureState !== "granted") {
+        throw new Error("old gesture edge cannot outlive its QUIC lease");
+      }
+      await this.datagramWriter.ready;
+      if (this.closed) throw new Error("gesture lease ended before send");
+      await this.datagramWriter.write(owned);
+    });
+    this.gestureWriteQueue = send.then(
+      () => { this.pendingGestureEdges -= 1; },
+      () => {
+        this.pendingGestureEdges -= 1;
+        this.close("gesture delivery failed");
+      },
+    );
+    return send;
   }
 
   sendRealtime(bytes) {
@@ -66,40 +194,88 @@ class WebTransportGameConnection {
 
   #queueRealtime(bytes, copy) {
     if (this.closed) return Promise.resolve();
-    const payload = toUint8Array(bytes);
-    this.latestRealtime = copy ? payload.slice() : payload;
+    const offered = toUint8Array(bytes);
+    const payload = copy ? offered.slice() : offered;
+    try {
+      if (this.v1ReplayWindow.offer(payload)) this.latestRealtime = null;
+      else this.latestRealtime = payload;
+    } catch (error) {
+      this.close("original v1 replay window overflow");
+      throw error;
+    }
+    return this.#ensureRealtimeFlush();
+  }
+
+  #ensureRealtimeFlush() {
     if (!this.realtimeFlush) {
       this.realtimeFlush = this.#flushRealtime()
         .catch((error) => {
           if (!this.closed) throw error;
         })
-        .finally(() => { this.realtimeFlush = null; });
+        .finally(() => {
+          this.realtimeFlush = null;
+          // Resume existing work without offering/counting its packets twice.
+          if (!this.closed && (this.v1ReplayWindow.pending || this.latestRealtime)) {
+            void this.#ensureRealtimeFlush().catch(() => {
+              if (!this.closed) this.close("realtime continuation failed");
+            });
+          }
+        });
     }
     return this.realtimeFlush;
   }
 
   async #flushRealtime() {
-    while (!this.closed && this.latestRealtime) {
+    while (!this.closed && (this.v1ReplayWindow.pending || this.latestRealtime)) {
       await this.datagramWriter.ready;
       if (this.closed) return;
-      const payload = this.latestRealtime;
-      this.latestRealtime = null;
+      const protectedPayload = this.v1ReplayWindow.peek();
+      const payload = protectedPayload ?? this.latestRealtime;
+      if (!protectedPayload) this.latestRealtime = null;
       await this.datagramWriter.write(payload);
+      if (this.closed) return;
+      if (protectedPayload) this.v1ReplayWindow.complete(protectedPayload);
     }
+  }
+
+  async negotiatePrivateHitDeliveryLab(options) {
+    if (this.closed || this.experimentalGestureState !== "granted" || this.#privateHitLab) {
+      throw new Error("private HIT requires one current original gesture transport");
+    }
+    const { createPrivateHitDeliveryLab } = await import("./private-hit-delivery-lab.mjs");
+    if (this.closed || this.#privateHitLab) throw new Error("retired or duplicate private HIT negotiation");
+    this.#privateHitLab = createPrivateHitDeliveryLab({ ...options, transport: this });
+    void this.transport.closed.then(
+      () => this.close("original private HIT connection ended"),
+      () => this.close("original private HIT connection failed"),
+    );
+    await this.#privateHitLab.start();
+    return this.#privateHitLab;
   }
 
   async sendReliable(bytes) {
     if (this.closed) throw new Error("WebTransport connection is closed");
     const payload = frameReliable(toUint8Array(bytes));
     await this.reliableWriter.ready;
-    if (this.closed) return;
+    // A closed session cannot treat an unsent reliable frame as delivered.
+    // The M147 recipient ledger may advance written-state ONLY after write().
+    if (this.closed) throw new Error("WebTransport connection is closed");
     await this.reliableWriter.write(payload);
+    // A completed writer promise is not a current-lease delivery if the
+    // connection was retired while the write was still in flight. Keep this
+    // conservative: any later recipient ACK/replay must use its own lease.
+    if (this.closed) throw new Error("WebTransport connection is closed");
   }
 
   close(reason = "client close") {
     if (this.closed) return;
     this.closed = true;
+    this.#privateHitLab?.close(reason);
+    this.experimentalGestureState = "closed";
+    this.gestureGrantWaiter?.reject(new Error("experimental gesture transport closed"));
+    this.gestureGrantWaiter = null;
     this.latestRealtime = null;
+    this.v1ReplayWindow.close();
     const pendingFlush = this.realtimeFlush;
     const transportClosed = this.transport.closed;
     this.transport.close({ closeCode: 0, reason });

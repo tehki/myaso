@@ -1,3 +1,6 @@
+import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
+import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
+import { verifyM173WorldJumpSpend } from "./m173-world-stamina-proof.mjs";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -22,6 +25,7 @@ import { observeM219RollBufferIngress } from "./m219-buffered-roll-ingress-evide
 import { summarizeM220KnockdownFocusTimeline } from "./m220-knockdown-focus-timeline.mjs";
 import { mustAwaitM202GuardConvergence } from "./m202-guardbreak-convergence.mjs";
 import { verifyM201ServerPunishProof } from "./m201-authoritative-phase-proof.mjs";
+import { classifyGuardBreakPunishWorld } from "./combat4d-world-chronology.mjs";
 import { verifyM206ServerKnockdownPunish } from "./m206-knockdown-punish-proof.mjs";
 import { verifyM209DualKnockdownServerPunish } from "./m209-dual-knockdown-proof.mjs";
 import { verifyM211DualRecoveryServerProof } from "./m211-dual-recovery-phase-proof.mjs";
@@ -29,6 +33,9 @@ import { planM203W3cPointerPause } from "./m203-w3c-wheel-ack.mjs";
 import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
+import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
+import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
@@ -36,18 +43,19 @@ import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scen
 import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
+import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
+import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
+import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
 const scenario = process.env.MYASO_PVP_SCENARIO ?? "damage";
-// Headless Firefox can occasionally stall longer than a 40 ms DOM key tap.
-// Keep the real E key depressed across multiple browser/input frames so the
-// authoritative client has a fair opportunity to sample the genuine gesture.
-const heavyKeyPulseMs = 120;
+// Initialized before the top-level native flight dispatcher invokes M110/M111.
+const M110_LMB_HEAVY_HOLD_MS = 450;
 // A full M62 threat chevron paints dozens of exact-tone pixels; a handful can
 // arise from raster overlap. Use one significance floor for positive and leak proof.
 const threatMarkerMinPixels = 8;
-if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uimiddleblockpressure", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
+if (!new Set(["damage", "inputloss", "parry", "dodge", "block", "guardbreak", "backblock", "respawn", "ui", "uirespawn", "uifeedback", "uihittell", "uivitals", "uiidentity", "uiscore", "uimatch", "uirematch", "uiffa3", "uikillfeed", "uifocus", "uithreat", "uithreatbearing", "uimultithreat", "uisecondarythreat", "uisecondarybearing", "uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers", "uijumpffaprimary", "uijumpffasecondary", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparry", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uistun", "uiguardbreak", "uimiddleblockpressure", "uidodge", "uirecovery", "uirecoverytell", "uiattackintent", "uiheavy", "uiheavyinputloss", "uiheavyinputlossgap", "uiheavyblock", "uiheavyparry", "uiheavydodge", "uiheavypunish", "uiheavyguardbreak", "uiheavyguardbreakpunish", "uifeint", "uirunningattack", "uidirectionallight", "uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer", "uiguardbreaktell", "uiparrytell", "uiblockfacingtell", "uidodgetell", "uideathtell"]).has(scenario)) throw new Error(`unsupported MYASO_PVP_SCENARIO: ${scenario}`);
 const staticPort = Number(process.env.MYASO_PVP_FLIGHT_HTTP_PORT ?? 4174);
 const browsers = [
   {
@@ -321,7 +329,7 @@ try {
     // This is loopback-only evidence, never a forged input or a retry.
     const acceptedHeavyInputs = (game.output().match(/M229_LOOPBACK_HEAVY_INPUT_ACCEPTED/g) ?? []).length;
     if (acceptedHeavyInputs < 1) {
-      throw new Error(`M229 missing server-accepted heavy after genuine KeyE and deliberate first drop: ${JSON.stringify({ droppedActionDatagrams, acceptedHeavyInputs })}`);
+      throw new Error(`M229 missing server-accepted heavy after genuine held-LMB and deliberate first drop: ${JSON.stringify({ droppedActionDatagrams, acceptedHeavyInputs })}`);
     }
     // M230: counts alone may accept an unrelated heavy from another session
     // or a later action edge. Require the *same* first-dropped sample tick.
@@ -333,6 +341,39 @@ try {
     console.log("M230_EXACT_HEAVY_REPLAY_EVIDENCE " + JSON.stringify(exactReplay));
     console.log(`M229_HEAVY_LOSS_INGRESS_EVIDENCE ${JSON.stringify({ ok: true, droppedActionDatagrams, acceptedHeavyInputs })}`);
     console.log(`M108_HEAVY_INPUT_LOSS_RECOVERY ${JSON.stringify({ ok: true, droppedActionDatagrams, results })}`);
+  } else if (scenario === "uiheavyinputlossgap") {
+    // Same genuine W3C/World M108 flight, with one additional original input
+    // datagram dropped at the loopback server ingress after the first edge loss.
+    // This does not forge input, ACK, World events, or damage.
+    const results = await withM231M108FailureEvidence(
+      async () => await runOnlineUiHeavyStrikeFlight(sessions),
+      () => game.output(),
+      (diagnostic) => console.error("M231_M108_FAILURE_PATH_EVIDENCE " + JSON.stringify(diagnostic)),
+    );
+    const output = game.output();
+    const droppedActionDatagrams = (output.match(/M63_INPUT_ACTION_PACKET_DROPPED/g) ?? []).length;
+    const acceptedHeavyInputs = (output.match(/M229_LOOPBACK_HEAVY_INPUT_ACCEPTED/g) ?? []).length;
+    const firstDrop = output.match(/CORE8A_FIRST_LOSS_DROP session=(\S+) action_tick=(\d+) packet_tick=(\d+) mask=(\d+) attack=(\d+) heavy=(\d+)/);
+    const followupDrops = [...output.matchAll(/CORE8A_FOLLOWING_INPUT_DATAGRAM_DROPPED session=(\S+) packet_tick=(\d+) remaining_after=(\d+)/g)];
+    const recovered = output.match(/M229_LOOPBACK_HEAVY_INPUT_ACCEPTED session=(\S+) action_tick=(\d+) client_tick=(\d+) packet_tick=(\d+) accepted_samples=(\d+)/);
+    if (droppedActionDatagrams !== 1 || acceptedHeavyInputs !== 1) {
+      throw new Error("CORE8A gap flight must prove exactly one original dropped edge and one server recovery: " + JSON.stringify({ droppedActionDatagrams, acceptedHeavyInputs }));
+    }
+    if (!firstDrop || firstDrop[4] !== "3" || firstDrop[5] !== "1" || firstDrop[6] !== "1") {
+      throw new Error("CORE8A two-packet gap missing genuine original attack+heavy edge: " + JSON.stringify({ firstDrop }));
+    }
+    if (followupDrops.length !== 1 || followupDrops.some((entry) => entry[1] !== firstDrop[1])) {
+      throw new Error("CORE8A two-packet gap did not drop exactly two following input datagrams on the same session: " + JSON.stringify({ firstDrop, followupDrops: followupDrops.map(x => x.slice(1)) }));
+    }
+    if (!recovered || recovered[1] !== firstDrop[1] || recovered[2] !== firstDrop[2]
+      || output.indexOf(recovered[0]) <= Math.max(...followupDrops.map((entry) => entry.index))) {
+      throw new Error("CORE8A two-packet gap did not recover the same original heavy tick after both drops: " + JSON.stringify({ firstDrop, followupDrops: followupDrops.map(x => x.slice(1)), recovered: recovered?.slice(1) }));
+    }
+    console.log("CORE8A_TWO_PACKET_GAP_NATIVE_PASS " + JSON.stringify({
+      ok: true, actionTick: Number(firstDrop[2]), firstDroppedPacketTick: Number(firstDrop[3]),
+      followingDroppedPacketTicks: followupDrops.map((entry) => Number(entry[2])),
+      recoveredPacketTick: Number(recovered[4]), acceptedSamples: Number(recovered[5]), results,
+    }));
   } else if (scenario === "uiheavyblock") {
     const results = await runOnlineUiHeavyBlockFlight(sessions);
     console.log(`M107_HEAVY_BLOCK ${JSON.stringify({ ok: true, results })}`);
@@ -526,15 +567,35 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiguardbreakpunishffa"
+        // M173 exact original World same-tick Jump stamina-spend evidence.
+        // The existing server flag is fail-closed on nonloopback listeners.
+        || scenario === "uijumpattack"
+        || scenario === "uidirectionallight"
+        // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
+        || scenario === "uiheavyguardbreakpunish"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
+        // QA-only original-World proof for physical M35/M41 short-LMB parry:
+        // W3C wheel receipt and browser-local clocks cannot prove whether
+        // defender Block preceded server contact within the 125ms window.
+        // Read-only M201_AUTH_ACTION and CORE8C_WORLD_CONTACT on loopback;
+        // no World stepping, input synthesis, HIT recipient, or protocol change.
+        || scenario === "uistun" || scenario === "uiparrytell"
         || scenario === "uiheavydodge"
+        || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
+        || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa"
         || scenario === "uimultiknockdownffahit"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
+      // Existing M121/M156 original-v1 ingress evidence is never enabled for
+      // v2 or other production paths; the Rust server rejects nonloopback.
+      MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
-        scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uijumpattackinputloss" ? "1" : "0",
+        scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uijumpattackinputloss" ? "1" : "0",
+      MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS:
+        scenario === "uiheavyinputlossgap" ? "1" : "0",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -589,14 +650,14 @@ async function startBrowser(browser) {
     pageLoad: 30_000,
     implicit: 0,
   });
-  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
+  if (scenario === "uiparry" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell") {
     await webdriver(base, "POST", `/session/${sessionId}/window/rect`, { x: 0, y: 0, width: 1280, height: 900 });
   }
   return { ...browser, child, base, sessionId };
 }
 
 async function navigate(session, gameUrl, certificateHash) {
-  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
+  const page = scenario === "ui" || scenario === "uirespawn" || scenario === "uifeedback" || scenario === "uihittell" || scenario === "uivitals" || scenario === "uiidentity" || scenario === "uiscore" || scenario === "uimatch" || scenario === "uirematch" || scenario === "uiffa3" || scenario === "uikillfeed" || scenario === "uifocus" || scenario === "uithreat" || scenario === "uithreatbearing" || scenario === "uimultithreat" || scenario === "uisecondarythreat" || scenario === "uisecondarybearing" || scenario === "uisecondaryphase" || scenario === "uiguardarc" || scenario === "uisecondaryguardarc" || scenario === "uithreatmarkers" || scenario === "uijumpffaprimary" || scenario === "uijumpffasecondary" || scenario === "uijumprecoveryffa" || scenario === "uijumppunishffa" || scenario === "uimultirecoveryffa" || scenario === "uimultirecoveryspatial" || scenario === "uimultirecoverypunish" || scenario === "uiparry" || scenario === "uiparrypunishwindow" || scenario === "uiparrypunishffa" || scenario === "uiparrypunishffahit" || scenario === "uiguardbreakpunishffa" || scenario === "uiguardbreakpunishffahit" || scenario === "uikickknockdownffa" || scenario === "uikickknockdownffahit" || scenario === "uikickknockdownbounded" || scenario === "uirollknockdownbounded" || scenario === "uirollknockdownffahit" || scenario === "uimultiknockdownffa" || scenario === "uimultiknockdownffahit" || scenario === "uirollknockdownffa" || scenario === "uistaminaauth" || scenario === "uistaminaexhaustion" || scenario === "uistaminafeedback" || scenario === "uistaminaconfirmed" || scenario === "uistun" || scenario === "uiguardbreak" || scenario === "uimiddleblockpressure" || scenario === "uidodge" || scenario === "uirecovery" || scenario === "uirecoverytell" || scenario === "uiattackintent" || scenario === "uiheavy" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uiheavyblock" || scenario === "uiheavyparry" || scenario === "uiheavydodge" || scenario === "uiheavypunish" || scenario === "uiheavyguardbreak" || scenario === "uiheavyguardbreakpunish" || scenario === "uifeint" || scenario === "uirunningattack" || scenario === "uidirectionallight" || scenario === "uirollbuffer" || scenario === "uijumpbuffer" || scenario === "uijumpattack" || scenario === "uijumpattackinputloss" || scenario === "uijumpattackpunish" || scenario === "uijumpattacktelegraph" || scenario === "uijumpattackblock" || scenario === "uijumpattackparry" || scenario === "uijumpattackdodge" || scenario === "uijumpattackbuffer" || scenario === "uikickbuffer" || scenario === "uiguardbreaktell" || scenario === "uiparrytell" || scenario === "uiblockfacingtell" || scenario === "uidodgetell" || scenario === "uideathtell" ? "index.html" : "pvp-flight.html";
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
@@ -960,7 +1021,7 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
   await aimArena(attacker, attackerElementId, attackOffset);
   await sleep(60);
 
-  await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+  await performM110NativeHeldLmb(attacker, attackerElementId, attackOffset);
   await sleep(1100);
 
   const evidence = await Promise.all(entries.map(readUiEvidence));
@@ -973,9 +1034,8 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
   if (!attackerResult.keys.includes(`keydown:${movementCode}`) || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`M106 real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackerResult.keys.includes("keydown:KeyE") || !attackerResult.keys.includes("keyup:KeyE")) {
-    throw new Error(`M106 real heavy-strike E control was not delivered: ${JSON.stringify(attackerResult)}`);
-  }
+  requireM188NativeHeldLmb(attackerResult.pointers, attackRight, "M106");
+  if (attackerResult.keys.some(event => event.endsWith(":KeyE"))) throw new Error("M106 retired E cannot produce heavy Combat");
   if (attackerResult.playerHp !== 100 || attackerResult.opponentHp !== 54) {
     throw new Error(`M106 attacker HUD did not render one authoritative 46-damage heavy hit: ${JSON.stringify(attackerResult)}`);
   }
@@ -1010,12 +1070,19 @@ async function runOnlineUiHeavyStrikeFlight(entries) {
 async function prepareHeavyCounterplayFlight(
   entries,
   label,
-  { attackerName = "chrome", defenderName = "firefox", movementMs = 180 } = {},
+  { attackerName = "chrome", defenderName = "firefox", movementMs = 180,
+    nativeBoundedApproach = false, m121Direction = null } = {},
 ) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
-  const attacker = entries.find((entry) => entry.name === attackerName);
-  const defender = entries.find((entry) => entry.name === defenderName);
+  // Genuine actor order is authoritative. For M121 alone, bind W3C roles
+  // from the observed player IDs instead of assuming Chrome must be #1.
+  const nativeRoles = m121Direction === null
+    ? null : selectM121NativeRoles(ready, m121Direction);
+  const attacker = entries.find((entry) =>
+    entry.name === (nativeRoles?.attackerName ?? attackerName));
+  const defender = entries.find((entry) =>
+    entry.name === (nativeRoles?.defenderName ?? defenderName));
   const attackerReady = ready.find((entry) => entry.browser === attacker?.name);
   const defenderReady = ready.find((entry) => entry.browser === defender?.name);
   if (!attacker || !defender || !attackerReady || !defenderReady) {
@@ -1035,7 +1102,49 @@ async function prepareHeavyCounterplayFlight(
   const attackerElementId = await resolveArenaElement(attacker, `${label} attacker`);
   const defenderElementId = await resolveArenaElement(defender, `${label} defender`);
   await Promise.all(entries.map(centerArenaInViewport));
-  await pulseMovementKey(attacker, movementKey, movementMs);
+  if (nativeBoundedApproach) {
+    // M121 independent read-only forensic. Observe original accepted world
+    // positions and actual W3C keydown/up durations around ONE unchanged
+    // native keyboard transaction, before any combat click is sent.
+    const before = await readUiEvidence(attacker);
+    await pulseMovementKeyBoundedW3c(attacker, movementKey, movementMs);
+    const after = await readUiEvidence(attacker);
+    const preActors = before.acceptance?.fighters ?? [];
+    const postActors = after.acceptance?.fighters ?? [];
+    const ownBefore = preActors.find((entry) => entry.netId === attackerReady.playerNetId);
+    const targetBefore = preActors.find((entry) => entry.netId === defenderReady.playerNetId);
+    const ownAfter = postActors.find((entry) => entry.netId === attackerReady.playerNetId);
+    const targetAfter = postActors.find((entry) => entry.netId === defenderReady.playerNetId);
+    const distance = (a, b) => a && b
+      ? Math.hypot(b.x - a.x, b.y - a.y) : null;
+    const keyEvents = after.keyTransitions.filter((event) => event.code === movementCode);
+    const keyDown = keyEvents.filter((event) => event.type === "keydown").at(-1);
+    const keyUp = keyEvents.filter((event) => event.type === "keyup").at(-1);
+    console.log("M121_NATIVE_APPROACH_WORLD " + JSON.stringify({
+      attackerId: attackerReady.playerNetId,
+      targetId: defenderReady.playerNetId,
+      movementKey: movementCode,
+      requestedHoldMs: movementMs,
+      observedHoldMs: keyDown && keyUp ? keyUp.t - keyDown.t : null,
+      originalKeyEvents: keyEvents.slice(-4),
+      serverTickBefore: before.acceptance?.serverTick ?? null,
+      serverTickAfter: after.acceptance?.serverTick ?? null,
+      ownBefore, targetBefore, ownAfter, targetAfter,
+      distanceBefore: distance(ownBefore, targetBefore),
+      distanceAfter: distance(ownAfter, targetAfter),
+      originalLightReach: COMBAT.attack.reach,
+      unchangedCollisionRadius: COMBAT.fighterRadius,
+      // Sender samples are exact original 60Hz sendInput payload fields.
+      // Do not equate a DOM KeyD event with admitted server movement.
+      sampledOriginalV1: (after.acceptance?.m121SentSamples ?? [])
+        .filter((sample) => Number.isFinite(before.acceptance?.m121SentSamples?.at(-1)?.clientTick)
+          ? sample.clientTick >= before.acceptance.m121SentSamples.at(-1).clientTick
+          : true)
+        .slice(-64),
+    }));
+  } else {
+    await pulseMovementKey(attacker, movementKey, movementMs);
+  }
   await Promise.all([
     aimArena(attacker, attackerElementId, attackOffset),
     aimArena(defender, defenderElementId, blockOffset),
@@ -1050,17 +1159,16 @@ async function prepareHeavyCounterplayFlight(
   };
 }
 
-function assertHeavyControlDelivered(attackerResult, movementCode, label) {
+function assertHeavyControlDelivered(attackerResult, movementCode, label, pointerAttackRight = movementCode === "KeyD") {
   if (!attackerResult.keys.includes(`keydown:${movementCode}`)
     || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
     throw new Error(`${label} real attacker movement was not delivered: ${JSON.stringify(attackerResult)}`);
   }
-  if (!attackerResult.keys.includes("keydown:KeyE") || !attackerResult.keys.includes("keyup:KeyE")) {
-    throw new Error(`${label} real heavy-strike E control was not delivered: ${JSON.stringify(attackerResult)}`);
-  }
+  requireM188NativeHeldLmb(attackerResult.pointers, pointerAttackRight, label);
+  if (attackerResult.keys.some(event => event.endsWith(":KeyE"))) throw new Error(label + " retired E cannot produce heavy Combat");
 }
 
-// M195: three independent true E and wheel-back ingress calibrations replace
+// M195: three independent native held-LMB and wheel-back ingress calibrations replace
 // the one-shot sample that over-delayed post-merge heavy parry.
 // Read-only server action transitions prove every clean calibration.
 async function calibrateHeavyIngress(
@@ -1077,7 +1185,7 @@ async function calibrateHeavyIngress(
     const before = await readUiEvidence(attacker);
     const offset = before.acceptance?.ownActionTransitions?.length ?? 0;
     const started = Date.now();
-    await pulseMovementKey(attacker, "e", heavyKeyPulseMs);
+    await performM110NativeHeldLmb(attacker, attackerElementId, -attackOffset);
     await sleep(COMBAT.heavyAttack.windupMs + COMBAT.heavyAttack.activeMs
       + COMBAT.heavyAttack.recoveryMs + 210);
     const whiff = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
@@ -1132,9 +1240,9 @@ async function calibrateHeavyIngress(
     wheelIngressSamples, windupTick, blockTick };
 }
 
-// One real Chrome E gesture and one real Firefox wheel-back remain the entire
+// One real Chrome held-LMB gesture and one real Firefox wheel-back remain the entire
 // measured exchange. The W3C-native wheel pause compensates for observed
-// E-to-server-windup and wheel-to-server-block latency, not pointer latency.
+// held-LMB-to-server-windup and wheel-to-server-block latency.
 // Any wrong result is still a terminal failure in the block/parry callers.
 async function performHeavyCounterplayWindowWheel(
   attacker, defender, attackerElementId, defenderElementId,
@@ -1148,7 +1256,7 @@ async function performHeavyCounterplayWindowWheel(
   const attackActionOffset = before[0].acceptance?.ownActionTransitions?.length ?? 0;
   const defendActionOffset = before[1].acceptance?.ownActionTransitions?.length ?? 0;
   const wheelOffset = before[1].wheels.length;
-  // Bound the correction from sampled E/wheel ingress to avoid
+  // Bound the correction from sampled held-LMB/wheel ingress to avoid
   // path-dependent skew pushing the sole parry wheel past impact.
   const rawSkewMs = calibration.eIngressMs - calibration.wheelIngressMs;
   // A large negative compensation pre-arms heavy parry too early and
@@ -1166,12 +1274,12 @@ async function performHeavyCounterplayWindowWheel(
   }));
   if (scenario === "uiheavyblock" || scenario === "uiheavyparry") {
     // M223: stage the real wheel from a fresh server-observed heavy windup.
-    // Do not predict E acceptance from W3C ACK or inject synthetic events.
+    // Do not predict charging acceptance from W3C ACK or inject synthetic events.
     const logOffset = m201ServerOutput().length;
     const fighterId = before[0].playerNetId;
     const eIssuedAtMs = Date.now();
     const eOutcome = Promise.resolve().then(() =>
-      pulseMovementKey(attacker, "e", heavyKeyPulseMs)).then(
+      performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)).then(
       () => ({ ok: true }),
       error => ({ ok: false, error }),
     );
@@ -1194,7 +1302,23 @@ async function performHeavyCounterplayWindowWheel(
       targetAfterWindupMs,
       sampledWheelIngressMs: calibration.wheelIngressMs,
     });
-    const m223WheelDelayMs = m223Plan.wheelDelayMs;
+    // Combat4B M188: actual original-World protected CI on e1f2f9a
+    // still BLOCKED a genuine held-LMB heavy at tick619 after Firefox
+    // Block tick611 (8 ticks / 133ms > unchanged 125ms parry window).
+    // Exact original World CI e6f5c079: 3/3 real heavy BLOCK, 2/3 real
+    // heavy PARRY at contact age 116.7ms. Third parry BLOCK age150.0ms.
+    // Stage the SAME one physical W3C parry wheel 30ms later (+110ms
+    // total), seeking >=2 World ticks' contact-phase headroom without
+    // extending 125ms server parry. For M223 wheelIngress >=65ms, the
+    // physical pause stays within unchanged 450ms fixture bound.
+    // Keep strict 100HP, full guard, stun and no-fake-HIT assertions;
+    // heavy BLOCK 395ms and all original World/balance values unchanged.
+    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 110 : 0;
+    const m223WheelDelayMs = m223Plan.wheelDelayMs + m188HeldLmbParryOffsetMs;
+    if (!Number.isSafeInteger(m223WheelDelayMs)
+      || m223WheelDelayMs < 0 || m223WheelDelayMs > 450) {
+      throw new Error("M188 genuine wheel timing outside bounded native pause");
+    }
     const wheelIssuedAtMs = Date.now();
     const [eResult, wheelResult] = await Promise.all([
       eOutcome,
@@ -1210,14 +1334,16 @@ async function performHeavyCounterplayWindowWheel(
       wheelIngressCalibrationMs: calibration.wheelIngressMs,
       boundedWheelIngressMs: m223Plan.boundedWheelIngressMs,
       wheelDelayMs: m223WheelDelayMs, targetAfterWindupMs,
-      eW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
+      m188HeldLmbParryOffsetMs,
+      physicalHeavySource: "held-lmb", requestedHoldMs: M110_LMB_HEAVY_HOLD_MS,
+      lmbW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
     }));
     if (!eResult.ok) throw eResult.error;
     if (!wheelResult.ok) throw wheelResult.error;
   } else {
     // Preserve legacy scheduling outside strict M188 heavy defense.
     await Promise.all([
-      pulseMovementKey(attacker, "e", heavyKeyPulseMs),
+      performM110NativeHeldLmb(attacker, attackerElementId, attackOffset),
       scrollArenaWheel(defender, defenderElementId, 120, wheelDelayMs),
     ]);
   }
@@ -1252,9 +1378,17 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // A genuine two-browser CI trace (M223 windup tick 2635, block tick 2643,
   // heavy hit tick 2660) proved the 155ms lead expires the unchanged 240ms
   // block before contact: block ended at tick 2656 and 46HP leaked.
-  // Shift only this genuine wheel's target to 255ms after server-observed
-  // heavy windup. The ~100ms shift centers an ~180ms block-to-impact gap
-  // inside unchanged 125-240ms guard-only window. Never widen a proof gate.
+  // Unified M188 original World evidence at 94797f19: target 255ms yielded
+  // block tick 704, expiry tick 719, and 46HP HIT tick 724 (windup tick 691).
+  // The block expired five ticks before impact. Shift the same genuine wheel
+  // objective 110ms later to 365ms: approximately 13 ticks / 217ms of block
+  // lead, within unchanged 125-240ms block-only timing, beyond parry.
+  // Recent exact-head 31ea9d3: measured BLOCK tick735 and 46HP HIT tick749
+  // (14 World ticks / ~233ms); the guard expired on the impact boundary.
+  // Shift only the genuine W3C wheel aim 30ms later to target ~12 ticks
+  // (~200ms) before contact: strictly >125ms parry, <240ms block. The
+  // original exact -64 guard, HP100, no-parry assertions still decide PASS.
+  // This changes only physical test staging, NOT server timing or balance.
   // Keep M223 genuine server-windup timing, exact -64 guard, 100HP and
   // parry/late-block failure gates unchanged.
   const staged = await prepareHeavyCounterplayFlight(
@@ -1272,12 +1406,12 @@ async function runOnlineUiHeavyBlockFlight(entries) {
   // completely unresolved: pristine HP/guard and no parry feedback. Any resolved
   // or partially resolved exchange fails closed instead of being retried.
   for (let attempt = 1; attempt <= 3 && !evidence; attempt += 1) {
-    // Calibrate genuine browser delivery before committing the real E + wheel.
+    // Calibrate genuine browser delivery before committing real held-LMB + wheel.
     // Aim for a short block at heavy impact, outside the 125ms parry interval.
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 255,
+      attackOffset, blockOffset, 395,
     );
     await sleep(470);
 
@@ -1359,7 +1493,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
   let evidence = null;
   let lastObserved = null;
 
-  // As with the heavy-block flight, WebDriver can deliver the E edge while the
+  // As with the heavy-block flight, WebDriver can deliver the native edge while the
   // browser input latch misses the outbound sample. Retry only that completely
   // pristine case. Any evidence that a heavy actually committed, hit, blocked,
   // or otherwise resolved makes the attempt terminal and therefore fail-closed.
@@ -1453,7 +1587,8 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     // authoritative collision radius before the perpendicular dodge began.
     { attackerName: "firefox", defenderName: "chrome", movementMs: 120 },
   );
-  const { attacker, defender, defenderElementId, movementCode } = staged;
+  const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
+  const attackOffset = movementCode === "KeyD" ? 200 : -200;
 
   let committedObserved = false;
   let lastCommitEvidence = null;
@@ -1466,9 +1601,10 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
     // The loopback-only M201_ACTION proof binds this to the authoritative
     // fighter and 60Hz tick; never infer commitment from a WebDriver ACK.
     const serverLogOffset = m201ServerOutput().length;
-    const eResult = setMovementKey(attacker, "e", true).then(
+    const lmbOutcome = performM110NativeHeldLmb(attacker, attackerElementId, attackOffset).then(
       () => ({ ok: true }), error => ({ ok: false, error }),
     );
+    let dodgeError = null;
     try {
       let windup;
       try {
@@ -1477,21 +1613,18 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
           fighterId: beforeAttacker.playerNetId, sleep, timeoutMs: 550,
         });
       } catch (error) {
-        const delivered = await eResult;
+        const delivered = await lmbOutcome;
         if (!delivered.ok) throw delivered.error;
         throw error;
       }
       const windupObservedEpochMs = Date.now();
-      const delivered = await eResult;
-      if (!delivered.ok) throw delivered.error;
       committedObserved = true;
-      // Schedule one real W3C pointer-owned roll ~170ms after server windup
-      // is observed. Approx. 60ms browser+network receipt then positions
-      // its ~125ms i-frame around the 320ms heavy active contact, WITHOUT
-      // modifying either combat timer, heavy reach, 46HP or test assertions.
-      // Date.now() absolute scheduling avoids accumulating Chrome KeyS
-      // WebDriver ACK latency before the wheel and keeps heavy E held.
-      const wheelTargetEpochMs = windupObservedEpochMs + 170;
+      // Shift the native choreography by the extra physical charging hold,
+      // not the server's125ms iframe or320ms READY rule. Keep the original
+      //170ms perpendicular movement lead by waiting before KeyS begins.
+      const releaseHoldShiftMs = M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs;
+      const wheelTargetEpochMs = windupObservedEpochMs + 170 + releaseHoldShiftMs;
+      await sleep(releaseHoldShiftMs);
       await setMovementKey(defender, "s", true);
       try {
         const remainingMs = wheelTargetEpochMs - Date.now();
@@ -1501,15 +1634,21 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
         console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
           fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
           windupObservedAfterMs: windup.observedAfterMs,
-          plannedAfterWindupMs: 170,
+          plannedAfterWindupMs: 170 + releaseHoldShiftMs,
           wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
         }));
       } finally {
         await setMovementKey(defender, "s", false);
       }
+    } catch (error) {
+      dodgeError = error;
+      throw error;
     } finally {
-      await eResult;
-      await setMovementKey(attacker, "e", false);
+      const delivered = await lmbOutcome;
+      if (!delivered.ok) {
+        if (dodgeError && dodgeError !== delivered.error) throw new AggregateError([dodgeError, delivered.error], "native dodge and held-LMB commands failed");
+        throw delivered.error;
+      }
     }
     if (committedObserved) break;
 
@@ -1540,7 +1679,7 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   }
 
   // M204 issued exactly one genuine Chrome pointer-owned wheel and S control
-  // before releasing Firefox E, while the first heavy was still winding up.
+  // before Firefox's physical LMB release, while the heavy was charging.
   // Let authoritative active/recovery settle without polling inside iframe.
   await sleep(360);
 
@@ -1572,18 +1711,76 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
 }
 
 async function runOnlineUiDirectionalLightFlight(entries) {
+  const requestedDirection = process.env.MYASO_M121_DIRECTION ?? "right";
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M121 directional light",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 150 },
+    { movementMs: 150, nativeBoundedApproach: true,
+      m121Direction: requestedDirection },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const attackRight = movementCode === "KeyD";
   // In screen-space coordinates, left of a right-facing fighter is W/up; left
-  // of a left-facing fighter is S/down.
+  // of a left-facing fighter is S/down. Strictly fail if actual observed
+  // server-assigned roles do not match this trial's demanded direction.
   const strafeKey = attackRight ? "w" : "s";
   const strafeCode = attackRight ? "KeyW" : "KeyS";
   const attackOffset = attackRight ? 200 : -200;
+  if (attackRight !== (requestedDirection === "right")
+    || strafeCode !== (requestedDirection === "left" ? "KeyS" : "KeyW")) {
+    throw new Error("M121 native requested direction disagrees with actual actor geometry");
+  }
+  console.log("M121_NATIVE_DIRECTION_REQUIREMENT " + JSON.stringify({
+    requestedDirection, attacker: attacker.name, defender: defender.name,
+    movementCode, strafeCode, attackRight,
+  }));
+
+  const { planM121NativeGeometry } = await import("./m121-native-geometry-plan.mjs");
+  // The original fixed approach can leave a real 94.15px separation, beyond
+  // unchanged 76+18px light reach. Qualify actual replicas before the genuine
+  // directional chord, with room for its later ~20px lateral displacement.
+  const readM121Geometry = async () => {
+    const state = await readUiEvidence(attacker);
+    if (state.playerHp !== 100 || state.opponentHp !== 100
+        || state.playerGuard !== 100 || state.opponentGuard !== 100) {
+      throw new Error("M121 pre-strike native staging changed actual HP or guard: " + JSON.stringify(state));
+    }
+    const ownId = state.playerNetId;
+    const fighters = state.acceptance?.fighters ?? [];
+    const own = fighters.find(f => f.netId === ownId);
+    const target = fighters.find(f => f.netId !== ownId);
+    if (fighters.length !== 2 || !own || !target || !Number.isFinite(state.acceptance?.serverTick)) {
+      throw new Error("M121 missing two real authoritative staging replicas: " + JSON.stringify(state.acceptance));
+    }
+    return { own, target, serverTick: state.acceptance.serverTick };
+  };
+  let geometryReady = false;
+  const nativeGeometry = [];
+  await sleep(310); // separate additional physical WASD from the original approach's double-tap window
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const before = await readM121Geometry();
+    const plan = planM121NativeGeometry(before.own, before.target, attackRight);
+    if (!plan) {
+      await sleep(110);
+      const stable = await readM121Geometry();
+      if (isTickNewer32(stable.serverTick, before.serverTick)
+          && Math.hypot(stable.own.x - before.own.x, stable.own.y - before.own.y) <= 2
+          && Math.hypot(stable.target.x - before.target.x, stable.target.y - before.target.y) <= 2
+          && !planM121NativeGeometry(stable.own, stable.target, attackRight)) {
+        nativeGeometry.push({ before, stable, qualified: true });
+        geometryReady = true;
+        break;
+      }
+      nativeGeometry.push({ before, stable, qualified: false });
+    } else {
+      await pulseMovementKeyBoundedW3c(attacker, plan.key, plan.durationMs);
+      await sleep(310); // native pulses must not accidentally request directional dash
+      const after = await readM121Geometry();
+      nativeGeometry.push({ before, requestedNativePulse: plan, after });
+    }
+  }
+  console.log("M121_NATIVE_INTERIOR_GEOMETRY " + JSON.stringify({ attackRight, nativeGeometry }));
+  if (!geometryReady) throw new Error("M121 actual replica geometry did not converge before the single directional light");
 
   await performArenaDirectionalLight(attacker, attackerElementId, strafeKey, attackOffset);
 
@@ -1616,6 +1813,54 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
     throw new Error(`M121 directional light incomplete evidence: ${JSON.stringify(evidence)}`);
+  }
+  // This chronology is recorded BEFORE untouched strict HP / LEFT SWEEP
+  // checks, even when genuine attack hits in the wrong directional phase.
+  console.log("M121_ACTUAL_SENDER_WORLD_CHRONOLOGY " + JSON.stringify({
+    attacker: attackerResult.playerNetId,
+    defender: defenderResult.playerNetId,
+    physical: { keys: attackerResult.keyTransitions, pointers: attackerResult.pointers },
+    actualSent: (attackerResult.acceptance?.m121SentSamples ?? [])
+      .filter((sample) => sample.moveX || sample.moveY || sample.attack || sample.heavyAttack)
+      .slice(-64),
+    attackerWorld: attackerResult.acceptance?.ownActionTransitions?.slice(-12) ?? [],
+    defenderWorldView: defenderResult.acceptance?.focusActionTransitions?.slice(-12) ?? [],
+    defenderThreat: defenderResult.threatTransitions.slice(-12),
+    defenderRecovery: defenderResult.recoveryTransitions.slice(-12),
+    serverInputAcceptance: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => line.startsWith("M121_V1_SERVER_INPUT ")
+        && line.includes(` actor=${attackerResult.playerNetId} `))
+      .slice(-96),
+    serverWorldActionEvents: m201ServerOutput().split(/\r?\n/)
+      .filter((line) => line.startsWith("M201_AUTH_ACTION ")
+        && line.includes(` fighter=${attackerResult.playerNetId} `))
+      .slice(-32),
+    hp: { attacker: attackerResult.playerHp, victim: defenderResult.playerHp },
+  }));
+
+  // Combat 4A: a genuine short physical LMB can reach the 60Hz sender
+  // but be absent from the original authenticated v1 accepted batch.
+  // Diagnostic only: never replay a click or treat transport acceptance as HIT.
+  const releaseSentTicks = (attackerResult.acceptance?.m121SentSamples ?? [])
+    .filter((sample) => sample.attack && !sample.heavyAttack)
+    .map((sample) => sample.clientTick);
+  const releaseAdmittedTicks = m201ServerOutput().split(/\r?\n/)
+    .filter((line) => line.startsWith("M121_V1_SERVER_INPUT ")
+      && line.includes(` actor=${attackerResult.playerNetId} `))
+    .flatMap((line) => {
+      const accepted = line.match(/accepted=\[([^\]]*)\]/)?.[1] ?? "";
+      return [...accepted.matchAll(/(?:^|,)(\d+):1:0:/g)]
+        .map((match) => Number(match[1]));
+    });
+  if (releaseSentTicks.length
+      && !releaseSentTicks.some((tick) => releaseAdmittedTicks.includes(tick))) {
+    console.error("M121_ORIGINAL_V1_SHORT_RELEASE_INGRESS_GAP " + JSON.stringify({
+      actor: attackerResult.playerNetId,
+      releaseClientTicks: releaseSentTicks,
+      acceptedReleaseClientTicks: releaseAdmittedTicks,
+      physicalLmbEvents: attackerResult.pointers.filter((event) => event.button === 0),
+      originalWorldActions: attackerResult.acceptance?.ownActionTransitions?.slice(-10) ?? [],
+    }));
   }
 
   const lightDown = attackerResult.pointers.find((event) =>
@@ -3422,6 +3667,8 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   }
 
   const baselineStamina = ready.acceptance.authoritativeStamina;
+  // Only World events after this physical attempt may qualify its jump cost.
+  const worldStaminaProofOffset = m201ServerOutput().length;
   const actionOffset = ready.acceptance.ownActionTransitions.length;
   const staminaOffset = ready.acceptance.staminaTransitions.length;
   const denialOffset = ready.acceptance?.staminaDenialTransitions?.length ?? 0;
@@ -3481,20 +3728,27 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
       minimumIndex = index;
     }
   }
-  const preSpendStamina = minimumIndex > 0 && Number.isFinite(staminaTransitions[minimumIndex - 1]?.stamina)
-    ? staminaTransitions[minimumIndex - 1].stamina
-    : baselineStamina;
-  const expectedAfterJump = preSpendStamina - COMBAT.jump.staminaCost;
-  if (minimumStamina < expectedAfterJump - 1 || minimumStamina > expectedAfterJump + 1) {
-    throw new Error(milestone + " did not spend exactly the ordinary jump cost: "
-      + JSON.stringify({
-        baselineStamina,
-        preSpendStamina,
-        minimumStamina,
-        expectedAfterJump,
-        staminaTransitions,
-      }));
+  // A snapshot taken several World ticks before the chord is not a valid
+  // pre-spend baseline: the server may regenerate stamina in the meantime.
+  // Require exact original-World same-tick before/after proof instead.
+  const worldJumpSpend = verifyM173WorldJumpSpend(
+    m201ServerOutput().slice(worldStaminaProofOffset),
+    ready.acceptance.playerNetId,
+    COMBAT.jump.staminaCost,
+  );
+  const expectedAfterJump = worldJumpSpend.after;
+  if (minimumIndex < 0 || minimumStamina < expectedAfterJump - 1
+      || minimumStamina > expectedAfterJump + 1) {
+    throw new Error(milestone + " replicated stamina disagrees with exact original World cost: "
+      + JSON.stringify({ baselineStamina, worldJumpSpend, minimumStamina, staminaTransitions }));
   }
+  console.log("M173_ORIGINAL_WORLD_JUMP_SPEND_PROOF " + JSON.stringify({
+    actor: ready.acceptance.playerNetId,
+    baselineStamina,
+    worldJumpSpend,
+    minimumStamina,
+    staminaTransitions,
+  }));
 
   const transitions = rejected.acceptance?.staminaDenialTransitions?.slice(denialOffset) ?? [];
   const queuedIndex = transitions.findIndex((entry) =>
@@ -3996,9 +4250,9 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   const defenderBeforePunish = await readUiEvidence(defender);
   const punishPointerOffset = defenderBeforePunish.pointers.length;
   // Fire a genuine LMB as soon as the remote recovery cue becomes visible.
-  // M140 proves the player's commitment starts inside the unchanged 290 ms
-  // recovery window. The unchanged 135 ms light windup may finish after that
-  // recovery ends; changing its timing would be a balance change, not a proof.
+  // M140 proves the player's commitment starts inside the owner-approved
+  // 450ms jump-attack recovery window. The original 135ms light windup and
+  // authoritative hit/phase checks remain unchanged.
   await performArenaAttackHold(defender, defenderElementId, punishOffset, 90);
 
   let evidence = null;
@@ -6582,13 +6836,19 @@ async function runOnlineUiBoundedKickKnockdownFlight(entries) {
   const idleDeadline = Date.now() + COMBAT.kick.recoveryMs + 500;
   while (Date.now() < idleDeadline && !suppressorIdle) {
     const actions = await readOwnActions(suppressor);
-    const activeIndex = actions.findIndex((entry) =>
-      entry.action === COMBAT_ACTION.kickActive
-      && Number.isFinite(entry.epochMs)
-      && entry.epochMs === suppressedKickActive.epochMs);
-    suppressorIdle = actions.find((entry, index) =>
-      index > activeIndex
-      && entry.action === COMBAT_ACTION.idle
+    // A short #3 KickActive can fall between #3's sampled own frames.
+    // activeIndex=-1 used to admit the INITIAL Idle (before suppression)
+    // and send the verification RMB during the first kick's recovery.
+    // Match the same authoritative World tick across actor replicas,
+    // never unrelated browser-local epoch clocks or stale Idle snapshots.
+    const suppressedTick = suppressedKickActive.serverTick;
+    if (!Number.isSafeInteger(suppressedTick) || suppressedTick < 1) {
+      throw new Error(milestone + " suppressed kick lacks original World tick");
+    }
+    suppressorIdle = actions.find((entry) =>
+      entry.action === COMBAT_ACTION.idle
+      && Number.isSafeInteger(entry.serverTick)
+      && entry.serverTick > suppressedTick
       && Number.isFinite(entry.epochMs)) ?? null;
     if (!suppressorIdle) await sleep(5);
   }
@@ -7355,7 +7615,7 @@ async function runOnlineUiFeintFlight(entries) {
 
   // M171 repeats the same authority rule for the distinct heavy-feint window.
   // Wait for the rejected light to finish, refresh exhaustion while moving away,
-  // then deliver one browser-owned KeyE + wheel-back chord inside 160 ms.
+  // then deliver one browser-owned held-LMB + wheel-back chord inside160ms.
   await waitForAttacker(
     (state) => state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
     COMBAT.attack.activeMs + COMBAT.attack.recoveryMs + 900,
@@ -7388,7 +7648,7 @@ async function runOnlineUiFeintFlight(entries) {
   const heavyBaselineStamina = Math.round(heavyExhausted.acceptance.authoritativeStamina);
   const heavyActionOffset = heavyExhausted.acceptance.ownActionTransitions.length;
   const heavyStaminaOffset = heavyExhausted.acceptance.staminaTransitions.length;
-  const heavyKeyOffset = heavyExhausted.keyTransitions.length;
+  const heavyPointerOffset = heavyExhausted.pointers.length;
   const heavyWheelOffset = heavyExhausted.wheels.length;
   await performArenaHeavyFeint(attacker, attackerElementId, awayOffset);
 
@@ -7402,10 +7662,9 @@ async function runOnlineUiFeintFlight(entries) {
     "original heavy commitment after rejected heavy feint",
   );
 
-  const heavyKeys = heavyCommitted.keyTransitions.slice(heavyKeyOffset);
+  const heavyPointers = heavyCommitted.pointers.slice(heavyPointerOffset);
   const heavyWheels = heavyCommitted.wheels.slice(heavyWheelOffset);
-  const heavyDown = heavyKeys.find((entry) => entry.type === "keydown" && entry.code === "KeyE");
-  const heavyUp = heavyKeys.find((entry) => entry.type === "keyup" && entry.code === "KeyE");
+  const { down: heavyDown, up: heavyUp } = requireM188NativeHeldLmb(heavyPointers, awayOffset > 0, "M171");
   const heavyWheelBack = heavyWheels.find((entry) => entry.deltaY > 0);
   if (!heavyDown || !heavyUp || !heavyWheelBack
     || !Number.isFinite(heavyDown.epochMs)
@@ -7414,16 +7673,32 @@ async function runOnlineUiFeintFlight(entries) {
     || heavyUp.epochMs <= heavyDown.epochMs
     || heavyWheelBack.epochMs < heavyDown.epochMs
     || heavyWheelBack.epochMs - heavyDown.epochMs > COMBAT.feint.heavyWindowMs - 10) {
-    throw new Error("M171 exhausted heavy feint did not deliver a genuine early KeyE+wheel-back chord: "
-      + JSON.stringify({ keys: heavyKeys, wheels: heavyWheels }));
+    throw new Error("M171 exhausted heavy feint did not deliver a genuine early held-LMB+wheel-back chord: "
+      + JSON.stringify({ pointers: heavyPointers, wheels: heavyWheels }));
   }
 
-  const heavyActions = heavyCommitted.acceptance.ownActionTransitions.slice(heavyActionOffset);
+  const heavySettled = await waitForAttacker(
+    state => {
+      const actions = state.acceptance?.ownActionTransitions?.slice(heavyActionOffset) ?? [];
+      const active = actions.find(entry => entry.action === COMBAT_ACTION.heavyAttackActive);
+      return active && actions.some(entry => entry.action === COMBAT_ACTION.idle && entry.epochMs > active.epochMs);
+    },
+    COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 700,
+    "completed original heavy recovery after rejected feint, without phantom release attack",
+  );
+  const heavyActions = heavySettled.acceptance.ownActionTransitions.slice(heavyActionOffset);
   if (heavyActions.some((entry) => entry.action === COMBAT_ACTION.feintRecovery)) {
     throw new Error("M171 exhausted heavy wheel-back incorrectly entered feint recovery: "
       + JSON.stringify(heavyActions));
   }
-  const heavyStaminaTransitions = heavyCommitted.acceptance.staminaTransitions.slice(heavyStaminaOffset);
+  if (heavyActions.filter(entry => entry.action === COMBAT_ACTION.heavyAttackActive).length !== 1
+      || heavyActions.some(entry => [COMBAT_ACTION.attackWindup, COMBAT_ACTION.attackActive,
+        COMBAT_ACTION.attackLeftWindup, COMBAT_ACTION.attackLeftActive, COMBAT_ACTION.attackRightWindup,
+        COMBAT_ACTION.attackRightActive].includes(entry.action))) {
+    throw new Error("M171 physical LMB release produced a phantom light or duplicate heavy after rejected feint: " + JSON.stringify(heavyActions));
+  }
+  if (heavyCommitted.keys.some(event => event.endsWith(":KeyE"))) throw new Error("M171 retired E cannot author heavy feint");
+  const heavyStaminaTransitions = heavySettled.acceptance.staminaTransitions.slice(heavyStaminaOffset);
   const heavyMinimumStamina = heavyStaminaTransitions.reduce(
     (value, entry) => Number.isFinite(entry.stamina) ? Math.min(value, entry.stamina) : value,
     heavyBaselineStamina,
@@ -7471,10 +7746,6 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   const punishMoveKey = attackRight ? "a" : "d";
   const punishMoveCode = attackRight ? "KeyA" : "KeyD";
   const punishOffset = attackRight ? -200 : 200;
-  // This whiff-only gate does not couple defender timing to E key-up, so it can
-  // keep the genuine key depressed longer than block/parry/dodge gates. The
-  // longer hold gives headless Firefox multiple input frames to sample it.
-  const heavyWhiffPulseMs = 240;
 
   // Stage inside punish range, then deliberately face the heavy away from
   // the defender. This creates a deterministic directional whiff without making
@@ -7482,7 +7753,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
   await aimArena(attacker, attackerElementId, whiffOffset);
   await sleep(40);
 
-  // A genuine WebDriver E edge can occasionally miss the client's one-shot
+  // A genuine WebDriver LMB gesture can occasionally miss the client's one-shot
   // outbound action latch. Retry only when the entire authoritative exchange
   // proves that no heavy ever committed. Any threat/recovery/commit evidence or
   // any vital change makes the attempt terminal and fail-closed.
@@ -7495,7 +7766,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     const commitsBefore = beforeAttacker.events.filter((text) =>
       text.startsWith("Heavy strike committed")).length;
 
-    await pulseMovementKey(attacker, "e", heavyWhiffPulseMs);
+    await performM110NativeHeldLmb(attacker, attackerElementId, whiffOffset);
     // React to the actual remote recovery cue instead of a wall-clock guess.
     // This both proves the punish window was readable to the defender and avoids
     // coupling the counter to cross-browser snapshot/WebDriver delivery skew.
@@ -7658,7 +7929,7 @@ async function runOnlineUiHeavyWhiffPunishFlight(entries) {
     throw new Error(`M109 heavy whiff punish incomplete evidence: ${JSON.stringify(evidence)}`);
   }
 
-  assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish");
+  assertHeavyControlDelivered(attackerResult, movementCode, "M109 heavy whiff punish", !attackRight);
   const authoritativeHeavyCommits = attackerResult.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
   if (authoritativeHeavyCommits !== 1) {
@@ -8012,6 +8283,30 @@ async function calibrateNativeParryIngress(
   return result;
 }
 
+async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, expectedActorId, allowHeavy = false) {
+  if (!Number.isInteger(baselineEventCount) || baselineEventCount < 0
+      || !Number.isSafeInteger(expectedActorId) || expectedActorId < 1) {
+    throw new TypeError("M41 requires a fresh current-attempt actor-bound World cue baseline");
+  }
+  // M41 source0/native CI: let Chrome observe its OWN unchanged actor-bound
+  // production World cue every 4ms. Repeated WebDriver HTTP scalar round
+  // trips previously arrived as late as one original 60Hz World contact tick.
+  // The ONE genuine Firefox wheel is still dispatched only after a fresh cue,
+  // and all native W3C ACK, HP, guard, parry and World assertions remain.
+  const cue = await webdriver(attacker.base, "POST",
+    `/session/${attacker.sessionId}/execute/async`, {
+      script: m41NativeAsyncCueScript(),
+      args: [baselineEventCount, expectedActorId, allowHeavy, timeoutMs],
+    });
+  if (cue?.actorId === expectedActorId
+    && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
+    && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
+    && (cue.text === "Attack committed - your windup is readable."
+      || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
+    && cue.latestText === cue.text) return cue;
+  throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
+}
+
 async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = null) {
   await Promise.all(entries.map(installUiObserver));
   const ready = await waitForUiReady(entries);
@@ -8030,7 +8325,8 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
-  await Promise.all(entries.map(centerArenaInViewport));
+  const visibleArenas = await Promise.all(entries.map(centerArenaInViewport));
+  const defenderViewport = visibleArenas[entries.indexOf(defender)];
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
   // Calibration is performed in the genuine browser prior to combat,
   // while neither fighter is attacking. Reset observer records afterward so
@@ -8059,24 +8355,50 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     // Move the genuine wheel 95ms later (target ~85ms before impact);
     // continue to reject every block, HP hit, missed/parried input or
     // changed 650ms stun/punish contract as before.
-    // M41 is an actual remote parry-tell raster flight. On quality
-    // #39437248971, Firefox's trusted wheel landed only 74ms before the
-    // authoritative 34HP contact (vs 105ms for the passing M41 run).
-    // Advance ONLY M41's real wheel dispatch by 12ms, targeting the middle
-    // of the unchanged 125ms server parry window. No combat or input fakes.
-    const releaseToStrikeParryDelayMs = scenario === "uiparrytell" ? 83 : 95;
+    // M41 e31994b9 native World contact 1691 was BLOCK at 133.3ms defender
+    // age: the old 35ms special wait armed its one real wheel too early for
+    // the unchanged 125ms parry window. Reuse M35's existing 95ms wait;
+    // this shifts ONLY M41's wheel 60ms later. Actual World parry and the
+    // exact remote raster/source-frame assertions still qualify the run.
+    const releaseToStrikeParryDelayMs = 95;
     // Any actual -38 guard block or 34 HP hit remains a terminal failure.
-    await Promise.all([
-      (async () => {
-        if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
-        await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
-      })(),
-      (async () => {
-        if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
-        await sleep(releaseToStrikeParryDelayMs);
-        await setArenaBlock(defender, defenderElementId, true);
-      })(),
-    ]);
+    if (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry") {
+      const attemptAttackerBaseline = lastAttemptBaseline.find((entry) => entry.browser === attacker.name);
+      if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
+        throw new Error("M41 could not record current-attempt original World cue baseline");
+      }
+      // Finish genuine aim before the measured exchange. The same native
+      // 35ms DOWN/UP then runs while we observe the fresh real World cue;
+      // no full-click ACK or large evidence serialization gates the one wheel.
+      await aimArena(attacker, attackerElementId, attackOffset);
+      const observed = await dispatchM41ObservedParry({
+        sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
+        awaitWorldCue: () => waitForM41WorldWindup(
+          attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+          scenario === "uiparrytell",
+        ),
+        // M33 now uses the original actor-bound windup gate and one real
+        // viewport-center native Firefox wheel, keeping M35 unchanged.
+        sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
+          ? scrollM41ViewportWheel(defender, defenderViewport)
+          : setArenaBlock(defender, defenderElementId, true),
+      });
+      console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
+        scenario, attacker: attacker.name, ...observed,
+      }));
+    } else {
+      await Promise.all([
+        (async () => {
+          if (parryIngress.attackLeadMs > 0) await sleep(parryIngress.attackLeadMs);
+          await performArenaAttackHold(attacker, attackerElementId, attackOffset, 35);
+        })(),
+        (async () => {
+          if (parryIngress.wheelLeadMs > 0) await sleep(parryIngress.wheelLeadMs);
+          await sleep(releaseToStrikeParryDelayMs);
+          await setArenaBlock(defender, defenderElementId, true);
+        })(),
+      ]);
+    }
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
@@ -8820,7 +9142,26 @@ async function runOnlineUiStunOverlayFlight(entries) {
   return evidence;
 }
 
-async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false } = {}) {
+// The original M110/M111 test must generate a real LMB release-heavy, never
+// resurrect the retired Key E producer. This hold clears browser + server
+// READY320ms; the original World still decides actual damage and guard loss.
+async function performM110NativeHeldLmb(session, elementId, xOffset) {
+  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "pointer", id: `mouse-${session.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: M110_LMB_HEAVY_HOLD_MS },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
+}
+
+async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false, onAcceptedLiveBreak = null } = {}) {
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M110 heavy guard break",
@@ -8840,13 +9181,13 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
   const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
     entry.visible && entry.phase === "HEAVY WINDUP").length;
   const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
-    // Start genuine E and schedule two genuine wheel-back pulses inside one
-    // browser-owned action sequence. The first lands at 70 ms and the second at
-    // 170 ms. Their unchanged 240 ms short-block windows overlap by 140 ms, so
-    // scheduler jitter cannot create a false fresh Block/parry edge before the
-    // ~320 ms heavy impact.
-    const heavyPulse = pulseMovementKey(attacker, "e", heavyKeyPulseMs);
-    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 70, 100);
+    // Genuine physical LMB is held beyond 320ms READY and deliberately released.
+    // Retain TWO genuine wheel-back events and their original 240ms short-block
+    // windows. Place the second early enough to age past the 125ms parry phase
+    // before the release-led heavy impact, while the guard window remains live.
+    // The original World, not these W3C ACKs, decides all HIT/guard outcomes.
+    const heavyPulse = performM110NativeHeldLmb(attacker, attackerElementId, attackOffset);
+    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 220, 100);
     let observed = false;
     try {
       const deadline = Date.now() + 420;
@@ -8927,8 +9268,8 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
       throw new Error(`M110 first heavy accidentally resolved as parry: ${JSON.stringify(firstEvidence)}`);
     }
 
-    // First evidence is sampled around 390 ms after E; finish the unchanged
-    // 840 ms heavy commitment before the second genuine heavy request.
+    // Await original heavy active/recovery after the physical LMB release;
+    // never reissue during the single server-owned charged gesture.
     await sleep(500);
     await Promise.all([
       aimArena(attacker, attackerElementId, attackOffset),
@@ -8983,7 +9324,22 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         && attackerState.opponentHp === 100 && attackerState.opponentGuard === 0
         && commitsAfter === commitsBefore + 1;
       if (guardBroken) {
-        secondHeavyIssuedAt = attemptIssuedAt;
+        // Anchor punish timing to a *real* native LMB pointerDOWN, not a
+        // retired Key E event, a WebDriver ACK or an invented server HIT.
+        if (returnTiming) {
+          const downs = (attackerState.pointers ?? []).filter((event) =>
+            event.type === "pointerdown" && event.button === 0
+            && Number.isFinite(event.epochMs)
+            && event.epochMs >= attemptIssuedAt - 100);
+          if (downs.length !== 1) {
+            throw new Error("M111 requires exactly one newly trusted physical LMB DOWN: "
+              + JSON.stringify({ attemptIssuedAt, downs }));
+          }
+          secondHeavyIssuedAt = downs[0].epochMs;
+          console.log("M111_NATIVE_HEAVY_ORIGIN " + JSON.stringify({
+            downEpochMs: secondHeavyIssuedAt, physicalSource: "LMB",
+          }));
+        }
         finalEvidence = states;
         break;
       }
@@ -9025,6 +9381,11 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
         entry.visible && entry.title === "STUNNED");
       if (feedbackReady && defenderStunned) {
         finalEvidence = states;
+        // Genuine server guard break + defender STUNNED already attested.
+        // Pre-arm exactly one real Chrome W3C action before slow extra reads.
+        if (returnTiming && typeof onAcceptedLiveBreak === "function") {
+          onAcceptedLiveBreak(secondHeavyIssuedAt);
+        }
         break;
       }
       await sleep(20);
@@ -9033,17 +9394,29 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
     if (blockHeld) await setArenaBlock(defender, defenderElementId, false);
   }
 
-  const evidence = await Promise.all(entries.map(readUiEvidence));
+  // In pre-armed M111 only, preserve the actual attested LIVE M110 snapshot
+  // rather than queue another Chrome WebDriver read behind its genuine click.
+  // Standalone M110 remains unchanged and re-reads both real browsers.
+  const evidence = returnTiming && onAcceptedLiveBreak
+    ? finalEvidence : await Promise.all(entries.map(readUiEvidence));
   const attackerResult = evidence.find((entry) => entry.browser === attacker.name);
   const defenderResult = evidence.find((entry) => entry.browser === defender.name);
   if (!attackerResult || !defenderResult) {
     throw new Error(`M110 heavy guard break incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
-  assertHeavyControlDelivered(attackerResult, movementCode, "M110 heavy guard break");
-  const heavyDowns = attackerResult.keys.filter((entry) => entry === "keydown:KeyE").length;
+  if (!attackerResult.keys.includes(`keydown:${movementCode}`)
+    || !attackerResult.keys.includes(`keyup:${movementCode}`)) {
+    throw new Error("M110 actual movement keys not observed: " + JSON.stringify(attackerResult.keys));
+  }
+  const heavyDowns = attackerResult.pointers.filter((event) =>
+    event.type === "pointerdown" && event.button === 0).length;
+  const heavyUps = attackerResult.pointers.filter((event) =>
+    event.type === "pointerup" && event.button === 0).length;
+  const retiredKeyE = attackerResult.keys.some((key) => key.includes("KeyE"));
   const authoritativeCommits = heavyCommitCount(attackerResult);
   const blockWheels = defenderResult.wheels.filter((event) => event.deltaY > 0);
-  if (heavyDowns < 2 || authoritativeCommits !== 2 || blockWheels.length < 2) {
+  if (retiredKeyE || heavyDowns !== 2 || heavyUps !== 2
+    || authoritativeCommits !== 2 || blockWheels.length < 2) {
     throw new Error(`M110 did not prove two real heavies into timed wheel-back blocks: ${JSON.stringify(evidence)}`);
   }
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
@@ -9083,11 +9456,28 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false 
 }
 
 async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
-  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming: true });
-  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
   const attacker = entries.find((entry) => entry.name === "chrome");
   const defender = entries.find((entry) => entry.name === "firefox");
   if (!attacker || !defender) throw new Error("M111 could not resolve fixed heavy guard-break roles");
+  let genuineNativePunish = null;
+  const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, {
+    returnTiming: true,
+    onAcceptedLiveBreak: (trustedSecondLmbDownEpoch) => {
+      if (genuineNativePunish || !Number.isFinite(trustedSecondLmbDownEpoch)) {
+        throw new Error("M111 requires exactly one native held-LMB heavy before W3C punish");
+      }
+      // Physical held LMB remains READY until real release; recovery starts
+      // afterwards. Keep the full World recovery and original 60ms margin.
+      const secondHeavyIssuedAt = trustedSecondLmbDownEpoch;
+      const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
+      const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS
+        + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
+      const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+      genuineNativePunish = performArenaAttackBurst(attacker, 1, initialPauseMs, 0)
+        .then(() => ({ ok: true }), error => ({ ok: false, error }));
+    },
+  });
+  const { evidence: guardBreakEvidence, secondHeavyIssuedAt } = guardBreakResult;
 
   const baselineAttacker = guardBreakEvidence.find((entry) => entry.browser === attacker.name);
   const baselineDefender = guardBreakEvidence.find((entry) => entry.browser === defender.name);
@@ -9104,17 +9494,11 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   const lightThreatsBefore = baselineDefender.threatTransitions.filter((entry) =>
     entry.visible && (entry.phase === "WINDUP" || entry.phase === "STRIKE")).length;
 
-  // Time the one genuine click from the accepted second-heavy request.
-  // Heavy windup + active + recovery is 840ms. The former 800ms click could
-  // release during authoritative heavy recovery, which DOES NOT buffer light
-  // attacks; the real 10ms W3C click was correctly ignored by the server.
-  // Schedule 60ms after the unchanged recovery boundary, still early enough
-  // for 135ms light windup to hit inside the defender's heavy guard-break stun.
-  // No extra clicks, synthetic events, damage relaxations or combat balance changes.
-  const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-  const firstClickTargetMs = COMBAT.heavyAttack.windupMs
-    + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
-  const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
+  // M111 pre-armed exactly one real WebDriver click from accepted M110 while
+  // defender's live guard-break STUNNED state is still authoritatively visible.
+  if (!genuineNativePunish || !Number.isFinite(secondHeavyIssuedAt)) {
+    throw new Error("M111 could not pre-arm genuine W3C after attested guard break");
+  }
   // The in-page observer timestamps both event-text and overlay mutations. That
   // provides stronger ordering evidence than repeated WebDriver reads and does
   // not perturb Firefox while the real Chrome action sequence is executing.
@@ -9122,7 +9506,8 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   // nine-tap burst mixed repeated charged-hold flags with releases and CI
   // #39412048012 resolved an unintended 46HP heavy instead of 34HP light.
   // Preserve all stun, HP, parry and recovery fail-closed proofs below.
-  await performArenaAttackBurst(attacker, 1, initialPauseMs, 0);
+  const genuineNativeResult = await genuineNativePunish;
+  if (!genuineNativeResult.ok) throw genuineNativeResult.error;
 
   const attackerDeadline = Date.now() + 260;
   let attackerResult = null;
@@ -9139,7 +9524,37 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
 
   let defenderResult = await readUiEvidence(defender);
   if (!attackerResult) {
-    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify(await readUiEvidence(attacker))}`);
+    const failed = await readUiEvidence(attacker);
+    const guardBreak = [...(failed.eventTransitions ?? [])].reverse()
+      .find((event) => event.text === "Opponent guard broken - punish.");
+    const pointerUp = [...(failed.pointers ?? [])].reverse()
+      .find((event) => event.button === 0 && event.type === "pointerup");
+    const originalSend = failed.m111InputPlane?.submitted ?? [];
+    const physicalUpEpoch = pointerUp?.epochMs ?? null;
+    // Original M111 34HP/66HP/real stun/punish requirements remain strict.
+    // This diagnostic never claims a HIT or changes original W3C action timing.
+    const forensic = {
+      guardBreakObservedAtEpochMs: guardBreak?.epochMs ?? null,
+      physicalPointerUpEpochMs: physicalUpEpoch,
+      guardBreakToPointerUpMs: Number.isFinite(physicalUpEpoch)
+        && Number.isFinite(guardBreak?.epochMs)
+        ? physicalUpEpoch - guardBreak.epochMs : null,
+      originalWorldGuardBreakStunMs: COMBAT.block.guardBreakStunMs,
+      originalWorldLightWindupMs: COMBAT.attack.windupMs,
+      originalClickHoldMs: 10,
+      physicalTerminals: failed.m111InputPlane?.physicalTerminals ?? [],
+      originalLightReleases: failed.m111InputPlane?.lightReleases ?? [],
+      actual30HzAttackSubmissionsNearLightRelease: originalSend.filter((item) =>
+        item.attack && Number.isFinite(physicalUpEpoch)
+        && item.epochMs >= physicalUpEpoch - 70
+        && item.epochMs <= physicalUpEpoch + 220),
+      sampledClientFramesNearPointerUp: Number.isFinite(physicalUpEpoch)
+        ? originalSend.filter((item) =>
+            Math.abs(item.epochMs - physicalUpEpoch) <= 220)
+        : originalSend.slice(-18),
+      originalObserverHasWorldHit: failed.events.includes("Opponent hit - 34 HP."),
+    };
+    throw new Error(`M111 attacker never confirmed exactly one real 34 HP light punish: ${JSON.stringify({ forensic, ui: failed })}`);
   }
 
   // Let the defender receive the same authoritative damage snapshot before
@@ -9176,6 +9591,31 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
     && (!stunEnd || damageTransition.t <= stunEnd.t));
   if (!hitDuringStun) {
     throw new Error(`M111 timestamped browser evidence placed the 34 HP punish outside STUNNED: ${JSON.stringify({ damageTransition, stunStart, stunEnd, eventTransitions: defenderResult.eventTransitions, overlayTransitions: defenderResult.overlayTransitions })}`);
+  }
+
+  // Never count client HUD damage as a real punish if original Rust World
+  // delivered the same 34HP after victim Stunned7 -> Idle0. Combat4D's
+  // independent exact server tick classifier is fail-closed; leave ALL
+  // existing browser STUNNED/HP/pointer/W3C predicates unchanged.
+  // Wait only for passive original loopback M201 stun-exit log if the hit
+  // landed legitimately BEFORE exit; no extra inputs or simulation writes.
+  console.log("M111_NATIVE_INPUT_CHRONOLOGY " + JSON.stringify({
+    secondHeavyIssuedAt,
+    keyTransitions: attackerResult.keyTransitions,
+    pointers: attackerResult.pointers,
+    ownActionTransitions: attackerResult.acceptance?.ownActionTransitions,
+    inputPlane: attackerResult.m111InputPlane,
+  }));
+  const worldDeadline = Date.now() + 950;
+  let originalWorld = { status: "INDETERMINATE", reason: "waiting for original World exit" };
+  while (Date.now() < worldDeadline) {
+    originalWorld = classifyGuardBreakPunishWorld(m201ServerOutput());
+    if (originalWorld.status !== "INDETERMINATE") break;
+    await sleep(15);
+  }
+  console.log("M111_ORIGINAL_WORLD_STUN_PROOF " + JSON.stringify(originalWorld));
+  if (originalWorld.status !== "WITHIN_STUN") {
+    throw new Error("M111 real original World 34HP was not inside server STUNNED: " + JSON.stringify(originalWorld));
   }
 
   const lightThreatsAfter = defenderResult.threatTransitions.filter((entry) =>
@@ -9691,6 +10131,19 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
   let blockHeld = false;
   try {
     blockHeld = true;
+    // M151/M152 require the same block-only exchange as M194. The old
+    // attack-first path admitted the wheel only3ticks before impact (a valid
+    // parry), so share the proven real wheel-first choreography. Actual
+    // trusted wheel, native driver ACK and all38guard/noHP/noPARRY gates stay.
+    // Original M194 first-red: wheel-backed Block tick4902 expired at
+    // tick4917; Chrome Light HIT tick4919 while defender was Idle.
+    // Its wheel-first compound click released too late for 240ms Block.
+    // Use the already-established genuine DOWN -> trusted wheel -> UP
+    // sequence for M194, as with M151. M152 remains wheel-first.
+    // Keep fixed parry/block, original World, attestation and HP gates.
+    const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";
+    const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";
+    const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";
     const m198Plan = planM198GuardBreakW3cExchange({
       parryWindowMs: COMBAT.block.parryWindowMs,
       shortBlockMs: COMBAT.block.shortBlockMs,
@@ -9741,12 +10194,16 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // that WAIT, but require the actual event to precede Chrome release
         // (read-only epoch evidence below), and require the wheel W3C ACK.
         // Neither the 125/240ms defense nor 34HP/-38 guard assertions change.
+        // Guard-only scenarios require the real trusted wheel before input.
+        // One genuine pre-aimed down/pause/up transaction removes a separate
+        // DOWN ACK barrier (52ms physical hold on e7ce01df). Actual DOM edges,
+        // wheel ACK and all guard/HP/parry gates below remain mandatory.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
-          // M194 main-push #39453669647: the actual trusted Firefox wheel
-          // arrived after the fixed 100ms Chrome release on attempt 5/5.
-          // Require trusted native wheel BEFORE release for M194 only, with
-          // the same unchanged server parry/guard/damage and strict W3C gates.
-          trustedWheelWaitMs: scenario === "uiguardbreak" ? 190 : 0,
+          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
+          preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
+          postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0,
+          sendAttackClick: wheelFirstGuardOnly
+            ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),
@@ -9823,7 +10280,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       const m320AuthoritativeLines = m201ServerOutput()
         .slice(m320ServerOutputStart)
         .split(/\r?\n/)
-        .filter(line => /^M201_AUTH_(ACTION|BLOCK|PARRY|BREAK) /.test(line))
+        .filter(line => /^(M201_AUTH_(ACTION|BLOCK|PARRY|BREAK|HIT)|CORE8C_WORLD_CONTACT) /.test(line))
         .slice(-16);
       console.log("M320_GUARD_BREAK_AUTH_TRACE " + JSON.stringify({
         attempt: attempt + 1,
@@ -10645,14 +11102,17 @@ async function runOnlineUiJumpFfaThreatFlight(entries, mode) {
     // 42-unit dash, not a fine staging move. M142 #39223717854 recorded
     // right distance 78 -> 120 -> 162 during tiny correction taps.
     // Separate all genuine W3C corrections by >240ms, including from the
-    // initial staging gesture. Never change combat reach or strict evidence.
+    // initial staging gesture. Fine adjustments use a single driver
+    // keyDown/pause/keyUp transaction instead of split commands whose hold
+    // can inflate under load. Server geometry, reach and strict checks stay.
+    // Never change combat reach or strict evidence.
     await sleep(300);
     await Promise.all([
       stage.leftMove.ms
-        ? pulseMovementKey(left, stage.leftMove.key, stage.leftMove.ms)
+        ? pulseMovementKeyBoundedW3c(left, stage.leftMove.key, stage.leftMove.ms)
         : Promise.resolve(),
       stage.rightMove.ms
-        ? pulseMovementKey(right, stage.rightMove.key, stage.rightMove.ms)
+        ? pulseMovementKeyBoundedW3c(right, stage.rightMove.key, stage.rightMove.ms)
         : Promise.resolve(),
     ]);
     await sleep(75);
@@ -10829,6 +11289,25 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   const observerId = ordered[1].playerNetId;
   const closerId = ordered[2].playerNetId;
 
+  // Passive native lifecycle witness: real focus/visibility loss can clear
+  // browser input latches. DOM delivery alone is not server admission proof.
+  await execute(jumpAttacker.base, jumpAttacker.sessionId, `
+    const records = [];
+    const append = event => {
+      if ((event.type === 'keydown' || event.type === 'keyup') && event.code !== 'Space') return;
+      if ((event.type === 'pointerdown' || event.type === 'pointerup') && event.button !== 0) return;
+      records.push({type:event.type, code:event.code??null, button:event.button??null,
+        trusted:event.isTrusted===true, epochMs:Date.now(), hidden:document.hidden,
+        focus:document.activeElement?.id??null,
+        serverTick:window.__MYASO_ACCEPTANCE_STATE__?.serverTick??null});
+      if (records.length > 64) records.shift();
+    };
+    for (const type of ['focus','blur','keydown','keyup','pointerdown','pointerup']) window.addEventListener(type, append, true);
+    document.addEventListener('visibilitychange', append, true);
+    window.__MYASO_M143_NATIVE_TIMELINE__ = records;
+    return true;
+  `);
+
   // Keep the jump attacker at its original farther spawn while moving #3
   // decisively inward. Before any recovery exists, Firefox must therefore keep
   // its ordinary nearest-rival focus on #3.
@@ -10861,7 +11340,7 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   const observerRecoveryOffset = observerBefore.recoveryTransitions.length;
 
   // Turn #1 180 degrees away from the observer and commit a genuine Space+LMB
-  // jump attack. It must whiff cleanly, yet its authoritative 290 ms recovery
+  // jump attack. It must whiff cleanly, yet its authoritative 450ms recovery
   // must temporarily outrank the closer idle #3 in the HUD focus.
   // M337: M143's old single-W3C-chord included an extra pointerMove tick;
   // exact-head CI #39420078938 measured real Space -> LMB = 67ms, violating
@@ -10870,9 +11349,16 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // the real click, authoritative jump-attack phases, 100HP and HUD gates.
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
+  const jumpServerLogOffset = m201ServerOutput().length;
+  // The owner-approved 450ms recovery extends the authoritative timeline.
+  // Sample through the genuine windup, active, full recovery AND returned
+  // idle/nearest focus; the 300ms bound is only W3C+replica observation slack.
+  // Keep every actual World phase/focus/vitals assertion unchanged.
+  const jumpLifecycleObserveMs = COMBAT.jumpAttack.windupMs
+    + COMBAT.jumpAttack.activeMs + COMBAT.jumpAttack.recoveryMs + 300;
   await Promise.all([
     performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
-    sampleUiEvidenceWhileActive(entries, 720, 8),
+    sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 8),
   ]);
 
   let evidence = await Promise.all(entries.map(readUiEvidence));
@@ -10882,6 +11368,25 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   if (!jumpState || !observerState || !closerState) {
     throw new Error(`${milestone} incomplete final evidence: ${JSON.stringify(evidence)}`);
   }
+
+  // Emit the actual source/replica/World chronology BEFORE every untouched
+  // focus and jump-phase assertion. Missing admission remains a fatal result.
+  console.log("M143_NATIVE_SOURCE_WORLD_DIAGNOSTIC " + JSON.stringify({
+    jumpId, observerId, closerId,
+    geometryBefore: baseline.map(state => ({ browser:state.browser,
+      serverTick:state.acceptance?.serverTick, fighters:state.acceptance?.fighters })),
+    nativeLifecycle: await execute(jumpAttacker.base, jumpAttacker.sessionId,
+      "return (window.__MYASO_M143_NATIVE_TIMELINE__??[]).map(event=>({...event}));"),
+    physical: { keys:jumpState.keyTransitions.slice(jumpKeyOffset), pointers:jumpState.pointers.slice(jumpPointerOffset) },
+    actualOriginalSender: jumpState.acceptance?.inputSubmissions ?? [],
+    ownReplicatedActions: jumpState.acceptance?.ownActionTransitions ?? [],
+    observerFocus: observerState.focusTransitions.slice(observerFocusOffset),
+    observerRecovery: observerState.recoveryTransitions.slice(observerRecoveryOffset),
+    geometryAfter: evidence.map(state => ({ browser:state.browser,
+      serverTick:state.acceptance?.serverTick, fighters:state.acceptance?.fighters })),
+    originalWorld: m201ServerOutput().slice(jumpServerLogOffset).split(/\r?\n/)
+      .filter(line=>/^M201_(AUTH_ACTION|AUTH_HIT|AUTH_BLOCK|AUTH_PARRY|AUTH_BREAK|FLIGHT_ACTOR_BASELINE) /.test(line)).slice(-128),
+  }));
 
   const focusTransitions = observerState.focusTransitions.slice(observerFocusOffset);
   const recoveryTransitions = observerState.recoveryTransitions.slice(observerRecoveryOffset);
@@ -11000,16 +11505,24 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // Bring both rivals inside normal light-attack distance from Firefox, but
   // move #3 farther inward so ordinary focus still prefers the idle right-side
   // rival. The later recovery override must therefore be what selects #1.
+  // M147: one real W3C keyboard action bounds the PHYSICAL hold, unlike
+  // separate keyDown/keyUp HTTP requests that stretched 210/260ms to >1s.
+  // Keep original World positions, normal focus and strict proof unchanged.
   await Promise.all([
-    pulseMovementKey(jumpAttacker, "d", 210),
-    pulseMovementKey(closerIdle, "a", 260),
+    pulseM147FocusStageKey(jumpAttacker, "d", 210),
+    pulseM147FocusStageKey(closerIdle, "a", 260),
   ]);
   await sleep(80);
 
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let observerBefore = baseline.find((entry) => entry.browser === observer.name);
   for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
-    await pulseMovementKey(closerIdle, "a", 45);
+    // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
+    // The first 260ms staging A and previous corrective A are real taps too.
+    // Separate every additional physical tap by >240ms: no synthetic
+    // movement, no change to World authority, and no false focus acceptance.
+    await sleep(300);
+    await pulseM147FocusStageKey(closerIdle, "a", 45);
     await sleep(55);
     baseline = await Promise.all(entries.map(readUiEvidence));
     observerBefore = baseline.find((entry) => entry.browser === observer.name);
@@ -11026,6 +11539,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     throw new Error(`${milestone} staging changed authoritative vitals: ${JSON.stringify(baseline)}`);
   }
 
+  if (baseline.length !== 3 || !baseline.every(entry => entry.playerHp === 100 && entry.playerGuard === 100)) {
+    throw new Error(`${milestone} preflight vitals must be pristine: ${JSON.stringify(baseline)}`);
+  }
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const observerPointerOffset = observerBefore.pointers.length;
@@ -11034,53 +11550,95 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
 
   // Whiff the narrow jump attack away from Firefox. #1 stays close enough to be
   // hit by Firefox's normal light attack, while #3 remains closer on the right.
+  // Pre-aim while idle: no extra pointer move/driver tick on the punish path.
+  await aimArena(observer, observerArena, -200);
   await aimArena(jumpAttacker, jumpArena, -200);
   await sleep(40);
-  await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
-
-  let recoveryEvidence = null;
+  const worldProofOffset = m201ServerOutput().length;
+  // Independent real drivers: observe the rendered cue without awaiting the
+  // other driver's jump command ACK. Every command is still awaited below.
+  const jumpCommand = performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)
+    .then(() => null, (error) => error);
   let recoveryCue = null;
-  const recoveryDeadline = Date.now() + 900;
-  while (Date.now() < recoveryDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const jumpState = states.find((entry) => entry.browser === jumpAttacker.name);
-    const observerState = states.find((entry) => entry.browser === observer.name);
-    const closerState = states.find((entry) => entry.browser === closerIdle.name);
-    const ownTransitions = jumpState?.acceptance?.ownActionTransitions ?? [];
-    const recoveryIndex = ownTransitions.findIndex((entry) =>
-      entry.action === COMBAT_ACTION.jumpAttackRecovery && Number.isFinite(entry.epochMs));
-    const cue = observerState?.recoveryTransitions.slice(observerRecoveryOffset).find((entry) =>
-      entry.visible
-      && entry.state === "jump-attack-recovery"
-      && entry.label === "PUNISH"
-      && entry.detail === "Jump attack recovery");
-    const pristine = jumpState?.playerHp === 100
-      && observerState?.playerHp === 100
-      && closerState?.playerHp === 100
-      && jumpState?.playerGuard === 100
-      && observerState?.playerGuard === 100
-      && closerState?.playerGuard === 100;
-    if (recoveryIndex >= 0
-      && observerState?.focusLabel === `PUNISH TARGET #${jumpId}`
-      && cue
-      && pristine) {
-      recoveryEvidence = states;
-      recoveryCue = cue;
-      break;
+  try {
+    // Use the already-supported native W3C asynchronous browser observer
+    // rather than many sequential WebDriver HTTP scalar polls. The only
+    // observed signal is the SAME actually rendered recovery/focus/vitals
+    // gate, registered before the genuine Firefox LMB is dispatched.
+    // No fabricated action, input writer or World timeline is introduced.
+    recoveryCue = await webdriver(observer.base, "POST",
+      `/session/${observer.sessionId}/execute/async`, {
+        script: `
+          const [offset, victimId, timeoutMs] = arguments;
+          const done = arguments[arguments.length - 1];
+          const started = performance.now();
+          const inspect = () => {
+            const state = window.__MYASO_M30_UI__ ?? {};
+            const recovery = document.querySelector('#opponent-recovery');
+            const focus = document.querySelector('#focus-label')?.textContent?.trim();
+            const entry = (state.recoveryTransitions ?? []).slice(offset)
+              .find((row) => row.visible && row.state === 'jump-attack-recovery'
+                && row.label === 'PUNISH' && row.detail === 'Jump attack recovery'
+                && Number.isFinite(row.epochMs));
+            const pristine = ['#player-hp-value', '#player-guard-value',
+              '#bot-hp-value', '#bot-guard-value'].every((selector) =>
+                document.querySelector(selector)?.textContent?.trim() === '100');
+            return entry && recovery && !recovery.hidden
+              && recovery.dataset.state === 'jump-attack-recovery'
+              && focus === 'PUNISH TARGET #' + victimId && pristine
+              ? { ...entry, focusLabel: focus } : null;
+          };
+          // Independent original-browser snapshots can arrive 9–22ms
+          // after Firefox first renders recovery. Require SAME real focus,
+          // recovery state and pristine vitals for 30ms; do not fabricate
+          // contact or relax native/World assertions. Fail on timeout.
+          let poll;
+          let stableCue = null;
+          let stableSince = null;
+          const check = () => {
+            const cue = inspect();
+            const now = performance.now();
+            if (cue) {
+              if (!stableCue || stableCue.epochMs !== cue.epochMs
+                  || stableCue.focusLabel !== cue.focusLabel) {
+                stableCue = cue;
+                stableSince = now;
+              }
+              if (now - stableSince >= 30) {
+                clearInterval(poll);
+                done(cue);
+                return;
+              }
+            } else {
+              stableCue = null;
+              stableSince = null;
+            }
+            if (now - started >= timeoutMs) {
+              clearInterval(poll);
+              done(null);
+            }
+          };
+          poll = setInterval(check, 4);
+          check();
+        `,
+        args: [observerRecoveryOffset, jumpId, 900],
+      });
+    if (!isM147RenderedRecoveryCue(recoveryCue, jumpId)) {
+      throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    if (!pristine && Number.isFinite(jumpState?.playerHp)) {
-      throw new Error(`${milestone} jump attack failed to whiff cleanly: ${JSON.stringify(states)}`);
-    }
-    await sleep(8);
+    // M147: once the genuine recovery cue is visibly present, dispatch one
+    // real, pre-aimed W3C pointer DOWN/UP without an additional pause tick.
+    // Even a 5ms requested pause can cost a whole headless driver tick before
+    // the original 60Hz sender samples release. The physical release remains
+    // genuine and the strict original World HIT-before-exit gate is unchanged.
+    await performArenaM221GuardBreakClick(observer, 0);
+  } finally {
+    const jumpError = await jumpCommand;
+    if (jumpError) throw jumpError;
   }
-  if (!recoveryEvidence || !recoveryCue) {
-    throw new Error(`${milestone} never exposed #${jumpId} as the actionable recovery target: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
-  }
-
-  // Act on the cue. Firefox aims left at #1 and commits one genuine LMB while
-  // #1 is still in authoritative jump-attack recovery. Idle #3 remains closer
-  // on the opposite side and must not take damage.
-  await performArenaAttackHold(observer, observerArena, -200, 90);
+  // Full recorded lifecycle/focus/input evidence is validated below. The World
+  // classifier additionally rejects every earlier HIT/BLOCK/PARRY/BREAK, so
+  // pristine baseline/final vitals cannot hide jump contact or guard recovery.
 
   let hitEvidence = null;
   const hitDeadline = Date.now() + 800;
@@ -11092,7 +11650,9 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     if (!jumpState || !observerState || !closerState) {
       throw new Error(`${milestone} incomplete punish evidence: ${JSON.stringify(states)}`);
     }
-    if (jumpState.playerHp === 66 && observerState.playerHp === 100 && closerState.playerHp === 100) {
+    if (hasM147PunishFeedback(states, {
+      jumpBrowser: jumpAttacker.name, observerBrowser: observer.name, closerBrowser: closerIdle.name,
+    })) {
       hitEvidence = states;
       break;
     }
@@ -11163,6 +11723,25 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     index > recoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
   const recovery = lifecycle[recoveryIndex];
   const idle = lifecycle[idleIndex];
+  // Combat4C read-only fail-first provenance: cross-browser UI timestamps can
+  // disagree with the original Rust World entry/exit ticks. Emit evidence
+  // before the STRICT browser-order assertion so a red native trial still
+  // preserves both clocks, actual source0 submissions and original contact.
+  // Do not classify the HIT or change any acceptance gate here.
+  const beforeLifecycleWorldTrace = m201ServerOutput().slice(worldProofOffset);
+  console.log("M147_PRE_LIFECYCLE_WORLD_DIAGNOSTIC " + JSON.stringify({
+    actors: { victim: jumpId, punisher: observerId, idle: closerId },
+    cue: recoveryCue,
+    physical: { jumpDown: jumpDowns[0], jumpUp: jumpUps[0],
+      punishDown: punishDowns[0], punishUp: punishUps[0] },
+    victimUiRecovery: { entry: recovery, exit: idle },
+    inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    browserInputChronology: (observerState.m147InputPlane ?? []).slice(-32),
+    source0Samples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
+    originalWorldEvents: beforeLifecycleWorldTrace.split(/\r?\n/)
+      .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
+      .slice(-24),
+  }));
   if (jumpState.acceptance?.scenario !== "uijumppunishffa"
     || observerState.acceptance?.scenario !== "uijumppunishffa"
     || closerState.acceptance?.scenario !== "uijumppunishffa"
@@ -11206,6 +11785,39 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   if (observerState.focusLabel !== `NEAREST #${closerId}`) {
     throw new Error(`${milestone} HUD did not return to closer idle #${closerId} after the punish window: ${JSON.stringify(observerState)}`);
   }
+
+  const punishUp = punishUps[0];
+  if (!Number.isFinite(punishUp?.epochMs) || punishUp.epochMs <= punishDown.epochMs
+      || punishUp.epochMs - punishDown.epochMs >= 320
+      || !punishDown.trusted || !punishUp.trusted
+      || punishDown.pointerId !== punishUp.pointerId) {
+    throw new Error(`${milestone} did not preserve one genuine same-pointer short release: ${JSON.stringify({ punishDown, punishUp })}`);
+  }
+  // Read-only native chronology BEFORE the strict World proof. Keep a
+  // bounded actor/tick/input timeline even when the HIT is too late; this
+  // does not create input, change the choreography, or waive any assertion.
+  const actualWorldTrace = m201ServerOutput().slice(worldProofOffset);
+  console.log("M147_PRE_GATE_CHRONOLOGY " + JSON.stringify({
+    actors: { victim: jumpId, punisher: observerId, idle: closerId },
+    cue: { epochMs: recoveryCue.epochMs, t: recoveryCue.t,
+      state: recoveryCue.state, detail: recoveryCue.detail,
+      focusLabel: recoveryCue.focusLabel },
+    physical: { jumpDown: jumpDowns[0], jumpUp: jumpUps[0],
+      punishDown, punishUp, },
+    recovery: { entry: recovery, exit: idle },
+    focus: focusTransitions.slice(-6),
+    inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    browserInputChronology: (observerState.m147InputPlane ?? []).slice(-32),
+    sentSamples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
+    worldActions: actualWorldTrace.split(/\r?\n/)
+      .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
+      .slice(-24),
+  }));
+  const worldRecoveryProof = verifyM147WorldRecoveryProof(
+    actualWorldTrace,
+    { jumpId, punisherId: observerId, closerId },
+  );
+  console.log(`M147_WORLD_RECOVERY_PROOF ${JSON.stringify(worldRecoveryProof)}`);
 
   return evidence.map((entry) => ({
     ...entry,
@@ -11343,12 +11955,13 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
           }));
         }
         await sleep(jumpInputDelayMs);
-        // M336: on CI #39418435711 M145's genuine 1ms-synchronized
-        // Space+LMB was delivered to DOM but #1 never sent an authoritative
-        // action. Hold the *same* one real W3C chord through more 30Hz input
-        // sampling frames. M144 stays at 90ms; all original 60/70/150/200ms
-        // onset/recovery, damage and focus gates remain unchanged.
-        await performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90);
+        // M336/M144: real Space+LMB reached the Chrome DOM together but
+        // loaded exact-head quality #40184398389 still showed ZERO original
+        // World actions for #1 while #3 completed its light recovery.
+        // Preserve one genuine W3C chord and allow 180ms for original
+        // 60Hz input sampling, as M145 already does. Keep the unchanged
+        // strict 60/70/150/200ms onset, server phase, focus and vitals gates.
+        await performArenaPreAimedJumpAttackChord(jumpAttacker, 180);
       })(),
       // R1 M144: light commits on release and its 185ms delayed jump now
       // correctly yields #3 recovery before #1 recovery. Observe long enough
@@ -11612,7 +12225,7 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
 
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
-  const heavyKeyOffset = heavyBefore.keyTransitions.length;
+  const heavyPointerOffset = heavyBefore.pointers.length;
   const observerPointerOffset = observerBefore.pointers.length;
   const observerFocusOffset = observerBefore.focusTransitions.length;
   const observerRecoveryOffset = observerBefore.recoveryTransitions.length;
@@ -11637,9 +12250,9 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
   })();
 
   await Promise.all([
-    pulseMovementKey(heavyAttacker, "e", heavyKeyPulseMs),
+    performM110NativeHeldLmb(heavyAttacker, heavyArena, 200),
     (async () => {
-      await sleep(100);
+      await sleep(100 + M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs);
       await performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90);
     })(),
     punishPromise,
@@ -11700,12 +12313,9 @@ async function runOnlineUiMultiRecoveryPunishFlight(entries) {
     })}`);
   }
 
-  const heavyKeys = heavyState.keyTransitions.slice(heavyKeyOffset);
-  const heavyDown = heavyKeys.find((entry) => entry.type === "keydown" && entry.code === "KeyE");
-  const heavyUp = heavyKeys.find((entry) => entry.type === "keyup" && entry.code === "KeyE");
-  if (!heavyDown || !heavyUp) {
-    throw new Error(`${milestone} lacked genuine KeyE heavy provenance from #${heavyId}: ${JSON.stringify(heavyKeys)}`);
-  }
+  const heavyPointers = heavyState.pointers.slice(heavyPointerOffset);
+  requireM188NativeHeldLmb(heavyPointers, true, milestone + " heavy #" + heavyId);
+  if (heavyState.keys.some(event => event.endsWith(":KeyE"))) throw new Error(milestone + " retired E cannot author heavy attack");
 
   const jumpKeys = jumpState.keyTransitions.slice(jumpKeyOffset);
   const jumpPointers = jumpState.pointers.slice(jumpPointerOffset);
@@ -11930,6 +12540,35 @@ async function pulseMovementKey(session, value, durationMs) {
   await setMovementKey(session, value, false);
 }
 
+// M121: one genuine W3C keyboard transaction avoids a 150ms held
+// approach accidentally lasting ~700ms due to two separate driver roundtrips.
+// Original server geometry, HP and authoritative hit requirements unchanged.
+// M147 is a read-only native staging harness, not a production input path.
+// The entire physical key press and release must share one W3C transaction.
+async function pulseM147FocusStageKey(session, key, durationMs) {
+  const actions = planM147NativeFocusKeyActions({
+    keyboardId: `keyboard-${session.name}`, key, durationMs,
+  });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, actions);
+}
+
+async function pulseMovementKeyBoundedW3c(session, value, durationMs) {
+  if (!Number.isFinite(durationMs) || durationMs < 0 || durationMs > 250) {
+    throw new RangeError("M121 bounded native approach outside staging budget");
+  }
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
+    actions: [{
+      type: "key",
+      id: `keyboard-${session.name}`,
+      actions: [
+        { type: "keyDown", value },
+        { type: "pause", duration: durationMs },
+        { type: "keyUp", value },
+      ],
+    }],
+  });
+}
+
 async function resolveArenaElement(session, label) {
   const arena = await webdriver(session.base, "POST", `/session/${session.sessionId}/element`, {
     using: "css selector",
@@ -12046,6 +12685,15 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
   });
 }
 
+// M41 original native QA only: still one physical W3C wheel-back at the
+// arena's real visible center, without WebDriver element-origin resolution.
+async function scrollM41ViewportWheel(session, arena) {
+  const actions = planM41ViewportWheel({
+    arena, wheelId: `wheel-${session.name}`,
+  });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, actions);
+}
+
 async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, betweenMs) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
@@ -12152,38 +12800,18 @@ async function setArenaAttack(session, elementId, pressed, xOffset = 200) {
 }
 
 async function performArenaDirectionalLight(session, elementId, strafeKey, xOffset = 200) {
-  const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
-  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
-    actions: [
-      {
-        type: "key",
-        id: `keyboard-${session.name}`,
-        actions: [
-          { type: "keyDown", value: strafeKey },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "pause", duration: 0 },
-          { type: "keyUp", value: strafeKey },
-        ],
-      },
-      {
-        type: "pointer",
-        id: `mouse-${session.name}`,
-        parameters: { pointerType: "mouse" },
-        actions: [
-          { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
-          { type: "pause", duration: 30 },
-          { type: "pointerDown", button: 0 },
-          { type: "pause", duration: 40 },
-          { type: "pointerUp", button: 0 },
-          { type: "pause", duration: 150 },
-        ],
-      },
-    ],
+  // Physical 7-tick W3C chord. Aim first, then press strafe and LMB in the
+  // same native tick; keep strafe until after the genuine LMB release. This
+  // prevents driver-induced pre-strike drift without altering World reach.
+  const plan = planM121DirectionalW3cActions({
+    elementId,
+    keyboardId: `keyboard-${session.name}`,
+    pointerId: `mouse-${session.name}`,
+    strafeKey,
+    xOffset,
   });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, plan);
 }
-
 
 async function performArenaRunHold(session, elementId, movementKey, xOffset = 200, holdMs = 900) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
@@ -12310,22 +12938,28 @@ async function performArenaRunningAttack(session, elementId, movementKey, xOffse
 
 async function performArenaHeavyFeint(session, elementId, xOffset = 200) {
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
+  // One native compound transaction: physical LMB DOWN, real wheel at70ms,
+  // then physical UP at450ms. A denied exhausted feint must preserve exactly
+  // one original heavy; the full recovery proof rejects phantom light on UP.
   try {
     await webdriver(session.base, "POST", "/session/" + session.sessionId + "/actions", {
       actions: [
         {
-          type: "key",
-          id: "keyboard-" + session.name,
+          type: "pointer",
+          id: "mouse-" + session.name,
+          parameters: { pointerType: "mouse" },
           actions: [
-            { type: "keyDown", value: "e" },
-            { type: "pause", duration: 50 },
-            { type: "keyUp", value: "e" },
+            { type: "pointerMove", duration: 0, origin, x: xOffset, y: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pause", duration: M110_LMB_HEAVY_HOLD_MS - 70 },
+            { type: "pointerUp", button: 0 },
           ],
         },
         {
           type: "wheel",
           id: "wheel-" + session.name,
           actions: [
+            { type: "pause", duration: 0 },
             { type: "pause", duration: 70 },
             { type: "scroll", x: 0, y: 0, deltaX: 0, deltaY: 120, duration: 0, origin },
             { type: "pause", duration: 0 },
@@ -12611,7 +13245,7 @@ async function performArenaAttackHold(session, elementId, xOffset = 200, holdMs 
   // R2: this is the real LIGHT gesture shared by genuine PvP flights.
   // A requested 90ms press legitimately upgrades to heavy after 80ms; cap
   // it to a true 20–35ms tap rather than weakening the 34HP light gates.
-  // Charging heavy still has its separate sustained-LMB and KeyE proof.
+  // Charging heavy still has its separate sustained-LMB release proof.
   const boundedHoldMs = Math.max(20, Math.min(35, Math.trunc(holdMs)));
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{
@@ -12641,7 +13275,10 @@ async function performArenaM221GuardBreakClick(session, clickHoldMs = 10) {
       parameters: { pointerType: "mouse" },
       actions: [
         { type: "pointerDown", button: 0 },
-        { type: "pause", duration: clickHoldMs },
+        // M147 only: a zero-duration pause is STILL an extra W3C driver tick.
+        // Deliver genuine physical DOWN/UP back-to-back on the same pointer.
+        // Positive holds elsewhere retain their original native timing.
+        ...(clickHoldMs > 0 ? [{ type: "pause", duration: clickHoldMs }] : []),
         { type: "pointerUp", button: 0 },
       ],
     }],
@@ -12813,6 +13450,8 @@ async function installUiObserver(session) {
         const entry = {
           type,
           button: event.button,
+          trusted: event.isTrusted === true,
+          pointerId: event.pointerId,
           x: Number(((event.clientX - rect.left) / rect.width).toFixed(3)),
           y: Number(((event.clientY - rect.top) / rect.height).toFixed(3)),
           t: Number((performance.now() - state.startedAt).toFixed(1)),
@@ -13977,11 +14616,22 @@ async function readUiEvidence(session) {
       keyTransitions: (state.keyTransitions ?? []).slice(),
       pointers: state.pointers.slice(),
       wheels: (state.wheels ?? []).slice(),
+      m147InputPlane: (window.__MYASO_M147_INPUT_PLANE__ ?? [])
+        .slice(-96).map((x) => ({ ...x })),
+      m111InputPlane: window.__MYASO_M111_INPUT_PLANE__ ? {
+        physicalTerminals: (window.__MYASO_M111_INPUT_PLANE__.physicalTerminals ?? []).slice().map((x) => ({ ...x })),
+        lightReleases: (window.__MYASO_M111_INPUT_PLANE__.lightReleases ?? []).slice().map((x) => ({ ...x })),
+        submitted: (window.__MYASO_M111_INPUT_PLANE__.submitted ?? []).slice(-96).map((x) => ({ ...x })),
+      } : null,
       acceptance: window.__MYASO_ACCEPTANCE_STATE__ ? {
         scenario: window.__MYASO_ACCEPTANCE_STATE__.scenario ?? '',
         lastSubmittedClientTick: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedClientTick ?? null,
         lastSubmittedAtEpochMs: window.__MYASO_ACCEPTANCE_STATE__.lastSubmittedAtEpochMs ?? null,
         inputSubmissions: (window.__MYASO_ACCEPTANCE_STATE__.inputSubmissions ?? []).slice(-32).map((entry) => ({ ...entry })),
+        // Original M121 60Hz v1 input sender trace, copied READ-ONLY from the
+        // real page to the WebDriver observer; no cross-plane inference.
+        m121SentSamples: (window.__MYASO_ACCEPTANCE_STATE__.m121SentSamples ?? [])
+          .slice(-96).map((entry) => ({ ...entry })),
         playerNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.playerNetId ?? 0),
         focusNetId: Number(window.__MYASO_ACCEPTANCE_STATE__.focusNetId ?? 0),
         serverTick: Number(window.__MYASO_ACCEPTANCE_STATE__.serverTick ?? 0),
@@ -14154,7 +14804,9 @@ async function waitForDriver(base, child, name) {
 
 async function execute(base, sessionId, script) {
   const response = await webdriver(base, "POST", `/session/${sessionId}/execute/sync`, { script, args: [] });
-  return response.value ?? response;
+  // A successful WebDriver script may intentionally return null. Preserve it;
+  // nullish fallback would turn an absent cue into the truthy response envelope.
+  return response && Object.hasOwn(response, "value") ? response.value : response;
 }
 
 async function webdriver(base, method, pathname, body) {

@@ -1,0 +1,44 @@
+name: Combat 4 M194 five genuine guard-break blocks (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/r2-release-led-short-block.mjs"
+      - "tests/r2-m194-trusted-wheel-release.test.mjs"
+      - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "server/src/simulation.rs"
+      - ".github/workflows/combat4-m194-five-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-five-real-browser-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Original M194 source, strict unit gates and native browser prerequisites
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check scripts/r2-release-led-short-block.mjs
+          node --test tests/r2-m194-trusted-wheel-release.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build unchanged original authoritative Rust game server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Original M194 genuine five independent Chrome Firefox W3C block-only trials
+        env:
+          MYASO_PVP_SCENARIO: uiguardbreak
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "M194 STRICT exact-head independent native trial $attempt/5"
+            timeout --signal=TERM --kill-after=5s 150s node scripts/pvp_browser_flight_runner.mjs
+          done

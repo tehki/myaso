@@ -1,0 +1,33 @@
+name: Core8A P0 single typed edge outbox vs v1 QUIC congestion (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "tests/core8a-p0-selected-typed-outbox-backpressure.test.mjs"
+      - "src/network/prealpha-lmb-gesture-proposal.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "src/network/prealpha-shared-source-allocator-proposal.mjs"
+      - "web/network-transport.mjs"
+      - "src/network/input-codec.mjs"
+      - ".github/workflows/core8a-p0-selected-typed-outbox-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  one-selected-review-wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Real original adapter and selected typed 0x11/0x12 outbox QA
+        run: |
+          node --check tests/core8a-p0-selected-typed-outbox-backpressure.test.mjs
+          node --test tests/core8a-p0-selected-typed-outbox-backpressure.test.mjs
+          node --test tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs

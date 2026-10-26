@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { COMBAT, createFighter, createWorld, stepWorld } from "../src/combat/model.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { encodeInputPacket, decodeInputPacket, inputPacketBytes } from "../src/network/input-codec.mjs";
+import { createInputRedundancy } from "../src/network/input-redundancy.mjs";
 
 test("heavy restores near-light attack range, physical forward lunge, and 320ms hold", () => {
   assert.equal(COMBAT.attack.reach, 76);
@@ -107,7 +108,19 @@ test("R2 controls are present in both browser clients",()=>{
 test("R2 authoritative transport retains the true dash flag before redundancy/packet encoding",()=>{
   const src=readFileSync(new URL("../web/authoritative-client.mjs",import.meta.url),"utf8");
   assert.match(src,/dash: Boolean\(sample\.dash\)/);
-  assert.match(src,/samples: \[\.\.\.inputSamples\]\.reverse\(\)/);
+  assert.match(src, /const redundantSamples = inputRedundancy\.push\(normalized\)/);
+  assert.match(src, /samples: redundantSamples/);
+  // Assert the actual production redundancy helper keeps the physical dash
+  // bit in the current tick's v1 wire bytes, including during edge pinning.
+  const sender = createInputRedundancy();
+  sender.push({tick:49,attack:false,dash:false});
+  const sample = {tick:50,attack:true,heavyAttack:true,dash:true,moveX:1};
+  const samples = sender.push(sample);
+  const packet = decodeInputPacket(encodeInputPacket({sequence:1,clientTick:50,samples}));
+  assert.equal(packet.samples[0].tick,50);
+  assert.equal(packet.samples[0].dash,true);
+  assert.equal(packet.samples[0].moveX,1);
+  assert.equal(packet.samples[0].heavyAttack,true);
   const recon=readFileSync(new URL("../src/browser/reconciliation.mjs",import.meta.url),"utf8");
   assert.match(recon,/dash: Boolean\(input\.dash\)/);
 });

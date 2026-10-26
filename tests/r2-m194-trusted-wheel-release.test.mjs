@@ -87,7 +87,7 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const section = runner.slice(runner.indexOf("async function runOnlineUiGuardBreakFlight("),
     runner.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section, /trustedWheelWaitMs: scenario === "uiguardbreak" \? 190 : 0/);
+  assert.match(section, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.match(section, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(section, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(section, /M193 guard-break exchange/);
@@ -108,4 +108,256 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
     }), TypeError);
   }
   assert.equal(downCount, 0);
+});
+
+test("M194 wheel-first native chronology requires trusted Firefox wheel BEFORE one real Chrome click", async () => {
+  const trusted = deferred(), ack = deferred(), timeoutCeiling = deferred();
+  const calls = [];
+  let now = 0;
+  const flight = dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs: 15, trustedWheelWaitMs: 190,
+    now: () => now,
+    sleep: ms => {
+      calls.push("wait:" + ms);
+      if (ms === 190) return timeoutCeiling.promise;
+      now += ms;
+      return Promise.resolve();
+    },
+    sendWheel: () => { calls.push("real-fox-wheel"); return ack.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackDown: () => { calls.push("real-chrome-down"); now += 7; },
+    sendAttackUp: () => { calls.push("real-chrome-up"); now += 9; },
+  });
+  await tick();
+  assert.equal(calls.includes("real-chrome-down"), false);
+  now = 15;
+  trusted.resolve({ trusted: true, deltaY: 120 });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")), [
+    "real-fox-wheel", "real-chrome-down", "real-chrome-up",
+  ]);
+  const pending = Promise.race([flight.then(() => "complete"), tick().then(() => "still-awaiting-original-wheel-ACK")]);
+  assert.equal(await pending, "still-awaiting-original-wheel-ACK");
+  now = 75;
+  ack.resolve();
+  const receipt = await flight;
+  assert.equal(receipt.wheelHeadStartMs, 15);
+  assert.equal(receipt.postTrustedWheelMs, 15);
+  assert.equal(receipt.attackDownDispatchMs, 30);
+  assert.equal(receipt.attackUpDispatchMs, 37);
+  assert.equal(receipt.clickHoldMs, 7);
+  assert.ok(receipt.clickHoldMs < COMBAT.heavyAttack.windupMs);
+  assert.equal(calls.filter(x => x === "real-chrome-up").length, 1);
+});
+
+test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB down", async () => {
+  let downs = 0, ups = 0;
+  await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs: 15, trustedWheelWaitMs: 190,
+    sendWheel: () => {},
+    awaitTrustedWheel: () => new Promise(() => {}),
+    sendAttackDown: () => { downs++; },
+    sendAttackUp: () => { ups++; },
+    sleep: ms => ms === 190 ? Promise.resolve() : Promise.reject(Error("unexpected extra wait")),
+  }), /wheel not delivered before wheel-first attack/);
+  assert.equal(downs, 0);
+  assert.equal(ups, 0);
+  for (const invalid of [NaN, -1, 81, Infinity]) {
+    await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+      preWheelHeadStartMs: invalid, trustedWheelWaitMs: 190,
+      sendWheel: () => {}, awaitTrustedWheel: () => ({ trusted: true, deltaY: 120 }),
+      sendAttackDown: () => { downs++; }, sendAttackUp: () => { ups++; },
+    }), TypeError);
+  }
+  assert.equal(downs, 0);
+});
+
+test("M194 and M151 use native release-anchored genuine wheel; M152 remains wheel-first", () => {
+  const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  assert.match(runner, /const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";/,
+    "only M152 retains wheel-first compound W3C input");
+  assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
+  assert.match(runner, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak"/);
+  assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
+  assert.match(runner, /postTrustedWheelMs: \(m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 25 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
+  assert.equal(COMBAT.block.parryWindowMs, 125);
+  assert.equal(COMBAT.block.shortBlockMs, 240);
+  assert.equal(COMBAT.attack.guardDamage, 38);
+});
+
+test("M194 first-red late-HIT counterexample uses physical release-anchored guard in the unchanged 125..240ms interval", async () => {
+  const trusted = deferred();
+  const wheelAck = deferred();
+  const ceiling = deferred();
+  let now = 0;
+  const events = [];
+  const flight = dispatchR2ReleaseLedShortBlock({
+    trustedWheelWaitMs:190,
+    postTrustedWheelMs:25,
+    now:()=>now,
+    sleep: ms => {
+      if (ms === 190) return ceiling.promise;
+      assert.equal(ms,25);
+      now += ms;
+      events.push("bounded-post-wheel:" + ms);
+      return Promise.resolve();
+    },
+    sendAttackDown: () => { events.push("trusted-native-down"); now = 5; },
+    sendWheel: () => { events.push("genuine-wheel"); now = 20; return wheelAck.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackUp: () => { events.push("trusted-native-up"); now += 5; },
+  });
+  await tick();
+  assert.deepEqual(events, ["trusted-native-down", "genuine-wheel"]);
+  now = 35;
+  trusted.resolve({trusted:true,deltaY:120});
+  await tick();
+  assert.deepEqual(events, ["trusted-native-down","genuine-wheel","bounded-post-wheel:25","trusted-native-up"]);
+  let settled=false;
+  flight.then(()=>{settled=true;});
+  await tick();
+  assert.equal(settled,false,"genuine Firefox native wheel W3C ACK is still mandatory");
+  now=75;wheelAck.resolve();
+  const proof=await flight;
+  assert.equal(proof.attackUpDispatchMs,60);
+  assert.equal(proof.clickHoldMs,60,
+    "physical source0 click budget starts before the real native DOWN ACK, not after it");
+  assert.equal(proof.postTrustedWheelMs,25);
+  const predictedContactAgeMs=(proof.attackUpDispatchMs - proof.trustedWheelObservedMs) + COMBAT.attack.windupMs;
+  assert.equal(predictedContactAgeMs,160);
+  assert.ok(predictedContactAgeMs > COMBAT.block.parryWindowMs);
+  assert.ok(predictedContactAgeMs < COMBAT.block.shortBlockMs);
+  assert.equal(events.filter(x=>x==="trusted-native-up").length,1);
+  // Timing is a W3C orchestration projection, never fabricated World contact.
+  // Only original Rust World BLOCK/-38 guard and HP100 can qualify native CI.
+});
+
+test("M194 compound click starts once after trusted wheel and awaits both original command ACKs", async () => {
+  const trusted=deferred(),wheelAck=deferred(),clickAck=deferred(),ceiling=deferred();
+  let now=0,clicks=0,split=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,now:()=>now,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(now+=ms),
+    sendWheel:()=>wheelAck.promise,awaitTrustedWheel:()=>trusted.promise,
+    sendAttackDown:()=>{split++;},sendAttackUp:()=>{split++;},
+    sendAttackClick:()=>{clicks++;return clickAck.promise;},
+  });
+  await tick();assert.equal(clicks,0);
+  now=20;trusted.resolve({trusted:true,deltaY:120});await tick();
+  assert.equal(clicks,1);assert.equal(split,0);
+  now=147;clickAck.resolve();await tick();
+  assert.equal(await Promise.race([flight.then(()=>"done"),tick().then(()=>"pending")]),"pending");
+  now=180;wheelAck.resolve();
+  const result=await flight;
+  assert.equal(result.attackClickDispatchMs,35);assert.equal(result.attackClickAckMs,147);
+  assert.equal(result.wheelAckMs,180);assert.equal(result.trustedWheelObservedMs,20);
+  for(const key of ["attackDownDispatchMs","attackDownAckMs","attackUpDispatchMs","attackUpAckMs","clickHoldMs"])
+    assert.equal(result[key],null,"compound command ACK cannot fabricate physical edge timing");
+  assert.equal(result.postTrustedWheelMs,15);
+});
+
+test("M194 compound click ACK remains mandatory even after wheel ACK", async()=>{
+  const clickAck=deferred(),ceiling=deferred();let clicks=0;
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(),
+    sendWheel:()=>{},awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+    sendAttackClick:()=>{clicks++;return clickAck.promise;},
+  });
+  await tick();assert.equal(clicks,1);
+  assert.equal(await Promise.race([flight.then(()=>"done"),tick().then(()=>"pending")]),"pending");
+  clickAck.resolve();await flight;
+});
+
+test("M194 absent or untrusted wheel admits no compound click and legacy cannot opt in", async()=>{
+  for(const report of [null,{trusted:false,deltaY:120},{trusted:true,deltaY:-120}]){
+    let clicks=0;
+    await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+      preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+      sleep:ms=>ms===190&&report===null?Promise.resolve():new Promise(()=>{}),
+      sendWheel:()=>{},awaitTrustedWheel:()=>report===null?new Promise(()=>{}):report,
+      sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+      sendAttackClick:()=>{clicks++;},
+    }),/wheel/);
+    assert.equal(clicks,0);
+  }
+  await assert.rejects(()=>dispatchR2ReleaseLedShortBlock({
+    sendAttackDown:()=>{},sendAttackUp:()=>{},sendWheel:()=>{},awaitTrustedWheel:()=>{},sendAttackClick:()=>{},
+  }),TypeError);
+});
+
+test("M194 compound failure waits for wheel ACK and preserves both original errors", async()=>{
+  const wheelAck=deferred(),ceiling=deferred(),clickError=Error("native compound click failed"),wheelError=Error("native wheel failed");
+  const flight=dispatchR2ReleaseLedShortBlock({
+    preWheelHeadStartMs:15,trustedWheelWaitMs:190,
+    sleep:ms=>ms===190?ceiling.promise:Promise.resolve(),
+    sendWheel:()=>wheelAck.promise,awaitTrustedWheel:()=>({trusted:true,deltaY:120}),
+    sendAttackDown:()=>assert.fail("split down"),sendAttackUp:()=>assert.fail("split up"),
+    sendAttackClick:()=>{throw clickError;},
+  });
+  await tick();
+  assert.equal(await Promise.race([flight.then(()=>"done",()=>"failed"),tick().then(()=>"pending")]),"pending");
+  const rejected=assert.rejects(flight,error=>error instanceof AggregateError&&error.errors[0]===clickError&&error.errors[1]===wheelError);
+  wheelAck.reject(wheelError);await rejected;
+});
+
+test("M151 one authentic down then trusted wheel then short release keeps strict W3C ACK", async () => {
+  const trusted = deferred(), wheelAck = deferred(), releaseAck = deferred();
+  const ceiling = deferred();
+  const calls = [];
+  let time = 0;
+  const flight = dispatchR2ReleaseLedShortBlock({
+    trustedWheelWaitMs: 190, postTrustedWheelMs: 25,
+    now: () => time,
+    sleep: ms => {
+      calls.push("pause:" + ms);
+      if (ms === 190) return ceiling.promise;
+      time += ms;
+      return Promise.resolve();
+    },
+    sendAttackDown: () => { calls.push("real-down"); time = 10; },
+    sendWheel: () => { calls.push("real-wheel"); return wheelAck.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackUp: () => { calls.push("real-up"); return releaseAck.promise; },
+  });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")), ["real-down", "real-wheel"]);
+  time = 40;
+  trusted.resolve({ trusted: true, deltaY: 120 });
+  await tick();
+  assert.deepEqual(calls.filter(x => x.startsWith("real-")),
+    ["real-down", "real-wheel", "real-up"]);
+  assert.ok(calls.includes("pause:25"));
+  assert.equal(await Promise.race([flight.then(() => "passed"), tick().then(() => "pending")]),
+    "pending", "genuine W3C release and wheel ACK are mandatory");
+  releaseAck.resolve();
+  await tick();
+  assert.equal(await Promise.race([flight.then(() => "passed"), tick().then(() => "pending")]),
+    "pending", "genuine wheel W3C ACK is still mandatory");
+  time = 82;
+  wheelAck.resolve();
+  const result = await flight;
+  assert.equal(result.postTrustedWheelMs, 25);
+  assert.equal(result.attackUpDispatchMs, 65);
+  assert.equal(result.clickHoldMs, 65);
+  assert.equal(calls.filter(x => x === "real-up").length, 1);
+});
+
+test("M151 cannot admit untrusted or absent wheel as an accepted light", async () => {
+  let upCount = 0;
+  for (const report of [null, { trusted: false, deltaY: 120 },
+    { trusted: true, deltaY: -120 }]) {
+    await assert.rejects(() => dispatchR2ReleaseLedShortBlock({
+      trustedWheelWaitMs: 190, postTrustedWheelMs: 25,
+      sendAttackDown: () => {},
+      sendWheel: () => {},
+      awaitTrustedWheel: () => report === null
+        ? Promise.reject(Error("missing genuine wheel")) : report,
+      sendAttackUp: () => { upCount++; },
+      sleep: ms => ms === 190 ? new Promise(() => {}) : Promise.resolve(),
+    }), /wheel/);
+  }
+  assert.equal(upCount, 0, "never release a credited light on missing wheel");
 });

@@ -1,0 +1,60 @@
+name: Core8A M147 HIT receipt control proposal (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "server/src/combat_hit_control_proposal.rs"
+      - "server/src/combat_hit_control_ingress_proposal.rs"
+      - "server/src/combat_hit_lease_mint_proposal.rs"
+      - "server/src/combat_hit_receipt.rs"
+      - "server/src/combat_hit_journal.rs"
+      - "server/src/combat_hit_delivery_proposal.rs"
+      - "server/src/combat_hit_world_commit_proposal.rs"
+      - "server/src/lib.rs"
+      - "src/network/m147-hit-control-proposal.mjs"
+      - "src/network/m147-hit-receipt-codec.mjs"
+      - "src/browser/m147-hit-receipt-feedback.mjs"
+      - "tests/core8a-m147-hit-control-lease-draft.test.mjs"
+      - "tests/m147-authoritative-hit-receipt.test.mjs"
+      - "docs/CORE8A_M147_HIT_RECEIPT_OWNER_REVIEW_20261024.md"
+      - "docs/CORE8A_M147_PER_RECIPIENT_HIT_DELIVERY_REVIEW_20261024.md"
+      - ".github/workflows/core8a-m147-hit-control-draft.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codec-journal-and-lease-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
+      - name: Byte-accurate dormant JS HIT codec and 3-role lease negatives
+        run: |
+          node --check src/network/m147-hit-control-proposal.mjs
+          node --check src/network/m147-hit-receipt-codec.mjs
+          node --test tests/core8a-m147-hit-control-lease-draft.test.mjs tests/m147-authoritative-hit-receipt.test.mjs
+      - name: Original Rust World-derived HIT receipt, bounded journal and 32B control vectors
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit
+      - name: Server-owned recipient-incarnation contiguous projection and ACK safety
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_delivery_proposal
+      - name: Core8C source-derived World HIT and canonical bound actor incarnation
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_world_commit_proposal
+      - name: Default-OFF framed HIT_CONTROL and real World atomic receipt ingress
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_control_ingress_proposal
+      - name: Core8A OS-CSPRNG nonlive HIT lease and original actor-incarnation fence
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib combat_hit_lease_mint_proposal
+      - name: Original Rust formatting unchanged
+        run: cargo fmt --all --manifest-path server/Cargo.toml -- --check
+      - name: Strict Rust Clippy (no live feature flags)
+        run: cargo clippy --locked --all-targets --manifest-path server/Cargo.toml -- -D warnings

@@ -1,0 +1,52 @@
+name: Core8A P0 two-packet first-heavy loss native qualification (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "web/**"
+      - "src/**"
+      - "server/**"
+      - "tests/core8a-multi-packet-gap.test.mjs"
+      - ".github/workflows/core8a-two-packet-gap-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-world-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2]
+    env:
+      MYASO_PVP_SCENARIO: uiheavyinputlossgap
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Genuine native prerequisites
+        run: |
+          node --check scripts/pvp_browser_flight_runner.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build original authoritative World
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict genuine two-packet input-loss recovery
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee core8a-two-packet-gap.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core8a-two-packet-gap-trial-${{ matrix.trial }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: core8a-two-packet-gap.log
+          if-no-files-found: warn

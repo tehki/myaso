@@ -177,8 +177,10 @@ canvas.addEventListener("wheel", (event) => {
 canvas.addEventListener("pointermove", updateMouse);
 window.addEventListener("blur", releaseInputs);
 canvas.addEventListener("keydown", (event) => {
+  // E is reserved for future Use interaction, not a Combat heavy shortcut.
+  if (event.code === "KeyE") return;
   const firstAudioGesture = !audio.isUnlocked();
-  if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyE", "Space"].includes(event.code)) event.preventDefault();
+  if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
     if (direction && player.action === "idle"
@@ -188,8 +190,6 @@ canvas.addEventListener("keydown", (event) => {
     }
   }
   keys.add(event.code);
-  if (event.code === "KeyE" && !event.repeat) heavyAttackRequested = true;
-  if (event.code === "KeyE" && !event.repeat) audio.play("heavy");
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
     audio.play("jump");
@@ -197,7 +197,6 @@ canvas.addEventListener("keydown", (event) => {
   }
   // Commit every native key action before one-time AudioContext startup.
   audio.unlock();
-  if (firstAudioGesture && !event.repeat && event.code === "KeyE") audio.play("heavy");
   if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
 });
 canvas.addEventListener("keyup", (event) => keys.delete(event.code));

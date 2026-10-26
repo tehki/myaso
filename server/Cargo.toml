@@ -6,8 +6,13 @@ rust-version = "1.88"
 publish = false
 license = "Apache-2.0"
 
+[features]
+default = []
+experimental-hit-delivery-lab = []
+
 [dependencies]
 anyhow = "=1.0.104"
+getrandom = "=0.4.3"
 tokio = { version = "~1.51", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 wtransport = { version = "=0.7.2", default-features = false, features = ["ring", "self-signed"] }
 

@@ -1,0 +1,155 @@
+name: Main 0 real first-party Silver Knights + v2 Combat W3C World proof (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+      - "server/tests/prealpha_boot_nonce_authority.rs"
+      - "server/src/prealpha_authenticated_gesture.rs"
+      - "server/src/prealpha_lmb_gesture_authority.rs"
+      - "server/tests/combat4c_release_only_source_ownership.rs"
+      - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
+      - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/network-transport.mjs"
+      - "tools/art/main0_v2_knights_combat_four_native.mjs"
+      - ".github/workflows/main0-v2-knights-combat-four-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-real-browser-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - acceptance: original
+            mode: original
+            browsers: chrome,firefox,chrome,chrome
+          - acceptance: held-lmb-chrome
+            mode: held-lmb
+            browsers: chrome,firefox,chrome,chrome
+          - acceptance: held-lmb-firefox
+            mode: held-lmb
+            browsers: firefox,chrome,chrome,chrome
+          - acceptance: four-combat-lifecycle
+            mode: four-combat-lifecycle
+            browsers: chrome,firefox,chrome,firefox
+    env:
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
+      MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Source syntax and genuine native browser prerequisites
+        run: |
+          node --test tests/combat4-native-gesture-admission.test.mjs
+          node --check tools/art/main0_v2_knights_combat_four_native.mjs
+          node --check web/online-game.mjs
+          node --check web/prealpha-gesture-live-lab.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Four real W3C original game Silver fighters and physical gesture World (${{ matrix.acceptance }})
+        run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
+      - name: Preserve original native evidence and SHA256 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-localhost-original-game-gesture-w3c-${{ matrix.acceptance }}
+          path: .artifacts/main0-knights-combat-gesture/
+          if-no-files-found: ignore
+          retention-days: 5
+
+
+  review-only-immutable-package:
+    needs: four-real-browser-original-world
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify exact source and default-OFF loopback-only review boundary
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REVIEW_SOURCE_SHA"
+          node --test tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs tests/prealpha-lmb-gesture-proposal.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("server/src/main.rs").read_text(encoding="utf-8")
+          assert 'env::var("MYASO_EXPERIMENTAL_GESTURE_V2")' in source
+          assert 'Ok("0") | Err(_) => false' in source
+          assert 'if v2_lab && !bind.ip().is_loopback()' in source
+          assert 'experimental v2 gesture ingress is loopback-only' in source
+          PY
+      - name: Build original authoritative server with pinned Rust 1.89
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo +1.89.0 build --locked --release --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Package review-only source and verify archive roundtrip
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/combat-review-package/bin" "$RUNNER_TEMP/combat-review-package/public" review-artifact
+          cp server/target/release/myaso-server "$RUNNER_TEMP/combat-review-package/bin/myaso-server"
+          chmod 0755 "$RUNNER_TEMP/combat-review-package/bin/myaso-server"
+          cp -a web "$RUNNER_TEMP/combat-review-package/public/web"
+          cp -a src "$RUNNER_TEMP/combat-review-package/public/src"
+          cp -a ops "$RUNNER_TEMP/combat-review-package/ops"
+          printf '%s\n' "$REVIEW_SOURCE_SHA" > "$RUNNER_TEMP/combat-review-package/REVISION"
+          archive="review-artifact/myaso-prealpha-review-${REVIEW_SOURCE_SHA}.tar.gz"
+          tar --sort=name --mtime="@$(git show -s --format=%ct HEAD)" --owner=0 --group=0 --numeric-owner -C "$RUNNER_TEMP/combat-review-package" -cf - . | gzip -n > "$archive"
+          (cd review-artifact && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+          (cd review-artifact && sha256sum -c "$(basename "$archive").sha256")
+          mkdir -p "$RUNNER_TEMP/combat-review-roundtrip"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/combat-review-roundtrip" --no-same-owner
+          diff -qr "$RUNNER_TEMP/combat-review-package" "$RUNNER_TEMP/combat-review-roundtrip"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          sha = os.environ["REVIEW_SOURCE_SHA"]
+          digest = lambda path: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          archive = Path("review-artifact") / f"myaso-prealpha-review-{sha}.tar.gz"
+          manifest = {
+              "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
+              "binarySha256": digest("server/target/release/myaso-server"),
+              "archiveSha256": digest(archive),
+              "rustc": subprocess.check_output(["rustc", "+1.89.0", "--version"], text=True).strip(),
+              "cargo": subprocess.check_output(["cargo", "+1.89.0", "--version"], text=True).strip(),
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "reviewOnly": True, "playableAuthorized": False, "defaultOff": True,
+              "archiveChecksumVerified": True, "archiveRoundtripVerified": True,
+              "operationalRollbackVerified": False,
+              "independentHumanHostsVerified": False,
+              "activation": "Requires Main0 and owner GO; no operational action performed",
+          }
+          assert manifest["commit"] == sha
+          archive.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Preserve immutable exact-head review package without activation
+        uses: actions/upload-artifact@v4
+        with:
+          name: myaso-prealpha-review-${{ github.event.pull_request.head.sha || github.sha }}
+          path: review-artifact/
+          if-no-files-found: error
+          retention-days: 14

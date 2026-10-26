@@ -1,0 +1,19 @@
+# UI Department 10 — proposed Pre-Alpha pointerDOWN gesture source, DORMANT
+
+**Scope:** Main [Pre-Alpha 0.1 #695](https://github.com/tehki/myaso/issues/695), mandatory Combat [instant light/heavy #696](https://github.com/tehki/myaso/issues/696), parent Core 8A [review-only outbox #712](https://github.com/tehki/myaso/pull/712), Combat4 [server review #711](https://github.com/tehki/myaso/pull/711) and Core8C [wire review #715](https://github.com/tehki/myaso/pull/715). This DRAFT contains no authoritative gameplay change and must not be merged into the live browser while the actual negotiated v2 contract is undecided.
+
+### What UI 10 actually implements
+
+The new **unimported** `src/browser/prealpha-lmb-dom-gesture-review.mjs` consumes a **proposal-only Core 8A `ProposedLmbGestureOutbox` instance** to reserve a single mouse-left-button pointer-down and preserve matching pointer-up as an independent typed edge, even when both occur within one legacy 30Hz input sample. Only a deliberately requested `approvedHoldUpgrade(pointerId)` can request the same gesture's UPGRADE. It cannot decide server-time attack-light commitment, 135ms unlanded window, 320ms READY heavy or Combat hits. **No automatic JS charge timer is implemented or permitted** until the server-owned policy/transport is approved.
+
+It never initiates a second LMB gesture while the first is active. Mouse leave followed by actual global window pointerUP terminates the original gesture; other-pointer UP, pen/touch, right click/RMB-run are ignored; a Space+LMB jump-attack chord and focused chat composer are delegated to their existing original-game owners. Lost capture, pointercancel, window blur, hidden tab or chat opening issue CANCEL (not phantom RELEASE). Closed lease, bad tick, outbox failure or reconnect fail closed and force a **new** negotiated authenticated Core8A lease. No automatic v1 input compatibility or client hit grant is inferred.
+
+There is an **opt-in test-only** listener attaching function; the live `web/online-game.mjs` never imports this module or the Core8A proposed outbox. Adding this listener concurrently with current v1 LMB would risk double attack and is **forbidden**. Future Main+Combat4+Core8A/8C integration must first replace the old gesture handler atomically and decide reliable version-negotiated ingress, ACK/de-dup, connection lease/actor binding, server 135/320ms thresholds and native acceptance for quick tap, upgrade, early release, cancel, KeyE heavy, RMB run, Space+LMB, chat Enter/Escape, death/reconnect, packet loss and full strict Combat M gates. An ACK may only prove transport-edge settlement, never damage/Hit, and browser input does not authenticate actor identity.
+
+### Evidence
+
+`tests/ui10-prealpha-lmb-dom-review.test.mjs` checks short press/release same tick, held identity, cancel on focus/blur/reconnect, mismatched pointer and duplicate edges, chat/Space arbitration, bounded failure and teardown; combined with upstream Core8A proposal tests. `scripts/ui10-prealpha-lmb-native-review.mjs` serves **a dedicated ephemeral loopback HTML QA canvas** and consumes genuine Chrome/Firefox W3C pointer events, not the original in-game Combat server. It exercises the proposal module with real events only and reports no server or Combat success. Original v1 production browser/server code is unchanged.
+
+**Important:** This is not a four-player real Combat/HP test, not a browser shipping feature, not an approved protocol spec, not a session authenticator and not instant attack functionality. Pre-Alpha source, Main's optional real Chat C1 [#708](https://github.com/tehki/myaso/pull/708) and full Silver+Chat native [#716](https://github.com/tehki/myaso/pull/716) remain separately gated. Main orchestrator alone approves any real runtime wiring, main merge, immutable package, independent-host acceptance, rollback or GO.
+
+**DRAFT / DEFAULT OFF / NO MAIN MERGE / NO DEPLOY / PUBLIC RELEASE HOLD.**

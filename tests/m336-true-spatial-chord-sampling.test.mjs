@@ -11,8 +11,8 @@ const begin = runner.indexOf("async function performArenaPreAimedJumpAttackChord
 const end = runner.indexOf("\nasync function ", begin + 30);
 const chord = runner.slice(begin, end);
 
-test("M336 M145 holds one authentic Space+LMB across 30Hz sampling; M144 unchanged", () => {
-  assert.match(flight, /performArenaPreAimedJumpAttackChord\(jumpAttacker, spatial \? 180 : 90\)/);
+test("M144/M336 both hold one authentic Space+LMB across original 30Hz input sampling", () => {
+  assert.match(flight, /performArenaPreAimedJumpAttackChord\(jumpAttacker, 180\)/);
   assert.match(chord, /const boundedHoldMs = Math\.max\(50, Math\.min\(180, Math\.trunc\(holdMs\)\)\)/);
   assert.match(chord, /type: "pointerDown", button: 0/);
   assert.match(chord, /type: "keyDown", value: " "/);
@@ -27,10 +27,12 @@ test("M336 M145 holds one authentic Space+LMB across 30Hz sampling; M144 unchang
 });
 
 test("M336 read-only real client input submission evidence does not change packet or controls", () => {
-  const guarded = game.indexOf('if (acceptanceScenario === "uimultirecoveryspatial") {', game.indexOf("function simulatePrediction("));
+  const guarded = game.indexOf('if (acceptanceScenario === "uimultirecoveryspatial"', game.indexOf("function simulatePrediction("));
   const send = game.indexOf("networkClient.sendInput({ tick: outgoingTick, ...currentInput });", guarded);
   const reset = game.indexOf("attackRequested = false;", send);
   assert.ok(guarded >= 0 && send > guarded && reset > send);
+  assert.match(game.slice(guarded, send), /acceptanceScenario === "uimultirecoveryffa"/,
+    "M144 must expose actual 30Hz sender input samples without modifying packets");
   const evidence = game.slice(guarded, send);
   assert.match(evidence, /debug\.inputSubmissions\.push\(\{/);
   assert.match(evidence, /attack: Boolean\(currentInput\.attack\)/);

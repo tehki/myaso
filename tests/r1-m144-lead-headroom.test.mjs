@@ -17,7 +17,7 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   const genuineLightClickMs = 45;
   assert.ok(genuineLightClickMs < LEFT_HEAVY_CHARGE_MS);
   assert.ok(flight.includes(`performArenaAttackHold(lightAttacker, lightArena, 200, ${genuineLightClickMs})`));
-  assert.ok(flight.includes("performArenaPreAimedJumpAttackChord(jumpAttacker, spatial ? 180 : 90)"));
+  assert.ok(flight.includes("performArenaPreAimedJumpAttackChord(jumpAttacker, 180)"));
   assert.ok(flight.includes("jumpAttackDowns[0].epochMs - lightUps[0].epochMs"));
   assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
   assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));
@@ -25,6 +25,8 @@ test("M144 retains exact real 60..200ms light-release lead gate with earlier tru
   assert.ok(flight.includes("lightPunishIndex < 0 || jumpPunishIndex <= lightPunishIndex || nearestReturnIndex <= jumpPunishIndex"));
   assert.ok(flight.includes("verifyM211DualRecoveryServerProof(m201ServerOutput()"));
   assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, 1250, 8)"));
+  assert.ok(flight.includes("performArenaPreAimedJumpAttackChord(jumpAttacker, 180)"),
+    "M144 must preserve genuine 180ms W3C chord for original 30Hz sampling");
   assert.ok(flight.includes("const minLeadMs = spatial ? 70 : 60;"));
   assert.ok(flight.includes("const maxLeadMs = spatial ? 150 : 200;"));
   assert.ok(flight.includes("evidence.some((entry) => entry.playerHp !== 100 || entry.playerGuard !== 100)"));

@@ -1,0 +1,47 @@
+name: Combat 4 M121 two real directional W3C World trials (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m121-native-geometry-plan.mjs"
+      - "scripts/m121-native-direction-roles.mjs"
+      - "tests/m121-native-geometry-plan.test.mjs"
+      - "tests/m121-native-direction-roles.test.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/light-attack-movement.mjs"
+      - "server/src/simulation.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - ".github/workflows/combat4-m121-two-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-two-real-chrome-firefox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MYASO_PVP_SCENARIO: uidirectionallight
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Genuine first-party directional source and real browser prerequisites
+        run: |
+          node --test tests/m121-native-geometry-plan.test.mjs tests/m121-native-direction-roles.test.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build unchanged authoritative Rust World before native scenario startup
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: M121 original first W3C left-sweep and 34HP World acceptance
+        run: MYASO_M121_DIRECTION=right timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs
+      - name: M121 original second W3C left-sweep and 34HP World acceptance
+        if: always()
+        run: MYASO_M121_DIRECTION=left timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs

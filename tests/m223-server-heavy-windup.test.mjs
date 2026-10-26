@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { COMBAT } from "../src/combat/model.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "../scripts/m223-server-heavy-windup.mjs";
 
 test("M223 accepts only fresh native server windup of intended fighter", async () => {
@@ -44,12 +45,13 @@ test("M223 rejects truncated stream, partial line and invalid fighter", async ()
   }),/did not observe/);
 });
 
-test("M223 preserves one genuine E and one wheel plus strict combat outcomes",()=>{
+test("M223 preserves one genuine held-LMB release and one wheel plus strict combat outcomes",()=>{
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const code=source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
     source.indexOf("async function runOnlineUiHeavyBlockFlight("));
   assert.ok(code.includes("awaitM223HeavyWindup({"));
-  assert.ok(code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
+  assert.ok(code.includes('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)'));
+  assert.ok(!code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
   assert.ok(code.includes("scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs)"));
   assert.ok(code.includes("M192_REAL_INGRESS_OUTCOME"));
   assert.ok(code.includes("M223_SERVER_WINDUP_PLAN"));
@@ -80,6 +82,12 @@ test("M223.1 clamps slow wheel samples without changing server combat windows", 
   assert.deepEqual(planM223WheelDelay({
     targetAfterWindupMs:285, sampledWheelIngressMs:39,
   }), {boundedWheelIngressMs:65,wheelDelayMs:220});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:395, sampledWheelIngressMs:73,
+  }), {boundedWheelIngressMs:73,wheelDelayMs:322});
+  assert.deepEqual(planM223WheelDelay({
+    targetAfterWindupMs:395, sampledWheelIngressMs:103,
+  }), {boundedWheelIngressMs:85,wheelDelayMs:310});
 });
 
 test("M223.1 refuses invalid or unqualified sampled ingress", () => {
@@ -93,15 +101,52 @@ test("M223.1 refuses invalid or unqualified sampled ingress", () => {
   }),TypeError);
 });
 
+test("Combat4B M188 physical held-LMB parry preserves one bounded wheel and strict defense predicates", () => {
+  const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+  const helper = source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
+    source.indexOf("async function runOnlineUiHeavyBlockFlight("));
+  // A real original World event trace at 1fa6f494 proved 405ms native parry
+  // resulted in BLOCK (64 guard), not PARRY. The World timers stay unchanged;
+  // qualify the +110ms physically-delayed wheel on exact-head native CI.
+  assert.match(helper, /m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" \? 110 : 0/);
+  assert.match(helper, /m223WheelDelayMs = m223Plan\.wheelDelayMs \+ m188HeldLmbParryOffsetMs/);
+  assert.match(helper, /m223WheelDelayMs < 0 \|\| m223WheelDelayMs > 450/);
+  // 405ms planner plus parry-only wheel retiming must preserve <=450ms bound.
+  assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:65}).wheelDelayMs+110,450);
+  assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:85}).wheelDelayMs+110,430);
+  assert.match(helper, /performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
+  assert.match(helper, /scrollArenaWheel\(defender, defenderElementId, 120, m223WheelDelayMs\)/);
+  const block = source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
+    source.indexOf("async function runOnlineUiHeavyParryFlight("));
+  const parry = source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
+    source.indexOf("async function runOnlineUi", source.indexOf("async function runOnlineUiHeavyParryFlight(") + 20));
+  assert.match(block, /attackOffset, blockOffset, 395,/);
+  assert.match(block, /defenderResult\.playerHp === 100/);
+  assert.match(block, /defenderGuardInWindow/);
+  assert.match(parry, /attackOffset, blockOffset, 405,/);
+  assert.match(parry, /defenderResult\.playerHp === 100/);
+  assert.match(parry, /defenderResult\.playerGuard === 100/);
+  assert.match(parry, /feedbackTransitions\.includes\("parried"\)/);
+  assert.match(parry, /feedbackTransitions\.includes\("parry-success"\)/);
+});
+
 test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict outcome checks", () => {
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const block=source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
     source.indexOf("async function runOnlineUiHeavyParryFlight("));
   const parry=source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
     source.indexOf("async function runOnlineUi",source.indexOf("async function runOnlineUiHeavyParryFlight(")+20));
-  // Authentic M107 block previously expired 2-4 server ticks before heavy hit.
-  // Move the dispatch target without changing original guard / parry windows.
-  assert.ok(block.includes("attackOffset, blockOffset, 255,"));
+  // Exact original World failure at 94797f19: block start704 / expiry719 /
+  // heavy HIT724. A 110ms later physical wheel targets guard-only, not parry,
+  // without altering either server timer or World damage assertions.
+  const worldTickMs = 1000 / 60;
+  const oldLeadMs = (724 - 704) * worldTickMs;
+  const predictedBlockTick = 704 + Math.round((395 - 255) / worldTickMs);
+  const newLeadMs = (724 - predictedBlockTick) * worldTickMs;
+  assert.ok(oldLeadMs > COMBAT.block.shortBlockMs);
+  assert.ok(newLeadMs > COMBAT.block.parryWindowMs);
+  assert.ok(newLeadMs < COMBAT.block.shortBlockMs);
+  assert.ok(block.includes("attackOffset, blockOffset, 395,"));
   assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
   // Short-reach active lunge: authoritative block tick 605, hit tick 615
   // proves 285ms is ~167ms before contact; aim genuine parry wheel later.
