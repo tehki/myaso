@@ -775,21 +775,48 @@ try{
    return after>=0 && lines.slice(after+1).find(line=>/M201_AUTH_ACTION tick=\d+ fighter=1 from=\d+ to=0/.test(line));
  },14000);
  assert(heavyReturnedIdle,"new physically pressed light starts only after original World returns to Idle");
- // Real original World spawns fighter #1/#2 96px apart. Light reaches
- // 76px + 18px fighter radius = 94px, while the preceding true 46HP
- // heavy reaches 82+18=100px and knocks the target BACK 28px.
- // Correct the authentic 4-human-actor QA staging, NOT World reach, hit
- // events or strict 34HP assertion: physically walk the real attacker
- // toward the knockback-displaced target using a trusted W3C key hold.
- // 220ms at the original 215px/s nominal walk speed is ~47px of reach
- // recovery, leaving genuine World collision/damage to decide success.
- await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-  actions:[{type:"key",id:"real-original-post-heavy-forward-step",actions:[
-   {type:"keyDown",value:"d"},
-   {type:"pause",duration:220},
-   {type:"keyUp",value:"d"},
-  ]}]
- });
+ // True original Light reach is 76 + fighter radius 18 = 94 world units.
+ // Heavy knockback and W3C keyboard scheduling make a fixed hold unreliable.
+ // Require real replicated World geometry before one physical Light click;
+ // never mutate fighter coordinates, World reach or attack authority.
+ const geometryAttempts=[];
+ const readOriginalPair=async()=>{
+  const p=await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+  return {tick:p?.serverTick??null,
+   a:p?.replicatedFighters?.find(f=>f.netId===1)??null,
+   t:p?.replicatedFighters?.find(f=>f.netId===2)??null};
+ };
+ let stage=null;
+ for(let attempt=0;attempt<6;attempt++){
+  const before=await readOriginalPair(),{a,t}=before;
+  assert.ok(a&&t&&a.action===0&&t.action===0,
+   "real original World attackers must be Idle for Light staging");
+  assert.ok(Math.abs(t.y-a.y)<=8,"original Light staging must keep the real horizontal lane");
+  const gap=t.x-a.x;
+  if(gap>COMBAT.fighterRadius*2+8&&gap<=COMBAT.attack.reach+COMBAT.fighterRadius-8){
+   await sleeps(120);
+   const verified=await readOriginalPair();
+   if(verified.tick>before.tick && verified.a && verified.t
+    && Math.abs(verified.a.x-a.x)<=2 && Math.abs(verified.t.x-t.x)<=2
+    && Math.abs(verified.t.y-t.y)<=2){stage={before,verified,gap,geometryAttempts};break;}
+  }else{
+   const distance=gap-(COMBAT.attack.reach-8);
+   const key=distance>=0?"d":"a";
+   const ms=Math.max(80,Math.min(200,Math.ceil(Math.abs(distance)*1000/COMBAT.moveSpeed)));
+   assert.equal(await evaluate(attacker,
+    "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;"),
+    true,"physical WASD needs original focused arena");
+   await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+    actions:[{type:"key",id:"real-original-post-heavy-world-staging",actions:[
+     {type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key},
+    ]}]
+   });
+   await sleeps(310); // avoid an accidental second-tap native Dash
+   geometryAttempts.push({attempt,key,ms,before,after:await readOriginalPair()});
+  }
+ }
+ assert.ok(stage,"genuine movement failed stable original Light geometry: "+JSON.stringify(geometryAttempts));
+ console.log("COMBAT4C_ORIGINAL_LIGHT_GEOMETRY_STAGED",JSON.stringify(stage));
  const pointer=await evaluate(attacker, "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();const b=c.getBoundingClientRect();return {x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50),focus:document.activeElement===c};");
  assert(pointer.focus,"actual canvas must own physical LMB before W3C action");
  const shortLightWorldStart=readAuthoritativeWorld().length;
