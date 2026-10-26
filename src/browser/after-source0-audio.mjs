@@ -14,6 +14,7 @@ export function createAfterSource0Audio({
   }
   if (!Number.isFinite(delayMs) || delayMs < 0) throw new RangeError("invalid delay");
   let pending = null;
+  let pendingKeyboard = null;
   let scheduled = null;
 
   function noteRelease(classification) {
@@ -21,6 +22,21 @@ export function createAfterSource0Audio({
     if (audio.isUnlocked()) return false;
     pending = classification;
     return true;
+  }
+  // WASD and Space are recorded in their genuine trusted keyboard callback,
+  // but WebAudio startup must wait until the original input writer returns.
+  function noteKeyboardGesture(code, isRepeat = false) {
+    if (isRepeat || audio.isUnlocked() || scheduled !== null) return false;
+    if (code === "Space") pendingKeyboard = "jump";
+    else if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(code)) pendingKeyboard = "step";
+    else return false;
+    return true;
+  }
+  function matchesKeyboardSource0(input) {
+    if (!pendingKeyboard || !input) return false;
+    if (pendingKeyboard === "jump") return input.jump === true;
+    return (Number.isFinite(input.moveX) && input.moveX !== 0)
+      || (Number.isFinite(input.moveY) && input.moveY !== 0);
   }
   function matchesReleasedSource0(input) {
     if (!pending || !input) return false;
@@ -30,9 +46,16 @@ export function createAfterSource0Audio({
     return true;
   }
   function afterOriginalSend(input) {
-    if (scheduled !== null || !matchesReleasedSource0(input)) return false;
-    const cue = pending === "heavy" ? "heavy" : "light";
+    if (scheduled !== null) return false;
+    const released = matchesReleasedSource0(input);
+    if (!released && !matchesKeyboardSource0(input)) return false;
+    // Space+LMB's committed Jump Light is a real sent attack, not a raw jump.
+    const cue = released
+      ? (pending === "heavy" ? "heavy" : "light")
+      : (pendingKeyboard === "jump" && input.attack === true && input.heavyAttack === false
+        ? "light" : pendingKeyboard);
     pending = null;
+    pendingKeyboard = null;
     scheduled = schedule(() => {
       scheduled = null;
       if (!audio.isUnlocked()) audio.unlock();
@@ -42,8 +65,9 @@ export function createAfterSource0Audio({
   }
   function reset() {
     pending = null;
+    pendingKeyboard = null;
     if (scheduled !== null) cancel(scheduled);
     scheduled = null;
   }
-  return Object.freeze({ noteRelease, afterOriginalSend, reset });
+  return Object.freeze({ noteRelease, noteKeyboardGesture, afterOriginalSend, reset });
 }
