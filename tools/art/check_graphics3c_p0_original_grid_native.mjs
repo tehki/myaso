@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {join} from "node:path";
 import {createHash} from "node:crypto";
+import {execFileSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 const [twoDir,fourDir]=process.argv.slice(2);
 assert.ok(twoDir&&fourDir,"genuine independent 2-seat and 4-seat Rust/browser reports required");
 const hash=b=>createHash("sha256").update(b).digest("hex");
@@ -61,6 +63,9 @@ function validate(path,players){
 }
 const two=validate(twoDir,2),four=validate(fourDir,4);
 assert.equal(two.sourceCommit,four.sourceCommit,"different source hashes cannot be combined");
+const checkedOutHead=execFileSync("git",["-C",fileURLToPath(new URL("../../",import.meta.url)),"rev-parse","HEAD"],{encoding:"utf8"}).trim();
+assert.match(checkedOutHead,/^[0-9a-f]{40}$/,"strict native QA requires an actual Git source head");
+assert.equal(two.sourceCommit,checkedOutHead,"native screenshots must be captured from the exact checked-out source SHA");
 console.log("GRAPHICS3C_P0_REAL_GRID_FULL_CANVAS_PASS "+JSON.stringify({
  exactHead:two.sourceCommit,sessions:6,worlds:2,engines,realSilver:true,optionalTerrain:false,
  independentHumans:false,gpuPresent:false,presentationClockDebtSampled:true,
