@@ -1,0 +1,55 @@
+# Graphics 3C P0 — original arena 2/4 genuine Rust Silver Canvas evidence
+
+SOURCE-ONLY NATIVE QA. Not full quality, art owner approval, or release GO.
+
+Owner P0 Graphics Build #1029 prioritizes the original minimal 960x540 Combat grid. This exact-source new QA child of canonical Main Combat/Core integration Draft #1036 exact source a312e857aafc4fcdc241403f98281932ebd9f56d (all 28 first-party GitHub Actions workflows green on that parent at the 26 October checkpoint) ports prior QA-only #1035 instrumentation without importing old Graphics branch source or altering actual gameplay. It changes zero production Canvas, authored animation, network, Rust server, Combat, input or optional terrain logic. The packed-earth Arena Lite, Greyhaven and 3B architecture remain excluded.
+
+## True acceptance
+
+The two-stage exact-HEAD native GitHub job starts real original pinned-certificate Rust WebTransport servers in two separate isolated local-host sessions. First genuine Chrome+Firefox / 2 distinct server-owned actors, then Chrome+Firefox+Chrome+Firefox / 4 distinct actors. Each browser reports original Silver WebP draw receipts, the real server-issued actor ID, original roster, original grid and 960x540 game Canvas. Original artist-authored Silver atlases are not modified.
+
+Each W3C browser captures both:
+- Genuine unretouched headless whole-page screenshots including HUD/controls; page viewport may crop the lower part of the actual arena in 1280x720.
+- Entire first-party actual original 960x540 game Canvas, PNG from the live DOM canvas.toDataURL, binary PNG signature, exact IHDR dimensions, original bytes and SHA256 pinned/checked per actor.
+
+The test passively wraps original Canvas2D drawImage for original full-floor background blits, times the original call, and retains the last 600 callback timestamps and costs. No output pixel or game clock change. Reports callback frame intervals p50/p95 and specific original layer-blit cost p50/p95; neither represents full-frame GPU-present time or all scene rendering work. The native URL now enables existing read-only netstats=1 display and collects actual Extra render lag p50/p95, bounded catch-up count, and source sample count. This is presentation render-gap debt; NOT the server tick, authoritative delay, packet ingress time or GPU present.
+
+The strict native checker verifies all six original full Canvas PNGs and all six W3C screenshots, both runs on the same SHA, 2 and 4 Rust actor IDs, genuine engines, source Silver draws, original grid, frame/draw distributions and actual source presentation-gap samples. It fails closed if the diagnostics display is missing. The read-only diagnostics opt-in is native-QA-only, not a public default.
+
+## What still needs separate acceptance
+
+The original Roll motion is now independently exercised with a genuine W3C wheel scroll (deltaY=-120) over the visible first-party Canvas. It requires at least three additional original `silver_roll.webp` drawImage calls compared to the pre-gesture baseline, separately in each 2-player and 4-player Rust session. The Roll source atlas deliberately remains unrelit and unmodified. A 2D browser observer does not by itself verify Rust action input timing, 350ms roll duration fidelity, live multi-host responsiveness or all five art motions.
+
+The native source-animation probe additionally sends a genuine first-party W3C `Space` keyDown/pause/keyUp after locomotion settles. It requires at least three new original `silver_jump_relit.webp` drawImage calls **above the pre-gesture count**, in both separately started Rust Worlds. This does not modify authority, imply source-ground shadow pixels are checked by this probe, or qualify all five clips. Grounded-shadow animation retains its independent native 3A QA.
+
+A genuine W3C KeyD keyDown/keyUp now additionally moves actor #1 with the original focused Canvas, and requires at least eight authentic Blender-source relit walk-or-sprint WebP drawImage calls; the report records the actual counts. This verifies one real browser-driven Silver locomotion animation, NOT all five clips or World input-tick causality. No injected DOM keyboard events, fake fighter packets or gameplay source changes are used.
+
+Four processes on a single CI machine are not four independently operated human hosts. Passive samples do not establish GPU compositor presentation FPS or true 60FPS. Source render-gap target debt is now read from the authentic diagnostics UI. This does not trace precise Rust snapshot TX/packet ingress times or correlate each presentation frame with a server event. Core8A/8C and 3C own separately measured transport timing. This source probe also cannot establish five exercised original motions, original light/heavy/parry/guard/knockdown telegraph contrast, actor reconnect/bfcache restore, actual 14 fully clickable controls, or one RAF with four visible bodies when some original actors are legitimately offscreen. Those remain explicit UNVERIFIED items.
+
+Main retains exact protected quality, authoritative Combat M-series, human multiplayer, SHA package, stage and release GO. This new child must independently pass native Chrome/Firefox and protected quality on its exact head. Neither the earlier #1044 green results nor any parent #1036 results qualify this QA-changed commit. Default original grid remains unchanged, no terrain/buildings promoted.
+
+## 26 October 2026 -- exact Core/Combat source reconciliation
+
+The source branch is pinned to Main 0 Draft #1036 commit `a312e857aafc4fcdc241403f98281932ebd9f56d` for the entire QA experiment. All four changes remain confined to evidence tooling, test workflow and documentation. No Combat/Core/World, controls, renderer, art or network runtime source is changed. The original 960x540 arena remains default, Greyhaven remains default-OFF. The Core/Combat PR can continue to advance independently; this Graphics child requires its own exact-head protected and real browser acceptance and does not authorize merging or deployment.
+
+## 26 October 2026 -- P0 canonical 28-green Core/Combat source port
+
+Git parent fixed to Main/Combat Draft #1036 `a312e857aafc4fcdc241403f98281932ebd9f56d`. This QA port carries the verified original 2/4 Chrome/Firefox full-Canvas source-SHA, original Silver walk/sprint/Jump and real wheel-negative Roll visual proofs from historical Graphics3C #1053 (`2dcfd20e2311ddd6153b0290c9c111565f805a6f`), which passed its native runs while protected full quality was cancelled. This new source does **not** inherit earlier runs or canonical parent green; it must independently run all required exact-child QA and core/combat checks. Zero edits to production Web, World, Rust, network, Combat, authored character/terrain textures, UI or optional environment defaults. No production artifact is released by this draft.
+
+## 26 October 2026 — original-scene performance evidence remains HOLD
+
+On the fully green earlier head `c1523082c86f537384cd6f7b530187d4c147a5bb`, genuine original two-player Chrome had **442ms p95 source presentation render-gap debt**, and a four-seat Firefox actor recorded **39ms callback-frame p95**. The original background blit p95 was only ~0.1–1ms. Neither browser callback timing nor source render-gap debt is GPU-present FPS. Green visual provenance is not proof of performance readiness.
+
+The test now emits a separate machine-readable `GRAPHICS3C_PERFORMANCE_RELEASE_HOLD` for every 2/4-player source browser whose frame-callback p95 or source render-gap p95 is **above 33ms** (same observation threshold shown in the original native netstats panel). Its strict validator independently recomputes the advisory from the genuine report. `performanceReleaseGo=false` regardless of those observed thresholds, as no GPU-present data or independent human physical hosts is collected. This evidence does not change any game source, art, runtime, release flag, World authority or protected quality gate. Further real-host and GPU tracing is required, not silently assumed.
+
+## 26 October 2026 — original network diagnostics co-sampled, not causal
+
+The existing first-party `?netstats=1` HUD already exposes input-to-ACK p50/p95, ACK jitter p95, snapshot-gap p50/p95 and input-ACK sample count alongside the source interpolation render-gap. Native QA now captures those source values **at the same inspection point** in both 2-seat and 4-seat authentic Rust/Chrome/Firefox worlds. The strict verifier independently reparses the unchanged actual HUD text and checks the report fields, treating genuine `collecting…` metrics as **null**, never zero. The `GRAPHICS3C_PERFORMANCE_RELEASE_HOLD` record includes per-actor co-samples with callback p95 and extra-render-gap p95 for Core8A/8C investigation.
+
+These metrics come from **different bounded source windows**, updated on different cadences. They are not frame-by-frame aligned and do not prove snapshot starvation, network causation or GPU slowdown. The source still needs timestamped, independent WAN host and GPU-present evidence before performance release acceptance. No network, rendering, authority, controls, or other production code was touched.
+
+## 26 October 2026 — bounded original-CANVAS network HUD chronology
+
+The native QA source observer now attaches a **read-only**, at-most-64-entry local monotonic timeline to each original actor's `Canvas2D.drawImage` background floor-blit callback. No timers or additional canvas reads are installed in the game. At most one original, unmodified `?netstats=1` HUD text receipt is sampled every 400ms (display refreshes roughly every 500ms), with a local `performance.now()` timestamp and original frame sample number. A strict independent checker verifies the bounded, monotonic, genuine source HUD chronology in both original separate Rust 2-seat and 4-seat worlds. JSON receipts are included with the existing SHA-pinned full Canvas screenshots, and a condensed per-session timeline summary appears in `GRAPHICS3C_PERFORMANCE_RELEASE_HOLD`.
+
+**Interpretation limit:** this only time-orders coarse browser-local rolling HUD summaries around first-party Canvas callbacks; individual snapshot events, authoritative World ticks, transport ACK ingress and GPU-present frames remain *untimestamped by this probe*. The source HUD refresh may lag an actual callback by up to one 500ms interval; every HUD field has its own rolling sampling window. Correlation suggestions from this probe cannot alone establish causality. No source app, transport, Combat, authored art, 90ms interpolation target or release gate was touched. Physical WAN machines and GPU-present profiling remain separate HARD HOLD requirements.
