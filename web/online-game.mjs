@@ -236,7 +236,7 @@ let middleBlockHeld = false;
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
-    m147InputProbe?.onLight();
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.onLight();
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
@@ -297,13 +297,13 @@ function onLeftPointerUp(event) {
   }
   if (event.button !== 0) return;
   if (reviewedGestureLab) return; // v2 capture owns physical terminal
-  m147InputProbe?.pointerUp(event);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerUp(event);
   updateMouse(event);
-  m147InputProbe?.releaseInvocation();
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.releaseInvocation();
   const committed = leftButtonCharge.release(event.pointerId);
   // Only the matching physical pointer may retire the current gesture.
   if (committed === null) return;
-  m147InputProbe?.release(committed);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.release(committed);
   leftButtonDown = false;
   leftButtonPressMovement = null;
   if (m111InputProbe && committed) {
@@ -955,7 +955,7 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
-  m147InputProbe?.sampled(currentInput, predictionStep + 1);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.sampled(currentInput, predictionStep + 1);
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
   if (predictionStep % 2 === 0 && networkClient) {
@@ -1028,7 +1028,7 @@ function simulatePrediction(stepMs) {
         m111InputProbe.submitted.shift();
       }
     }
-    m147InputProbe?.sendInput(currentInput, outgoingTick);
+    if (typeof m147InputProbe !== "undefined") m147InputProbe?.sendInput(currentInput, outgoingTick);
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
@@ -2080,7 +2080,7 @@ function createArenaLayer() {
 
 function frame(now) {
   if (document.hidden) return;
-  m147InputProbe?.raf(now);
+  if (typeof m147InputProbe !== "undefined") m147InputProbe?.raf(now);
   frameBudget.advance(now, simulatePrediction);
   updateChargeHud();
   const impact = combatImpact.sample(now);
