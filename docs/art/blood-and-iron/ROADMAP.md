@@ -28,7 +28,7 @@
 
 ## G2 — Authoritative multiplayer presentation (BLOCKED)
 
-**Entry:** G1 accepted, Combat4C/Core8A/8C approve versioned event/actor lifecycle and explicit Main authorization.
+**Entry:** G1 accepted, Combat4 (unified engineering)/Core8A/8C approve versioned event/actor lifecycle and explicit Main authorization.
 
 **Future scope:** real Rust/WebTransport 2-player then four-player Chrome/Firefox; server-confirmed lethal only, idempotent per event/actor, late/reordered/duplicate detection, respawn/new actor generation clearing, reconnect consistency, Off/Reduced/Full settings, damage/HP parity, no packet/input interference.
 
@@ -58,7 +58,7 @@
 | 3A — Characters & Animation | Audit original 22-bone Silver source, 8-way body/head part feasibility | Authored head/limb/body death exports after approval; keep five P0 motions pristine |
 | 3B — Buildings & Architecture | Study decals on stone/wood/dirt/grass and roof/facade occlusion | Surface material masks/placement agreement only; do not alter approved buildings |
 | 3C — Environment & Atmosphere | Design bounded blood droplets, pool/decal lifecycle, cache/culling and perf benchmark | Cosmetic effect rendering, no new server physics |
-| Combat 4C — Mechanics/Authority integration | Decide potential authoritative lethal-event eligibility without new rule change | Server eligibility and input/gameplay changes only through separate approval |
+| Combat 4 — Unified Combat engineering | Decide potential authoritative lethal-event eligibility without new rule change | Server eligibility and input/gameplay changes only through separate approval |
 | Combat 4D — Independent QA | Design readability, hit/HP/death parity and browser scenarios | Independent no-regression and human visual acceptance |
 | Core 8A/8C — Networking/World | Review proposed event version/id/order/reconnect/spawn-epoch and cost | Own any future wire protocol/replication; no assumed current event |
 | Physics 6 | Review local cosmetic ground fall/part depth | No second authoritative physics |
@@ -78,6 +78,6 @@
 
 ## Immediate next action
 
-Graphics Orchestrator 3 presents the **single G0 Draft PR** to Main0, Combat4C/4D, Core8A/8C, Graphics3A/3B/3C and UI10 for **planning review only**. Record architectural decisions on parent #1065. Do not spawn new departments or duplicative issue trees.
+Graphics Orchestrator 3 presents the **single G0 Draft PR** to Main0, Combat4 (unified engineering)/4D, Core8A/8C, Graphics3A/3B/3C and UI10 for **planning review only**. Record architectural decisions on parent #1065. Do not spawn new departments or duplicative issue trees.
 
 **Current status: G0 documents submitted for review / G1–G4 HARD HOLD / no gore gameplay or production implementation.**
