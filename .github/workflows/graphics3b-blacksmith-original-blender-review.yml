@@ -80,6 +80,18 @@ jobs:
           assert r["artistAuthoredParts"]["originalAuthoredAnvil"]
           assert r["artistAuthoredParts"]["originalAuthoredForge"]
           assert r["artistAuthoredParts"]["originalAuthoredHammerAndTongs"]
+          dusk=r["actualDoorGlassDuskAndOriginalChimneySmoke"]
+          assert dusk["realBlenderSourceOnly"] and dusk["originalGameUnaffected"]
+          assert dusk["door"]["actualSourceModel"]=="Door_1_Round"
+          assert dusk["door"]["realOriginalGlassPolygons"]>0
+          assert dusk["door"]["realOriginalGlassMaterialSlots"]>0
+          assert dusk["door"]["originalDayMaterialRestored"]
+          assert dusk["door"]["duskOnlyWarmAmber"] and not dusk["door"]["syntheticGlassOverlay"]
+          assert dusk["smoke"]["sourceModel"]=="Prop_Chimney"
+          assert dusk["smoke"]["nativeCyclesVolumetricObjects"]==8
+          assert dusk["smoke"]["actual4DNoiseDensity"] and dusk["smoke"]["duskOnly"]
+          assert dusk["smoke"]["originalChimneyMeshUnchanged"]
+          assert not dusk["smoke"]["gameEmitterChanged"]
           assert r["artistAuthoredParts"]["anvilForgeCenterDistanceMeters"]<=2.2
           fixes=r["ownerRequestedBlenderGeometryFix"]
           assert fixes["authenticDoorMeshCount"]>0

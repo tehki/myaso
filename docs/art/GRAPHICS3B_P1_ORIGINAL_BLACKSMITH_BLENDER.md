@@ -42,3 +42,15 @@ The new **editable native Blender scene** uses the same original pinned CC0 Stan
 **Fail-closed actual Blender geometry audit:** compute evaluated *world-coordinate bounding boxes* from genuine imported glTF roof/crate and actual authored forge/hammer/bench objects after parent transforms. Require roof–forge horizontal AABB clearance ≥0.16m and crate–tool/bench clearance ≥0.10m. Verify original roof Z envelope contains both full-height gable tips, authentic door/shutter imported meshes are nonempty and same-run real window glass material slots exist. Record actual numeric clearances and world bounds in the archived source report, then run genuine Blender day+dusk RGBA, real W3C Chrome/Firefox canvas readback and screenshot acceptance. Geometry tests do not replace owner visual judgement.
 
 **Runtime remains prohibited:** no `src/`, `web/`, `server/`, `assets/world/`, Rust/Combat changes, no World9 `smith` replacement authorization, no doors/portals/item pickup/collision contract, no merge/deploy. Source-derived 3D geometry is not a real network authority test.
+
+## Original Blender dusk refinement — real door glazing and chimney smoke
+
+On the authorized Windows Machine, Blender **4.5.14 LTS** imported the original 15 pinned CC0 Standard Quaternius modules and generated a new **editable .blend**, authentic day/dusk 640 × 640 RGBA images and source proof JSON from the committed scene generator.
+
+- Genuine `Door_1_Round.gltf` contains **48 actual glass polygon vertices** using `MI_WindowGlass`. Scene-local material copies set a warm amber emissive Principled material on the door's original polygons in dusk only, restoring the exact original source PBR material in daylight. The point light is placed from measured world-space door-glass bounds, not from an invented overlay.
+- Procedural volumetric chimney smoke is anchored to the **actual imported** `Prop_Chimney.gltf` mesh top. Its recorded top is **z=7.2278757 m** at approximately **(x=1.1728893,y=0.72)** in local Blender scene units. Eight tapered 3D wisps use real Cycles Volume Principled shaders with 4D density noise, gradual drift and soft dusk-only scattering light; no game particle emitter is added.
+- Existing actual imported roof–forge clearance remains **0.37843 m**, creator crate–hammer **0.94836 m**, crate–workbench **0.51144 m**, with real closed gables and no source mesh modifications.
+- Source scene is authoritative only as **Blender artwork**; it does not grant World9 `smith` integration, real doors/portals, game runtime smoke, Combat, or server authority. Owner visual approval remains outstanding.
+- Native source CI now fails closed if authentic door glass or authored smoke evidence is missing. The original complete game quality gate remains mandatory.
+
+This revision is **not an image-generation mockup** and was built with the actual Blender executable through Remote Desktop Commander. No merge, deployment, or runtime activation has occurred.

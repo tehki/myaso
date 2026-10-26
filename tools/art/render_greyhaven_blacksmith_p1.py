@@ -255,6 +255,143 @@ def make_original_glass_visible(original):
     return replacements, lamp
 
 
+
+def author_door_glass_glow(original):
+    """Illuminate ACTUAL glass polygons inside genuine Door_1_Round.gltf at dusk."""
+    meshes = original.get("Door_1_Round", [])
+    if not meshes:
+        raise ValueError("Missing genuine Quaternius original wooden door")
+    switches, vertices = [], []
+    bpy.context.view_layer.update()
+    for obj in meshes:
+        obj.data = obj.data.copy()
+        for poly in obj.data.polygons:
+            mat = obj.data.materials[poly.material_index]
+            if mat and mat.name.startswith("MI_WindowGlass"):
+                vertices.extend(obj.matrix_world @ obj.data.vertices[i].co
+                                for i in poly.vertices)
+        for slot, old_mat in enumerate(obj.data.materials):
+            if not old_mat or not old_mat.name.startswith("MI_WindowGlass"):
+                continue
+            new_mat = old_mat.copy()
+            new_mat.name = "Smith_GenuineDoorGlass_WarmDusk_ArtOnly"
+            if not new_mat.use_nodes:
+                raise ValueError("Real door glass material has no PBR nodes")
+            bsdf = next((n for n in new_mat.node_tree.nodes
+                         if n.type == "BSDF_PRINCIPLED"), None)
+            if bsdf is None:
+                raise ValueError("Real door source glass has no Principled BSDF")
+            for key, value in [
+                ("Base Color", (.95, .44, .12, 1.)),
+                ("Emission Color", (1., .36, .075, 1.)),
+                ("Emission Strength", 2.0),
+                ("Alpha", 1.)]:
+                socket = bsdf.inputs.get(key)
+                if socket is None:
+                    raise ValueError("Blender source door missing PBR socket: " + key)
+                for link in list(socket.links):
+                    new_mat.node_tree.links.remove(link)
+                socket.default_value = value
+            switches.append((obj, slot, old_mat, new_mat))
+    if not switches or not vertices:
+        raise ValueError("AUTHENTIC Door_1_Round glass polygon/material missing; no fake door light")
+    bounds = {key: [min(v[i] for v in vertices), max(v[i] for v in vertices)]
+              for i, key in enumerate(("x", "y", "z"))}
+    center = [sum(bounds[k])/2 for k in ("x","y","z")]
+    data = bpy.data.lights.new("Smith_Door_AuthenticPaneWarmLight_DuskOnly", "POINT")
+    data.energy = 0.
+    data.color = (1., .44, .13)
+    data.shadow_soft_size = .35
+    lamp = bpy.data.objects.new(data.name, data)
+    bpy.context.scene.collection.objects.link(lamp)
+    lamp.location = (center[0], center[1]+.10, center[2])
+    return switches, lamp, {
+        "actualSourceModel": "Door_1_Round",
+        "realOriginalGlassPolygons": len(vertices),
+        "realOriginalGlassMaterialSlots": len(switches),
+        "measuredOriginalGlassBounds": bounds,
+        "originalDayMaterialRestored": True, "duskOnlyWarmAmber": True,
+        "syntheticGlassOverlay": False
+    }
+
+
+def author_chimney_smoke(original):
+    """Scene-only irregular native Cycles volume attached to ACTUAL roof chimney."""
+    chimney = original.get("Prop_Chimney", [])
+    if not chimney:
+        raise ValueError("No genuine original Quaternius roof chimney for smoke")
+    b = mesh_world_bounds(chimney)
+    x = (b["x"][0]+b["x"][1])/2
+    y = (b["y"][0]+b["y"][1])/2
+    z = b["z"][1]
+    if not (3.8 < z < 9.0):
+        raise ValueError("Original source chimney top cannot anchor physical smoke")
+    mat = bpy.data.materials.new("Smith_ActualChimney_SoftGreyNoiseVolume_DuskOnly")
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+    output = nodes.new("ShaderNodeOutputMaterial")
+    volume = nodes.new("ShaderNodeVolumePrincipled")
+    volume.inputs["Color"].default_value = (.78, .76, .73, 1.)
+    volume.inputs["Emission Strength"].default_value = .075
+    volume.inputs["Emission Color"].default_value = (.68, .70, .73, 1.)
+    volume.inputs["Anisotropy"].default_value = .12
+    tex = nodes.new("ShaderNodeTexCoord")
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.noise_dimensions = "4D"
+    noise.inputs["Scale"].default_value = 3.65
+    noise.inputs["Detail"].default_value = 3.0
+    noise.inputs["Roughness"].default_value = .68
+    info = nodes.new("ShaderNodeObjectInfo")
+    multiplier = nodes.new("ShaderNodeMath")
+    multiplier.operation = "MULTIPLY"
+    multiplier.inputs[1].default_value = 5.0
+    ramp = nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = .33
+    ramp.color_ramp.elements[0].color = (0.,0.,0.,1.)
+    ramp.color_ramp.elements[1].position = .70
+    ramp.color_ramp.elements[1].color = (.16,.16,.16,1.)
+    edges = mat.node_tree.links
+    edges.new(tex.outputs["Generated"], noise.inputs["Vector"])
+    edges.new(info.outputs["Random"], multiplier.inputs[0])
+    edges.new(multiplier.outputs[0], noise.inputs["W"])
+    edges.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+    edges.new(ramp.outputs["Color"], volume.inputs["Density"])
+    edges.new(volume.outputs["Volume"], output.inputs["Volume"])
+    puffs = []
+    # Thin near chimney, broader, drifting above: not opaque stacked spheres.
+    for i in range(8):
+        height = .13+.33*i
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.,
+            location=(x+.085*i, y+.040*i, z+height))
+        puff = bpy.context.object
+        puff.name = "Smith_RoofChimney_ActualCyclesNoiseSmoke_DuskOnly_%d" % i
+        puff.scale = (.15+.042*i, .18+.044*i, .28+.057*i)
+        puff.data.materials.append(mat)
+        puff.hide_render = True
+        puffs.append(puff)
+    # Physically light the scattering wisps, instead of making a flat white
+    # billboard or opaque black ball against the transparent film.
+    smoke_fill = bpy.data.lights.new("Smith_Smoke_LowEnergySkyScatter_DuskOnly", "POINT")
+    smoke_fill.energy = 0.
+    smoke_fill.color = (.85, .85, .91)
+    smoke_fill.shadow_soft_size = 1.1
+    smoke_lamp = bpy.data.objects.new(smoke_fill.name, smoke_fill)
+    bpy.context.scene.collection.objects.link(smoke_lamp)
+    smoke_lamp.location = (x+.30, y-.22, z+1.32)
+    return puffs, {
+        "sourceModel": "Prop_Chimney",
+        "measuredSourceChimneyBounds": b,
+        "actualSourceChimneyTopZ": z,
+        "actualSourceChimneyCenterXY": [x,y],
+        "nativeCyclesVolumetricObjects": len(puffs),
+        "actual4DNoiseDensity": True,
+        "maxVolumeDensity": .16,
+        "duskOnly": True,
+        "gameEmitterChanged": False,
+        "originalChimneyMeshUnchanged": True
+    }, smoke_lamp
+
 def forge_and_tools(cfg):
     if cfg.get("excludeItemsAndEquipmentAuthority") is not True or cfg.get("fireCosmeticOnly") is not True:
         raise ValueError("Blacksmith asset may never grant equipment, swords or gameplay fire")
@@ -441,6 +578,9 @@ def run():
         raise ValueError("Actual imported wooden door and open window shutters required")
     gable_report = repair_gables(correction["gables"], original)
     glass_switches, window_lamp = make_original_glass_visible(original)
+    door_glass_switches, door_lamp, real_door_report = author_door_glass_glow(original)
+    glass_switches.extend(door_glass_switches)
+    smoke_objects, smoke_report, smoke_lamp = author_chimney_smoke(original)
     authored, furnace = forge_and_tools(cfg["authoredDetails"])
     intersection_report = audit_artist_intersections(original, correction)
     print("GRAPHICS3B_BLACKSMITH_ACTUAL_3D_CLEARANCE_PASS " +
@@ -452,11 +592,12 @@ def run():
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
-    scene.cycles.samples = 24
+    scene.cycles.samples = 64
+    denoiser_available = bool(getattr(bpy.app.build_options, "openimagedenoise", False))
     if hasattr(scene.cycles, "use_denoising"):
-        scene.cycles.use_denoising = False
+        scene.cycles.use_denoising = denoiser_available
     if hasattr(bpy.context.view_layer.cycles, "use_denoising"):
-        bpy.context.view_layer.cycles.use_denoising = False
+        bpy.context.view_layer.cycles.use_denoising = denoiser_available
     scene.render.resolution_x = 640
     scene.render.resolution_y = 640
     scene.render.resolution_percentage = 100
@@ -488,6 +629,10 @@ def run():
         for obj, slot, original_material, lit_material in glass_switches:
             obj.data.materials[slot] = lit_material if is_dusk else original_material
         window_lamp.data.energy = 42 if is_dusk else 0.
+        door_lamp.data.energy = 28 if is_dusk else 0.
+        smoke_lamp.data.energy = 48 if is_dusk else 0.
+        for puff in smoke_objects:
+            puff.hide_render = not is_dusk
         key.data.energy = 1100 if mood == "day" else 330
         fill.data.energy = 440 if mood == "day" else 175
         furnace.data.energy = 115 if mood == "day" else 245
@@ -514,6 +659,10 @@ def run():
               "realImportedVertexCount": sum(g["vertices"] for g in genuine),
               "genuineOriginalGlTF": genuine,
               "artistAuthoredParts": authored,
+              "actualDoorGlassDuskAndOriginalChimneySmoke": {
+                  "door": real_door_report, "smoke": smoke_report,
+                  "realBlenderSourceOnly": True,
+                  "originalGameUnaffected": True},
               "ownerRequestedBlenderGeometryFix": {
                   "realGables": gable_report,
                   "actualCollisionFreeGeometry": intersection_report,
