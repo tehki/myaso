@@ -22,20 +22,38 @@ export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId
     eventCount:state.events.length, latestText };
 }
 
-export async function dispatchM41ObservedParry({ sendAttack, awaitWorldCue, sendWheel }) {
-  if (![sendAttack,awaitWorldCue,sendWheel].every(fn=>typeof fn === "function")) {
-    throw new TypeError("M41 requires native click, observed World cue and native wheel callbacks");
+export async function dispatchM41ObservedParry({
+  sendAttack, awaitWorldCue, sendWheel, now = () => Date.now(),
+}) {
+  if (![sendAttack, awaitWorldCue, sendWheel, now].every(fn => typeof fn === "function")) {
+    throw new TypeError("M41 requires native click, observed World cue, wheel and clock callbacks");
   }
+  // Read-only host chronology. Neither these timestamps nor native ACKs
+  // authorize Block/Parry: only authentic original World contact qualifies.
+  // Preserve native click/wheel issue order, both ACKs, and the cue gate.
+  const chronology = {
+    attackIssuedEpochMs: now(), cueResolvedEpochMs: null,
+    wheelIssuedEpochMs: null, wheelAckEpochMs: null,
+    attackAckEpochMs: null,
+  };
   const attack = (async () => {
-    try { await sendAttack(); return {ok:true}; }
-    catch (error) { return {ok:false,error}; }
+    try {
+      await sendAttack();
+      chronology.attackAckEpochMs = now();
+      return {ok:true};
+    } catch (error) { chronology.attackAckEpochMs = now(); return {ok:false,error}; }
   })();
   let cue, wheel = {ok:true}, observationError;
   try {
     cue = await awaitWorldCue();
     if (!cue) throw new Error("M41 missing fresh actor-bound World cue; no native wheel allowed");
-    wheel = await Promise.resolve().then(sendWheel).then(
-      () => ({ok:true}), error => ({ok:false,error}));
+    chronology.cueResolvedEpochMs = now();
+    wheel = await Promise.resolve().then(() => {
+      chronology.wheelIssuedEpochMs = now();
+      return sendWheel();
+    }).then(
+      () => { chronology.wheelAckEpochMs = now(); return {ok:true}; },
+      error => { chronology.wheelAckEpochMs = now(); return {ok:false,error}; });
   } catch (error) { observationError = error; }
   // Even absent/invalid cues and failed wheels cannot hide a driver failure
   // or abandon the real click while its physical button is still held.
@@ -43,7 +61,7 @@ export async function dispatchM41ObservedParry({ sendAttack, awaitWorldCue, send
   const errors = [observationError, !attackResult.ok && attackResult.error, !wheel.ok && wheel.error].filter(Boolean);
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) throw new AggregateError(errors,"M41 native click, cue or wheel failed");
-  return {cue, nativeClickAck:true, nativeWheelAck:true};
+  return {cue, nativeClickAck:true, nativeWheelAck:true, chronology};
 }
 
 // Native QA only: observe the identical production World cue inside its OWN

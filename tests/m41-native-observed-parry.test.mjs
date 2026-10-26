@@ -53,3 +53,42 @@ test("failed native wheel still awaits click completion; no duplicate native com
   await tick();assert.equal(wheels,1);
   const rejected=assert.rejects(flight,/native wheel failed/);attack.resolve();await rejected;
 });
+
+test("original M41 cue-to-wheel host chronology is read-only and never gates a native parry", async () => {
+  const attack = deferred(), wheel = deferred(), seen = [];
+  let epoch = 1793015340300;
+  const now = () => { epoch += 7; return epoch; };
+  const flight = dispatchM41ObservedParry({
+    now,
+    sendAttack: () => { seen.push("real-click"); return attack.promise; },
+    awaitWorldCue: () => { seen.push("actor-cue"); return readM41ScalarWorldCue(state, 0, 1); },
+    sendWheel: () => { seen.push("real-wheel"); return wheel.promise; },
+  });
+  await tick();
+  assert.deepEqual(seen, ["real-click", "actor-cue", "real-wheel"]);
+  wheel.resolve(); await tick();
+  assert.equal(await Promise.race([flight.then(() => "done"), tick().then(() => "waiting")]), "waiting");
+  attack.resolve();
+  const result = await flight;
+  assert.deepEqual(seen, ["real-click", "actor-cue", "real-wheel"],
+    "no additional input source or second wheel");
+  const t = result.chronology;
+  assert.ok(t.attackIssuedEpochMs < t.cueResolvedEpochMs);
+  assert.ok(t.cueResolvedEpochMs < t.wheelIssuedEpochMs);
+  assert.ok(t.wheelIssuedEpochMs < t.wheelAckEpochMs);
+  assert.ok(t.wheelIssuedEpochMs < t.attackAckEpochMs,
+    "wheel dispatch does not wait for the click ACK");
+  assert.equal(result.nativeWheelAck, true);
+  assert.equal(result.nativeClickAck, true);
+});
+
+test("no fresh M41 actor cue means no wheel despite chronology instrumentation", async () => {
+  let wheels = 0;
+  await assert.rejects(dispatchM41ObservedParry({
+    now: () => 100,
+    sendAttack: async () => {},
+    awaitWorldCue: async () => null,
+    sendWheel: () => { wheels++; },
+  }), /missing fresh actor-bound World cue/);
+  assert.equal(wheels, 0);
+});
