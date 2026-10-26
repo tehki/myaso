@@ -15,6 +15,7 @@ from graphics3a_p1_neck_surface_qc import collar_surface_proximity
 from graphics3a_p1_head_plane_clip import clip_skinned_mesh_y
 from graphics3a_p1_skin_paint_ab import (NEUTRAL_MIN_RGB_MEAN, NEUTRAL_MAX_RGB_MEAN, NEUTRAL_MAX_CHANNEL_SPAN, skin_sample_is_valid, skin_reference_uv)
 from graphics3a_p1_hood_review_rules import (approved_hood_member, verified_hood_bind_anchors)
+from graphics3a_p1_hood_motion_rules import collar_follow_center
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
@@ -302,9 +303,12 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  print('COMBINED_BOUNDS',lo.tolist(),hi.tolist(),'height',h,'head_top',float(max(v[:,1].max() for v in verts[len(target_parts(target,tbuf,target_path)): ])),flush=True)
  def look_at(eye,aim):
   up=np.array([0.,1.,0.]);z=eye-aim;z/=np.linalg.norm(z);x=np.cross(up,z);x/=np.linalg.norm(x);y=np.cross(z,x);m=np.eye(4);m[:3,:3]=np.stack((x,y,z),axis=1);m[:3,3]=eye;return m
- if camera_mode not in ('full-body','collar-closeup'):
+ if camera_mode not in ('full-body','collar-closeup','animated-neck-closeup'):
   raise ValueError("Unrecognized review camera mode")
- closeup=(camera_mode=='collar-closeup')
+ closeup=(camera_mode!='full-body')
+ follow_neck=(camera_mode=='animated-neck-closeup')
+ neck_index=joint_map(target)['neck_01'] if follow_neck else None
+ rest_neck_y=float(target_world[neck_index][1,3]) if follow_neck else None
  view_size=512 if closeup else 256
  view_center=center.copy()
  if closeup: view_center[1]=cut_y+.05
@@ -332,9 +336,20 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
     tm=trimesh.Trimesh(vertices=skinned,faces=part['faces'],vertex_normals=normals,
       visual=trimesh.visual.texture.TextureVisuals(uv=part['uv']),process=False)
     scene.add(pyrender.Mesh.from_trimesh(tm,material=part['material'],smooth=True),pose=turn@worlds[part['node']])
-   scene.add(cam,pose=cp)
-   scene.add(pyrender.DirectionalLight(color=np.ones(3),intensity=2.5),pose=look_at(center+np.array([3.,5.,4.]),center))
-   scene.add(pyrender.DirectionalLight(color=np.array([.65,.75,1.]),intensity=1.),pose=look_at(center+np.array([-3.,2.,-2.]),center))
+   # A Roll moves the actual head far below the rest collar and fixed camera.
+   # Opt-in camera follows the posed, rotated source neck for each view.
+   # Existing default and fixed-camera modes remain visually unchanged.
+   scene_camera_pose=cp
+   lighting_center=center
+   if follow_neck:
+    posed_neck=turn@np.r_[worlds[neck_index][:3,3],1.]
+    camera_center=np.asarray(collar_follow_center(
+     posed_neck[:3].tolist(),rest_neck_y,cut_y),dtype=float)
+    scene_camera_pose=look_at(camera_center+np.array([0.,.02,max(h*2.8,3.5)]),camera_center)
+    lighting_center=camera_center
+   scene.add(cam,pose=scene_camera_pose)
+   scene.add(pyrender.DirectionalLight(color=np.ones(3),intensity=2.5),pose=look_at(lighting_center+np.array([3.,5.,4.]),lighting_center))
+   scene.add(pyrender.DirectionalLight(color=np.array([.65,.75,1.]),intensity=1.),pose=look_at(lighting_center+np.array([-3.,2.,-2.]),lighting_center))
    rgba,_=renderer.render(scene,flags=pyrender.RenderFlags.RGBA)
    if int((rgba[:,:,3]>127).sum())<500:raise ValueError('Blank composite')
    im=Image.fromarray(rgba,'RGBA');im.save(output/f'facing_{direction*45:03d}.png');sheet.paste(im,(direction*view_size,0),im)
@@ -353,6 +368,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'contact_sheet_sha256':sha256(sheet_path.read_bytes()),
          'view_count':8,
          'camera_mode':camera_mode,
+         'camera_tracks_animated_neck':follow_neck,
          'head_cut_method':cut_method,
          'head_face_component_mode':face_parts,
          'body_atlas_variant':body_atlas,
@@ -378,7 +394,7 @@ def main():
  p.add_argument('--clip',default='Walk_Loop')
  p.add_argument('--fraction',type=float,default=0.5)
  p.add_argument('--head-cut-y',type=float,default=None)
- p.add_argument('--camera-mode',choices=('full-body','collar-closeup'),default='full-body')
+ p.add_argument('--camera-mode',choices=('full-body','collar-closeup','animated-neck-closeup'),default='full-body')
  p.add_argument('--cut-method',choices=('centroid','plane'),default='centroid')
  p.add_argument('--face-parts',choices=('all','without-eyebrows','head-only'),default='all')
  p.add_argument('--body-atlas',choices=('original','publisher-light'),default='original')
