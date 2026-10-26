@@ -82,7 +82,8 @@ export const COMBAT = Object.freeze({
   jumpAttack: Object.freeze({
     windupMs: 105,
     activeMs: 105,
-    recoveryMs: 290,
+    // Match the authoritative Rust World's 450ms punishable recovery.
+    recoveryMs: 450,
     reach: 48,
     arcRadians: Math.PI * 0.24,
     damage: 42,

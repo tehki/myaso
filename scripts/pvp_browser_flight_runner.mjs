@@ -4230,9 +4230,9 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   const defenderBeforePunish = await readUiEvidence(defender);
   const punishPointerOffset = defenderBeforePunish.pointers.length;
   // Fire a genuine LMB as soon as the remote recovery cue becomes visible.
-  // M140 proves the player's commitment starts inside the unchanged 290 ms
-  // recovery window. The unchanged 135 ms light windup may finish after that
-  // recovery ends; changing its timing would be a balance change, not a proof.
+  // M140 proves the player's commitment starts inside the owner-approved
+  // 450ms jump-attack recovery window. The original 135ms light windup and
+  // authoritative hit/phase checks remain unchanged.
   await performArenaAttackHold(defender, defenderElementId, punishOffset, 90);
 
   let evidence = null;
@@ -11310,7 +11310,7 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   const observerRecoveryOffset = observerBefore.recoveryTransitions.length;
 
   // Turn #1 180 degrees away from the observer and commit a genuine Space+LMB
-  // jump attack. It must whiff cleanly, yet its authoritative 290 ms recovery
+  // jump attack. It must whiff cleanly, yet its authoritative 450ms recovery
   // must temporarily outrank the closer idle #3 in the HUD focus.
   // M337: M143's old single-W3C-chord included an extra pointerMove tick;
   // exact-head CI #39420078938 measured real Space -> LMB = 67ms, violating

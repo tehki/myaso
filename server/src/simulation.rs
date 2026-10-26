@@ -75,7 +75,8 @@ const JUMP_STAMINA_COST: f32 = 14.0;
 const JUMP_MOVE_MULTIPLIER: f32 = 1.08;
 const JUMP_ATTACK_WINDUP_MS: f32 = 105.0;
 const JUMP_ATTACK_ACTIVE_MS: f32 = 105.0;
-const JUMP_ATTACK_RECOVERY_MS: f32 = 290.0;
+// Owner-approved 450ms punishable jump-attack recovery (2026-10-26).
+const JUMP_ATTACK_RECOVERY_MS: f32 = 450.0;
 const JUMP_ATTACK_REACH: f32 = 48.0;
 const JUMP_ATTACK_ARC_RADIANS: f32 = std::f32::consts::PI * 0.24;
 const JUMP_ATTACK_DAMAGE: f32 = 42.0;

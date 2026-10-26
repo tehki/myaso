@@ -93,6 +93,16 @@ fn actual_punisher_hit_at(target_tick: u32) -> Evidence {
 }
 
 #[test]
+fn m147_owner_approved_jump_recovery_is_450_ms_at_original_60_hz() {
+    let baseline = actual_original_world(None);
+    assert_eq!(
+        baseline.recovery_exit - baseline.recovery_enter,
+        27,
+        "owner-approved 450ms jump recovery must last 27 ticks at original 60Hz"
+    );
+}
+
+#[test]
 fn m147_authentic_light_hit_one_world_tick_before_recovery_exit_is_in_recovery() {
     let baseline = actual_original_world(None);
     assert_eq!(baseline.hit_tick, None);
