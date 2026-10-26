@@ -398,6 +398,16 @@ async fn main() -> Result<()> {
     if flight_m121_input_proof && (!bind.ip().is_loopback() || !flight_action_proof || v2_lab) {
         bail!("M121 original-v1 ingress proof requires loopback, flight action proof and v2 OFF");
     }
+    // M41: an opt-in, loopback-only, read-only trace of *accepted* original
+    // v1 Block edges. Never treat WebDriver ACK as authenticated admission.
+    let flight_m41_input_proof = match env::var("MYASO_FLIGHT_M41_INPUT_PROOF").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(_) => false,
+        Ok(_) => bail!("MYASO_FLIGHT_M41_INPUT_PROOF must be 0 or 1"),
+    };
+    if flight_m41_input_proof && (!bind.ip().is_loopback() || !flight_action_proof || v2_lab) {
+        bail!("M41 original-v1 ingress proof requires loopback, flight action proof and v2 OFF");
+    }
     tokio::spawn(run_authoritative_clock(
         Arc::clone(&game),
         flight_action_proof,
@@ -465,7 +475,10 @@ async fn main() -> Result<()> {
                 lease_epoch,
                 v2_lab,
                 flight_action_proof,
-                flight_m121_input_proof,
+                FlightV1InputProofs {
+                    m121: flight_m121_input_proof,
+                    m41: flight_m41_input_proof,
+                },
                 Arc::clone(&game),
             )
             .await;
@@ -807,13 +820,21 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
     }
 }
 
+// Group only optional diagnostic flags. Production session, lease and
+// original v1 writer remain unchanged; no new input authorization is added.
+#[derive(Clone, Copy)]
+struct FlightV1InputProofs {
+    m121: bool,
+    m41: bool,
+}
+
 async fn handle_connection(
     connection: Connection,
     player_id: u32,
     lease_epoch: u64,
     v2_lab: bool,
     flight_action_proof: bool,
-    flight_m121_input_proof: bool,
+    flight_v1_proofs: FlightV1InputProofs,
     game: Arc<SharedGame>,
 ) -> Result<()> {
     let connection = Arc::new(connection);
@@ -827,6 +848,8 @@ async fn handle_connection(
     let mut snapshots = SnapshotSession::default();
     let mut reliable_snapshots = SnapshotSession::default();
     let mut last_input_sequence = None;
+    // One *accepted* rising Block per physical wheel pulse; bound log volume.
+    let mut m41_last_accepted_block = false;
     let mut dropped_action_ticks = VecDeque::with_capacity(MAX_DROPPED_ACTION_TICKS);
     // One bounded diagnostic window per original QUIC session. The impairment
     // fixture is loopback-only and OFF in the normal server configuration.
@@ -1207,11 +1230,33 @@ async fn handle_connection(
                         }
                     }
                 }
+                // M41: one read-only rising authenticated Block transition,
+                // after the ORIGINAL ingress dedup/coalescer (not merely decode).
+                // Repeated 60Hz Block frames must not swamp CI log evidence.
+                let m41_block_rising = flight_v1_proofs.m41
+                    && player_id <= 3
+                    && m41_original_admitted_block_rising(
+                        &mut m41_last_accepted_block,
+                        coalesced.as_ref(),
+                    );
+                let m41_accepted = if m41_block_rising {
+                    accepted.iter().map(|s| format!("{}:{}", s.tick, u8::from(s.block)))
+                        .collect::<Vec<_>>().join(",")
+                } else {
+                    String::new()
+                };
+                let m41_coalesced = if m41_block_rising {
+                    coalesced.as_ref().map(|(tick, intent)| {
+                        format!("{tick}:{}", u8::from(intent.block))
+                    }).unwrap_or_else(|| "none".to_owned())
+                } else {
+                    String::new()
+                };
                 // M121: preserve actual accepted v1 samples and post-set-input
                 // World state under one original authoritative lock. A client
                 // send, a decoded QUIC datagram, an ingress-accepted sample
                 // and a World action are four different proofs.
-                let prove_m121 = flight_m121_input_proof && player_id <= 3
+                let prove_m121 = flight_v1_proofs.m121 && player_id <= 3
                     && packet.samples().iter().any(|sample| {
                         sample.attack || sample.heavy_attack
                             || sample.move_x != 0.0 || sample.move_y != 0.0
@@ -1243,7 +1288,7 @@ async fn handle_connection(
                     accepted.as_slice(),
                     coalesced.as_ref(),
                 );
-                let (server_tick, m121_world) = {
+                let (server_tick, m121_world, m41_world) = {
                     let mut state = game.state.lock().await;
                     let tick = apply_coalesced_input_and_read_tick(
                         &mut state,
@@ -1265,8 +1310,21 @@ async fn handle_connection(
                     } else {
                         None
                     };
-                    (tick, probe)
+                    let m41_state = if m41_block_rising {
+                        state.world.fighter(player_id).map(|fighter| {
+                            format!("{}:{}", fighter.action.wire_code(), u8::from(fighter.input().block))
+                        })
+                    } else {
+                        None
+                    };
+                    (tick, probe, m41_state)
                 };
+                if m41_block_rising {
+                    println!(
+                        "M41_V1_BLOCK_ADMISSION actor={player_id} session={stable_id} lease={lease_epoch} packet_tick={} accepted=[{m41_accepted}] coalesced={m41_coalesced} world_tick={server_tick} world_action_input_block={}",
+                        packet.client_tick, m41_world.as_deref().unwrap_or("missing")
+                    );
+                }
                 if prove_m121 {
                     println!(
                         "M121_V1_SERVER_INPUT actor={player_id} session={stable_id} packet_tick={} accepted=[{m121_accepted}] coalesced={m121_coalesced} world_tick={server_tick} world={}",
@@ -1528,6 +1586,20 @@ fn selected_light_release_motion(
         })
 }
 
+// Read-only edge classification on genuine accepted/coalesced client state.
+// Missing/replayed/stale datagrams cannot arm an acceptance trace.
+fn m41_original_admitted_block_rising(
+    previous_block: &mut bool,
+    admitted: Option<&(u32, InputIntent)>,
+) -> bool {
+    let Some((_, intent)) = admitted else {
+        return false;
+    };
+    let rising = intent.block && !*previous_block;
+    *previous_block = intent.block;
+    rising
+}
+
 fn apply_coalesced_input_and_read_tick(
     state: &mut GameState,
     player_id: u32,
@@ -1571,6 +1643,43 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn m41_only_an_authentic_new_coalesced_block_edge_is_logged() {
+        let mut previous = false;
+        let blocked = (
+            101,
+            InputIntent {
+                block: true,
+                ..InputIntent::default()
+            },
+        );
+        let released = (104, InputIntent::default());
+
+        assert!(!m41_original_admitted_block_rising(&mut previous, None));
+        assert!(m41_original_admitted_block_rising(
+            &mut previous,
+            Some(&blocked)
+        ));
+        assert!(previous);
+        assert!(
+            !m41_original_admitted_block_rising(&mut previous, None),
+            "duplicate/stale packet may not create another accepted Block"
+        );
+        assert!(
+            !m41_original_admitted_block_rising(&mut previous, Some(&blocked)),
+            "continuous held Block is not a new gesture"
+        );
+        assert!(!m41_original_admitted_block_rising(
+            &mut previous,
+            Some(&released)
+        ));
+        assert!(!previous);
+        assert!(
+            m41_original_admitted_block_rising(&mut previous, Some(&blocked)),
+            "new genuine Block after admitted release is a new rising edge"
+        );
+    }
 
     #[test]
     fn private_hit_activation_requires_every_independent_engineering_gate() {
