@@ -87,7 +87,7 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const section = runner.slice(runner.indexOf("async function runOnlineUiGuardBreakFlight("),
     runner.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly\) \? 190 : 0/);
+  assert.match(section, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.match(section, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(section, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(section, /M193 guard-break exchange/);
@@ -172,18 +172,65 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
   assert.equal(downs, 0);
 });
 
-test("M194 and M152 wheel-first remain unchanged; M151 uses genuine release-anchored wheel", () => {
+test("M194 and M151 use native release-anchored genuine wheel; M152 remains wheel-first", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const guardOnly = runner.match(/const wheelFirstGuardOnly = (\[[\s\S]*?\])\.includes\(scenario\);/);
   assert.ok(guardOnly, "only explicit native guard-only scenarios may opt in");
-  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreak", "uiguardbreakpunishffahit"]);
+  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreakpunishffahit"]);
   assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
+  assert.match(runner, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak"/);
   assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
-  assert.match(runner, /postTrustedWheelMs: m151ReleaseAnchoredGuardOnly \? 25 : 0/);
-  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly\) \? 190 : 0/);
+  assert.match(runner, /postTrustedWheelMs: \(m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 25 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.attack.guardDamage, 38);
+});
+
+test("M194 first-red late-HIT counterexample uses physical release-anchored guard in the unchanged 125..240ms interval", async () => {
+  const trusted = deferred();
+  const wheelAck = deferred();
+  const ceiling = deferred();
+  let now = 0;
+  const events = [];
+  const flight = dispatchR2ReleaseLedShortBlock({
+    trustedWheelWaitMs:190,
+    postTrustedWheelMs:25,
+    now:()=>now,
+    sleep: ms => {
+      if (ms === 190) return ceiling.promise;
+      assert.equal(ms,25);
+      now += ms;
+      events.push("bounded-post-wheel:" + ms);
+      return Promise.resolve();
+    },
+    sendAttackDown: () => { events.push("trusted-native-down"); now = 5; },
+    sendWheel: () => { events.push("genuine-wheel"); now = 20; return wheelAck.promise; },
+    awaitTrustedWheel: () => trusted.promise,
+    sendAttackUp: () => { events.push("trusted-native-up"); now += 5; },
+  });
+  await tick();
+  assert.deepEqual(events, ["trusted-native-down", "genuine-wheel"]);
+  now = 35;
+  trusted.resolve({trusted:true,deltaY:120});
+  await tick();
+  assert.deepEqual(events, ["trusted-native-down","genuine-wheel","bounded-post-wheel:25","trusted-native-up"]);
+  let settled=false;
+  flight.then(()=>{settled=true;});
+  await tick();
+  assert.equal(settled,false,"genuine Firefox native wheel W3C ACK is still mandatory");
+  now=75;wheelAck.resolve();
+  const proof=await flight;
+  assert.equal(proof.attackUpDispatchMs,60);
+  assert.equal(proof.clickHoldMs,55);
+  assert.equal(proof.postTrustedWheelMs,25);
+  const predictedContactAgeMs=(proof.attackUpDispatchMs - proof.trustedWheelObservedMs) + COMBAT.attack.windupMs;
+  assert.equal(predictedContactAgeMs,160);
+  assert.ok(predictedContactAgeMs > COMBAT.block.parryWindowMs);
+  assert.ok(predictedContactAgeMs < COMBAT.block.shortBlockMs);
+  assert.equal(events.filter(x=>x==="trusted-native-up").length,1);
+  // Timing is a W3C orchestration projection, never fabricated World contact.
+  // Only original Rust World BLOCK/-38 guard and HP100 can qualify native CI.
 });
 
 test("M194 compound click starts once after trusted wheel and awaits both original command ACKs", async () => {

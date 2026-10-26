@@ -10135,11 +10135,15 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     // attack-first path admitted the wheel only3ticks before impact (a valid
     // parry), so share the proven real wheel-first choreography. Actual
     // trusted wheel, native driver ACK and all38guard/noHP/noPARRY gates stay.
-    // M151 failed with wheel-first block expiring before a loaded Chrome
-    // compound-click release. Keep M194 and M152 passing wheel-first unchanged;
-    // only M151 uses a true Chrome DOWN -> trusted Firefox wheel -> UP.
-    const wheelFirstGuardOnly = ["uiguardbreak", "uiguardbreakpunishffahit"].includes(scenario);
+    // Original M194 first-red: wheel-backed Block tick4902 expired at
+    // tick4917; Chrome Light HIT tick4919 while defender was Idle.
+    // Its wheel-first compound click released too late for 240ms Block.
+    // Use the already-established genuine DOWN -> trusted wheel -> UP
+    // sequence for M194, as with M151. M152 remains wheel-first.
+    // Keep fixed parry/block, original World, attestation and HP gates.
+    const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";
     const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";
+    const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";
     const m198Plan = planM198GuardBreakW3cExchange({
       parryWindowMs: COMBAT.block.parryWindowMs,
       shortBlockMs: COMBAT.block.shortBlockMs,
@@ -10195,9 +10199,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // DOWN ACK barrier (52ms physical hold on e7ce01df). Actual DOM edges,
         // wheel ACK and all guard/HP/parry gates below remain mandatory.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
-          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly) ? 190 : 0,
+          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0,
+          postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
