@@ -180,6 +180,13 @@ def add_authored_gable_infill(imported, spec):
     if (abs(wall_window["z"][1] - wall_door["z"][1]) > 0.01
             or abs(base_z - wall_window["z"][1]) > 0.15):
         raise ValueError("gable base does not meet actual imported original wall crown")
+    apex = spec.get("apexSeamClosure", {})
+    if (apex.get("originalApexZ") != 5.10 or
+            apex.get("correctedApexZ") != apex_z or
+            not 0.14 <= apex_z - apex["originalApexZ"] <= 0.20 or
+            apex.get("roofSourceMeshUntouched") is not True or
+            not 0.010 <= apex.get("shiftFrontFaceTowardCameraMeters", 0) <= 0.020):
+        raise ValueError("roof-apex dark-seam closure no longer matches approved infill")
     if (apex_z >= roof_bounds["z"][1] - 0.35 or
             x_half > max(abs(roof_bounds["x"][0]), abs(roof_bounds["x"][1]))):
         raise ValueError("gable infill not contained beneath the original source roof bounds")
@@ -210,6 +217,18 @@ def add_authored_gable_infill(imported, spec):
             raise ValueError("missing original plaster PBR socket: " + input_name)
         for link in list(socket.links):
             flat.node_tree.links.remove(link)
+    # Remove texture nodes from the scene-local material CLONE only.
+    # Those source-UV atlas nodes are not valid for this newly authored gable.
+    # Original glTF imported MI_Plaster material remains untouched.
+    for node in list(flat.node_tree.nodes):
+        if node.type == "TEX_IMAGE":
+            flat.node_tree.nodes.remove(node)
+    for socket_name, value in (("Metallic", 0.0), ("Alpha", 1.0)):
+        socket = principled.inputs.get(socket_name)
+        if socket:
+            for link in list(socket.links):
+                flat.node_tree.links.remove(link)
+            socket.default_value = value
     principled.inputs["Base Color"].default_value = tuple(uniform_wall_color)
     principled.inputs["Roughness"].default_value = 0.91
     principled.inputs["Normal"].default_value = (0.0, 0.0, 0.0)
@@ -327,6 +346,9 @@ def add_authored_gable_infill(imported, spec):
              "userRequestedPlainWall": False,
              "userRequestedMatchWeatheredLowerFacade": True,
              "roofApexStainCorrection": "extended plaster behind ridge/eave",
+             "roofApexSeamExtendedMeters": apex_z - apex["originalApexZ"],
+             "faceMovedForwardMeters": apex["shiftFrontFaceTowardCameraMeters"],
+             "sourceGableAtlasNodesDisconnected": True,
              "realBlender3DPrism": True,
              "newGableMeshName": infill.name,
              "worldVertices": [list(v) for v in verts],
