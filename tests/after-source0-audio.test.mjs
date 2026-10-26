@@ -108,7 +108,7 @@ test("source0 keyboard handler does not perform synchronous first-use WebAudio s
   const end = online.indexOf('window.addEventListener("keyup"', start);
   assert.ok(start >= 0 && end > start);
   const keyboard = online.slice(start, end);
-  assert.match(keyboard, /afterSource0Audio\?\.noteKeyboardGesture\(event\.code, event\.repeat\)/);
+  assert.match(keyboard, /afterSource0Audio\.noteKeyboardGesture\(event\.code, event\.repeat\)/);
   assert.doesNotMatch(keyboard, /audio\.unlock\(\)/);
   assert.match(online, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\);[\s\S]{0,230}afterSource0Audio\?\.afterOriginalSend\(currentInput\)/);
 });
