@@ -45,6 +45,7 @@ import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
+import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -8324,7 +8325,8 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   await Promise.all(entries.map((entry) => execute(entry.base, entry.sessionId, "document.querySelector('#arena').focus(); return document.activeElement?.id;")));
   const attackerElementId = await resolveArenaElement(attacker, "M33 attacker");
   const defenderElementId = await resolveArenaElement(defender, "M33 defender");
-  await Promise.all(entries.map(centerArenaInViewport));
+  const visibleArenas = await Promise.all(entries.map(centerArenaInViewport));
+  const defenderViewport = visibleArenas[entries.indexOf(defender)];
   await aimArena(defender, defenderElementId, attackRight ? -200 : 200);
   // Calibration is performed in the genuine browser prior to combat,
   // while neither fighter is attacking. Reset observer records afterward so
@@ -8375,7 +8377,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
           scenario === "uiparrytell",
         ),
-        sendWheel: () => setArenaBlock(defender, defenderElementId, true),
+        sendWheel: () => scenario === "uiparrytell"
+          ? scrollM41ViewportWheel(defender, defenderViewport)
+          : setArenaBlock(defender, defenderElementId, true),
       });
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
         scenario, attacker: attacker.name, ...observed,
@@ -12673,6 +12677,15 @@ async function scrollArenaWheel(session, elementId, deltaY, delayMs = 0) {
   await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, {
     actions: [{ type: "wheel", id: `wheel-${session.name}`, actions }],
   });
+}
+
+// M41 original native QA only: still one physical W3C wheel-back at the
+// arena's real visible center, without WebDriver element-origin resolution.
+async function scrollM41ViewportWheel(session, arena) {
+  const actions = planM41ViewportWheel({
+    arena, wheelId: `wheel-${session.name}`,
+  });
+  await webdriver(session.base, "POST", `/session/${session.sessionId}/actions`, actions);
 }
 
 async function scrollArenaWheelPair(session, elementId, deltaY, firstDelayMs, betweenMs) {
