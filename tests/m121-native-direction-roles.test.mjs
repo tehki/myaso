@@ -50,7 +50,7 @@ test("M121 original runner enforces authentic KeyS and existing World 34HP proof
     "M121 role selection is in the genuine preparation function");
   assert.ok(block.includes('const strafeKey = attackRight ? "w" : "s";'));
   assert.ok(block.includes('performArenaDirectionalLight(attacker, attackerElementId, strafeKey, attackOffset)'));
-  assert.ok(block.includes('attackerResult.opponentHp === 66'));
-  assert.ok(block.includes('defenderResult.playerHp === 66'));
+  assert.ok(block.includes('attackerResult?.opponentHp === 66'));
+  assert.ok(block.includes('defenderResult?.playerHp === 66'));
   assert.ok(block.includes('M121_ACTUAL_SENDER_WORLD_CHRONOLOGY'));
 });
