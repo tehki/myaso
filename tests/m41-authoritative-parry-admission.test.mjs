@@ -26,7 +26,9 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.match(source, /async function waitForM41WorldWindup\(attacker, timeoutMs, baselineEventCount, expectedActorId, allowHeavy = false\)/);
   const poll = source.slice(source.indexOf("async function waitForM41WorldWindup("), source.indexOf("async function runOnlineUiParryFlight("));
   assert.doesNotMatch(poll, /readUiEvidence/);
-  assert.match(poll, /await execute\(attacker\.base, attacker\.sessionId, script\)/);
+  assert.match(poll, /await webdriver\(attacker\.base, "POST",/);
+  assert.match(poll, /m41NativeAsyncCueScript\(\)/);
+  assert.match(poll, /args: \[baselineEventCount, expectedActorId, allowHeavy, timeoutMs\]/);
   assert.match(source, /M33 genuine short-click parry resolved unexpectedly:/,
     "a genuine HP or guard impact must remain a fatal failure");
   assert.match(source, /M41 remote parry-stun tell never appeared:/,

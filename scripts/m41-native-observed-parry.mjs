@@ -45,3 +45,22 @@ export async function dispatchM41ObservedParry({ sendAttack, awaitWorldCue, send
   if (errors.length > 1) throw new AggregateError(errors,"M41 native click, cue or wheel failed");
   return {cue, nativeClickAck:true, nativeWheelAck:true};
 }
+
+// Native QA only: observe the identical production World cue inside its OWN
+// real browser instead of serializing many W3C execute/sync HTTP responses.
+// The returned cue still has to pass waitForM41WorldWindup actor/index/text
+// checks before the one real Firefox parry wheel can be sent. No simulated
+// keyboard/mouse, action writer or World authority is introduced.
+export function m41NativeAsyncCueScript() {
+  return "const observe = " + readM41ScalarWorldCue.toString() + ";"
+    + "const [baseline, actorId, allowHeavy, timeoutMs] = arguments;"
+    + "const done = arguments[arguments.length - 1];"
+    + "const started = performance.now();"
+    + "let poll;"
+    + "const check = () => {"
+    + "const cue = observe(window.__MYASO_M30_UI__, baseline, actorId, allowHeavy);"
+    + "if (cue || performance.now() - started >= timeoutMs) {"
+    + "clearInterval(poll);done(cue ?? null);"
+    + "}};"
+    + "poll = setInterval(check, 4);check();";
+}

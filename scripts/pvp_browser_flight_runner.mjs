@@ -41,7 +41,7 @@ import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
-import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "./m41-native-observed-parry.mjs";
+import { dispatchM41ObservedParry, readM41ScalarWorldCue, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -8268,21 +8268,22 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
       || !Number.isSafeInteger(expectedActorId) || expectedActorId < 1) {
     throw new TypeError("M41 requires a fresh current-attempt actor-bound World cue baseline");
   }
-  const script = "return (" + readM41ScalarWorldCue.toString()
-    + ")(window.__MYASO_M30_UI__, " + baselineEventCount + ", " + expectedActorId + ", " + allowHeavy + ");";
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    // Read only the actual production-visible cue and its original observer
-    // identity/index/frame timestamp. Do not serialize the entire HUD/history.
-    const cue = await execute(attacker.base, attacker.sessionId, script);
-    if (cue?.actorId === expectedActorId
-      && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
-      && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
-      && (cue.text === "Attack committed - your windup is readable."
-        || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
-      && cue.latestText === cue.text) return cue;
-    await sleep(10);
-  }
+  // M41 source0/native CI: let Chrome observe its OWN unchanged actor-bound
+  // production World cue every 4ms. Repeated WebDriver HTTP scalar round
+  // trips previously arrived as late as one original 60Hz World contact tick.
+  // The ONE genuine Firefox wheel is still dispatched only after a fresh cue,
+  // and all native W3C ACK, HP, guard, parry and World assertions remain.
+  const cue = await webdriver(attacker.base, "POST",
+    `/session/${attacker.sessionId}/execute/async`, {
+      script: m41NativeAsyncCueScript(),
+      args: [baselineEventCount, expectedActorId, allowHeavy, timeoutMs],
+    });
+  if (cue?.actorId === expectedActorId
+    && Number.isInteger(cue.eventIndex) && cue.eventIndex >= baselineEventCount
+    && Number.isFinite(cue.t) && cue.t >= 0 && cue.eventCount > cue.eventIndex
+    && (cue.text === "Attack committed - your windup is readable."
+      || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
+    && cue.latestText === cue.text) return cue;
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
 
