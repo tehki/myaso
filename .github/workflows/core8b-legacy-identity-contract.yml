@@ -1,0 +1,48 @@
+name: Core8B legacy identity import contract (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/core8b-legacy-identity-contract.yml
+      - docs/CORE8B_CHARACTER_ITEM_ADAPTER_CONTRACT_V0_20261026.md
+      - server/Cargo.toml
+      - server/Cargo.lock
+      - server/src/identity.rs
+      - server/src/item_ownership.rs
+      - server/src/item_journal.rs
+      - server/src/zone_item_transfer.rs
+      - server/src/legacy_identity_import.rs
+      - server/src/lib.rs
+      - server/tests/core8b_legacy_identity_import.rs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Additive focused proof only. The protected quality/native Combat M193/M41/
+# M147 release gates remain mandatory and can stay RED independently.
+concurrency:
+  group: core8b-legacy-import-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core8b-migration-review:
+    name: dormant identity and item compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate canonical source formatting
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Verify in-memory import is collision-safe (no live auth)
+        run: cargo test --locked --manifest-path server/Cargo.toml --test core8b_legacy_identity_import
+      - name: Verify durable generation and stale-session fences
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib identity::tests
+      - name: Verify exclusive item ownership and no duplication
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib item_ownership::tests
+      - name: Verify single-writer crash journal replay
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib item_journal::tests
+      - name: Verify ground arrival and ABA fences
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib zone_item_transfer::tests
+      - name: Type-check all Rust test targets
+        run: cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
