@@ -7,6 +7,7 @@ import { createDormantSharedUi10Sources, attachDormantSharedUi10Sources } from "
 
 export async function activateLoopbackGestureLab({
   gameClient, canvas, windowObj, documentObj, getClientTick,
+  isJumpAttackChord = () => false,
 } = {}) {
   if (!gameClient || !canvas || !windowObj || !documentObj
       || typeof getClientTick !== "function") {
@@ -106,7 +107,10 @@ export async function activateLoopbackGestureLab({
       outbox, getClientTick,
       isCanvasTarget:e => e.target === canvas,
       isChatFocused:() => Boolean(documentObj.activeElement?.closest?.("[data-local-chat]")),
-      isJumpAttackChord:() => false, // Rust World owns validity; never fake an action
+      // Space+LMB is NOT an ordinary typed Light. Until Main0 approves an
+      // exclusive authoritative JumpAttack route, fail closed rather than
+      // inventing a second v1 attack writer or a false World Light.
+      isJumpAttackChord,
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
@@ -143,7 +147,13 @@ export async function activateLoopbackGestureLab({
     add(windowObj,"mouseup",drainNewEdges);
     add(windowObj,"pointercancel",drainNewEdges);
     add(canvas,"lostpointercapture",drainNewEdges);
-    add(windowObj,"keydown",drainNewEdges);
+    add(windowObj,"keydown",event => {
+      // Space pressed after physical LMB: terminal is a genuine CANCEL,
+      // never a phantom RELEASE or a second Light. A previously landed
+      // original World Light cannot be undone by a later keypress.
+      if (event.code === "Space" && !event.repeat) gates.jumpChord();
+      drainNewEdges();
+    });
     add(windowObj,"keyup",drainNewEdges);
     add(windowObj,"blur",drainNewEdges);
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));

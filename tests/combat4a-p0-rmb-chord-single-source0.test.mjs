@@ -155,10 +155,12 @@ test("single loopback sender drains only newly authored typed events; timer reta
   assert.equal(calls,2,"retired session must never send");
   assert.match(lab,/if \(outbox\.snapshot\.pending > 0\) drain\(\);/,
     "genuine unacknowledged typed events retain the one bounded retry timer");
-  for(const type of ["pointerup","mouseup","pointercancel","keydown","keyup","blur"]){
+  for(const type of ["pointerup","mouseup","pointercancel","keyup","blur"]){
     assert.ok(lab.includes('add(windowObj,"'+type+'",drainNewEdges);'),
       "all source edges use one immediate sequence-gated drain: "+type);
   }
+  assert.match(lab,/add\(windowObj,"keydown",event => \{[\s\S]*?event\.code === "Space"[\s\S]*?gates\.jumpChord\(\)[\s\S]*?drainNewEdges\(\);\s*\}\);/,
+    "Space keydown must cancel current typed LMB before using the SAME sequence-gated drain");
 });
 
 
