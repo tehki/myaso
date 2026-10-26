@@ -376,7 +376,8 @@ canvas.addEventListener("lostpointercapture", (event) => {
   }
 });
 canvas.addEventListener("wheel", (event) => {
-  const m41WheelToken = m41PhysicalChronology?.wheelStart(event);
+  const m41WheelToken = typeof m41PhysicalChronology !== "undefined"
+    ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
   canvas.focus();
   if (event.deltaY < 0) {
@@ -387,7 +388,7 @@ canvas.addEventListener("wheel", (event) => {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
     audio.play("guard");
   }
-  m41PhysicalChronology?.wheelEnd(m41WheelToken);
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.wheelEnd(m41WheelToken);
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
@@ -910,7 +911,7 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
-  m41PhysicalChronology?.reset();
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.reset();
   dashGesture.clearTaps();
   dashRequested = false;
   dashMove = null;
@@ -966,7 +967,7 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
-  m41PhysicalChronology?.sampled(currentInput, predictionStep + 1);
+  if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.sampled(currentInput, predictionStep + 1);
   if (typeof m147InputProbe !== "undefined") m147InputProbe?.sampled(currentInput, predictionStep + 1);
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
@@ -1024,6 +1025,7 @@ function simulatePrediction(stepMs) {
             // Trust and callback timestamps originate in the game listener;
             // actual World Block/PARRY still requires independent Rust proof.
             m41PhysicalInput: m41InputProbe && currentInput.block
+              && typeof m41PhysicalChronology !== "undefined"
               ? m41PhysicalChronology?.sendInvocation(outgoingTick, currentInput) : null,
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
