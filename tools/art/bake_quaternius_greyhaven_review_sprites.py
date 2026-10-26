@@ -70,10 +70,18 @@ def run():
             or gable.get("sourcePlasterPBR", "").startswith("MI_Plaster") is not True
             or gable.get("sourceTimberPBR", "").startswith("MI_WoodTrim") is not True
             or gable.get("timberBraceCount") != 3
-            or gable.get("userRequestedPlainWall") is not True
+            or gable.get("userRequestedMatchWeatheredLowerFacade") is not True
             or gable.get("originalSourcePlasterMaterialUnchanged") is not True
-            or gable.get("flatBaseColorUnlinked") is not True
-            or gable.get("flatNormalUnlinked") is not True
+            or gable.get("worldSpaceNoSourceUV") is not True
+            or gable.get("sourceGableAtlasNodesDisconnected") is not True
+            or gable.get("sourcePlasterImageTexturesNotUsedOnGable") is not True
+            or gable.get("lowContrastNoBigStain") is not True
+            or gable.get("gableColorVariationLinked") is not True
+            or gable.get("gableFineBumpLinked") is not True
+            or gable.get("worldPositionWeatheringNoise") != 9.5
+            or not 0.14 <= gable.get("roofApexSeamExtendedMeters", 0) <= 0.20
+            or gable.get("roofApexHiddenTipRiseMeters") != 0.17
+            or gable.get("roofApexHiddenTipForwardMeters") != 0.035
             or gable.get("flatRoughnessUnlinked") is not True
             or gable.get("plainGableMaterialName") != "BloodIron_Greyhaven_PlainGablePlaster_ReviewOnly"
             or gable.get("gableFaceAreaSquareMeters", 0) < 2.0
@@ -107,6 +115,14 @@ def run():
         "gablePlainPlasterNoUVTexture": True,
         "gableSourcePlasterUnchanged": True,
         "gableCenterPostRemoved": True,
+        "gableSourceMatchedWeathered": True,
+        "gableNoDarkApexAtlasStain": True,
+        "gableApexSeamExtendedMeters": gable["roofApexSeamExtendedMeters"],
+        "gableApexHiddenTipRiseMeters": gable["roofApexHiddenTipRiseMeters"],
+        "gableApexHiddenTipForwardMeters": gable["roofApexHiddenTipForwardMeters"],
+        "gableWeatheringWorldScale": gable["worldPositionWeatheringNoise"],
+        "gableWeatheredDarkRGBA": gable["weatheredDarkRGBA"],
+        "gableWeatheredLightRGBA": gable["weatheredLightRGBA"],
         "gablePlainWallRGBA": gable["plainPlasterWallRGBA"],
         "duskWindowAndDoorGlassFromGenuineBlender": True,
         "duskProceduralSmokeFromSourceChimney": True,

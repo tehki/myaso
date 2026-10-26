@@ -158,7 +158,7 @@ def add_authored_gable_infill(imported, spec):
     Keep original CC0 meshes and PBR textures immutable. New geometry is an
     independent, editable Blender ART assembly using their source materials.
     """
-    if (spec.get("treatment") != "plain-plaster-wall"
+    if (spec.get("treatment") != "source-matched-weathered-plaster"
             or spec.get("noRoofSourceMeshEdits") is not True
             or spec.get("gameplayFootprintUnchanged") is not True):
         raise ValueError("refusing unapproved gable fill/roof source change")
@@ -180,7 +180,18 @@ def add_authored_gable_infill(imported, spec):
     if (abs(wall_window["z"][1] - wall_door["z"][1]) > 0.01
             or abs(base_z - wall_window["z"][1]) > 0.15):
         raise ValueError("gable base does not meet actual imported original wall crown")
-    if (apex_z >= roof_bounds["z"][1] - 0.35 or
+    apex = spec.get("apexSeamClosure", {})
+    if (apex.get("originalApexZ") != 5.10 or
+            apex.get("correctedApexZ") != apex_z or
+            not 0.14 <= apex_z - apex["originalApexZ"] <= 0.20 or
+            apex.get("roofSourceMeshUntouched") is not True or
+            not 0.010 <= apex.get("shiftFrontFaceTowardCameraMeters", 0) <= 0.020):
+        raise ValueError("roof-apex dark-seam closure no longer matches approved infill")
+    hidden_tip_height = apex.get("hiddenTipRoofOverlapZ", None)
+    hidden_tip_forward = apex.get("hiddenTipTowardCameraY", None)
+    if (hidden_tip_height != 0.17 or hidden_tip_forward != 0.035):
+        raise ValueError("unreviewed roof-ridge seam cap geometry")
+    if (apex_z + hidden_tip_height >= roof_bounds["z"][1] - 0.35 or
             x_half > max(abs(roof_bounds["x"][0]), abs(roof_bounds["x"][1]))):
         raise ValueError("gable infill not contained beneath the original source roof bounds")
     plaster = next((m for m in bpy.data.materials if m.name.startswith("MI_Plaster")), None)
@@ -210,21 +221,76 @@ def add_authored_gable_infill(imported, spec):
             raise ValueError("missing original plaster PBR socket: " + input_name)
         for link in list(socket.links):
             flat.node_tree.links.remove(link)
+    # Remove texture nodes from the scene-local material CLONE only.
+    # Those source-UV atlas nodes are not valid for this newly authored gable.
+    # Original glTF imported MI_Plaster material remains untouched.
+    for node in list(flat.node_tree.nodes):
+        if node.type == "TEX_IMAGE":
+            flat.node_tree.nodes.remove(node)
+    for socket_name, value in (("Metallic", 0.0), ("Alpha", 1.0)):
+        socket = principled.inputs.get(socket_name)
+        if socket:
+            for link in list(socket.links):
+                flat.node_tree.links.remove(link)
+            socket.default_value = value
     principled.inputs["Base Color"].default_value = tuple(uniform_wall_color)
-    principled.inputs["Roughness"].default_value = 0.90
+    principled.inputs["Roughness"].default_value = 0.91
     principled.inputs["Normal"].default_value = (0.0, 0.0, 0.0)
     flat.diffuse_color = tuple(uniform_wall_color)
-    if any(principled.inputs[key].is_linked
-           for key in ("Base Color", "Normal", "Roughness")):
-        raise ValueError("plain gable shader unexpectedly depends on textured UV")
+    # Authored gable has NO original wall UV coordinates. Sample subtle fine
+    # variation in WORLD SPACE from the geometry Position instead: no skew,
+    # repeating decals, large stains, or source PBR image modification.
+    # Warm beige bracket is calibrated against the actual front wall in a
+    # genuine Blender daylight frame (~151/133/107 RGB lower facade).
+    weather = spec.get("weatheredPlaster", {})
+    dark, light = weather.get("darkRGBA"), weather.get("lightRGBA")
+    if (weather.get("method") != "world-position-fine-noise"
+            or weather.get("noiseScale") != 9.5
+            or not isinstance(dark, list) or not isinstance(light, list)
+            or len(dark) != 4 or len(light) != 4
+            or any(not isinstance(c, (float, int)) or c < 0 or c > 1
+                   for c in dark + light)
+            or dark[3] != 1 or light[3] != 1
+            or any(light[i] - dark[i] < 0.02 or light[i] - dark[i] > 0.14 for i in range(3))):
+        raise ValueError("unapproved weathered plaster range; do not introduce dark stains")
+    geometry = flat.node_tree.nodes.new("ShaderNodeNewGeometry")
+    geometry.name = "BloodIron_WorldPosition_NoSourceUV_ReviewOnly"
+    noise = flat.node_tree.nodes.new("ShaderNodeTexNoise")
+    noise.name = "BloodIron_FineWeatheredPlaster_NoSpot"
+    noise.noise_dimensions = "3D"
+    noise.inputs["Scale"].default_value = weather["noiseScale"]
+    noise.inputs["Detail"].default_value = 3.0
+    noise.inputs["Roughness"].default_value = 0.55
+    noise.inputs["Distortion"].default_value = 0.0
+    ramp = flat.node_tree.nodes.new("ShaderNodeValToRGB")
+    ramp.name = "BloodIron_LowerWallColorRange_NoBlotch_ReviewOnly"
+    ramp.color_ramp.elements[0].position = 0.31
+    ramp.color_ramp.elements[0].color = tuple(dark)
+    ramp.color_ramp.elements[1].position = 0.69
+    ramp.color_ramp.elements[1].color = tuple(light)
+    flat.node_tree.links.new(geometry.outputs["Position"], noise.inputs["Vector"])
+    flat.node_tree.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+    flat.node_tree.links.new(ramp.outputs["Color"], principled.inputs["Base Color"])
+    bump = flat.node_tree.nodes.new("ShaderNodeBump")
+    bump.name = "BloodIron_SubtlePlasterGrain"
+    bump.inputs["Strength"].default_value = 0.045
+    bump.inputs["Distance"].default_value = 0.008
+    flat.node_tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    flat.node_tree.links.new(bump.outputs["Normal"], principled.inputs["Normal"])
+    if (not principled.inputs["Base Color"].is_linked or
+            not principled.inputs["Normal"].is_linked or
+            principled.inputs["Roughness"].is_linked or
+            any(node.type == "TEX_IMAGE" and any(output.is_linked for output in node.outputs)
+                for node in flat.node_tree.nodes)):
+        raise ValueError("gable must use procedural world-space aging without source UV/image atlas")
     # Make the gable an actual double-sided 3D triangular prism, not a
     # billboard/image overlay or browser-side disguise of the roof aperture.
     depth = 0.09
     verts = [
         (-x_half, front_y, base_z), (x_half, front_y, base_z),
-        (0.0, front_y, apex_z),
+        (0.0, front_y - hidden_tip_forward, apex_z + hidden_tip_height),
         (-x_half, front_y + depth, base_z), (x_half, front_y + depth, base_z),
-        (0.0, front_y + depth, apex_z),
+        (0.0, front_y + depth - hidden_tip_forward, apex_z + hidden_tip_height),
     ]
     faces = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3),
              (1, 2, 5, 4), (2, 0, 3, 5)]
@@ -272,11 +338,24 @@ def add_authored_gable_infill(imported, spec):
              "sourcePlasterPBR": plaster.name, "sourceTimberPBR": timber.name,
              "plainGableMaterialName": flat.name,
              "plainPlasterWallRGBA": list(uniform_wall_color),
-             "flatBaseColorUnlinked": not principled.inputs["Base Color"].is_linked,
-             "flatNormalUnlinked": not principled.inputs["Normal"].is_linked,
+             "worldSpaceNoSourceUV": True,
+             "worldPositionWeatheringNoise": weather["noiseScale"],
+             "weatheredDarkRGBA": list(dark), "weatheredLightRGBA": list(light),
+             "sourcePlasterImageTexturesNotUsedOnGable": True,
+             "lowContrastNoBigStain": True,
+             "gableColorVariationLinked": principled.inputs["Base Color"].is_linked,
+             "gableFineBumpLinked": principled.inputs["Normal"].is_linked,
              "flatRoughnessUnlinked": not principled.inputs["Roughness"].is_linked,
              "originalSourcePlasterMaterialUnchanged": True,
-             "userRequestedPlainWall": True,
+             "userRequestedPlainWall": False,
+             "userRequestedMatchWeatheredLowerFacade": True,
+             "roofApexStainCorrection": "extended plaster behind ridge/eave",
+             "roofApexSeamExtendedMeters": apex_z - apex["originalApexZ"],
+             "faceMovedForwardMeters": apex["shiftFrontFaceTowardCameraMeters"],
+             "sourceGableAtlasNodesDisconnected": True,
+             "roofApexHiddenTipRiseMeters": hidden_tip_height,
+             "roofApexHiddenTipForwardMeters": hidden_tip_forward,
+             "roofApexFullHeightMeters": apex_z + hidden_tip_height,
              "realBlender3DPrism": True,
              "newGableMeshName": infill.name,
              "worldVertices": [list(v) for v in verts],
