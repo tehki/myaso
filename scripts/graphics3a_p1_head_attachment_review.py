@@ -13,6 +13,7 @@ from graphics3a_p1_head_attach_rules import (archive_uri,head_cut_from_mesh_top,
 from graphics3a_p1_neck_seam_qc import neck_collar_proximity
 from graphics3a_p1_neck_surface_qc import collar_surface_proximity
 from graphics3a_p1_head_plane_clip import clip_skinned_mesh_y
+from graphics3a_p1_neck_cap_geometry import geometric_neck_cap
 from graphics3a_p1_skin_paint_ab import (NEUTRAL_MIN_RGB_MEAN, NEUTRAL_MAX_RGB_MEAN, NEUTRAL_MAX_CHANNEL_SPAN, skin_sample_is_valid, skin_reference_uv)
 from graphics3a_p1_hood_review_rules import (approved_hood_member, verified_hood_bind_anchors)
 from graphics3a_p1_hood_motion_rules import collar_follow_center
@@ -103,7 +104,7 @@ def read_base(archive,suffix):
   member=names[0];doc=json.loads(z.read(member));prefix=member.rsplit('/',1)[0]+'/'
   buffers=[z.read(archive_uri(prefix,b['uri'])) for b in doc.get('buffers',[])]
  return doc,buffers,prefix
-def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,cut_y,target_top,cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original'):
+def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,cut_y,target_top,cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',head_cap='open'):
  base_joints=base['skins'][base['nodes'][next(i for i,n in enumerate(base['nodes']) if 'mesh' in n and 'skin' in n)]['skin']]['joints']
  target_skin=target['skins'][target['nodes'][target_node]['skin']]
  bnames=[base['nodes'][i]['name'] for i in base_joints]
@@ -112,6 +113,8 @@ def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,c
  remap=np.asarray(remap_joint_indices(bnames,tnames),dtype=int)
  xform=np.linalg.inv(tworld[target_node])
  parts=[]; materials={}
+ if head_cap!='open' and (head_cap!='geometric-prototype' or cut_method!='plane'):
+  raise ValueError('Neck cap requires explicit plane cut and experimental mode')
  for ni,node in enumerate(base['nodes']):
   if 'mesh' not in node or 'skin' not in node: continue
   if node.get('name') not in allowed_head_mesh_names('all'):
@@ -149,6 +152,7 @@ def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,c
    normal_matrix=np.linalg.inv(transform[:3,:3]).T
    norm=(normal_matrix@norm.T).T;norm/=np.maximum(np.linalg.norm(norm,axis=1)[:,None],1e-12)
    weights/=np.maximum(weights.sum(axis=1)[:,None],1e-12)
+   cap=None
    if cut_method=='plane' and node.get('name','').lower().startswith('superhero_'):
     # The current approved Base / Peasant exports share an identity-aligned
     # target mesh node. Fail closed rather than clipping mismatched axes.
@@ -162,9 +166,31 @@ def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,c
     joints=np.asarray(clipped['joints'],int)
     weights=np.asarray(clipped['weights'],float)
     faces=np.asarray(clipped['faces'],int)
+    if head_cap=='geometric-prototype': cap=geometric_neck_cap(clipped,cut_y)
    material=mat_for(base,bbuf,barchive,prefix,prim.get('material'),materials,body_atlas,head_paint)
    parts.append({'node':target_node,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,
                  'joints':joints,'weights':weights,'uv':uv,'faces':faces,'material':material})
+   if cap is not None:
+    # Head underside ONLY; matching torso neck cap not yet authored.
+    skin_rgb=(171,116,81) if 'female' in node.get('name','').lower() else (171,121,83)
+    cap_material=pyrender.MetallicRoughnessMaterial(
+      baseColorFactor=tuple(float(c)/255 for c in skin_rgb)+(1.,),
+      metallicFactor=0.,roughnessFactor=1.,doubleSided=True)
+    parts.append({'node':target_node,'name':'P1_SKINNED_NECK_CAP_OFFLINE',
+      'positions':np.asarray(cap['positions'],float),
+      'normals':np.asarray(cap['normals'],float),
+      'joints':np.asarray(cap['joints'],int),
+      'weights':np.asarray(cap['weights'],float),
+      'uv':np.asarray(cap['uv'],float),
+      'faces':np.asarray(cap['faces'],int),
+      'material':cap_material,
+      'cap_metadata':{'planar_loop_count':cap['planar_loop_count'],
+         'planar_loop_vertex_counts':cap['planar_loop_vertex_counts'],
+         'cap_triangles':cap['cap_triangles'],
+         'boundary_edges':cap['boundary_edges'],
+         'status':cap['status']}})
+    print('OFFLINE_HEAD_UNDERSIDE_CAP',cap['planar_loop_vertex_counts'],
+      'triangles',cap['cap_triangles'],'BODY_CAP_MISSING',flush=True)
    print('HEAD_PART',node.get('name'),len(pos),'vertices',len(faces),'faces','material',prim.get('material'),flush=True)
  return parts
 def target_parts(target,tbuf,path):
@@ -251,7 +277,7 @@ def load_private_publisher_hood(archive,target_model_name,target,target_mesh_nod
  if not parts:raise ValueError("Approved Ranger hood had no renderable parts")
  return parts,member
 
-def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',approved_hood_archive=None,hood_material='legacy-preview',hood_palette='original'):
+def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',approved_hood_archive=None,hood_material='legacy-preview',hood_palette='original',head_cap='open'):
  target,tbuf=load_gltf(target_path)
  base,bbuf,prefix=read_base(base_archive,suffix)
  target_node=next(i for i,n in enumerate(target['nodes']) if 'mesh' in n and 'skin' in n)
@@ -289,7 +315,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
   target_rest_vertices.append((w@np.c_[part['positions'],np.ones(len(part['positions']))].T).T[:,:3])
  outfit_top=max(float(v[:,1].max()) for v in target_rest_vertices)
  if cut_y is None: cut_y=head_cut_from_mesh_top(outfit_top)
- head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top,cut_method,face_parts,body_atlas,head_paint)
+ head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top,cut_method,face_parts,body_atlas,head_paint,head_cap)
  if not head: raise ValueError("No safe head meshes qualified")
  hood_member=None
  if approved_hood_archive is not None:
@@ -402,6 +428,8 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'camera_mode':camera_mode,
          'camera_tracks_animated_neck':follow_neck,
          'head_cut_method':cut_method,
+         'head_cap_variant':head_cap,
+         'original_source_head_cap_diagnostic':next((part['cap_metadata'] for part in head if 'cap_metadata' in part),None),
          'head_face_component_mode':face_parts,
          'body_atlas_variant':body_atlas,
          'head_paint_variant':head_paint,
@@ -430,6 +458,7 @@ def main():
  p.add_argument('--head-cut-y',type=float,default=None)
  p.add_argument('--camera-mode',choices=('full-body','collar-closeup','animated-neck-closeup'),default='full-body')
  p.add_argument('--cut-method',choices=('centroid','plane'),default='centroid')
+ p.add_argument('--head-cap',choices=('open','geometric-prototype'),default='open',help='Offline head underside only; no game asset')
  p.add_argument('--face-parts',choices=('all','without-eyebrows','head-only'),default='all')
  p.add_argument('--body-atlas',choices=('original','publisher-light'),default='original')
  p.add_argument('--head-paint',choices=('original','neutral-to-skin-prototype'),default='original')
@@ -445,7 +474,7 @@ def main():
  if a.output.resolve().is_relative_to(repo):
   raise ValueError("No generated vendor images may be written inside the repository")
  render(a.target_model,a.base_archive,a.base_model_suffix,a.animation_archive,a.animation_model_suffix,
-        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint,a.approved_hood_archive,a.hood_material,a.hood_palette)
+        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint,a.approved_hood_archive,a.hood_material,a.hood_palette,a.head_cap)
 
 if __name__=='__main__':
  main()
