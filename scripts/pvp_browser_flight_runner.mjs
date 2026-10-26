@@ -567,6 +567,7 @@ async function startGameServer() {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
+        || scenario === "uiparry"
         || scenario === "uiguardbreakpunishffa"
         // M173 exact original World same-tick Jump stamina-spend evidence.
         // The existing server flag is fail-closed on nonloopback listeners.
@@ -592,9 +593,12 @@ async function startGameServer() {
       // Existing M121/M156 original-v1 ingress evidence is never enabled for
       // v2 or other production paths; the Rust server rejects nonloopback.
       MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa" ? "1" : "0",
-      // Core8A original v1 admission proof: genuine M41/M35 positive-wheel
-      // cases only; server refuses public binds, v2 and missing action proof.
-      MYASO_FLIGHT_M41_INPUT_PROOF: scenario === "uiparrytell" || scenario === "uistun" ? "1" : "0",
+      // Core8A original v1 Block-edge admission proof, reused read-only by
+      // M33/M35/M41/M194/M111 native W3C flights. Server rejects public
+      // binds, v2 or missing action proof; do not change production defaults.
+      MYASO_FLIGHT_M41_INPUT_PROOF:
+        ["uiparry", "uiparrytell", "uistun", "uiguardbreak",
+          "uiheavyguardbreakpunish"].includes(scenario) ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uijumpattackinputloss" ? "1" : "0",
       MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS:
