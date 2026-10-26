@@ -12,6 +12,7 @@ import trimesh, pyrender
 from graphics3a_p1_head_attach_rules import (archive_uri,head_cut_from_mesh_top,remap_joint_indices,choose_head_faces,validate_upper_anchors)
 from graphics3a_p1_neck_seam_qc import neck_collar_proximity
 from graphics3a_p1_neck_surface_qc import collar_surface_proximity
+from graphics3a_p1_head_plane_clip import clip_skinned_mesh_y
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
@@ -44,7 +45,7 @@ def read_base(archive,suffix):
   member=names[0];doc=json.loads(z.read(member));prefix=member.rsplit('/',1)[0]+'/'
   buffers=[z.read(archive_uri(prefix,b['uri'])) for b in doc.get('buffers',[])]
  return doc,buffers,prefix
-def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,cut_y,target_top):
+def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,cut_y,target_top,cut_method='centroid'):
  base_joints=base['skins'][base['nodes'][next(i for i,n in enumerate(base['nodes']) if 'mesh' in n and 'skin' in n)]['skin']]['joints']
  target_skin=target['skins'][target['nodes'][target_node]['skin']]
  bnames=[base['nodes'][i]['name'] for i in base_joints]
@@ -73,7 +74,8 @@ def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,c
     world_h=(bworld[ni]@np.c_[pos,np.ones(len(pos))].T).T
     cent=world_h[faces,1].mean(axis=1)
     # Only the head/neck region above the collar line; reject torso/shoulder faces.
-    faces=faces[choose_head_faces(cent,cut_y)]
+    if cut_method=='centroid': faces=faces[choose_head_faces(cent,cut_y)]
+    elif cut_method!='plane': raise ValueError('Invalid head mesh cut method')
    else:
     # Separate eyes and eyebrows are already head-only meshes.
     pass
@@ -87,6 +89,19 @@ def make_parts(base,bbuf,bworld,barchive,prefix,target,tbuf,tworld,target_node,c
    normal_matrix=np.linalg.inv(transform[:3,:3]).T
    norm=(normal_matrix@norm.T).T;norm/=np.maximum(np.linalg.norm(norm,axis=1)[:,None],1e-12)
    weights/=np.maximum(weights.sum(axis=1)[:,None],1e-12)
+   if cut_method=='plane' and node.get('name','').lower().startswith('superhero_'):
+    # The current approved Base / Peasant exports share an identity-aligned
+    # target mesh node. Fail closed rather than clipping mismatched axes.
+    if not np.allclose(tworld[target_node],np.eye(4),atol=1e-5):
+     raise ValueError('Plane-cut preview requires aligned target-world mesh')
+    clipped=clip_skinned_mesh_y(pos.tolist(),norm.tolist(),uv.tolist(),
+      joints.tolist(),weights.tolist(),faces.tolist(),cut_y)
+    pos=np.asarray(clipped['positions'],float)
+    norm=np.asarray(clipped['normals'],float)
+    uv=np.asarray(clipped['uv'],float)
+    joints=np.asarray(clipped['joints'],int)
+    weights=np.asarray(clipped['weights'],float)
+    faces=np.asarray(clipped['faces'],int)
    material=mat_for(base,bbuf,barchive,prefix,prim.get('material'),materials)
    parts.append({'node':target_node,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,
                  'joints':joints,'weights':weights,'uv':uv,'faces':faces,'material':material})
@@ -122,7 +137,7 @@ def target_parts(target,tbuf,path):
    parts.append({'node':ni,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,'joints':joints,
     'weights':weights,'uv':uv,'faces':faces,'material':cache[mi]})
  return parts
-def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body'):
+def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid'):
  target,tbuf=load_gltf(target_path)
  base,bbuf,prefix=read_base(base_archive,suffix)
  target_node=next(i for i,n in enumerate(target['nodes']) if 'mesh' in n and 'skin' in n)
@@ -160,7 +175,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
   target_rest_vertices.append((w@np.c_[part['positions'],np.ones(len(part['positions']))].T).T[:,:3])
  outfit_top=max(float(v[:,1].max()) for v in target_rest_vertices)
  if cut_y is None: cut_y=head_cut_from_mesh_top(outfit_top)
- head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top)
+ head=make_parts(base,bbuf,base_world,base_archive,prefix,target,tbuf,target_world,target_node,cut_y,outfit_top,cut_method)
  if not head: raise ValueError("No safe head meshes qualified")
  # Diagnostic only: rest-pose cut boundary to actual garment vertices.
  # Nearest-vertex distance is unsigned and cannot approve a collar seam.
@@ -251,6 +266,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'contact_sheet_sha256':sha256(sheet_path.read_bytes()),
          'view_count':8,
          'camera_mode':camera_mode,
+         'head_cut_method':cut_method,
          'frame_size_px':view_size,
          'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
          'neck_collar_rest_pose_surface_diagnostic':surface_diagnostic,
@@ -271,6 +287,7 @@ def main():
  p.add_argument('--fraction',type=float,default=0.5)
  p.add_argument('--head-cut-y',type=float,default=None)
  p.add_argument('--camera-mode',choices=('full-body','collar-closeup'),default='full-body')
+ p.add_argument('--cut-method',choices=('centroid','plane'),default='centroid')
  a=p.parse_args()
  for file in [a.target_model,a.base_archive,a.animation_archive]:
   if not file.is_file(): raise FileNotFoundError(file)
@@ -279,7 +296,7 @@ def main():
  if a.output.resolve().is_relative_to(repo):
   raise ValueError("No generated vendor images may be written inside the repository")
  render(a.target_model,a.base_archive,a.base_model_suffix,a.animation_archive,a.animation_model_suffix,
-        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode)
+        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method)
 
 if __name__=='__main__':
  main()
