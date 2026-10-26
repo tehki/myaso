@@ -4,7 +4,6 @@ import { installRightButtonGesture } from "../src/browser/right-button-gesture.m
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
-import { createAfterSource0Audio } from "../src/browser/after-source0-audio.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
@@ -197,8 +196,6 @@ const webTransportOptions = cert
 
 const keys = new Set();
 const audio = createGameAudio();
-// Presentation may warm up only AFTER the real original combat input is authored.
-const afterSource0Audio = createAfterSource0Audio({ audio });
 installGameAudioControls(audio);
 const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
@@ -316,10 +313,8 @@ function onLeftPointerUp(event) {
     });
     if (m111InputProbe.physicalTerminals.length > 32) m111InputProbe.physicalTerminals.shift();
   }
-  // Initial AudioContext construction consumed 410ms inside real M147
-  // pointerUP. Keep genuine release/Light synchronous; defer first-use audio
-  // until AFTER the unmodified original v1 sender accepts its release sample.
-  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.noteRelease(committed);
+  // First-use AudioContext construction is forbidden during live combat.
+  // The existing Effects/Enable sound controls allow a separate trusted gesture.
   if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerHandlerEnd();
 }
 canvas.addEventListener("pointerup", onLeftPointerUp);
@@ -903,7 +898,6 @@ function updateMouse(event) {
 
 function releaseInputs() {
   keys.clear();
-  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
   dashGesture.clearTaps();
   dashRequested = false;
   dashMove = null;
@@ -1034,8 +1028,7 @@ function simulatePrediction(stepMs) {
     }
     if (typeof m147InputProbe !== "undefined") m147InputProbe?.sendInput(currentInput, outgoingTick);
     networkClient.sendInput({ tick: outgoingTick, ...currentInput });
-    // No synchronous audio startup is permitted before this genuine v1 send.
-    if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+    // Never construct AudioContext from live input or the sender's next frame.
     clientTick = (clientTick + 1) >>> 0;
     attackRequested = false;
     runningAttackRequested = false;
