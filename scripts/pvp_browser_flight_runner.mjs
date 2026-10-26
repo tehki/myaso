@@ -8306,8 +8306,19 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     && cue.latestText === cue.text) return cue;
   // Preserve the original fail-closed gate; only emit a bounded read-only
   // snapshot when the browser never observed an admissible fresh World cue.
-  if (cue?.timedOut === true) {
-    console.log("M41_NATIVE_CUE_TIMEOUT " + JSON.stringify(cue));
+  if (!cue) {
+    // Failure-only W3C read; never use this bounded history to authorize a
+    // late wheel. Retain the original null timeout and fatal native gate.
+    try {
+      const diagnostic = await execute(attacker.base, attacker.sessionId,
+        "return window.__MYASO_M41_LAST_TIMEOUT__ ?? null;");
+      if (diagnostic?.timedOut === true) {
+        console.log("M41_NATIVE_CUE_TIMEOUT " + JSON.stringify(diagnostic));
+      }
+    } catch (error) {
+      console.log("M41_NATIVE_CUE_TIMEOUT_READ_ERROR "
+        + JSON.stringify({ message: String(error).slice(0, 160) }));
+    }
   }
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
