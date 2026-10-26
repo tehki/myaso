@@ -5873,7 +5873,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
             event.action === knockdownAction && Number.isFinite(event.epochMs));
           if (found || performance.now() - started >= timeoutMs) {
             clearInterval(watcher);
-            done(found ? { ...found } : null);
+            done(found ? { ...found, observedEpochMs: Date.now() } : null);
           }
         };
         watcher = setInterval(check, 4);
@@ -5892,6 +5892,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
 
+  const worldProofOffset = m201ServerOutput().length;
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
     await setMovementKey(roller, retreatKey, true);
@@ -5924,6 +5925,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const rollCompletion = scrollArenaWheel(roller, rollerElementId, -120, 0)
       .then(() => ({ ok: true }), (error) => ({ ok: false, error }));
     const knockdownTransition = await knockdownWatcher;
+    const watcherReturnedAt = Date.now();
 
     if (knockdownTransition) {
       // R1 light is committed on pointerUP. M237: a genuine 35ms hold
@@ -5934,7 +5936,16 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       // Do not await the roller's unrelated driver wheel ACK, lengthen the
       // 260ms knockdown, shorten the 135ms server windup, or permit a
       // same-tick active/recovery without the original strict checks.
+      const clickDispatchedAt = Date.now();
       await performArenaM221GuardBreakClick(punisher, 5);
+      const clickCompletedAt = Date.now();
+      console.log("M156_NATIVE_DISPATCH_DIAGNOSTIC " + JSON.stringify({
+        attempt, knockdownTransition, watcherReturnedAt,
+        clickDispatchedAt, clickCompletedAt,
+        nodeDispatchDelayMs: clickDispatchedAt - watcherReturnedAt,
+        nodeClickCommandMs: clickCompletedAt - clickDispatchedAt,
+        world: m201ServerOutput().slice(worldProofOffset),
+      }));
       const rollResult = await rollCompletion;
       if (!rollResult.ok) throw rollResult.error;
       conversion = {
@@ -6065,6 +6076,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     && Math.abs(punishDown.y - 0.5) <= 0.15
     && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
   const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  // Record the real input and original World before any strict timing rejection.
+  // Browser epochs and Node timings remain separate; neither qualifies a HIT.
+  console.log("M156_PRE_GATE_CHRONOLOGY " + JSON.stringify({
+    knockdownTransition: conversion.knockdownTransition, punishPointers,
+    browserInputChronology: (punisherState.m147InputPlane ?? []).slice(-32),
+    source0Samples: (punisherState.acceptance?.m121SentSamples ?? []).slice(-24),
+    inputSubmissions: (punisherState.acceptance?.inputSubmissions ?? []).slice(-24),
+    world: m201ServerOutput().slice(worldProofOffset),
+  }));
   if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
     || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
     || punishUp.epochMs <= punishDown.epochMs
@@ -11557,7 +11577,10 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   const worldProofOffset = m201ServerOutput().length;
   // Independent real drivers: observe the rendered cue without awaiting the
   // other driver's jump command ACK. Every command is still awaited below.
-  const jumpCommand = performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)
+  // The mouse is already aimed above. Reuse the existing pointer-first native
+  // chord: an extra pointerMove tick let Space precede LMB by 163ms in #1077.
+  // Actual trusted-event spacing and original World gates remain mandatory.
+  const jumpCommand = performArenaPreAimedJumpAttackChord(jumpAttacker, 90)
     .then(() => null, (error) => error);
   let recoveryCue = null;
   try {

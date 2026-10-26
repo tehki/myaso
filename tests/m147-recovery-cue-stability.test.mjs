@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 // Source-authentic Firefox recovery observer only; real World/HIT/native
 // acceptance remains independently mandatory.
-const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
+const source = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const begin = source.indexOf("async function runOnlineUiJumpRecoveryFfaPunishFlight(");
 const end = source.indexOf("async function runOnlineUiMultiRecoveryFfaFocusFlight(", begin);
 const original = source.slice(begin, end);
