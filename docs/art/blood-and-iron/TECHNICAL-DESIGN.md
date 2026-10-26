@@ -2,7 +2,7 @@
 
 **Status:** SPECIFICATION ONLY. Not an implemented protocol, renderer, event handler, physics system or asset.  
 **Parent:** https://github.com/tehki/myaso/issues/1065  
-**Authority:** Graphics3 proposes; Combat4C/Core8A/8C review event/authority; Combat4D validates; Main0 authorizes G1+.
+**Authority:** Graphics3 proposes; Combat4 (unified engineering)/Core8A/8C review event/authority; Combat4D validates; Main0 authorizes G1+.
 
 ## Current baseline and constraints
 
@@ -23,7 +23,7 @@ Verified protected main `6fa59b649112c272bcbc018b4a32bf963f9a5bba` uses Rust Wor
 
 ## Proposed event envelope — illustrative ONLY
 
-This schema is **not an existing WebTransport/World protocol**. Combat4C and Core8A/8C must approve semantics, carrier, serialization and source ownership before any implementation.
+This schema is **not an existing WebTransport/World protocol**. Combat4 (unified engineering) and Core8A/8C must approve semantics, carrier, serialization and source ownership before any implementation.
 
 ~~~json
 {
