@@ -20,7 +20,7 @@ function harness(){
   let clock=100,focusCalls=0,preventCalls=0,cancelCalls=0;
   canvas.focus=()=>{focusCalls++;};
   const context={canvas,window,document,COMBAT,COMBAT_ACTION,performance:{now:()=>clock},
-    audio:{play(){}},queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
+    audio:{play(){}},m41PhysicalChronology:null,queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
     currentInput:{},reviewedGestureLab:false,matchOver:false,dashGesture:{clearTaps(){}},
     leftButtonCharge:{cancel(){},isCharging:()=>false},rightButtonGesture:{cancel(){},isRunning:()=>false},
     shortBlockUntil:0,middleBlockHeld:false,rollRequested:false,dashRequested:false,dashMove:null,

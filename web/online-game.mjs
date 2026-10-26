@@ -4,6 +4,7 @@ import { installRightButtonGesture } from "../src/browser/right-button-gesture.m
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
 import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
+import { createM41PhysicalInputChronology } from "../src/browser/m41-physical-input-chronology.mjs";
 import { createAfterSource0Audio } from "../src/browser/after-source0-audio.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
@@ -199,6 +200,9 @@ const keys = new Set();
 const audio = createGameAudio();
 // Presentation may warm up only AFTER the real original combat input is authored.
 const afterSource0Audio = createAfterSource0Audio({ audio });
+// Acceptance-only physical wheel -> sampled Block -> original v1 invocation.
+const m41PhysicalChronology = acceptanceScenario === "uiparrytell"
+  || acceptanceScenario === "uistun" ? createM41PhysicalInputChronology() : null;
 installGameAudioControls(audio);
 const remoteActionAudio = createRemoteActionAudioTracker();
 const dashGesture = createDirectionalDash();
@@ -372,6 +376,7 @@ canvas.addEventListener("lostpointercapture", (event) => {
   }
 });
 canvas.addEventListener("wheel", (event) => {
+  const m41WheelToken = m41PhysicalChronology?.wheelStart(event);
   event.preventDefault();
   canvas.focus();
   if (event.deltaY < 0) {
@@ -382,6 +387,7 @@ canvas.addEventListener("wheel", (event) => {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
     audio.play("guard");
   }
+  m41PhysicalChronology?.wheelEnd(m41WheelToken);
 }, { passive: false });
 canvas.addEventListener("pointermove", updateMouse);
 canvas.addEventListener("keydown", (event) => {
@@ -904,6 +910,7 @@ function updateMouse(event) {
 function releaseInputs() {
   keys.clear();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
+  m41PhysicalChronology?.reset();
   dashGesture.clearTaps();
   dashRequested = false;
   dashMove = null;
@@ -959,6 +966,7 @@ function sampleInput() {
 
 function simulatePrediction(stepMs) {
   sampleInput();
+  m41PhysicalChronology?.sampled(currentInput, predictionStep + 1);
   if (typeof m147InputProbe !== "undefined") m147InputProbe?.sampled(currentInput, predictionStep + 1);
   if (!matchOver && local.initialized) predictMovement(currentInput, stepMs);
   predictionStep += 1;
@@ -1013,6 +1021,10 @@ function simulatePrediction(stepMs) {
             jump: Boolean(currentInput.jump),
             heavyAttack: Boolean(currentInput.heavyAttack),
             block: Boolean(currentInput.block),
+            // Trust and callback timestamps originate in the game listener;
+            // actual World Block/PARRY still requires independent Rust proof.
+            m41PhysicalInput: m41InputProbe && currentInput.block
+              ? m41PhysicalChronology?.sendInvocation(outgoingTick, currentInput) : null,
           });
           if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
         }
