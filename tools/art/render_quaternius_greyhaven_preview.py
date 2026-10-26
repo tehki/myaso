@@ -152,7 +152,169 @@ def apply_blood_iron_review_palette():
     return changed
 
 
-def render_mood(scene, mood, output, key, fill, environment):
+def glass_world_bounds(meshes):
+    """Locate actual glass polygons in source Quaternius imported meshes."""
+    verts = []
+    for obj in meshes:
+        obj.data = obj.data.copy()  # REVIEW only; source glTF bytes remain immutable
+        for polygon in obj.data.polygons:
+            mat = obj.data.materials[polygon.material_index]
+            if mat and mat.name.startswith("MI_WindowGlass"):
+                for index in polygon.vertices:
+                    verts.append(obj.matrix_world @ obj.data.vertices[index].co)
+    if not verts:
+        raise ValueError("source model has no genuine Quaternius glass polygons")
+    return {axis: (min(v[i] for v in verts), max(v[i] for v in verts))
+            for i, axis in enumerate(("x", "y", "z"))}
+
+
+def prepare_original_glass_dusk_lighting(imported):
+    """New Blender scene shaders only; do not edit any original source PBR texture."""
+    targets = (("window", "Window_Wide_Round1", 26.0),
+               ("door", "Door_1_Round", 12.0))
+    proof, switches, lights = {}, [], []
+    for kind, source_name, watts in targets:
+        meshes = imported.get(source_name, [])
+        if not meshes:
+            raise ValueError("missing authentic source " + source_name)
+        bounds = glass_world_bounds(meshes)
+        center = {axis: sum(bounds[axis]) / 2.0 for axis in ("x", "y", "z")}
+        changed = 0
+        for obj in meshes:
+            for index, original in enumerate(obj.data.materials):
+                if original is None or not original.name.startswith("MI_WindowGlass"):
+                    continue
+                lit = original.copy()
+                lit.name = "BloodIron_Dusk_" + kind + "_GenuineGlass_ReviewOnly"
+                if not lit.use_nodes:
+                    raise ValueError("source glass is not PBR-node based: " + kind)
+                bsdf = next((n for n in lit.node_tree.nodes
+                             if n.type == "BSDF_PRINCIPLED"), None)
+                if bsdf is None:
+                    raise ValueError("source Quaternius glass lacks Principled shader: " + kind)
+                for channel, value in (
+                    ("Base Color", (0.94, 0.38, 0.095, 1.0)),
+                    ("Emission Color", (1.0, 0.34, 0.07, 1.0)),
+                    ("Emission Strength", 2.0 if kind == "window" else 1.6),
+                    ("Alpha", 1.0),
+                ):
+                    inp = bsdf.inputs.get(channel)
+                    if inp is None:
+                        raise ValueError("Blender Principled socket unavailable: " + channel)
+                    for link in list(inp.links):
+                        lit.node_tree.links.remove(link)
+                    inp.default_value = value
+                if hasattr(lit, "surface_render_method"):
+                    lit.surface_render_method = "DITHERED"
+                elif hasattr(lit, "blend_method"):
+                    lit.blend_method = "OPAQUE"
+                switches.append((obj, index, original, lit))
+                changed += 1
+        if changed < 1:
+            raise ValueError("source glass material slot absent: " + kind)
+        # Lighting is slightly *inside* the wall; the authentic glass emits
+        # into the scene while nearby timber/plaster catches a soft warm tint.
+        source_light = bpy.data.lights.new("BloodIron_Dusk_" + kind + "_light", "POINT")
+        source_light.energy = watts
+        source_light.color = (1.0, 0.47, 0.17)
+        source_light.shadow_soft_size = 0.65 if kind == "window" else 0.35
+        lamp = bpy.data.objects.new(source_light.name, source_light)
+        bpy.context.scene.collection.objects.link(lamp)
+        lamp.location = (center["x"], center["y"] + 0.09, center["z"])
+        lights.append((lamp, watts))
+        proof[kind] = {"originalSourceModel": source_name,
+                       "genuineGlassBounds": bounds,
+                       "genuineGlassMaterialSlots": changed,
+                       "emissionColor": [1.0, 0.34, 0.07],
+                       "warmLightWatts": watts}
+    return switches, lights, proof
+
+
+def prepare_chimney_smoke(imported):
+    """Small author-time procedural smoke volumes, never runtime GPU emitters."""
+    actual = imported.get("Prop_Chimney", [])
+    if not actual:
+        raise ValueError("missing genuine source chimney")
+    bounds = mesh_world_bounds(actual)
+    base_x = sum(bounds["x"]) / 2.0
+    base_y = sum(bounds["y"]) / 2.0
+    top_z = bounds["z"][1]
+    if top_z < 4.0:
+        raise ValueError("chimney smoke cannot anchor to invalid source chimney")
+    material = bpy.data.materials.new("BloodIron_Review_ProceduralWarmGraySmoke")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    nodes.clear()
+    output = nodes.new("ShaderNodeOutputMaterial")
+    volume = nodes.new("ShaderNodeVolumePrincipled")
+    volume.inputs["Color"].default_value = (0.60, 0.53, 0.48, 1)
+    volume.inputs["Anisotropy"].default_value = 0.10
+    # Unbroken homogeneous density would look like a cotton-ball sphere.
+    # Blender-native 4D noise gives each original-geometry-anchored wisp a
+    # genuinely different irregular density field, with transparent gaps.
+    coords = nodes.new("ShaderNodeTexCoord")
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.noise_dimensions = "4D"
+    noise.inputs["Scale"].default_value = 4.3
+    noise.inputs["Detail"].default_value = 2.6
+    noise.inputs["Roughness"].default_value = 0.62
+    random = nodes.new("ShaderNodeObjectInfo")
+    variation = nodes.new("ShaderNodeMath")
+    variation.operation = "MULTIPLY"
+    variation.inputs[1].default_value = 6.0
+    colorramp = nodes.new("ShaderNodeValToRGB")
+    colorramp.color_ramp.elements[0].position = 0.33
+    colorramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)
+    colorramp.color_ramp.elements[1].position = 0.71
+    colorramp.color_ramp.elements[1].color = (0.42, 0.42, 0.42, 1.0)
+    links = material.node_tree.links
+    links.new(coords.outputs["Generated"], noise.inputs["Vector"])
+    links.new(random.outputs["Random"], variation.inputs[0])
+    links.new(variation.outputs[0], noise.inputs["W"])
+    links.new(noise.outputs["Fac"], colorramp.inputs["Fac"])
+    links.new(colorramp.outputs["Color"], volume.inputs["Density"])
+    links.new(volume.outputs["Volume"], output.inputs["Volume"])
+    puff_list = []
+    for i in range(6):
+        height = 0.20 + 0.26 * i
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0,
+            location=(base_x + 0.085*i, base_y + 0.035*i, top_z + height))
+        puff = bpy.context.object
+        puff.name = "BloodIron_Chimney_Smoke_ReviewOnly_" + str(i)
+        puff.scale = (0.24 + 0.055*i, 0.26 + 0.057*i, 0.29 + 0.049*i)
+        puff.data.materials.append(material)
+        puff.hide_render = True
+        puff_list.append(puff)
+    # Separate tiny volumetric fill light makes authored smoke legible
+    # against dark transparent game art without inventing an in-game emitter.
+    smoke_lamp = bpy.data.lights.new("BloodIron_Dusk_ActualChimneySmokeFill", "POINT")
+    smoke_lamp.energy = 0
+    smoke_lamp.color = (1.0, 0.66, 0.46)
+    smoke_lamp.shadow_soft_size = 0.85
+    smoke_light = bpy.data.objects.new(smoke_lamp.name, smoke_lamp)
+    bpy.context.scene.collection.objects.link(smoke_light)
+    smoke_light.location = (base_x + 0.10, base_y - 0.18, top_z + 1.02)
+    proof = {"anchorOriginalSourceModel": "Prop_Chimney",
+             "actualSourceChimneyTopMeters": top_z,
+             "actualSourceChimneyCenter": [base_x, base_y],
+             "proceduralVolumePuffs": len(puff_list),
+             "proceduralVolumeNoise4D": True,
+             "renderVolumeDensityMax": 0.42,
+             "duskSoftSmokeFillWatts": 46.0,
+             "duskOnly": True, "animatedInGame": False,
+             "sourceGLTFUnmodified": True}
+    return puff_list, [(smoke_light, 46.0)], proof
+
+
+def render_mood(scene, mood, output, key, fill, environment,
+                glass_switches, interior_lights, smoke_objects):
+    is_dusk = mood == "dusk"
+    for obj, idx, original, lit in glass_switches:
+        obj.data.materials[idx] = lit if is_dusk else original
+    for lamp, watts in interior_lights:
+        lamp.data.energy = watts if is_dusk else 0.0
+    for puff in smoke_objects:
+        puff.hide_render = not is_dusk
     key.data.energy = 1100 if mood == "day" else 500
     key.data.color = (1.0, 0.87, 0.70) if mood == "day" else (1.0, 0.52, 0.30)
     fill.data.energy = 420 if mood == "day" else 190
@@ -202,6 +364,9 @@ def main():
     print("GRAPHICS3B_ORIGINAL_QUATERNIUS_REAL_DOOR_ALIGNMENT_PASS " +
           json.dumps(door_alignment, sort_keys=True))
     review_roof_materials = apply_blood_iron_review_palette()
+    glass_switches, interior_lights, glass_proof = prepare_original_glass_dusk_lighting(imported)
+    smoke_objects, smoke_lights, smoke_proof = prepare_chimney_smoke(imported)
+    interior_lights.extend(smoke_lights)
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
@@ -246,7 +411,9 @@ def main():
     scene.camera = camera
     key = light("daylight / fire-amber key", (1, -7, 10), 1100, 6, (1, 0.87, 0.70))
     fill = light("blue-gray sky fill", (-6, 2, 7), 550, 7, (0.56, 0.70, 1))
-    captures = [render_mood(scene, mood, output, key, fill, world) for mood in ("day", "dusk")]
+    captures = [render_mood(scene, mood, output, key, fill, world,
+                            glass_switches, interior_lights, smoke_objects)
+                for mood in ("day", "dusk")]
     scene.render.filepath = ""
     blend_path = output / "greyhaven-quaternius-cottage-source.blend"
     bpy.ops.wm.save_as_mainfile(filepath=str(blend_path))
@@ -269,6 +436,14 @@ def main():
         "sourceLicense": cfg["source"]["license"],
         "doorFrameAlignment": door_alignment,
         "sourceTextureFilesOverwritten": False,
+        "duskInteriorAndChimney": {
+          "actualSourceGlassLighting": glass_proof,
+          "actualSourceChimneySmoke": smoke_proof,
+          "dayGlassMaterialAndLightsPreserved": True,
+          "originalMeshesAndTexturesUnchanged": True,
+          "blenderSceneOnly": True,
+          "emittedDoorAndWindowGlassDuskOnly": True
+        },
         "materialReview": {"roofMaterialNodesChanged": review_roof_materials,
           "roofHue": 0.5, "roofSaturation": 0.78, "roofValue": 0.70,
           "newShaderGradeOnly": True, "sourcePBRImagesPreserved": True},

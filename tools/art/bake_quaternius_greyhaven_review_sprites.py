@@ -51,6 +51,19 @@ def run():
             or alignment.get("depthCenterOffsetMeters", 1.0) > 0.10
             or not 0 <= alignment.get("thresholdBottomOffsetMeters", -1.0) <= 0.09):
         raise ValueError("cannot bake Quaternius cottage with unverified Blender door/arch alignment")
+    dusk = report.get("duskInteriorAndChimney", {})
+    glass = dusk.get("actualSourceGlassLighting", {})
+    smoke = dusk.get("actualSourceChimneySmoke", {})
+    if (dusk.get("blenderSceneOnly") is not True or
+            dusk.get("dayGlassMaterialAndLightsPreserved") is not True or
+            dusk.get("emittedDoorAndWindowGlassDuskOnly") is not True or
+            dusk.get("originalMeshesAndTexturesUnchanged") is not True or
+            any(glass.get(part, {}).get("genuineGlassMaterialSlots", 0) < 1
+                for part in ("window", "door")) or
+            smoke.get("anchorOriginalSourceModel") != "Prop_Chimney" or
+            smoke.get("proceduralVolumePuffs") != 6 or
+            smoke.get("animatedInGame") is not False):
+        raise ValueError("actual original Blender dusk source glass and anchored smoke audit missing")
     captures = report.get("captured")
     if len(captures or []) != 2:
         raise ValueError("requires original day AND dusk source evidence")
@@ -70,6 +83,9 @@ def run():
         "doorFrameDepthOffsetMeters": alignment["depthCenterOffsetMeters"],
         "doorThresholdBottomOffsetMeters": alignment["thresholdBottomOffsetMeters"],
         "cameraReview": camera,
+        "duskWindowAndDoorGlassFromGenuineBlender": True,
+        "duskProceduralSmokeFromSourceChimney": True,
+        "chimneySmokeAnimatedInGame": False,
         "images": {},
     }
     for mood, evidence in zip(("day","dusk"),captures):

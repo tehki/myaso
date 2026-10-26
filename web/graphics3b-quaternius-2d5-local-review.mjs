@@ -26,7 +26,10 @@ else try{
     JSON.stringify(manifest.cameraReview?.position)!=="[3,-12,17]"||
     JSON.stringify(manifest.cameraReview?.target)!=="[0,0,2.8]"||
     manifest.cameraReview?.orthoScale!==12.8||
-    manifest.cameraReview?.liveWorld9CameraChanged!==false)
+    manifest.cameraReview?.liveWorld9CameraChanged!==false||
+    manifest.duskWindowAndDoorGlassFromGenuineBlender!==true||
+    manifest.duskProceduralSmokeFromSourceChimney!==true||
+    manifest.chimneySmokeAnimatedInGame!==false)
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={},imageInfo={};
  for(const key of ["day","dusk"]){
