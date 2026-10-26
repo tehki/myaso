@@ -30,5 +30,14 @@ test("practice and online freeze only genuine light-commit movement then discard
     assert.match(content, /committedLightMove = null;/);
     assert.match(content, /leftButtonCharge\.cancel\(\);/);
   }
-  assert.match(online, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\);[\s\S]{0,130}committedLightMove = null;/);
+  // First-use audio may now be scheduled AFTER the original v1 input send.
+  // Keep this assertion about the actual order, not an arbitrary character span.
+  const originalSend = "networkClient.sendInput({ tick: outgoingTick, ...currentInput });";
+  const sendAt = online.indexOf(originalSend);
+  assert.ok(sendAt >= 0, "original source0 writer must submit the input");
+  const clearAt = online.indexOf("committedLightMove = null;", sendAt + originalSend.length);
+  assert.ok(clearAt > sendAt, "committed movement clears only after original input submission");
+  const betweenSendAndClear = online.slice(sendAt + originalSend.length, clearAt);
+  assert.match(betweenSendAndClear, /afterSource0Audio\\?\\.afterOriginalSend\\(currentInput\\)/);
+  assert.doesNotMatch(betweenSendAndClear, /audio\\.unlock\\(\\)/, "no synchronous audio startup between send and clear");
 });
