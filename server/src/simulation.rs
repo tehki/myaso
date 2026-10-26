@@ -764,11 +764,24 @@ impl World {
         let Ok(index) = self.fighter_index(net_id) else {
             return false;
         };
+        let now_ms = self.now_ms;
         let fighter = &mut self.fighters[index];
         if fighter.action == Action::Dead {
             return false;
         }
         match command {
+            // A future one-owner source0 Space+LMB wire event may request
+            // JumpAttack, but can NEVER manufacture a World Jump or bypass
+            // the original stamina ledger. The ORIGINAL server tick must
+            // have already executed a jump, including its 14 stamina spend.
+            // Repeat commands fail after the first real action transition.
+            Command::BeginJumpAttack
+                if fighter.action == Action::Jump
+                    && spend_stamina(now_ms, fighter, JUMP_ATTACK_STAMINA_COST) =>
+            {
+                fighter.begin_jump_attack();
+                true
+            }
             Command::BeginLightWindup
                 if fighter.action == Action::Idle
                     && !fighter.latest_input.block
