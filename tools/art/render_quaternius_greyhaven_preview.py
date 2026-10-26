@@ -158,7 +158,7 @@ def add_authored_gable_infill(imported, spec):
     Keep original CC0 meshes and PBR textures immutable. New geometry is an
     independent, editable Blender ART assembly using their source materials.
     """
-    if (spec.get("treatment") != "source-plaster-with-timber-braces"
+    if (spec.get("treatment") != "plain-plaster-wall"
             or spec.get("noRoofSourceMeshEdits") is not True
             or spec.get("gameplayFootprintUnchanged") is not True):
         raise ValueError("refusing unapproved gable fill/roof source change")
@@ -187,6 +187,36 @@ def add_authored_gable_infill(imported, spec):
     timber = next((m for m in bpy.data.materials if m.name.startswith("MI_WoodTrim")), None)
     if not plaster or not timber or not plaster.use_nodes or not timber.use_nodes:
         raise ValueError("original Quaternius plaster and timber PBR materials required")
+    # The original MI_Plaster atlas expects source-authored UV coordinates.
+    # Our new authored triangle has none, so applying it directly causes a
+    # skewed/incorrect plaster texture. User chose a PLAIN wall instead.
+    # Make a scene-local copy and leave the actual source material untouched.
+    uniform_wall_color = spec.get("plainWallRGBA")
+    if (not isinstance(uniform_wall_color, list) or len(uniform_wall_color) != 4
+            or any(not isinstance(v, (float, int)) for v in uniform_wall_color)
+            or not all(0.0 <= v <= 1.0 for v in uniform_wall_color)
+            or uniform_wall_color[3] != 1.0):
+        raise ValueError("plain plaster color must be validated opaque RGBA")
+    flat = plaster.copy()
+    flat.name = "BloodIron_Greyhaven_PlainGablePlaster_ReviewOnly"
+    flat.use_nodes = True
+    principled = next((node for node in flat.node_tree.nodes
+                      if node.type == "BSDF_PRINCIPLED"), None)
+    if principled is None:
+        raise ValueError("original Quaternius plaster lacks a principled PBR shader")
+    for input_name in ("Base Color", "Normal", "Roughness"):
+        socket = principled.inputs.get(input_name)
+        if socket is None:
+            raise ValueError("missing original plaster PBR socket: " + input_name)
+        for link in list(socket.links):
+            flat.node_tree.links.remove(link)
+    principled.inputs["Base Color"].default_value = tuple(uniform_wall_color)
+    principled.inputs["Roughness"].default_value = 0.90
+    principled.inputs["Normal"].default_value = (0.0, 0.0, 0.0)
+    flat.diffuse_color = tuple(uniform_wall_color)
+    if any(principled.inputs[key].is_linked
+           for key in ("Base Color", "Normal", "Roughness")):
+        raise ValueError("plain gable shader unexpectedly depends on textured UV")
     # Make the gable an actual double-sided 3D triangular prism, not a
     # billboard/image overlay or browser-side disguise of the roof aperture.
     depth = 0.09
@@ -201,7 +231,7 @@ def add_authored_gable_infill(imported, spec):
     infill_data = bpy.data.meshes.new("BloodIron_Greyhaven_Gable_SourcePlasterMesh")
     infill_data.from_pydata(verts, [], faces)
     infill_data.update()
-    infill_data.materials.append(plaster)
+    infill_data.materials.append(flat)
     infill = bpy.data.objects.new("BloodIron_Greyhaven_RealGablePlaster_ReviewOnly", infill_data)
     bpy.context.scene.collection.objects.link(infill)
 
@@ -232,9 +262,6 @@ def add_authored_gable_infill(imported, spec):
         timber_brace("BloodIron_Gable_TimberRightRafter_ReviewOnly",
                      (x_half - 0.10, beam_y, base_z + 0.08),
                      (0.0, beam_y, apex_z - 0.12), 0.10),
-        timber_brace("BloodIron_Gable_TimberCenterPost_ReviewOnly",
-                     (0.0, beam_y - 0.005, base_z + 0.10),
-                     (0.0, beam_y - 0.005, apex_z - 0.17), 0.09),
     ]
     # A solid building cannot have a zero-area attic fill.
     area = x_half * 2.0 * (apex_z - base_z) * 0.5
@@ -243,6 +270,13 @@ def add_authored_gable_infill(imported, spec):
     proof = {"sourceRoofModel": "Roof_RoundTiles_4x4",
              "sourceFrontWalls": ["Wall_Plaster_Window_Wide_Round", "Wall_Plaster_Door_Round"],
              "sourcePlasterPBR": plaster.name, "sourceTimberPBR": timber.name,
+             "plainGableMaterialName": flat.name,
+             "plainPlasterWallRGBA": list(uniform_wall_color),
+             "flatBaseColorUnlinked": not principled.inputs["Base Color"].is_linked,
+             "flatNormalUnlinked": not principled.inputs["Normal"].is_linked,
+             "flatRoughnessUnlinked": not principled.inputs["Roughness"].is_linked,
+             "originalSourcePlasterMaterialUnchanged": True,
+             "userRequestedPlainWall": True,
              "realBlender3DPrism": True,
              "newGableMeshName": infill.name,
              "worldVertices": [list(v) for v in verts],
