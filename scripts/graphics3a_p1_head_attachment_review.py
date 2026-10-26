@@ -122,7 +122,7 @@ def target_parts(target,tbuf,path):
    parts.append({'node':ni,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,'joints':joints,
     'weights':weights,'uv':uv,'faces':faces,'material':cache[mi]})
  return parts
-def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction):
+def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body'):
  target,tbuf=load_gltf(target_path)
  base,bbuf,prefix=read_base(base_archive,suffix)
  target_node=next(i for i,n in enumerate(target['nodes']) if 'mesh' in n and 'skin' in n)
@@ -200,11 +200,18 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  print('COMBINED_BOUNDS',lo.tolist(),hi.tolist(),'height',h,'head_top',float(max(v[:,1].max() for v in verts[len(target_parts(target,tbuf,target_path)): ])),flush=True)
  def look_at(eye,aim):
   up=np.array([0.,1.,0.]);z=eye-aim;z/=np.linalg.norm(z);x=np.cross(up,z);x/=np.linalg.norm(x);y=np.cross(z,x);m=np.eye(4);m[:3,:3]=np.stack((x,y,z),axis=1);m[:3,3]=eye;return m
- cam=pyrender.OrthographicCamera(xmag=span*.61,ymag=span*.61,znear=.02,zfar=50)
- cp=look_at(center+np.array([0.,h*.13,max(h*2.8,3.5)]),center)
+ if camera_mode not in ('full-body','collar-closeup'):
+  raise ValueError("Unrecognized review camera mode")
+ closeup=(camera_mode=='collar-closeup')
+ view_size=512 if closeup else 256
+ view_center=center.copy()
+ if closeup: view_center[1]=cut_y+.05
+ view_span=.46 if closeup else span
+ cam=pyrender.OrthographicCamera(xmag=view_span*.61,ymag=view_span*.61,znear=.02,zfar=50)
+ cp=look_at(view_center+np.array([0.,.02 if closeup else h*.13,max(h*2.8,3.5)]),view_center)
  output=Path(out);output.mkdir(parents=True,exist_ok=True)
- renderer=pyrender.OffscreenRenderer(viewport_width=256,viewport_height=256,point_size=1)
- sheet=Image.new('RGBA',(8*256,256),(35,38,49,255))
+ renderer=pyrender.OffscreenRenderer(viewport_width=view_size,viewport_height=view_size,point_size=1)
+ sheet=Image.new('RGBA',(8*view_size,view_size),(35,38,49,255))
  try:
   for direction in range(8):
    angle=direction*math.pi/4;c,s=math.cos(angle),math.sin(angle);yaw=np.eye(4);yaw[:3,:3]=[[c,0,s],[0,1,0],[-s,0,c]]
@@ -228,7 +235,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
    scene.add(pyrender.DirectionalLight(color=np.array([.65,.75,1.]),intensity=1.),pose=look_at(center+np.array([-3.,2.,-2.]),center))
    rgba,_=renderer.render(scene,flags=pyrender.RenderFlags.RGBA)
    if int((rgba[:,:,3]>127).sum())<500:raise ValueError('Blank composite')
-   im=Image.fromarray(rgba,'RGBA');im.save(output/f'facing_{direction*45:03d}.png');sheet.paste(im,(direction*256,0),im)
+   im=Image.fromarray(rgba,'RGBA');im.save(output/f'facing_{direction*45:03d}.png');sheet.paste(im,(direction*view_size,0),im)
  finally:renderer.delete()
  sheet.save(output/'head_attach_eight_view_contact_sheet.png')
  sheet_path=output/'head_attach_eight_view_contact_sheet.png'
@@ -243,6 +250,8 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'head_meshes':[{'name':part['name'],'vertex_count':len(part['positions']),'face_count':len(part['faces'])} for part in head],
          'contact_sheet_sha256':sha256(sheet_path.read_bytes()),
          'view_count':8,
+         'camera_mode':camera_mode,
+         'frame_size_px':view_size,
          'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
          'neck_collar_rest_pose_surface_diagnostic':surface_diagnostic,
          'limitations':'Eight private offline views and unsigned nearest-vertex collar proximity only; no accepted neck seam, game export, Art Director approval, animated seam, ground contact, or native multiplayer validation'}
@@ -261,6 +270,7 @@ def main():
  p.add_argument('--clip',default='Walk_Loop')
  p.add_argument('--fraction',type=float,default=0.5)
  p.add_argument('--head-cut-y',type=float,default=None)
+ p.add_argument('--camera-mode',choices=('full-body','collar-closeup'),default='full-body')
  a=p.parse_args()
  for file in [a.target_model,a.base_archive,a.animation_archive]:
   if not file.is_file(): raise FileNotFoundError(file)
@@ -269,7 +279,7 @@ def main():
  if a.output.resolve().is_relative_to(repo):
   raise ValueError("No generated vendor images may be written inside the repository")
  render(a.target_model,a.base_archive,a.base_model_suffix,a.animation_archive,a.animation_model_suffix,
-        a.head_cut_y,a.output,a.clip,a.fraction)
+        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode)
 
 if __name__=='__main__':
  main()
