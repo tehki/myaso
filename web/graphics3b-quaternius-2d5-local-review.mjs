@@ -29,7 +29,10 @@ else try{
     manifest.cameraReview?.liveWorld9CameraChanged!==false||
     manifest.duskWindowAndDoorGlassFromGenuineBlender!==true||
     manifest.duskProceduralSmokeFromSourceChimney!==true||
-    manifest.chimneySmokeAnimatedInGame!==false)
+    manifest.chimneySmokeAnimatedInGame!==false||
+    manifest.realSourcePBRGableInfillInBlender!==true||
+    manifest.gableTimberBraceCount!==4||
+    manifest.originalRoofAndWallMeshesUnchanged!==true)
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={},imageInfo={};
  for(const key of ["day","dusk"]){
