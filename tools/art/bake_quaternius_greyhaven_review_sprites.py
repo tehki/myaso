@@ -64,6 +64,18 @@ def run():
             smoke.get("proceduralVolumePuffs") != 6 or
             smoke.get("animatedInGame") is not False):
         raise ValueError("actual original Blender dusk source glass and anchored smoke audit missing")
+    gable = report.get("gableInfill", {})
+    if (gable.get("realBlender3DPrism") is not True
+            or gable.get("sourceRoofModel") != "Roof_RoundTiles_4x4"
+            or gable.get("sourcePlasterPBR", "").startswith("MI_Plaster") is not True
+            or gable.get("sourceTimberPBR", "").startswith("MI_WoodTrim") is not True
+            or gable.get("timberBraceCount") != 4
+            or gable.get("gableFaceAreaSquareMeters", 0) < 2.0
+            or gable.get("originalRoofAndWallMeshesUnchanged") is not True
+            or gable.get("unchangedDoorGlassLightingAndSmoke") is not True
+            or gable.get("world9PlacementUnchanged") is not True
+            or gable.get("gameplayCollisionUnchanged") is not True):
+        raise ValueError("original Quaternius roof-to-wall gap lacks verified real Blender timber/plaster gable infill")
     captures = report.get("captured")
     if len(captures or []) != 2:
         raise ValueError("requires original day AND dusk source evidence")
@@ -83,6 +95,9 @@ def run():
         "doorFrameDepthOffsetMeters": alignment["depthCenterOffsetMeters"],
         "doorThresholdBottomOffsetMeters": alignment["thresholdBottomOffsetMeters"],
         "cameraReview": camera,
+        "realSourcePBRGableInfillInBlender": True,
+        "gableTimberBraceCount": gable["timberBraceCount"],
+        "originalRoofAndWallMeshesUnchanged": True,
         "duskWindowAndDoorGlassFromGenuineBlender": True,
         "duskProceduralSmokeFromSourceChimney": True,
         "chimneySmokeAnimatedInGame": False,
