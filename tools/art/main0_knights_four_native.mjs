@@ -154,6 +154,27 @@ try{
  }
  assert.ok(genuineMotionSource.walk+genuineMotionSource.sprint>=8,
    "genuine native KeyD must cause a source-authentic Silver locomotion WebP draw");
+ // An independent real W3C Space gesture must draw Blender-source Jump,
+ // not a fabricated DOM event or synthetic sprite/raster sample. Give the
+ // original authoritative server time to leave the locomotion state first.
+ await sleeps(500);
+ const jumpBefore=await evaluate(motionSession,
+   "return window.__arenaLiteNative?.knightSources?.['silver_jump_relit.webp']||0;");
+ assert.ok(Number.isInteger(jumpBefore)&&jumpBefore>=0);
+ await request(motionSession.base,"POST",motionActionPath,{
+  actions:[{type:"key",id:"graphics3c-authentic-jump",actions:[
+   {type:"keyDown",value:" "},{type:"pause",duration:150},{type:"keyUp",value:" "}
+  ]}]
+ });
+ const jumpAfter=await waitFor(async()=>{
+  const draws=await evaluate(motionSession,
+   "return window.__arenaLiteNative?.knightSources?.['silver_jump_relit.webp']||0;");
+  return Number.isInteger(draws)&&draws-jumpBefore>=3?draws:null;
+ },4500);
+ const genuineJumpSource={browser:motionSession.engine,actorId:actors[0].actor.id,
+  key:"Space",before:jumpBefore,after:jumpAfter,draws:jumpAfter-jumpBefore};
+ assert.ok(genuineJumpSource.draws>=3,
+   "real native Space must paint original Silver Jump source WebP frames");
  await sleeps(2400);
  const trial=[];
  for(const {s,actor,flag} of actors){
@@ -205,6 +226,7 @@ try{
   authenticSilverKnightIntegrationVerified:true,
   genuineW3cSilverLocomotionVerified:true,
   genuineW3cLocomotion:{browser:motionSession.engine,actorId:actors[0].actor.id,key:"KeyD",...genuineMotionSource},
+  genuineW3cSilverJumpVerified:true,genuineW3cJump:genuineJumpSource,
   allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
   genuineFullCombatApproval:false,optionalTerrainEnabled:false,
@@ -213,6 +235,7 @@ try{
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
  console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot),
   genuineW3cLocomotion:report.genuineW3cLocomotion,
+  genuineW3cJump:report.genuineW3cJump,
   fullCanvases:trial.map(x=>x.fullCanvasScreenshot),
   floorBlitP95Ms:trial.map(x=>x.data.floorBlitDurationP95Ms),
   presentationDebtP95Ms:trial.map(x=>x.data.presentationDebtP95Ms)}));

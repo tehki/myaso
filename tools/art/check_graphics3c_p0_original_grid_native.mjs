@@ -26,6 +26,18 @@ function validate(path,players){
     && r.genuineW3cLocomotion[clipCount]>=0,"trustworthy nonnegative source locomotion clip count");
  assert.ok(r.genuineW3cLocomotion.walk+r.genuineW3cLocomotion.sprint>=8,
    "the actual 2/4-seat browser must draw original relit walk or sprint WebP");
+ assert.equal(r.genuineW3cSilverJumpVerified,true,
+   "source-backed actual W3C Space jump must be demonstrated in the browser");
+ assert.equal(r.genuineW3cJump?.browser,engines[0]);
+ assert.equal(r.genuineW3cJump?.actorId,1);
+ assert.equal(r.genuineW3cJump?.key,"Space");
+ for(const field of ["before","after","draws"])
+  assert.ok(Number.isInteger(r.genuineW3cJump[field])&&r.genuineW3cJump[field]>=0,
+    "actual original Silver Jump source count must be a nonnegative integer");
+ assert.equal(r.genuineW3cJump.draws,r.genuineW3cJump.after-r.genuineW3cJump.before,
+   "Jump report must provide true source-atlas drawImage deltas");
+ assert.ok(r.genuineW3cJump.draws>=3,
+   "real Space gesture must draw the original Blender Silver Jump atlas");
  assert.equal(r.allFiveClipsVisuallyValidated,false);
  assert.equal(r.trueFourIndependentHumanOperators,false);
  assert.equal(r.modeIsOptional,false);
