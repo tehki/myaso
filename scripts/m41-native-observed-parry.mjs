@@ -108,7 +108,9 @@ export function m41NativeAsyncCueScript() {
     + "const state = window.__MYASO_M30_UI__;"
     + "const cue = observe(state, baseline, actorId, allowHeavy);"
     + "if (cue || performance.now() - started >= timeoutMs) {"
-    + "clearInterval(poll);done(cue ?? timeoutEvidence(state, baseline, actorId, performance.now() - started));"
+    + "clearInterval(poll);"
+    + "if (!cue) window.__MYASO_M41_LAST_TIMEOUT__ = timeoutEvidence(state, baseline, actorId, performance.now() - started);"
+    + "done(cue ?? null);"
     + "}};"
     + "poll = setInterval(check, 4);check();";
 }
