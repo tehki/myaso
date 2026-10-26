@@ -54,8 +54,8 @@ def run(target_path, hood_archive, animation_archive, output):
     validate_skeleton_pair(hood,target)
     target_nodes=[i for i,n in enumerate(target["nodes"]) if "mesh" in n and "skin" in n]
     hood_nodes=[i for i,n in enumerate(hood["nodes"]) if "mesh" in n and "skin" in n]
-    if len(target_nodes)!=1 or len(hood_nodes)!=1:
-        raise ValueError("Private test expects one Peasant and one Ranger Hood skinned node")
+    if not target_nodes or len(hood_nodes)!=1:
+        raise ValueError("Private test needs Peasant skinned meshes and one Ranger Hood skinned node")
     tn,hn=target_nodes[0],hood_nodes[0]
     sm,tm,hm=joint_map(source),joint_map(target),joint_map(hood)
     src_rest=world_matrices(source,{},np)
@@ -70,8 +70,8 @@ def run(target_path, hood_archive, animation_archive, output):
         float(np.max(np.abs(skin_matrices(target,tbuf,tgt_rest,tn,np)-np.eye(4)))),
     )
     if bind_error>5e-4:raise ValueError("Rest pose skin matrices are not identity")
-    if np.max(np.abs(hood_rest[hn]-tgt_rest[tn]))>1e-5:
-        raise ValueError("Hood and Peasant mesh node rest coordinate spaces differ")
+    if any(np.max(np.abs(hood_rest[hn]-tgt_rest[node]))>1e-5 for node in target_nodes):
+        raise ValueError("Hood and one or more Peasant mesh node rest spaces differ")
 
     hnames=[hood["nodes"][i]["name"] for i in hood["skins"][hood["nodes"][hn]["skin"]]["joints"]]
     tnames=[target["nodes"][i]["name"] for i in target["skins"][target["nodes"][tn]["skin"]]["joints"]]
