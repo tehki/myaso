@@ -247,8 +247,8 @@ def prepare_chimney_smoke(imported):
     nodes.clear()
     output = nodes.new("ShaderNodeOutputMaterial")
     volume = nodes.new("ShaderNodeVolumePrincipled")
-    volume.inputs["Color"].default_value = (0.52, 0.46, 0.41, 1)
-    volume.inputs["Density"].default_value = 0.38
+    volume.inputs["Color"].default_value = (0.65, 0.59, 0.54, 1)
+    volume.inputs["Density"].default_value = 0.53
     volume.inputs["Anisotropy"].default_value = 0.12
     material.node_tree.links.new(volume.outputs["Volume"], output.inputs["Volume"])
     puff_list = []
@@ -258,17 +258,28 @@ def prepare_chimney_smoke(imported):
             location=(base_x + 0.085*i, base_y + 0.035*i, top_z + height))
         puff = bpy.context.object
         puff.name = "BloodIron_Chimney_Smoke_ReviewOnly_" + str(i)
-        puff.scale = (0.18 + 0.042*i, 0.20 + 0.05*i, 0.25 + 0.042*i)
+        puff.scale = (0.24 + 0.055*i, 0.26 + 0.057*i, 0.29 + 0.049*i)
         puff.data.materials.append(material)
         puff.hide_render = True
         puff_list.append(puff)
+    # Separate tiny volumetric fill light makes authored smoke legible
+    # against dark transparent game art without inventing an in-game emitter.
+    smoke_lamp = bpy.data.lights.new("BloodIron_Dusk_ActualChimneySmokeFill", "POINT")
+    smoke_lamp.energy = 0
+    smoke_lamp.color = (1.0, 0.66, 0.46)
+    smoke_lamp.shadow_soft_size = 0.85
+    smoke_light = bpy.data.objects.new(smoke_lamp.name, smoke_lamp)
+    bpy.context.scene.collection.objects.link(smoke_light)
+    smoke_light.location = (base_x, base_y - 0.26, top_z + 0.79)
     proof = {"anchorOriginalSourceModel": "Prop_Chimney",
              "actualSourceChimneyTopMeters": top_z,
              "actualSourceChimneyCenter": [base_x, base_y],
              "proceduralVolumePuffs": len(puff_list),
+             "renderVolumeDensity": 0.53,
+             "duskSoftSmokeFillWatts": 95.0,
              "duskOnly": True, "animatedInGame": False,
              "sourceGLTFUnmodified": True}
-    return puff_list, proof
+    return puff_list, [(smoke_light, 95.0)], proof
 
 
 def render_mood(scene, mood, output, key, fill, environment,
@@ -330,7 +341,8 @@ def main():
           json.dumps(door_alignment, sort_keys=True))
     review_roof_materials = apply_blood_iron_review_palette()
     glass_switches, interior_lights, glass_proof = prepare_original_glass_dusk_lighting(imported)
-    smoke_objects, smoke_proof = prepare_chimney_smoke(imported)
+    smoke_objects, smoke_lights, smoke_proof = prepare_chimney_smoke(imported)
+    interior_lights.extend(smoke_lights)
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
