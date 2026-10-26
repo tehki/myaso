@@ -104,9 +104,29 @@ def clip_skinned_mesh_y(positions,normals,uvs,joints,weights,faces,cut_y):
             out[5].append(tuple(newface))
     if not out[5]:
         raise ValueError("No head surface remains after plane clipping")
+    # Triangle clipping above uses expanded corner attributes. Merge only
+    # exactly equivalent attributes for a topologically meaningful boundary
+    # and accurate open-edge neck diagnosis. UV/normal seams are retained.
+    welded=[[],[],[],[],[],[]]
+    seen={}
+    for face in out[5]:
+        triangle=[]
+        for old_index in face:
+            key=tuple(
+                tuple(round(float(component), 9) for component in out[k][old_index])
+                for k in range(5)
+            )
+            if key not in seen:
+                seen[key]=len(welded[0])
+                for k in range(5):
+                    welded[k].append(out[k][old_index])
+            triangle.append(seen[key])
+        if len(set(triangle))!=3:
+            raise ValueError("Attribute welding produced degenerate triangle")
+        welded[5].append(tuple(triangle))
     return {
-        "positions":out[0],"normals":out[1],"uv":out[2],
-        "joints":out[3],"weights":out[4],"faces":out[5],
-        "method":"triangle_plane_clip_no_cap",
+        "positions":welded[0],"normals":welded[1],"uv":welded[2],
+        "joints":welded[3],"weights":welded[4],"faces":welded[5],
+        "method":"triangle_plane_clip_welded_attributes_no_cap",
         "status":"HOLD_OFFLINE_REVIEW_ONLY",
     }
