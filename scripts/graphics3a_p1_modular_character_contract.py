@@ -15,6 +15,15 @@ BODY_REGIONS = (
 )
 HEAD_STATES = ("attached", "detached")
 HEAD_ACCESSORIES = ("eyes", "eyebrows", "hair")
+SLOT_BODY_MASKS = {
+    "head": frozenset(("head", "neck")),
+    "torso": frozenset(("torso", "pelvis", "left_arm", "right_arm")),
+    "arms": frozenset(("left_arm", "right_arm")),
+    "hands": frozenset(("left_hand", "right_hand")),
+    "legs": frozenset(("pelvis", "left_leg", "right_leg")),
+    "feet": frozenset(("left_foot", "right_foot")),
+    "back": frozenset(("torso",)),
+}
 
 
 def _asset_id(value):
@@ -77,8 +86,8 @@ def validate_modular_manifest(manifest: Mapping) -> None:
             raise ValueError("Every equipment item must have unique explicit body masking")
         if any(region not in BODY_REGIONS for region in hides):
             raise ValueError("Equipment attempts to hide an unknown body region")
-        if item["slot"] == "head" and any(x not in ("head","neck") for x in hides):
-            raise ValueError("Headgear must not hide unrelated body regions")
+        if any(region not in SLOT_BODY_MASKS[item["slot"]] for region in hides):
+            raise ValueError("Equipment slot may not hide unrelated body regions")
 
 
 @dataclass(frozen=True)
