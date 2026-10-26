@@ -174,9 +174,8 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
 
 test("M194 and M151 use native release-anchored genuine wheel; M152 remains wheel-first", () => {
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
-  const guardOnly = runner.match(/const wheelFirstGuardOnly = (\[[\s\S]*?\])\.includes\(scenario\);/);
-  assert.ok(guardOnly, "only explicit native guard-only scenarios may opt in");
-  assert.deepEqual(JSON.parse(guardOnly[1]), ["uiguardbreakpunishffahit"]);
+  assert.match(runner, /const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";/,
+    "only M152 retains wheel-first compound W3C input");
   assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
   assert.match(runner, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak"/);
   assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
