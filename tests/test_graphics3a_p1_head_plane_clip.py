@@ -23,7 +23,9 @@ class ClipHeadTests(unittest.TestCase):
     def test_crossing_triangle_gets_two_faces(self):
         result=self.clip()
         self.assertEqual(len(result["faces"]),2)
-        self.assertEqual(len(result["positions"]),6)
+        self.assertEqual(len(result["positions"]),4)
+        # The two clipped triangles share the same edge vertices.
+        self.assertEqual(len(set(result["faces"][0]) & set(result["faces"][1])),2)
 
     def test_new_vertices_lie_exactly_on_cut_plane(self):
         r=self.clip()
