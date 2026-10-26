@@ -31,7 +31,10 @@ else try{
     manifest.duskProceduralSmokeFromSourceChimney!==true||
     manifest.chimneySmokeAnimatedInGame!==false||
     manifest.realSourcePBRGableInfillInBlender!==true||
-    manifest.gableTimberBraceCount!==4||
+    manifest.gableTimberBraceCount!==3||
+    manifest.gablePlainPlasterNoUVTexture!==true||
+    manifest.gableSourcePlasterUnchanged!==true||
+    manifest.gableCenterPostRemoved!==true||
     manifest.originalRoofAndWallMeshesUnchanged!==true)
    throw Error("not an isolated approved-comparison-only sprite manifest");
  const images={},imageInfo={};
