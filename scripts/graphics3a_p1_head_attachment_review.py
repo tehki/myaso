@@ -16,13 +16,14 @@ from graphics3a_p1_head_plane_clip import clip_skinned_mesh_y
 from graphics3a_p1_skin_paint_ab import (NEUTRAL_MIN_RGB_MEAN, NEUTRAL_MAX_RGB_MEAN, NEUTRAL_MAX_CHANNEL_SPAN, skin_sample_is_valid, skin_reference_uv)
 from graphics3a_p1_hood_review_rules import (approved_hood_member, verified_hood_bind_anchors)
 from graphics3a_p1_hood_motion_rules import collar_follow_center
+from graphics3a_p1_hood_pbr_rules import ranger_orm_image_uri
 from graphics3a_p1_cpu_skin_retarget import (
  load_gltf, load_glb_from_zip, world_matrices, joint_map, accessor_values, skin_matrices,
  sample_clip, retarget_pose, safe_local_path, normalized_base_color_factor,
  validate_skeleton_pair, sha256,
 )
 
-def mat_for(doc,buffers,archive,prefix,mi,cache,body_atlas='original',head_paint='original'):
+def mat_for(doc,buffers,archive,prefix,mi,cache,body_atlas='original',head_paint='original',ranger_orm=False):
  if mi in cache:return cache[mi]
  m=doc.get('materials',[])[mi] if mi is not None else {}
  pbr=m.get('pbrMetallicRoughness',{})
@@ -58,8 +59,18 @@ def mat_for(doc,buffers,archive,prefix,mi,cache,body_atlas='original',head_paint
   altered[mask]=sample
   tex=Image.fromarray(altered,'RGB').convert('RGBA')
   print('HEAD_PAINT_EXPERIMENT',m.get('name'),'neutral_pixels_recolored',int(mask.sum()),'reference_rgb',sample.tolist(),flush=True)
+ orm_texture=None
+ if ranger_orm:
+  if not archive:raise ValueError("Publisher ORM needs private original source archive")
+  uri=ranger_orm_image_uri(doc,mi)
+  with ZipFile(archive) as z:
+   data=z.read(archive_uri(prefix,uri))
+  orm_texture=Image.open(io.BytesIO(data)).convert('RGBA').copy()
+  if tex is None or orm_texture.size!=tex.size or orm_texture.size!=(4096,4096):
+   raise ValueError("Original Ranger base color and ORM atlas dimensions mismatch")
+  print('SOURCE_RANGER_ORM_ENABLED',uri,'resolution',orm_texture.size,flush=True)
  mat=pyrender.MetallicRoughnessMaterial(
-  baseColorTexture=tex,baseColorFactor=normalized_base_color_factor(pbr),
+  baseColorTexture=tex,baseColorFactor=normalized_base_color_factor(pbr),metallicRoughnessTexture=orm_texture,
   metallicFactor=float(pbr.get('metallicFactor',1.0)),roughnessFactor=float(pbr.get('roughnessFactor',1.0)),
   alphaMode=m.get('alphaMode','OPAQUE'),alphaCutoff=float(m.get('alphaCutoff',0.5)),
   doubleSided=bool(m.get('doubleSided',False)))
@@ -165,7 +176,7 @@ def target_parts(target,tbuf,path):
    parts.append({'node':ni,'name':node.get('name',str(ni)),'positions':pos,'normals':norm,'joints':joints,
     'weights':weights,'uv':uv,'faces':faces,'material':cache[mi]})
  return parts
-def load_private_publisher_hood(archive,target_model_name,target,target_mesh_node,target_world):
+def load_private_publisher_hood(archive,target_model_name,target,target_mesh_node,target_world,hood_material='legacy-preview'):
  """Add original approved free Standard Ranger hood mesh for offline P1 lookdev.
 
  Source vendor ZIP remains local and unchanged. The target rig drives this
@@ -211,7 +222,7 @@ def load_private_publisher_hood(archive,target_model_name,target,target_mesh_nod
    raise ValueError("Ranger hood source geometry contains unsafe values")
   if faces.min()<0 or faces.max()>=len(pos):raise ValueError("Ranger hood source triangle out of bounds")
   weights/=np.maximum(weights.sum(axis=1)[:,None],1e-12)
-  mat=mat_for(doc,buffers,archive,prefix,p.get("material"),materials)
+  mat=mat_for(doc,buffers,archive,prefix,p.get("material"),materials,ranger_orm=(hood_material=="publisher-orm"))
   parts.append(dict(node=target_mesh_node,name=target_model_name.rsplit(".",1)[0]+"_Ranger_Hood",
    positions=pos,normals=normals,uv=uv,joints=remap[js],weights=weights,faces=faces,material=mat))
   print("P1_PRIVATE_APPROVED_HOOD",member,"vertices",len(pos),"faces",len(faces),
@@ -219,7 +230,7 @@ def load_private_publisher_hood(archive,target_model_name,target,target_mesh_nod
  if not parts:raise ValueError("Approved Ranger hood had no renderable parts")
  return parts,member
 
-def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',approved_hood_archive=None):
+def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cut_y,out,clip_name,fraction,camera_mode='full-body',cut_method='centroid',face_parts='all',body_atlas='original',head_paint='original',approved_hood_archive=None,hood_material='legacy-preview'):
  target,tbuf=load_gltf(target_path)
  base,bbuf,prefix=read_base(base_archive,suffix)
  target_node=next(i for i,n in enumerate(target['nodes']) if 'mesh' in n and 'skin' in n)
@@ -262,7 +273,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
  hood_member=None
  if approved_hood_archive is not None:
   hood_parts,hood_member=load_private_publisher_hood(approved_hood_archive,target_path.name,
-    target,target_node,target_world)
+    target,target_node,target_world,hood_material)
   head.extend(hood_parts)
 
  # Diagnostic only: rest-pose cut boundary to actual garment vertices.
@@ -374,6 +385,7 @@ def render(target_path,base_archive,suffix,animation_archive,animation_suffix,cu
          'body_atlas_variant':body_atlas,
          'head_paint_variant':head_paint,
          'approved_ranger_hood_member':hood_member,
+         'hood_material_variant':hood_material,
          'approved_ranger_hood_archive_sha256':sha256(approved_hood_archive.read_bytes()) if hood_member else None,
          'frame_size_px':view_size,
          'neck_collar_rest_pose_geometry_diagnostic':collar_diagnostic,
@@ -399,6 +411,7 @@ def main():
  p.add_argument('--face-parts',choices=('all','without-eyebrows','head-only'),default='all')
  p.add_argument('--body-atlas',choices=('original','publisher-light'),default='original')
  p.add_argument('--head-paint',choices=('original','neutral-to-skin-prototype'),default='original')
+ p.add_argument('--hood-material',choices=('legacy-preview','publisher-orm'),default='legacy-preview')
  p.add_argument('--approved-hood-archive',type=Path,default=None,
                 help='Original private publisher Modular Fantasy Standard ZIP; experimental hood overlay only')
  a=p.parse_args()
@@ -409,7 +422,7 @@ def main():
  if a.output.resolve().is_relative_to(repo):
   raise ValueError("No generated vendor images may be written inside the repository")
  render(a.target_model,a.base_archive,a.base_model_suffix,a.animation_archive,a.animation_model_suffix,
-        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint,a.approved_hood_archive)
+        a.head_cut_y,a.output,a.clip,a.fraction,a.camera_mode,a.cut_method,a.face_parts,a.body_atlas,a.head_paint,a.approved_hood_archive,a.hood_material)
 
 if __name__=='__main__':
  main()
