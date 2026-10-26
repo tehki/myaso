@@ -246,7 +246,10 @@
         "originalApexZ": 5.1,
         "correctedApexZ": 5.26,
         "shiftFrontFaceTowardCameraMeters": 0.015,
-        "roofSourceMeshUntouched": true
+        "roofSourceMeshUntouched": true,
+        "hiddenTipRoofOverlapZ": 0.17,
+        "hiddenTipTowardCameraY": 0.035,
+        "sourceTimberAndTilesUnaffected": true
       },
       "noCenterPost": true
     }
