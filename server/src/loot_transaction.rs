@@ -1799,6 +1799,207 @@ mod tests {
     }
 
     #[test]
+    fn recovered_exact_pickup_rejects_old_ground_entity_after_same_sword_redrop() {
+        use crate::magic_checkpoint::load_joint;
+
+        // Same physical sword returns to the exact world coordinate under a
+        // NEW ground entity. After durable recovery, an unspent old pickup
+        // sequence must not mistake the old object for the new one.
+        // This is a local prototype checkpoint test, not a global writer.
+        let mut world = World::new(800.0, 600.0);
+        let mut zones = ZoneAuthority::new();
+        let mut identity = SessionIdentityRegistry::new();
+        let mut loot = LootAuthority::new();
+        for id in 1..=2 {
+            assert!(world.add_player_at(id, 200.0, 200.0, 0.0));
+            zones.register(id).unwrap();
+            identity
+                .bind_verified(lease(id), CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            loot.register(id).unwrap();
+        }
+        let item_id = loot.grant(2, ItemKind::IronSword, 1).unwrap();
+        let first_ground = loot
+            .drop_backpack(2, world.fighter(2).unwrap(), ZoneId::Moonvale, item_id, 0)
+            .unwrap();
+        let old_selection = GroundSwordSelection {
+            ground_entity_id: first_ground,
+            expected_item_id: item_id,
+        };
+        let path = checkpoint_path();
+        let magic = MagicAuthority::new();
+        macro_rules! authority {
+            ($loot:expr, $magic:expr, $identity:expr, $actor:expr, $gen:expr, $seq:expr) => {
+                GroundSwordAuthority {
+                    path: &path,
+                    loot: $loot,
+                    magic: $magic,
+                    identity: $identity,
+                    tick: PickupWorldTick {
+                        world: &world,
+                        completed_tick: world.tick,
+                        zones: &zones,
+                    },
+                    operation: VerifiedLootOperation {
+                        lease: SessionLease::new($actor, $gen).unwrap(),
+                        sequence: $seq,
+                    },
+                }
+            };
+        }
+        let acquired = commit_verified_ground_sword_equip_checked(
+            authority!(&mut loot, &magic, &identity, 2, 1, 1),
+            old_selection,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 2);
+                assert_eq!(ground.entity_id, first_ground);
+                assert_eq!(ground.item.id, item_id);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(acquired.id, item_id);
+        let new_selection = commit_verified_equipped_sword_drop_checked(
+            authority!(&mut loot, &magic, &identity, 2, 1, 2),
+            item_id,
+            |fighter, ground, zone| {
+                assert_eq!((ground.at.x, ground.at.y), (fighter.x, fighter.y));
+                assert_eq!(ground.item.id, item_id);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_ne!(new_selection.ground_entity_id, first_ground);
+        assert_eq!(new_selection.expected_item_id, item_id);
+        assert!(!loot.ground().contains_key(&first_ground));
+        assert_eq!(loot.ground().len(), 1);
+        assert_eq!(
+            loot.ground()[&new_selection.ground_entity_id].at,
+            crate::loot::Point { x: 200.0, y: 200.0 }
+        );
+
+        // Crash/reconnect after both durable commits, retaining the current
+        // checkpoint bytes. All future requests use fresh verified leases.
+        let durable_before_recovery = fs::read(&path).unwrap();
+        let (mut recovered, recovered_magic) = load_joint(&path).unwrap();
+        let mut reconnected = SessionIdentityRegistry::new();
+        for id in 1..=2 {
+            let fresh = SessionLease::new(id, 2).unwrap();
+            reconnected
+                .bind_verified(fresh, CharacterId::new(u64::from(id)).unwrap())
+                .unwrap();
+            recovered.resume_inventory(&reconnected, fresh).unwrap();
+        }
+        assert_eq!(recovered.ground().len(), 1);
+        assert!(!recovered.ground().contains_key(&first_ground));
+        assert_eq!(
+            recovered.ground()[&new_selection.ground_entity_id].item.id,
+            item_id
+        );
+        let before_denials = recovered.export_state().unwrap();
+
+        // Player1 has an unspent sequence, yet their old exact entity is
+        // gone. Player2's original sequence is already committed. A forged
+        // item ID on the NEW entity is also denied, even with fresh sequence.
+        for (actor, sequence, selected, expected) in [
+            (1, 1, old_selection, LootError::NotFound),
+            (2, 1, old_selection, LootError::ReplayOperation),
+            (
+                1,
+                1,
+                GroundSwordSelection {
+                    ground_entity_id: new_selection.ground_entity_id,
+                    expected_item_id: item_id + 100,
+                },
+                LootError::NotFound,
+            ),
+        ] {
+            let result = commit_verified_ground_sword_equip_checked(
+                authority!(
+                    &mut recovered,
+                    &recovered_magic,
+                    &reconnected,
+                    actor,
+                    2,
+                    sequence
+                ),
+                selected,
+                |_, _, _| -> Result<(), PickupCommitError> {
+                    panic!("stale/forged recovered click must not reach Physics or commit");
+                },
+            );
+            match (result, expected) {
+                (Err(PickupCommitError::Loot(LootError::NotFound)), LootError::NotFound)
+                | (
+                    Err(PickupCommitError::Loot(LootError::ReplayOperation)),
+                    LootError::ReplayOperation,
+                ) => {}
+                (actual, expected) => panic!("expected {expected:?}, got {actual:?}"),
+            }
+            assert_eq!(recovered.export_state().unwrap(), before_denials);
+            assert_eq!(fs::read(&path).unwrap(), durable_before_recovery);
+        }
+
+        // A freshly selected entity must still be claimable by the other
+        // verified player exactly once, conserving original physical ItemId.
+        let obtained = commit_verified_ground_sword_equip_checked(
+            authority!(&mut recovered, &recovered_magic, &reconnected, 1, 2, 1),
+            new_selection,
+            |fighter, ground, zone| {
+                assert_eq!(fighter.net_id, 1);
+                assert_eq!(ground.entity_id, new_selection.ground_entity_id);
+                assert_eq!(ground.item.id, item_id);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(obtained.id, item_id);
+        assert!(recovered.ground().is_empty());
+        assert!(recovered
+            .inventory(2)
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        assert_eq!(
+            recovered
+                .inventory(1)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            item_id
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(CharacterId::new(1).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            recovered.committed_operation_sequence(CharacterId::new(2).unwrap()),
+            Some(2)
+        );
+        let (reopened, _) = load_joint(&path).unwrap();
+        assert!(reopened.ground().is_empty());
+        assert_eq!(
+            reopened
+                .parked_inventory(CharacterId::new(1).unwrap())
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            item_id
+        );
+        assert!(reopened
+            .parked_inventory(CharacterId::new(2).unwrap())
+            .unwrap()
+            .equipped(EquipmentSlot::MainHand)
+            .is_none());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn alpha_reused_session_cannot_steal_previous_characters_sword() {
         use crate::magic_checkpoint::load_joint;
 
