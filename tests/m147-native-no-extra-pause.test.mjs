@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
+import { createDirectionalDash, DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { readFileSync } from "node:fs";
 
 // Combat4B/4D source contract: M147 MUST use genuine pre-aimed W3C
@@ -66,4 +67,23 @@ test("M147 zero-hold physical W3C click omits the driver pause tick while ordina
     { type: "pointerUp", button: 0 },
   ], "normal M221 physical hold remains unchanged");
   await assert.rejects(click(session, -1), { name: "TypeError" });
+});
+
+test("M147 correction KeyA pulses cannot accidentally trigger genuine 240ms R2 Dash", () => {
+  const stage = m147.slice(m147.indexOf("await Promise.all(["),
+    m147.indexOf("const jumpBefore = baseline.find("));
+  assert.match(stage, /pulseMovementKey\(closerIdle, "a", 260\)/,
+    "original initial KeyA staging remains real");
+  assert.match(stage,
+    /for \(let attempt = 0; attempt < 3[^\n]*\{[\s\S]*?await sleep\(300\);\s*await pulseMovementKey\(closerIdle, "a", 45\);/,
+    "each genuine corrective KeyA tap is separated from the prior KeyA by at least 300ms");
+  assert.equal(DASH_DOUBLE_TAP_MS, 240, "original R2 dash interval remains unchanged");
+  const accidental = createDirectionalDash();
+  assert.equal(accidental.press("KeyA", 100), null);
+  assert.deepEqual(accidental.press("KeyA", 200), { x: -1, y: 0 },
+    "the historical 100ms correction spacing is an authentic native Dash");
+  const corrected = createDirectionalDash();
+  assert.equal(corrected.press("KeyA", 100), null);
+  assert.equal(corrected.press("KeyA", 445), null);
+  assert.equal(corrected.press("KeyA", 790), null);
 });

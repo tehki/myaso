@@ -11478,6 +11478,11 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let observerBefore = baseline.find((entry) => entry.browser === observer.name);
   for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+    // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
+    // The first 260ms staging A and previous corrective A are real taps too.
+    // Separate every additional physical tap by >240ms: no synthetic
+    // movement, no change to World authority, and no false focus acceptance.
+    await sleep(300);
     await pulseMovementKey(closerIdle, "a", 45);
     await sleep(55);
     baseline = await Promise.all(entries.map(readUiEvidence));
