@@ -591,6 +591,9 @@ async function startGameServer() {
       // Existing M121/M156 original-v1 ingress evidence is never enabled for
       // v2 or other production paths; the Rust server rejects nonloopback.
       MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa" ? "1" : "0",
+      // Core8A original v1 admission proof: genuine M41/M35 positive-wheel
+      // cases only; server refuses public binds, v2 and missing action proof.
+      MYASO_FLIGHT_M41_INPUT_PROOF: scenario === "uiparrytell" || scenario === "uistun" ? "1" : "0",
       MYASO_FLIGHT_DROP_NEW_ACTION_DATAGRAMS:
         scenario === "inputloss" || scenario === "uiheavyinputloss" || scenario === "uiheavyinputlossgap" || scenario === "uijumpattackinputloss" ? "1" : "0",
       MYASO_FLIGHT_DROP_FOLLOWING_INPUT_DATAGRAMS:
