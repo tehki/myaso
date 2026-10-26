@@ -368,7 +368,7 @@ def audit_artist_intersections(original, cfg):
     crate_hammer_gap = horizontal_clearance(crate, hammer)
     crate_bench_gap = horizontal_clearance(crate, bench)
     if roof_gap < cfg["minimumForgeRoofAabbClearanceMeters"]:
-        raise ValueError("ACTUAL source roof intersects forge/hood/stack: " + str(roof_gap))
+        raise ValueError("ACTUAL source roof intersects forge/hood/stack: " + json.dumps({"clearance":roof_gap,"roof":roof,"forge":forge}))
     if min(crate_hammer_gap, crate_bench_gap) < cfg["minimumCrateWorkbenchAabbClearanceMeters"]:
         raise ValueError("ACTUAL original creator crate still intersects bench or hammer")
     return {"actualImportedRoofBounds": roof,
