@@ -22,6 +22,7 @@ export function createDormantSharedUi10Sources({
   return Object.freeze({
     lmb, outbox, closeLease,
     chatOpened() { lmb.chatOpened(); },
+    jumpChord() { return lmb.jumpChord(); },
     blur() { lmb.blur(); },
     hidden() { lmb.hidden(); },
   });

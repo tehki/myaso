@@ -525,6 +525,8 @@ if (reviewedGestureLab) {
     experimentalGestureLab = await activateLoopbackGestureLab({
       gameClient: networkClient, canvas, windowObj: window,
       documentObj: document, getClientTick: () => clientTick >>> 0,
+      isJumpAttackChord: () => jumpRequested || keys.has("Space")
+        || local.action === COMBAT_ACTION.jump,
     });
     if (privateHitLabRequested) {
       // Real input ACKs are produced by the 60Hz original sender, which starts

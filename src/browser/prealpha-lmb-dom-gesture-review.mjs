@@ -119,6 +119,7 @@ export function createDormantPrealphaLmbDomGate({
     // Chat Enter and blur can cancel held attack edges, never submit a
     // phantom RELEASE. A reconnect must instead use a fresh outbox lease.
     chatOpened:() => terminate("cancel"),
+    jumpChord:() => terminate("cancel"),
     blur:() => terminate("cancel"),
     hidden:() => terminate("cancel"),
     approvedHoldUpgrade, closeLease:shutdown,
