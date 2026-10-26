@@ -231,7 +231,7 @@ return {x:Math.floor((left+right)/2),y:Math.floor((top+bottom)/2)};
   const ack=data.diagnosticsText.match(new RegExp("Input→ACK p50\\s+"+value+"\\s*·\\s*p95\\s+"+value));
   const jitter=data.diagnosticsText.match(new RegExp("Jitter p95\\s+"+value));
   const snapshots=data.diagnosticsText.match(new RegExp("Snapshots p50\\s+"+value+"\\s*·\\s*p95\\s+"+value));
-  const inputSamples=data.diagnosticsText.match(/\\|\\s+Samples\\s+(\\d+)(?:\\s*\\||$)/);
+  const inputSamples=data.diagnosticsText.match(/\|\s+Samples\s+(\d+)(?:\s*\||$)/);
   assert.ok(ack&&jitter&&snapshots&&inputSamples,
     "original source network HUD must contain actual ACK, jitter, snapshot and sample diagnostics");
   const ms=s=>s==="collecting…"?null:Number(s.slice(0,-2));

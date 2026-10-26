@@ -102,7 +102,7 @@ function validate(path,players){
   const ak=observed.match(new RegExp("Input→ACK p50\\s+"+timeValue+"\\s*·\\s*p95\\s+"+timeValue));
   const ji=observed.match(new RegExp("Jitter p95\\s+"+timeValue));
   const sn=observed.match(new RegExp("Snapshots p50\\s+"+timeValue+"\\s*·\\s*p95\\s+"+timeValue));
-  const sample=observed.match(/\\|\\s+Samples\\s+(\\d+)(?:\\s*\\||$)/);
+  const sample=observed.match(/\|\s+Samples\s+(\d+)(?:\s*\||$)/);
   assert.ok(ak&&ji&&sn&&sample,"original HUD co-sample requires genuine network telemetry");
   const observedMs=s=>s==="collecting…"?null:Number(s.slice(0,-2));
   assert.deepEqual(t.data.networkUiCoSample,{
