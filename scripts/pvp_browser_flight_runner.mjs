@@ -11662,6 +11662,24 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     index > recoveryIndex && entry.action === COMBAT_ACTION.idle && Number.isFinite(entry.epochMs));
   const recovery = lifecycle[recoveryIndex];
   const idle = lifecycle[idleIndex];
+  // Combat4C read-only fail-first provenance: cross-browser UI timestamps can
+  // disagree with the original Rust World entry/exit ticks. Emit evidence
+  // before the STRICT browser-order assertion so a red native trial still
+  // preserves both clocks, actual source0 submissions and original contact.
+  // Do not classify the HIT or change any acceptance gate here.
+  const beforeLifecycleWorldTrace = m201ServerOutput().slice(worldProofOffset);
+  console.log("M147_PRE_LIFECYCLE_WORLD_DIAGNOSTIC " + JSON.stringify({
+    actors: { victim: jumpId, punisher: observerId, idle: closerId },
+    cue: recoveryCue,
+    physical: { jumpDown: jumpDowns[0], jumpUp: jumpUps[0],
+      punishDown: punishDowns[0], punishUp: punishUps[0] },
+    victimUiRecovery: { entry: recovery, exit: idle },
+    inputSubmissions: (observerState.acceptance?.inputSubmissions ?? []).slice(-10),
+    source0Samples: (observerState.acceptance?.m121SentSamples ?? []).slice(-10),
+    originalWorldEvents: beforeLifecycleWorldTrace.split(/\\r?\\n/)
+      .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
+      .slice(-24),
+  }));
   if (jumpState.acceptance?.scenario !== "uijumppunishffa"
     || observerState.acceptance?.scenario !== "uijumppunishffa"
     || closerState.acceptance?.scenario !== "uijumppunishffa"

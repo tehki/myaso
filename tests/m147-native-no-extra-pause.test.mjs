@@ -87,3 +87,21 @@ test("M147 correction KeyA pulses cannot accidentally trigger genuine 240ms R2 D
   assert.equal(corrected.press("KeyA", 445), null);
   assert.equal(corrected.press("KeyA", 790), null);
 });
+
+test("M147 genuine original World and native timelines log before strict browser lifecycle rejection", () => {
+  const log = m147.indexOf('console.log("M147_PRE_LIFECYCLE_WORLD_DIAGNOSTIC "');
+  const gate = m147.indexOf('if (jumpState.acceptance?.scenario !== "uijumppunishffa"');
+  const strict = m147.indexOf("verifyM147WorldRecoveryProof(");
+  assert.ok(log > 0 && gate > log && strict > gate,
+    "read-only provenance remains available on a failing native browser timing gate");
+  const before = m147.slice(0, gate);
+  assert.match(before, /m201ServerOutput\(\)\.slice\(worldProofOffset\)/,
+    "forensics must use the actual original server World");
+  assert.match(before, /inputSubmissions: \(observerState\.acceptance\?\.inputSubmissions/);
+  assert.match(before, /source0Samples: \(observerState\.acceptance\?\.m121SentSamples/);
+  assert.match(before, /victimUiRecovery: \{ entry: recovery, exit: idle \}/);
+  assert.match(m147, /punishDown\.epochMs < recovery\.epochMs/,
+    "the existing strict original browser-order assertion remains unchanged");
+  assert.match(m147, /verifyM147WorldRecoveryProof\(/,
+    "strict native real-World contact gate remains mandatory");
+});
