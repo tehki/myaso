@@ -5,6 +5,7 @@ on:
     paths:
       - "assets/environment/greyhaven/blacksmith-p1/**"
       - "tools/art/render_greyhaven_blacksmith_p1.py"
+      - "tools/art/verify_blacksmith_original_native_browsers.mjs"
       - "docs/art/GRAPHICS3B_P1_ORIGINAL_BLACKSMITH_BLENDER.md"
       - ".github/workflows/graphics3b-blacksmith-original-blender-review.yml"
   workflow_dispatch:
@@ -34,6 +35,7 @@ jobs:
           fi
           node tools/art/verify_quaternius_standard_source.mjs
           python3 -m py_compile tools/art/render_greyhaven_blacksmith_p1.py
+          node --check tools/art/verify_blacksmith_original_native_browsers.mjs
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -86,6 +88,22 @@ jobs:
             sha256sum .artifacts/graphics3b-blacksmith/*
           } > .artifacts/graphics3b-blacksmith/source-sha256-evidence.txt
           cat .artifacts/graphics3b-blacksmith/source-sha256-evidence.txt
+      - name: Actual Chrome and Firefox W3C source-Blender day+dusk image proof
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          timeout --signal=TERM --kill-after=5s 180s node tools/art/verify_blacksmith_original_native_browsers.mjs
+      - name: Retain original browser Canvas, page screenshots and source SHA proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-p1-original-blacksmith-chrome-firefox
+          path: .artifacts/graphics3b-blacksmith-native-review/*
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Upload genuine original Blender source and visual evidence
         if: always()
         uses: actions/upload-artifact@v4
