@@ -475,8 +475,10 @@ async fn main() -> Result<()> {
                 lease_epoch,
                 v2_lab,
                 flight_action_proof,
-                flight_m121_input_proof,
-                flight_m41_input_proof,
+                FlightV1InputProofs {
+                    m121: flight_m121_input_proof,
+                    m41: flight_m41_input_proof,
+                },
                 Arc::clone(&game),
             )
             .await;
@@ -818,14 +820,21 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
     }
 }
 
+// Group only optional diagnostic flags. Production session, lease and
+// original v1 writer remain unchanged; no new input authorization is added.
+#[derive(Clone, Copy)]
+struct FlightV1InputProofs {
+    m121: bool,
+    m41: bool,
+}
+
 async fn handle_connection(
     connection: Connection,
     player_id: u32,
     lease_epoch: u64,
     v2_lab: bool,
     flight_action_proof: bool,
-    flight_m121_input_proof: bool,
-    flight_m41_input_proof: bool,
+    flight_v1_proofs: FlightV1InputProofs,
     game: Arc<SharedGame>,
 ) -> Result<()> {
     let connection = Arc::new(connection);
@@ -1224,7 +1233,7 @@ async fn handle_connection(
                 // M41: one read-only rising authenticated Block transition,
                 // after the ORIGINAL ingress dedup/coalescer (not merely decode).
                 // Repeated 60Hz Block frames must not swamp CI log evidence.
-                let m41_block_rising = flight_m41_input_proof
+                let m41_block_rising = flight_v1_proofs.m41
                     && player_id <= 3
                     && m41_original_admitted_block_rising(
                         &mut m41_last_accepted_block,
@@ -1247,7 +1256,7 @@ async fn handle_connection(
                 // World state under one original authoritative lock. A client
                 // send, a decoded QUIC datagram, an ingress-accepted sample
                 // and a World action are four different proofs.
-                let prove_m121 = flight_m121_input_proof && player_id <= 3
+                let prove_m121 = flight_v1_proofs.m121 && player_id <= 3
                     && packet.samples().iter().any(|sample| {
                         sample.attack || sample.heavy_attack
                             || sample.move_x != 0.0 || sample.move_y != 0.0
