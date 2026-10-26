@@ -118,9 +118,141 @@ def source_meshes(name, at, yaw, source):
         obj.matrix_world = world
     pivot.location = Vector(at)
     pivot.rotation_euler[2] = math.radians(yaw)
-    return {"model": name, "glTFsha256": sha256(original),
-            "meshCount": len(meshes),
-            "vertices": sum(len(obj.data.vertices) for obj in meshes)}
+    return ({"model": name, "glTFsha256": sha256(original),
+             "meshCount": len(meshes),
+             "vertices": sum(len(obj.data.vertices) for obj in meshes)},
+            meshes)
+
+
+def mesh_world_bounds(objects):
+    """Real evaluated-world oriented glTF/Blender geometry AABB, NOT authored guesses."""
+    if not objects:
+        raise ValueError("No genuine source/evaluated meshes to measure")
+    bpy.context.view_layer.update()
+    pts = [obj.matrix_world @ Vector(corner) for obj in objects if obj.type == "MESH"
+           for corner in obj.bound_box]
+    if not pts:
+        raise ValueError("Empty actual world-space source mesh")
+    return {axis: [min(p[i] for p in pts), max(p[i] for p in pts)]
+            for i, axis in enumerate(("x", "y", "z"))}
+
+
+def horizontal_clearance(first, second):
+    dx = max(first["x"][0] - second["x"][1],
+             second["x"][0] - first["x"][1], 0.0)
+    dy = max(first["y"][0] - second["y"][1],
+             second["y"][0] - first["y"][1], 0.0)
+    return math.hypot(dx, dy)
+
+
+def make_gable(name, y, sign, cfg, brick, timber):
+    """A real double-sided closed 3D triangular brick infill under original tiled roof."""
+    x = cfg["halfWidth"]
+    bottom, apex = cfg["baseZ"], cfg["apexZ"]
+    tip = apex + cfg["hiddenRoofOverlapZ"]
+    depth = 0.095
+    face_y = y
+    inside_y = y + sign * depth
+    verts = [(-x, face_y, bottom), (x, face_y, bottom),
+             (0, face_y, tip),
+             (-x, inside_y, bottom), (x, inside_y, bottom),
+             (0, inside_y, tip)]
+    faces = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3),
+             (1, 2, 5, 4), (2, 0, 3, 5)]
+    mesh = bpy.data.meshes.new(name + "_ActualTriangularPrism")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    mesh.materials.append(brick)
+    obj = bpy.data.objects.new(name + "_CloseRoofWallGap", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    brace_y = face_y - sign * .035
+    for edge, a, b in [
+        ("sill", (-x, brace_y, bottom+.045), (x, brace_y, bottom+.045)),
+        ("left-rafter", (-x+.12, brace_y, bottom+.10), (0, brace_y, apex-.18)),
+        ("right-rafter", (x-.12, brace_y, bottom+.10), (0, brace_y, apex-.18))]:
+        # Wood stays under and inside the existing original tiled roof; never edits it.
+        start, end = Vector(a), Vector(b)
+        direction = end - start
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(start+end)*.5)
+        piece = bpy.context.object
+        piece.name = name + "_RealOak_" + edge
+        piece.dimensions = (.11, .11, direction.length)
+        piece.rotation_euler = direction.to_track_quat("Z", "Y").to_euler()
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        piece.data.materials.append(timber)
+    return obj
+
+
+def repair_gables(cfg, original):
+    """Verify real roof/wall geometry before authoring front AND back closures."""
+    roof = mesh_world_bounds(original.get("Roof_RoundTiles_4x4", []))
+    left = mesh_world_bounds(original.get("Wall_UnevenBrick_Door_Round", []))
+    right = mesh_world_bounds(original.get("Wall_UnevenBrick_Window_Wide_Round", []))
+    bottom, tip = cfg["baseZ"], cfg["apexZ"] + cfg["hiddenRoofOverlapZ"]
+    if (not (3.00 <= bottom <= 3.20 and 5.25 <= tip <= 5.50)
+            or not 1.75 <= cfg["halfWidth"] <= 1.95
+            or abs(left["z"][1] - right["z"][1]) > .03
+            or abs(bottom - left["z"][1]) > .17
+            or roof["z"][1] <= tip + .27
+            or roof["x"][0] > -cfg["halfWidth"]
+            or roof["x"][1] < cfg["halfWidth"]):
+        raise ValueError("Gable is not matched to actual imported Quaternius roof/wall")
+    brick = pbr("Smith_Gable_RealWeatheredBrick",
+                (0.295, 0.235, 0.192), roughness=.97)
+    timber = pbr("Smith_Gable_RoughAgedTimber", (0.19, 0.115, 0.067), roughness=.9)
+    front = make_gable("Smith_FrontGable", cfg["frontFaceY"], 1, cfg, brick, timber)
+    rear = make_gable("Smith_RearGable", cfg["backFaceY"], -1, cfg, brick, timber)
+    if front.type != "MESH" or rear.type != "MESH":
+        raise ValueError("Real Blender gable triangular geometry missing")
+    return {"frontGableActual3D": front.name, "rearGableActual3D": rear.name,
+            "doubleSidedTriangleClosure": True, "realOriginalRoofBounds": roof,
+            "realOriginalFrontWallBounds": [left, right],
+            "roofSourceMeshUntouched": True,
+            "trianglePeakBelowOriginalRoofMeters": roof["z"][1] - tip}
+
+
+def make_original_glass_visible(original):
+    """Use ACTUAL glTF glass, retaining original day material and scene-only dusk clone."""
+    meshes = original.get("Window_Wide_Round1", [])
+    if not meshes:
+        raise ValueError("Blacksmith needs real source window panes")
+    replacements = []
+    for obj in meshes:
+        # Clone mesh data only for this artist scene. Original source files untouched.
+        obj.data = obj.data.copy()
+        for i, mat in enumerate(obj.data.materials):
+            if mat is None or not mat.name.startswith("MI_WindowGlass"):
+                continue
+            lit = mat.copy()
+            lit.name = "Smith_OriginalGlass_AmberDusk_SceneOnly"
+            if not lit.use_nodes:
+                raise ValueError("Original Quaternius window glass is not PBR")
+            bsdf = next((n for n in lit.node_tree.nodes
+                         if n.type == "BSDF_PRINCIPLED"), None)
+            if not bsdf:
+                raise ValueError("No actual original Quaternius glass shader")
+            for channel, value in (
+                ("Base Color", (.95, .47, .16, 1)),
+                ("Emission Color", (1., .36, .08, 1)),
+                ("Emission Strength", 1.7),
+                ("Alpha", 1.)):
+                socket = bsdf.inputs.get(channel)
+                if socket is None:
+                    raise ValueError("Original glass lacks " + channel)
+                for link in list(socket.links):
+                    lit.node_tree.links.remove(link)
+                socket.default_value = value
+            replacements.append((obj, i, mat, lit))
+    if not replacements:
+        raise ValueError("Original Quaternius transparent window glass missing")
+    data = bpy.data.lights.new("Smith_RealGlazedWindow_IndoorDuskGlow", "POINT")
+    data.energy = 0
+    data.color = (1., .49, .18)
+    data.shadow_soft_size = .62
+    lamp = bpy.data.objects.new(data.name, data)
+    bpy.context.scene.collection.objects.link(lamp)
+    lamp.location = (1., -1.81, 1.49)
+    return replacements, lamp
 
 
 def forge_and_tools(cfg):
@@ -128,9 +260,12 @@ def forge_and_tools(cfg):
         raise ValueError("Blacksmith asset may never grant equipment, swords or gameplay fire")
     fx, fy = cfg["forgeX"], cfg["forgeY"]
     ax, ay = cfg["anvilX"], cfg["anvilY"]
-    if not (2.2 <= fx <= 3.0 and -4.0 <= fy <= -3.1
-            and -0.8 <= ax <= 0.1 and -4.0 <= ay <= -3.1):
-        raise ValueError("Blacksmith source study layout exceeds local Blender review footprint")
+    if not (3.20 <= fx <= 3.70 and -4.35 <= fy <= -3.85
+            and 1.35 <= ax <= 1.70 and -4.35 <= ay <= -3.85):
+        raise ValueError("Blacksmith r2 forge/anvil cannot return beneath original roof")
+    separation = math.hypot(fx-ax, fy-ay)
+    if separation > 2.2 or separation < 1.50:
+        raise ValueError("Anvil must stand at a workable distance beside the forge")
     stone = pbr("BloodIron_Forge_RoughMasonry", (0.28, 0.26, 0.23))
     stone_top = pbr("BloodIron_Forge_SootedStone", (0.115, 0.105, 0.095))
     iron = pbr("BloodIron_HandForged_Iron", (0.115, 0.13, 0.14), metallic=0.85, roughness=0.52)
@@ -141,8 +276,8 @@ def forge_and_tools(cfg):
 
     # Distinct, physically modeled stone forge, not a flattened painting.
     # The yard and forge do not correspond to an authoritative map coordinate.
-    block("Smith_ForgingYard_StoneApron", (0.35, -3.48, -0.10),
-          (6.1, 2.3, 0.18), stone, 0.07)
+    block("Smith_ForgingYard_StoneApron", (.45, -3.92, -0.10),
+          (9.7, 2.8, .18), stone, .07)
     for dx, dz, length in [(-0.68, .28, 1.9), (0.68, .28, 1.9),
                            (-0.68, .77, 1.9), (0.68, .77, 1.9)]:
         block("Smith_Forge_ActualStoneCourse", (fx+dx, fy+.30, dz),
@@ -167,19 +302,22 @@ def forge_and_tools(cfg):
     horn.data.materials.append(iron)
 
     # Smith's tool chest, genuine three-dimensional tongs and hammer.
-    block("Smith_Toolbench_Oak", (-2.0, -3.65, .74), (1.25, .62, .15), wood, .04)
+    bx, by = cfg["toolbenchX"], cfg["toolbenchY"]
+    if abs(bx + 2.) > .01 or abs(by + 4.04) > .01:
+        raise ValueError("Blacksmith r2 toolbench must be clear of creator crate")
+    block("Smith_Toolbench_Oak", (bx, by, .74), (1.25, .62, .15), wood, .04)
     for dx in (-.42, .42):
         for dy in (-.20, .20):
-            block("Smith_Toolbench_Leg", (-2.0+dx, -3.65+dy, .34),
+            block("Smith_Toolbench_Leg", (bx+dx, by+dy, .34),
                   (.095, .095, .68), wood, .01)
-    beam("Smith_Hammer_OakHandle", (-2.18, -3.60, .96),
-         (-1.60, -3.55, 1.02), .043, wood)
-    block("Smith_Hammer_Hammerhead", (-1.58, -3.55, 1.03),
+    beam("Smith_Hammer_OakHandle", (bx-.18, by+.05, .96),
+         (bx+.40, by+.10, 1.02), .043, wood)
+    block("Smith_Hammer_Hammerhead", (bx+.42, by+.10, 1.03),
           (.19, .35, .16), iron, .023)
-    beam("Smith_Tongs_LeftIronArm", (-2.34, -3.77, .85),
-         (-1.77, -3.87, .88), .017, iron)
-    beam("Smith_Tongs_RightIronArm", (-2.34, -3.77, .85),
-         (-1.79, -3.69, .88), .017, iron)
+    beam("Smith_Tongs_LeftIronArm", (bx-.34, by-.12, .85),
+         (bx+.23, by-.22, .88), .017, iron)
+    beam("Smith_Tongs_RightIronArm", (bx-.34, by-.12, .85),
+         (bx+.21, by+.06, .88), .017, iron)
     block("Smith_IronBillet_OnAnvil", (ax-.04, ay-.03, .86),
           (.35, .12, .08), iron, .015)
 
@@ -211,8 +349,36 @@ def forge_and_tools(cfg):
     return {"originalAuthoredAnvil": True, "anvilMetalWorkpieces": 4,
             "originalAuthoredForge": True, "originalAuthoredHammerAndTongs": True,
             "staticEmberCount": count, "cosmeticForgeHeat": True,
+            "anvilForgeCenterDistanceMeters": separation,
             "serverItemsGranted": False, "serverCollisionModified": False,
             "world9ReplacementAuthorized": False}, lamp
+
+
+def audit_artist_intersections(original, cfg):
+    """Fail hard on actual imported roof/forge and original box/tool overlap."""
+    roof = mesh_world_bounds(original["Roof_RoundTiles_4x4"])
+    forge = mesh_world_bounds([o for o in bpy.data.objects
+                               if o.type == "MESH" and o.name.startswith("Smith_Forge_")])
+    crate = mesh_world_bounds(original["Prop_Crate"])
+    hammer = mesh_world_bounds([o for o in bpy.data.objects
+                                if o.type == "MESH" and o.name.startswith("Smith_Hammer_")])
+    bench = mesh_world_bounds([o for o in bpy.data.objects
+                               if o.type == "MESH" and o.name.startswith("Smith_Toolbench_")])
+    roof_gap = horizontal_clearance(roof, forge)
+    crate_hammer_gap = horizontal_clearance(crate, hammer)
+    crate_bench_gap = horizontal_clearance(crate, bench)
+    if roof_gap < cfg["minimumForgeRoofAabbClearanceMeters"]:
+        raise ValueError("ACTUAL source roof intersects forge/hood/stack: " + str(roof_gap))
+    if min(crate_hammer_gap, crate_bench_gap) < cfg["minimumCrateWorkbenchAabbClearanceMeters"]:
+        raise ValueError("ACTUAL original creator crate still intersects bench or hammer")
+    return {"actualImportedRoofBounds": roof,
+            "originalCreatorCrateBounds": crate,
+            "blenderForgeBounds": forge,
+            "roofVsForgeClearanceMeters": roof_gap,
+            "crateVsHammerClearanceMeters": crate_hammer_gap,
+            "crateVsWorkbenchClearanceMeters": crate_bench_gap,
+            "usingActualEvaluatedWorldMeshBounds": True,
+            "noForgeRoofIntersection": True, "noCreatorBoxToolIntersection": True}
 
 
 def area_light(name, pos, target, watts, size, color):
@@ -248,21 +414,41 @@ def run():
         raise ValueError("Blacksmith review cannot replace game camera")
     parts = cfg["parts"]
     selected = set(cfg["modelSelection"])
-    if len(parts) != 13 or len(selected) != 9:
-        raise ValueError("Unexpected original-source Blacksmith assembly")
+    if len(parts) != 15 or len(selected) != 11:
+        raise ValueError("Unexpected corrected original-source Blacksmith assembly")
+    correction = cfg["geometryCorrection"]
+    if not (correction.get("requestedByOwner") is True
+            and correction.get("requiresActualSourceDoor") is True
+            and correction.get("requiresActualSourceWindowShutters") is True
+            and correction.get("includesOriginalSourceGlassDuskLighting") is True
+            and correction.get("worldRuntimeUnchanged") is True):
+        raise ValueError("Missing owner-requested real Blender architectural repairs")
     output.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
 
     genuine = []
+    original = {}
     for part in parts:
         if part["model"] not in selected:
             raise ValueError("Unlicensed or unreviewed source model " + part["model"])
-        genuine.append(source_meshes(part["model"], part["at"], part["yawDeg"], source))
+        report, meshes = source_meshes(part["model"], part["at"], part["yawDeg"], source)
+        genuine.append(report)
+        original.setdefault(part["model"], []).extend(meshes)
     if sum(p["vertices"] for p in genuine) < 100:
         raise ValueError("Authentic source geometry missing")
-
+    if not original.get("Door_1_Round") or not original.get("WindowShutters_Wide_Round_Open"):
+        raise ValueError("Actual imported wooden door and open window shutters required")
+    gable_report = repair_gables(correction["gables"], original)
+    glass_switches, window_lamp = make_original_glass_visible(original)
     authored, furnace = forge_and_tools(cfg["authoredDetails"])
+    intersection_report = audit_artist_intersections(original, correction)
+    print("GRAPHICS3B_BLACKSMITH_ACTUAL_3D_CLEARANCE_PASS " +
+          json.dumps({"roofForgeMeters": intersection_report["roofVsForgeClearanceMeters"],
+                      "crateHammerMeters": intersection_report["crateVsHammerClearanceMeters"],
+                      "crateBenchMeters": intersection_report["crateVsWorkbenchClearanceMeters"],
+                      "realGables": 2, "originalDoorAndWindowShutters": True},
+                     sort_keys=True))
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
@@ -298,6 +484,10 @@ def run():
 
     captures = []
     for mood in ("day", "dusk"):
+        is_dusk = mood == "dusk"
+        for obj, slot, original_material, lit_material in glass_switches:
+            obj.data.materials[slot] = lit_material if is_dusk else original_material
+        window_lamp.data.energy = 42 if is_dusk else 0.
         key.data.energy = 1100 if mood == "day" else 330
         fill.data.energy = 440 if mood == "day" else 175
         furnace.data.energy = 115 if mood == "day" else 245
@@ -323,7 +513,18 @@ def run():
               "realImportedModuleCount": len(genuine),
               "realImportedVertexCount": sum(g["vertices"] for g in genuine),
               "genuineOriginalGlTF": genuine,
-              "artistAuthoredParts": authored, "captured": captures,
+              "artistAuthoredParts": authored,
+              "ownerRequestedBlenderGeometryFix": {
+                  "realGables": gable_report,
+                  "actualCollisionFreeGeometry": intersection_report,
+                  "authenticDoorMeshCount": len(original["Door_1_Round"]),
+                  "authenticWindowShutterMeshCount": len(original["WindowShutters_Wide_Round_Open"]),
+                  "authenticWindowGlassMaterialSlots": len(glass_switches),
+                  "originalRealGlazingWithDuskOnlyLight": True,
+                  "anvilCloserToForge": True,
+                  "forgeRoofAndToolCrateNonintersectionChecked": True,
+                  "ownerVisualAcceptanceStillRequired": True},
+              "captured": captures,
               "sourceBlendSha256": sha256(blend),
               "originalCottagePreserved": True, "originalRedLionPreserved": True,
               "world9ExistingBlacksmithIdForReviewOnly": "smith",
