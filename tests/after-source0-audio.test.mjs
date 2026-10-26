@@ -62,3 +62,33 @@ test("invalid input and audio objects fail closed", () => {
   assert.equal(h.helper.noteRelease(null), false);
   assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:false}), false);
 });
+
+test("online keyboard is input-only before WebAudio is explicitly enabled", async () => {
+  const { readFileSync } = await import("node:fs");
+  const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  const start = online.indexOf('canvas.addEventListener("keydown"');
+  const end = online.indexOf('window.addEventListener("keyup"', start);
+  assert.ok(start >= 0 && end > start);
+  const keyboard = online.slice(start, end);
+  assert.match(keyboard, /keys\.add\(event\.code\)/);
+  assert.match(keyboard, /jumpRequested = true/);
+  assert.doesNotMatch(keyboard, /audio\.unlock\(\)/,
+    "first WASD/Space cannot create AudioContext inside the input callback");
+  assert.doesNotMatch(keyboard, /noteKeyboardGesture/,
+    "do not defer an expensive context construction into live combat");
+  assert.match(online, /installGameAudioControls\(audio\)/,
+    "manual trusted audio controls stay available");
+  assert.match(online, /networkClient\.sendInput\(\{ tick: outgoingTick, \.\.\.currentInput \}\)/);
+  assert.match(online, /afterSource0Audio\?\.afterOriginalSend\(currentInput\)/,
+    "existing original mouse-first source0 ordering is untouched");
+});
+
+test("mouse-first release still warms sound after genuine original input submission", () => {
+  const h = harness();
+  assert.equal(h.helper.noteRelease("light"), true);
+  assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:true}), false);
+  assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:false}), true);
+  assert.deepEqual(h.events, ["schedule:50"]);
+  h.run();
+  assert.deepEqual(h.events, ["schedule:50", "unlock", "play:light"]);
+});
