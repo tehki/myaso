@@ -39,6 +39,9 @@ pub enum Disposition {
 pub enum Command {
     None,
     BeginLightWindup,
+    // Review-only World gate. No typed wire event may produce this command
+    // until Main 0 approves a single authenticated Space+LMB ingress route.
+    BeginJumpAttack,
     ActivateLight,
     UpgradeHeldHeavy { server_elapsed_ms: u64 },
     HeavyReady,
