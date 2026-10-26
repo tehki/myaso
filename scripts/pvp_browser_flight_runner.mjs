@@ -564,6 +564,9 @@ async function startGameServer() {
       MYASO_BIND: "127.0.0.1:0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreakpunishffa"
+        // M173 exact original World same-tick Jump stamina-spend evidence.
+        // The existing server flag is fail-closed on nonloopback listeners.
+        || scenario === "uijumpattack"
         || scenario === "uidirectionallight"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
         || scenario === "uiheavyguardbreakpunish"

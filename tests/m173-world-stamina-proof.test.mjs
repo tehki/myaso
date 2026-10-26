@@ -9,6 +9,8 @@ test("M173 uses flight-only original World pre/post rather than stale UI arithme
   assert.match(rust, /if flight_action_proof \{/);
   assert.match(rust, /m173_original_jump_spend_lines\(&state\.world, &before_jump_stamina\)/);
   assert.match(runner, /verifyM173WorldJumpSpend\(/);
+  assert.match(runner, /MYASO_FLIGHT_ACTION_PROOF: \(scenario === "uiguardbreakpunishffahit"[\s\S]*?\|\| scenario === "uijumpattack"/,
+    "M173 must enable the already loopback-restricted original World proof when running its native fixture");
   assert.match(runner, /m201ServerOutput\(\)\.slice\(worldStaminaProofOffset\)/);
   assert.doesNotMatch(runner.slice(runner.indexOf("async function runM173JumpAttackChordDenialPhase("),
     runner.indexOf("async function runOnlineUiJumpAttackCounterplayFlight(")), /preSpendStamina - COMBAT\.jump\.staminaCost/);
