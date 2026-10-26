@@ -47,7 +47,7 @@ class NeckSeamQATests(unittest.TestCase):
         garment = [(x+0.04, y, z) for x, y, z in self.head]
         report = neck_collar_proximity(self.head, self.faces, garment, 1.59)
         self.assertTrue(report["nearest_garment_vertex_distance_max_m"] >= 0.04)
-        self.assertEqual(report["neck_boundary_over_2cm_fraction"], 0.5)
+        self.assertEqual(report["neck_boundary_over_2cm_fraction"], 1.0)
         self.assertIn("not a surface-to-surface", report["limitations"][0])
 
     def test_neck_band_ignores_distant_body_mesh(self):
