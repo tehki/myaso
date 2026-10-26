@@ -22,7 +22,12 @@ function png(b){
 async function load(){
   const r=JSON.parse(await readFile(join(source,"greyhaven-blacksmith-source-report.json"),"utf8"));
   assert.equal(r.kind,"graphics3b-original-blacksmith-p1-review");
-  assert.equal(r.realImportedModuleCount,13);
+  assert.equal(r.realImportedModuleCount,15);
+  assert.ok(r.ownerRequestedBlenderGeometryFix?.authenticDoorMeshCount>0);
+  assert.ok(r.ownerRequestedBlenderGeometryFix?.authenticWindowShutterMeshCount>0);
+  assert.ok(r.ownerRequestedBlenderGeometryFix?.realGables?.doubleSidedTriangleClosure);
+  assert.ok(r.ownerRequestedBlenderGeometryFix?.actualCollisionFreeGeometry?.noForgeRoofIntersection);
+  assert.ok(r.ownerRequestedBlenderGeometryFix?.actualCollisionFreeGeometry?.noCreatorBoxToolIntersection);
   assert.equal(r.sourceOnly,true); assert.equal(r.placedInRuntime,false);
   assert.equal(r.productionAuthorized,false);
   for(const e of r.captured){
