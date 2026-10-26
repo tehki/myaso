@@ -43,6 +43,12 @@ jobs:
           - acceptance: space-chord-firefox
             mode: space-guard
             browsers: firefox,firefox,firefox,firefox
+          - acceptance: jump-action-chrome
+            mode: jump-review
+            browsers: chrome,chrome,chrome,chrome
+          - acceptance: jump-action-firefox
+            mode: jump-review
+            browsers: firefox,firefox,firefox,firefox
           - acceptance: four-combat-lifecycle
             mode: four-combat-lifecycle
             browsers: chrome,firefox,chrome,firefox

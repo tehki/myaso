@@ -16,6 +16,8 @@ pub enum GestureAction {
     Upgrade = 2,
     Release = 3,
     Cancel = 4,
+    // P0 review-only same source0 chord; never public or source1 Use.
+    JumpAttack = 5,
 }
 impl TryFrom<u8> for GestureAction {
     type Error = DecodeError;
@@ -25,6 +27,7 @@ impl TryFrom<u8> for GestureAction {
             2 => Ok(Self::Upgrade),
             3 => Ok(Self::Release),
             4 => Ok(Self::Cancel),
+            5 => Ok(Self::JumpAttack),
             _ => Err(DecodeError::UnknownAction(value)),
         }
     }

@@ -173,12 +173,17 @@ const cert = params.get("cert");
 // Opt-in NONRELEASE: the actual game page and the ORIGINAL pinned Rust World
 // must both be loopback. Public /web/ and official lobby never select v2.
 const gestureLabRequested = params.get("gestureLab") === "1";
+// P0 extension only: requires explicit opt-in on both localhost endpoints.
+const jumpCombatReviewRequested = params.get("jumpCombatReview") === "1";
 const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const reviewedGestureLab = gestureLabRequested
   && loopbackHosts.has(window.location.hostname)
   && loopbackHosts.has(new URL(server).hostname);
 if (gestureLabRequested && !reviewedGestureLab) {
   throw new Error("experimental server-authoritative gestures are loopback-only");
+}
+if (jumpCombatReviewRequested && !reviewedGestureLab) {
+  throw new Error("JumpAttack review requires original loopback gestureLab");
 }
 const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
 // Private receipts require the actor proven by an actual processed-input ACK.
@@ -527,6 +532,7 @@ if (reviewedGestureLab) {
       documentObj: document, getClientTick: () => clientTick >>> 0,
       isJumpAttackChord: () => jumpRequested || keys.has("Space")
         || local.action === COMBAT_ACTION.jump,
+      enableJumpAttackReview: jumpCombatReviewRequested,
     });
     if (privateHitLabRequested) {
       // Real input ACKs are produced by the 60Hz original sender, which starts
