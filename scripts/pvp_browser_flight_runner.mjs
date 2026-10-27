@@ -11584,6 +11584,42 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
 
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let observerBefore = baseline.find((entry) => entry.browser === observer.name);
+  // A native hold duration is not proof of World displacement. Reuse M121's
+  // existing replica-driven, interior-Light-range movement planner, with real
+  // bounded WASD only. Stage before the recovery/input proof window begins.
+  const { planM121NativeGeometry } = await import("./m121-native-geometry-plan.mjs");
+  const nativeGeometry = [];
+  let geometryReady = false;
+  await sleep(310); // separate any corrective key from the original D/A taps
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    baseline = await Promise.all(entries.map(readUiEvidence));
+    observerBefore = baseline.find(entry => entry.browser === observer.name);
+    const fighters = observerBefore?.acceptance?.fighters ?? [];
+    const victim = fighters.find(fighter => fighter.netId === jumpId);
+    const punisher = fighters.find(fighter => fighter.netId === observerId);
+    const plan = planM121NativeGeometry(victim, punisher, true);
+    nativeGeometry.push({serverTick: observerBefore.acceptance.serverTick, fighters, plan});
+    if (plan) {
+      await pulseMovementKeyBoundedW3c(jumpAttacker, plan.key, plan.durationMs);
+      await sleep(310); // genuine repeated keys must not accidentally request Dash
+      continue;
+    }
+    await sleep(80);
+    const stable = await readUiEvidence(observer);
+    const stableVictim = stable.acceptance?.fighters?.find(fighter => fighter.netId === jumpId);
+    const stablePunisher = stable.acceptance?.fighters?.find(fighter => fighter.netId === observerId);
+    if (stable.acceptance?.serverTick > observerBefore.acceptance.serverTick
+      && !planM121NativeGeometry(stableVictim, stablePunisher, true)
+      && Math.hypot(stableVictim.x - victim.x, stableVictim.y - victim.y) <= 2
+      && Math.hypot(stablePunisher.x - punisher.x, stablePunisher.y - punisher.y) <= 2) {
+      geometryReady = true;
+      baseline = await Promise.all(entries.map(readUiEvidence));
+      observerBefore = baseline.find(entry => entry.browser === observer.name);
+      break;
+    }
+  }
+  console.log("M147_NATIVE_INTERIOR_GEOMETRY " + JSON.stringify({nativeGeometry, geometryReady}));
+  if (!geometryReady) throw new Error(`${milestone} actual replica geometry did not converge before the single JumpAttack`);
   for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
     // The first 260ms staging A and previous corrective A are real taps too.
