@@ -1,0 +1,85 @@
+// Native QA only. Move observation ahead of the same-session W3C action queue;
+// the receipt is a rendered cue, never input or authoritative Parry evidence.
+import { randomUUID } from "node:crypto";
+import { readM41ScalarWorldCue, summarizeM41CueTimeout } from "./m41-native-observed-parry.mjs";
+
+export function createM35CueRegistry() {
+  const pending = new Map();
+  return {
+    issue(baseline, actorId) {
+      if (!Number.isInteger(baseline) || baseline < 0 || !Number.isSafeInteger(actorId) || actorId < 1) {
+        throw new TypeError("M35 requires a current actor-bound event baseline");
+      }
+      const token = randomUUID();
+      let resolve;
+      const promise = new Promise(done => { resolve = done; });
+      const timer = setTimeout(() => {
+        pending.delete(token);
+        resolve(null);
+      }, 1500);
+      pending.set(token, { baseline, actorId, resolve });
+      return {
+        token, wait: () => promise,
+        close() { clearTimeout(timer); pending.delete(token); resolve(null); },
+      };
+    },
+    receive(packet) {
+      const entry = pending.get(packet?.token);
+      if (!entry) return false;
+      const cue = packet.cue;
+      if (cue !== null && (cue?.actorId !== entry.actorId
+          || !Number.isInteger(cue.eventIndex) || cue.eventIndex < entry.baseline
+          || cue.eventCount !== cue.eventIndex + 1
+          || !Number.isFinite(cue.t) || cue.t < 0
+          || cue.text !== "Attack committed - your windup is readable."
+          || cue.latestText !== cue.text)) return false;
+      pending.delete(packet.token);
+      entry.resolve(cue);
+      return true;
+    },
+  };
+}
+
+export function m35PrearmedCueScript() {
+  return "const observe = " + readM41ScalarWorldCue.toString() + ";"
+    + "const summarize = " + summarizeM41CueTimeout.toString() + ";"
+    + `
+      const [token, baseline, actorId, timeoutMs] = arguments;
+      const arena = document.querySelector('#arena');
+      if (!arena || window.__MYASO_M35_CUE_WATCH__) return false;
+      delete window.__MYASO_M41_LAST_TIMEOUT__;
+      let poll, deadline, started, attemptBaseline = baseline;
+      const close = () => {
+        clearInterval(poll); clearTimeout(deadline);
+        arena.removeEventListener('pointerdown', begin, true);
+        delete window.__MYASO_M35_CUE_WATCH__;
+      };
+      const finish = cue => {
+        if (!cue) window.__MYASO_M41_LAST_TIMEOUT__ = summarize(
+          window.__MYASO_M30_UI__, baseline, actorId, performance.now() - started);
+        close();
+        fetch('/__myaso_m35_rendered_windup', {
+          method: 'POST', headers: {'content-type': 'application/json'},
+          body: JSON.stringify({token, cue}), keepalive: true,
+        }).catch(() => {});
+      };
+      const check = () => {
+        const cue = observe(window.__MYASO_M30_UI__, attemptBaseline, actorId, false);
+        if (cue) finish(cue);
+        else if (performance.now() - started >= timeoutMs) finish(null);
+      };
+      function begin(event) {
+        if (!event.isTrusted || event.button !== 0) return;
+        arena.removeEventListener('pointerdown', begin, true);
+        clearTimeout(deadline);
+        attemptBaseline = Math.max(baseline, window.__MYASO_M30_UI__?.events?.length ?? baseline);
+        started = performance.now();
+        poll = setInterval(check, 4);
+        check();
+      }
+      window.__MYASO_M35_CUE_WATCH__ = {close};
+      arena.addEventListener('pointerdown', begin, true);
+      deadline = setTimeout(close, 1500);
+      return true;
+    `;
+}

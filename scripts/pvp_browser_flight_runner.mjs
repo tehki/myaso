@@ -46,6 +46,7 @@ import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
+import { createM35CueRegistry, m35PrearmedCueScript } from "./m35-prearmed-windup-cue.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -150,6 +151,7 @@ let gameServer;
 let m201ServerOutput = () => "";
 const m221Registry = createM221TrustedWheelRegistry();
 const m227Registry = createM227TrustedLightRegistry();
+const m35CueRegistry = createM35CueRegistry();
 
 try {
   staticServer = await startStaticServer();
@@ -509,6 +511,18 @@ async function startStaticServer() {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+      // Same-origin loopback QA observation only; never a Combat input endpoint.
+      if (url.pathname === "/__myaso_m35_rendered_windup" && request.method === "POST") {
+        const local = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress);
+        if (!local || request.headers.origin !== `http://${request.headers.host}`) return send(response, 403, "forbidden");
+        let body = "";
+        for await (const chunk of request) {
+          body += chunk;
+          if (body.length > 1024) return send(response, 413, "payload too large");
+        }
+        if (!m35CueRegistry.receive(JSON.parse(body))) return send(response, 422, "stale/invalid rendered cue");
+        response.writeHead(204); response.end(); return;
+      }
       // Acceptance-only localhost receipt. No input is generated here.
       if (url.pathname === "/__myaso_m221_trusted_wheel" && request.method === "POST") {
         let body = "";
@@ -8324,6 +8338,22 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     && (cue.text === "Attack committed - your windup is readable."
       || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
     && cue.latestText === cue.text) return cue;
+  // Preserve the original fail-closed gate; only emit a bounded read-only
+  // snapshot when the browser never observed an admissible fresh World cue.
+  if (!cue) {
+    // Failure-only W3C read; never use this bounded history to authorize a
+    // late wheel. Retain the original null timeout and fatal native gate.
+    try {
+      const diagnostic = await execute(attacker.base, attacker.sessionId,
+        "return window.__MYASO_M41_LAST_TIMEOUT__ ?? null;");
+      if (diagnostic?.timedOut === true) {
+        console.log("M41_NATIVE_CUE_TIMEOUT " + JSON.stringify(diagnostic));
+      }
+    } catch (error) {
+      console.log("M41_NATIVE_CUE_TIMEOUT_READ_ERROR "
+        + JSON.stringify({ message: String(error).slice(0, 160) }));
+    }
+  }
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
 
@@ -8391,18 +8421,36 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // 35ms DOWN/UP then runs while we observe the fresh real World cue;
       // no full-click ACK or large evidence serialization gates the one wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
-      const observed = await dispatchM41ObservedParry({
-        sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
-        awaitWorldCue: () => waitForM41WorldWindup(
-          attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-          scenario === "uiparrytell",
-        ),
-        // M33 now uses the original actor-bound windup gate and one real
-        // viewport-center native Firefox wheel, keeping M35 unchanged.
-        sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
-          ? scrollM41ViewportWheel(defender, defenderViewport)
-          : setArenaBlock(defender, defenderElementId, true),
-      });
+      const prearmed = scenario === "uistun"
+        ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId) : null;
+      if (prearmed) {
+        const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
+          script: m35PrearmedCueScript(),
+          args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180],
+        });
+        if (armed !== true) { prearmed.close(); throw new Error("M35 could not arm native Windup observer before physical click"); }
+      }
+      let observed;
+      try {
+        observed = await dispatchM41ObservedParry({
+          sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
+          awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup(
+            attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+            scenario === "uiparrytell",
+          ),
+          // M33/M41 retain the viewport wheel; M35 retains its element wheel.
+          sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
+            ? scrollM41ViewportWheel(defender, defenderViewport)
+            : setArenaBlock(defender, defenderElementId, true),
+        });
+      } finally {
+        if (prearmed) {
+          prearmed.close();
+          const diagnostic = await execute(attacker.base, attacker.sessionId,
+            "window.__MYASO_M35_CUE_WATCH__?.close(); return window.__MYASO_M41_LAST_TIMEOUT__ ?? null;");
+          if (diagnostic?.timedOut === true) console.log("M35_NATIVE_CUE_TIMEOUT " + JSON.stringify(diagnostic));
+        }
+      }
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
         scenario, attacker: attacker.name, ...observed,
       }));
