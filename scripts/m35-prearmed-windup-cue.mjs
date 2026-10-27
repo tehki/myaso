@@ -46,15 +46,20 @@ export function m35PrearmedCueScript() {
     + `
       const [token, baseline, actorId, timeoutMs] = arguments;
       const arena = document.querySelector('#arena');
-      if (!arena || window.__MYASO_M35_CUE_WATCH__) return false;
+      const target = document.querySelector('#event-text');
+      if (!arena || !target || window.__MYASO_M35_CUE_WATCH__) return false;
       delete window.__MYASO_M41_LAST_TIMEOUT__;
-      let poll, deadline, started, attemptBaseline = baseline;
+      let poll, deadline, started, finished = false, attemptBaseline = baseline;
+      const mutationObserver = new MutationObserver(() => check());
       const close = () => {
+        finished = true;
         clearInterval(poll); clearTimeout(deadline);
+        mutationObserver.disconnect();
         arena.removeEventListener('pointerdown', begin, true);
         delete window.__MYASO_M35_CUE_WATCH__;
       };
       const finish = cue => {
+        if (finished) return;
         if (!cue) window.__MYASO_M41_LAST_TIMEOUT__ = summarize(
           window.__MYASO_M30_UI__, baseline, actorId, performance.now() - started);
         close();
@@ -64,8 +69,10 @@ export function m35PrearmedCueScript() {
         }).catch(() => {});
       };
       const check = () => {
+        if (finished || started === undefined) return;
         const cue = observe(window.__MYASO_M30_UI__, attemptBaseline, actorId, false);
-        if (cue) finish(cue);
+        if (cue) finish({ ...cue, observationLagMs: Math.max(0,
+          performance.now() - window.__MYASO_M30_UI__.startedAt - cue.t) });
         else if (performance.now() - started >= timeoutMs) finish(null);
       };
       function begin(event) {
@@ -78,6 +85,7 @@ export function m35PrearmedCueScript() {
         check();
       }
       window.__MYASO_M35_CUE_WATCH__ = {close};
+      mutationObserver.observe(target, {childList: true, subtree: true, characterData: true});
       arena.addEventListener('pointerdown', begin, true);
       deadline = setTimeout(close, 1500);
       return true;

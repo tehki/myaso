@@ -26,7 +26,8 @@ historical M35 failure had that sole cause.
 ## Narrow correction
 
 For the Light-only `uistun` and `uiparry` fixtures, arm a nonblocking read-only browser observer before issuing
-the same physical35ms W3C LMB. The observer starts its4ms checks only after a
+the same physical35ms W3C LMB. The observer checks DOM mutations immediately
+and retains a4ms deadline watchdog, only after a
 trusted native pointerDOWN and takes a fresh event baseline there, so events
 from aim/earlier actions cannot qualify. It calls the existing
 `readM41ScalarWorldCue` with Heavy disabled: current latest original rendered
@@ -80,3 +81,22 @@ the old queued observer path. Retain this first-red, do not report full PASS.
 Apply the same correction to `uiparry`, which has the identical Light-only
 admission requirement. Do not broaden it to `uiparrytell`/M41's distinct Heavy
 cue. Fresh exact-head full/native qualification remains necessary.
+
+## Genuine late-wheel failure after pre-arming
+
+On `2e4c299c40deb0fa73f2f9083ecd3284ee242775`, dedicated M35 trial3
+[job122055479339](https://github.com/tehki/myaso/actions/runs/40464165139/job/122055479339)
+did observe the correct Light cue but actual World HIT34 occurred at1905;
+defender Block started1907. It correctly failed with defender HP66/guard100.
+This is a distinct late-contact failure, not a missing cue; retain its logs.
+
+Remove the remaining polling-only wait by checking the same current cue in a
+MutationObserver callback on the original event-text target. Keep the4ms timer
+for deadline checks. A deterministic regression stalls polling timers and
+requires the real rendered-cue observer to complete in the mutation microtask.
+Add browser-local observationLagMs, calculated from the original UI event time
+and the same browser performance clock; do not subtract cross-browser clocks
+or use the diagnostic to qualify a hit. Cleanup disconnects the observer and
+guards against a queued duplicate callback. Focused checks now27/27 PASS.
+Native evidence must still determine whether further delivery latency remains;
+no server timing, physical wheel or Parry threshold is changed.

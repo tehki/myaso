@@ -7,9 +7,9 @@ import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "../scripts/m41-
 const light = "Attack committed - your windup is readable.";
 const heavy = "Heavy strike committed - the long windup is readable.";
 function observer(receipt, registry) {
-  let now = 0, poll, pointer;
+  let now = 0, poll, pointer, mutation, disconnected = false;
   const timers = new Map();
-  const state = {online: "Online - player #1 - server tick 100", events: [], eventTransitions: []};
+  const state = {online: "Online - player #1 - server tick 100", events: [], eventTransitions: [], startedAt: 0};
   const window = {__MYASO_M30_UI__: state};
   const packets = [];
   const arena = {
@@ -21,6 +21,11 @@ function observer(receipt, registry) {
   const armed = vm.runInNewContext(script, {
     window, token: receipt.token, document: {querySelector: () => arena},
     performance: {now: () => now},
+    MutationObserver: class {
+      constructor(fn) { mutation = fn; }
+      observe() {}
+      disconnect() { disconnected = true; }
+    },
     setInterval(fn, ms) { assert.equal(ms, 4); poll = fn; return 1; },
     clearInterval() { poll = null; },
     setTimeout(fn, ms) { timers.set(2, fn); assert.equal(ms, 1500); return 2; },
@@ -38,7 +43,8 @@ function observer(receipt, registry) {
     down(trusted = true) { pointer?.({isTrusted: trusted, button: 0}); },
     event(text) { state.events.push(text); state.eventTransitions.push({text, t: now}); },
     time(ms) { now += ms; poll?.(); },
-    get active() { return !!poll || !!pointer || timers.size > 0; },
+    mutations() { if (!disconnected) mutation(); },
+    get active() { return !!poll || !!pointer || timers.size > 0 || !disconnected; },
   };
 }
 
@@ -66,6 +72,21 @@ test("prearmed M35 observes real browser cue while same-session click ACK/observ
   assert.equal((await flight).nativeClickAck, true);
   assert.equal(b.active, false);
   assert.equal(registry.receive(b.packets[0]), false, "single-use receipt");
+  receipt.close();
+});
+
+test("M35 reads rendered Light in its mutation microtask even when polling timers stall", async () => {
+  const registry = createM35CueRegistry(), receipt = registry.issue(0, 1);
+  const b = observer(receipt, registry);
+  b.down(); b.event(light);
+  b.mutations(); // No timer callback/driver command has executed.
+  const cue = await receipt.wait();
+  assert.equal(cue.text, light);
+  assert.equal(cue.observationLagMs, 0);
+  assert.equal(b.packets.length, 1);
+  b.mutations(); b.time(200);
+  assert.equal(b.packets.length, 1, "one receipt, even if a timer was already queued");
+  assert.equal(b.active, false);
   receipt.close();
 });
 
