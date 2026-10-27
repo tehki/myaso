@@ -6,6 +6,9 @@ on:
       - ".github/workflows/combat4-m27-m33-native-repeat.yml"
       - "src/combat/m27-directional-block-staging.mjs"
       - "web/pvp-flight.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/authoritative-windup-hud.mjs"
+      - "tests/m41-authoritative-windup-hud.test.mjs"
       - "scripts/pvp_browser_flight_runner.mjs"
       - "scripts/m35-prearmed-windup-cue.mjs"
       - "scripts/m41-native-observed-parry.mjs"
@@ -48,7 +51,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           git rev-parse HEAD > original-source-sha.txt
-          node --test tests/m27-directional-block-staging.test.mjs tests/m41-prearmed-directional-parry.test.mjs tests/m35-prearmed-windup-cue.test.mjs tests/m41-authoritative-parry-admission.test.mjs
+          node --test tests/m27-directional-block-staging.test.mjs tests/m41-prearmed-directional-parry.test.mjs tests/m35-prearmed-windup-cue.test.mjs tests/m41-authoritative-parry-admission.test.mjs tests/m41-authoritative-windup-hud.test.mjs
           node --check web/pvp-flight.mjs
           node --check scripts/pvp_browser_flight_runner.mjs
           google-chrome --version

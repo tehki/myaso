@@ -6,6 +6,7 @@ import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
 import { createM41PhysicalInputChronology } from "../src/browser/m41-physical-input-chronology.mjs";
 import { createAfterSource0Audio } from "../src/browser/after-source0-audio.mjs";
+import { authoritativeWindupHudHint } from "../src/browser/authoritative-windup-hud.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
@@ -607,6 +608,13 @@ function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
   recordAcceptanceState(state, ownId);
+  // M41: a real authenticated original World snapshot can arrive between
+  // render frames. Surface ONLY its own actor's committed windup immediately,
+  // never a prediction/client-owned action; the same HUD is redrawn in RAF.
+  const originalWindupHint = authoritativeWindupHudHint(state.get(ownId), {
+    now: performance.now(), combatMessage, combatMessageUntil,
+  });
+  if (originalWindupHint) setStatus(originalWindupHint);
   observeThreatCommitment(state, ownId);
   const match = fighterMatchPresentation(state.values(), ownId);
   if (match.visible && !matchOver) {
