@@ -73,3 +73,25 @@ No merge, production changes, server flags, ingress change or public protocol v2
 
 **Current verdict: public instant-Light NOT IMPLEMENTED / NOT ACCEPTED.**
 The existing 20/20 SHA `7311357` and its public v1 remain unchanged.
+
+## Executable, dormant precontact hold policy seam
+
+The optional source-only `src/browser/combat4-precontact-hold-review.mjs`
+requires `explicitReview: true` plus caller-supplied **both** request and
+expiry thresholds strictly before the unchanged 135ms Light windup.
+It is NOT imported by `web/online-game.mjs`, attaches no W3C events,
+spawns no timers and writes no QUIC packets itself. An explicit review
+caller can `arm()` after the *existing* dormant source0 gate accepts a
+physical PRESS, and `poll()` while that same pointer/gesture remains
+held. Only that same lease's existing dormant typed outbox may emit
+the at-most-once UPGRADE edge; the Rust World may still discard it if
+LightActive/contact has occurred. Expired review clocks **do not retry**
+or retroactively cancel a landed Light. Session close/cancel and
+pointer/gesture identity changes retire the observation fail closed.
+
+Test example `requestAfterMs=48, expireAfterMs=96` is only an
+**illustrative test parameter**, neither approved Combat tuning nor a
+guaranteed network budget. 4A/4B/Core8A must still resolve the intended
+hold-classification policy under observed network jitter and prove the
+original World decision with native W3C/QUIC; no public activation may
+derive from an isolated typed UPGRADE being queued.
