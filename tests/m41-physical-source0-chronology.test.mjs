@@ -57,3 +57,26 @@ test("M41 source observer is scenario-scoped, read-only, and precedes the one or
     "only the original 34-byte v1 packet writer is invoked");
   assert.match(source, /m41PhysicalChronology\?\.reset\(\)/);
 });
+
+test("M41 authentic DOM-edge source0 send never claims a fabricated 120Hz sample",()=>{
+ let tick=1000;
+ const chron=createM41PhysicalInputChronology({
+  clock:()=>tick,epoch:()=>tick+1793000000000,
+ });
+ assert.equal(chron.immediateSendInvocation(4,{block:true}),null);
+ chron.wheelStart({deltaY:120,timeStamp:998,isTrusted:false});
+ assert.equal(chron.immediateSendInvocation(5,{block:true}),null,
+  "a synthetic wheel cannot take the early sender");
+ chron.wheelStart({deltaY:120,timeStamp:998,isTrusted:true});
+ tick=1001;
+ assert.equal(chron.immediateSendInvocation(6,{block:false}),null);
+ const real=chron.immediateSendInvocation(7,{block:true});
+ assert.equal(real.submissionKind,"physical-wheel-original-v1");
+ assert.equal(real.originalV1ClientTick,7);
+ assert.equal(real.firstBlockSample,null,
+  "read-only telemetry must not invent a prediction-step event");
+ assert.equal(real.wheel.trusted,true);
+ chron.reset();
+ assert.equal(chron.immediateSendInvocation(8,{block:true}),null,
+  "blur/reconnect must erase the old physical wheel identity");
+});

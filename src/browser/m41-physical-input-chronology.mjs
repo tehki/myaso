@@ -55,6 +55,20 @@ export function createM41PhysicalInputChronology({
     };
   }
 
+  // Actual original source0 DOM-edge transmission is not a 120Hz prediction
+  // sample. Record it separately rather than inventing firstBlockSample.
+  function immediateSendInvocation(clientTick, input) {
+    if (!wheel || !wheel.trusted || !input?.block) return null;
+    return {
+      wheel: { ...wheel },
+      firstBlockSample: null,
+      submissionKind: "physical-wheel-original-v1",
+      originalV1ClientTick: clientTick,
+      originalV1SendInvocationPerfMs: clock(),
+      originalV1SendInvocationEpochMs: epoch(),
+    };
+  }
+
   function reset() { wheel = null; firstBlockSample = null; }
-  return Object.freeze({ wheelStart, wheelEnd, sampled, sendInvocation, reset });
+  return Object.freeze({ wheelStart, wheelEnd, sampled, sendInvocation, immediateSendInvocation, reset });
 }

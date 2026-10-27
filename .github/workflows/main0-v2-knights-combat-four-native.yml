@@ -49,6 +49,12 @@ jobs:
           - acceptance: jump-action-firefox
             mode: jump-review
             browsers: firefox,firefox,firefox,firefox
+          - acceptance: jump-two-hit-chrome
+            mode: jump-two-hit
+            browsers: chrome,chrome,chrome,chrome
+          - acceptance: jump-two-hit-firefox
+            mode: jump-two-hit
+            browsers: firefox,firefox,firefox,firefox
           - acceptance: four-combat-lifecycle
             mode: four-combat-lifecycle
             browsers: chrome,firefox,chrome,firefox

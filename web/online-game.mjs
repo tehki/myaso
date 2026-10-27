@@ -6,6 +6,7 @@ import { createLeftButtonCharge } from "../src/browser/left-button-charge.mjs";
 import { createM147InputChronology } from "../src/browser/m147-input-chronology.mjs";
 import { createM41PhysicalInputChronology } from "../src/browser/m41-physical-input-chronology.mjs";
 import { createAfterSource0Audio } from "../src/browser/after-source0-audio.mjs";
+import { authoritativeWindupHudHint } from "../src/browser/authoritative-windup-hud.mjs";
 import { captureLightAttackMovement, resolveLightAttackReleaseMovement } from "../src/browser/light-attack-movement.mjs";
 import { createCombatImpactController } from "../src/browser/combat-impact.mjs";
 import { createGameAudio, installGameAudioControls, soundForCombatFeedback, createRemoteActionAudioTracker } from "../src/browser/game-audio.mjs";
@@ -108,6 +109,10 @@ const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
+// A distinct authenticated LightWindup must remain readable even if an earlier
+// attack left the same status string on screen. Never create a client attack.
+let lastWorldStatusAction = null;
+let lastWorldStatusActorId = null;
 let combatFeedbackTimer = 0;
 let authoritativeStamina = null;
 let pendingStaminaDenial = null;
@@ -384,14 +389,20 @@ canvas.addEventListener("wheel", (event) => {
   const m41WheelToken = typeof m41PhysicalChronology !== "undefined"
     ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
-  canvas.focus();
   if (event.deltaY < 0) {
+    canvas.focus();
     rollRequested = true;
     audio.play("roll");
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+    // Submit the true Block edge before focus/layout or audio can stall it.
+    // Focus still happens in the same physical callback for keyboard controls.
+    sendImmediatePhysicalBlockEdge(event.isTrusted === true);
+    canvas.focus();
     audio.play("guard");
+  } else {
+    canvas.focus();
   }
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.wheelEnd(m41WheelToken);
 }, { passive: false });
@@ -606,7 +617,29 @@ void import("../src/browser/chat-c1-activation.mjs")
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
+  const ownActor = state.get(ownId);
+  const freshWorldLightWindup = ownActor?.action === COMBAT_ACTION.attackWindup
+    && (lastWorldStatusAction !== COMBAT_ACTION.attackWindup
+      || lastWorldStatusActorId !== ownId);
+  lastWorldStatusAction = ownActor?.action ?? null;
+  lastWorldStatusActorId = ownId;
   recordAcceptanceState(state, ownId);
+  // M41: a real authenticated original World snapshot can arrive between
+  // render frames. Surface ONLY its own actor's committed windup immediately,
+  // never a prediction/client-owned action; the same HUD is redrawn in RAF.
+  // A newly committed ORIGINAL World LightWindup is later gameplay than a
+  // previous 980ms parry feedback banner. Surface this ONE genuine actor-bound
+  // transition even while that prior message is still visible; otherwise a
+  // second real Light can have no fresh HUD cue and native Firefox cannot
+  // react. Ordinary snapshots retain the existing message-priority contract.
+  const originalWindupHint = authoritativeWindupHudHint(ownActor, {
+    now: performance.now(),
+    combatMessage: freshWorldLightWindup ? null : combatMessage,
+    combatMessageUntil,
+  });
+  if (originalWindupHint) setStatus(originalWindupHint, {
+    force: freshWorldLightWindup,
+  });
   observeThreatCommitment(state, ownId);
   const match = fighterMatchPresentation(state.values(), ownId);
   if (match.visible && !matchOver) {
@@ -686,6 +719,7 @@ function recordAcceptanceState(state, ownId) {
     );
   }
   if (acceptanceScenario === "uidirectionallight"
+    || acceptanceScenario === "uijumppunishffa"
     || acceptanceScenario === "uijumprecoveryffa"
     || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
@@ -940,7 +974,7 @@ function releaseInputs() {
   pendingStaminaDenial = null;
 }
 
-function sampleInput() {
+function sampleInput({ playStepAudio = true } = {}) {
   if (matchOver) {
     currentInput.moveX = 0;
     currentInput.moveY = 0;
@@ -968,8 +1002,49 @@ function sampleInput() {
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
-  if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
+  if (playStepAudio && local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
     audio.play("step", { level: currentInput.run ? .90 : .55 });
+  }
+}
+
+// A real wheel-back is a latency-sensitive 240ms Block / 125ms Parry edge.
+// The normal source0 sender is driven by RAF prediction ticks; genuine Firefox
+// wheel callbacks have waited ~73ms for that render loop under native load.
+// Submit ONE fresh, original v1 sample immediately from the trusted DOM edge,
+// with the SAME monotonic client tick and the SAME authoritative QUIC writer.
+// No synthetic input, alternate combat engine, protocol or server clock.
+function sendImmediatePhysicalBlockEdge(trusted) {
+  if (!trusted || document.hidden || matchOver || !networkClient?.playerNetId) return;
+  sampleInput({ playStepAudio: false });
+  if (!currentInput.block) return;
+  const outgoingTick = clientTick;
+  markStaminaDenialSubmitted(outgoingTick, currentInput);
+  networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+  clientTick = (clientTick + 1) >>> 0;
+  // A physical edge can also coincide with an authentic one-shot attack/jump.
+  // It must never be replayed again at the next RAF-driven source0 tick.
+  attackRequested = false;
+  runningAttackRequested = false;
+  committedLightMove = null;
+  heavyAttackRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
+  if (typeof m41PhysicalChronology !== "undefined" && m41PhysicalChronology) {
+    const submission = m41PhysicalChronology.immediateSendInvocation(outgoingTick, currentInput);
+    const debug = window.__MYASO_ACCEPTANCE_STATE__;
+    if (debug) {
+      debug.inputSubmissions ??= [];
+      debug.inputSubmissions.push({
+        clientTick: outgoingTick, epochMs: Date.now(),
+        block: true, source: "physical-wheel-original-v1",
+        m41PhysicalInput: submission,
+      });
+      if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+    }
   }
 }
 
@@ -2073,8 +2148,8 @@ function setMeter(cacheKey, bar, label, value) {
   label.textContent = String(rounded);
 }
 
-function setStatus(text) {
-  if (hudCache.status === text) return;
+function setStatus(text, { force = false } = {}) {
+  if (!force && hudCache.status === text) return;
   hudCache.status = text;
   eventText.textContent = text;
 }

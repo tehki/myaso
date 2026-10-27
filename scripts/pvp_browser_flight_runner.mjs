@@ -46,6 +46,7 @@ import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
+import { createM35CueRegistry, m35PrearmedCueScript } from "./m35-prearmed-windup-cue.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -150,6 +151,7 @@ let gameServer;
 let m201ServerOutput = () => "";
 const m221Registry = createM221TrustedWheelRegistry();
 const m227Registry = createM227TrustedLightRegistry();
+const m35CueRegistry = createM35CueRegistry();
 
 try {
   staticServer = await startStaticServer();
@@ -509,6 +511,18 @@ async function startStaticServer() {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+      // Same-origin loopback QA observation only; never a Combat input endpoint.
+      if (url.pathname === "/__myaso_m35_rendered_windup" && request.method === "POST") {
+        const local = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress);
+        if (!local || request.headers.origin !== `http://${request.headers.host}`) return send(response, 403, "forbidden");
+        let body = "";
+        for await (const chunk of request) {
+          body += chunk;
+          if (body.length > 1024) return send(response, 413, "payload too large");
+        }
+        if (!m35CueRegistry.receive(JSON.parse(body))) return send(response, 422, "stale/invalid rendered cue");
+        response.writeHead(204); response.end(); return;
+      }
       // Acceptance-only localhost receipt. No input is generated here.
       if (url.pathname === "/__myaso_m221_trusted_wheel" && request.method === "POST") {
         let body = "";
@@ -3256,7 +3270,13 @@ async function runOnlineUiJumpAttackFlight(entries, expectedScenario = "uijumpat
   const keyTransitionOffset = beforeAttacker.keyTransitions.length;
   const pointerOffset = beforeAttacker.pointers.length;
 
-  await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+  // M136 first-red: an in-command W3C pointerMove allowed 138ms between
+  // physical Space DOWN and LMB DOWN on a loaded Chrome driver. Pre-aim
+  // while still Idle, then reuse the already-qualified M335 pointer-first
+  // single native W3C chord. The strict <=60ms physical timing, 42HP World
+  // HIT, both browser replicas and phase/guard checks remain unchanged.
+  await aimArena(attacker, attackerElementId, attackOffset);
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const deadline = Date.now() + 1800;
   let evidence = null;
@@ -3436,6 +3456,11 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     "idle after the successful jump attack",
   );
 
+  // Leave half the conversion cost as headroom for regeneration while the
+  // processed ACK waits for a fresh own snapshot. A 23 -> 9 setup can become
+  // 12 at confirmation; the client correctly refuses that stamina claim.
+  const setupStaminaExclusiveMax = COMBAT.jump.staminaCost
+    + Math.floor(COMBAT.jumpAttack.staminaCost / 2);
   let ready = null;
   let drainHolds = 0;
   for (let index = 0; index < 8 && !ready; index += 1) {
@@ -3444,7 +3469,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
       && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+      && stamina < setupStaminaExclusiveMax
       && idle) {
       ready = state;
       break;
@@ -3454,7 +3479,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+            < setupStaminaExclusiveMax
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1600,
         "regen into the jump-only stamina window",
@@ -3470,7 +3495,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 14-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
@@ -3484,7 +3509,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
   const airborne = await waitForAttacker(
     (state) => {
       const actions = state.acceptance?.ownActionTransitions?.slice(jumpActionOffset) ?? [];
-      return actions.some((entry) => entry.action === COMBAT_ACTION.jump)
+      return actions.at(-1)?.action === COMBAT_ACTION.jump
         && Number.isFinite(state.acceptance?.authoritativeStamina)
         && state.acceptance.authoritativeStamina < COMBAT.jumpAttack.staminaCost;
     },
@@ -3506,8 +3531,9 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
   const pointerOffset = airborne.pointers.length;
   const eventOffset = airborne.events.length;
   const feedbackOffset = airborne.feedbackTransitions.length;
-  await sleep(20);
-  await performArenaAttack(attacker, attackerElementId, awayOffset);
+  // The pointer is already aimed away. Keep a positive 5ms hold for strict down/up chronology;
+  // another pointer move and hold consume the short airborne denial window.
+  await performArenaM221GuardBreakClick(attacker, 5);
 
   const rejected = await waitForAttacker(
     (state) => {
@@ -3679,7 +3705,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   const defenderBefore = await readUiEvidence(defender);
   const focusOffset = defenderBefore.acceptance?.focusActionTransitions?.length ?? 0;
 
-  await performArenaJumpAttackChord(attacker, attackerElementId, awayOffset, 90);
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const rejected = await waitForAttacker(
     (state) => {
@@ -5873,7 +5899,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
             event.action === knockdownAction && Number.isFinite(event.epochMs));
           if (found || performance.now() - started >= timeoutMs) {
             clearInterval(watcher);
-            done(found ? { ...found } : null);
+            done(found ? { ...found, observedEpochMs: Date.now() } : null);
           }
         };
         watcher = setInterval(check, 4);
@@ -5892,6 +5918,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
   await aimArena(punisher, punisherElementId, punishOffset);
   await sleep(50);
 
+  const worldProofOffset = m201ServerOutput().length;
   let conversion = null;
   for (let attempt = 1; attempt <= 3 && !conversion; attempt += 1) {
     await setMovementKey(roller, retreatKey, true);
@@ -5924,6 +5951,7 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     const rollCompletion = scrollArenaWheel(roller, rollerElementId, -120, 0)
       .then(() => ({ ok: true }), (error) => ({ ok: false, error }));
     const knockdownTransition = await knockdownWatcher;
+    const watcherReturnedAt = Date.now();
 
     if (knockdownTransition) {
       // R1 light is committed on pointerUP. M237: a genuine 35ms hold
@@ -5934,7 +5962,16 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
       // Do not await the roller's unrelated driver wheel ACK, lengthen the
       // 260ms knockdown, shorten the 135ms server windup, or permit a
       // same-tick active/recovery without the original strict checks.
+      const clickDispatchedAt = Date.now();
       await performArenaM221GuardBreakClick(punisher, 5);
+      const clickCompletedAt = Date.now();
+      console.log("M156_NATIVE_DISPATCH_DIAGNOSTIC " + JSON.stringify({
+        attempt, knockdownTransition, watcherReturnedAt,
+        clickDispatchedAt, clickCompletedAt,
+        nodeDispatchDelayMs: clickDispatchedAt - watcherReturnedAt,
+        nodeClickCommandMs: clickCompletedAt - clickDispatchedAt,
+        world: m201ServerOutput().slice(worldProofOffset),
+      }));
       const rollResult = await rollCompletion;
       if (!rollResult.ok) throw rollResult.error;
       conversion = {
@@ -6065,6 +6102,15 @@ async function runOnlineUiRollKnockdownFfaHitFlight(entries) {
     && Math.abs(punishDown.y - 0.5) <= 0.15
     && (punisherId < defenderId ? punishDown.x >= 0.6 : punishDown.x <= 0.4);
   const knockdownEndEpochMs = conversion.knockdownTransition.epochMs + COMBAT.dodge.collisionKnockdownMs;
+  // Record the real input and original World before any strict timing rejection.
+  // Browser epochs and Node timings remain separate; neither qualifies a HIT.
+  console.log("M156_PRE_GATE_CHRONOLOGY " + JSON.stringify({
+    knockdownTransition: conversion.knockdownTransition, punishPointers,
+    browserInputChronology: (punisherState.m147InputPlane ?? []).slice(-32),
+    source0Samples: (punisherState.acceptance?.m121SentSamples ?? []).slice(-24),
+    inputSubmissions: (punisherState.acceptance?.inputSubmissions ?? []).slice(-24),
+    world: m201ServerOutput().slice(worldProofOffset),
+  }));
   if (punishDowns.length !== 1 || punishUps.length !== 1 || !punishAimValid
     || !Number.isFinite(punishDown?.epochMs) || !Number.isFinite(punishUp?.epochMs)
     || punishUp.epochMs <= punishDown.epochMs
@@ -8304,6 +8350,22 @@ async function waitForM41WorldWindup(attacker, timeoutMs, baselineEventCount, ex
     && (cue.text === "Attack committed - your windup is readable."
       || (allowHeavy && cue.text === "Heavy strike committed - the long windup is readable."))
     && cue.latestText === cue.text) return cue;
+  // Preserve the original fail-closed gate; only emit a bounded read-only
+  // snapshot when the browser never observed an admissible fresh World cue.
+  if (!cue) {
+    // Failure-only W3C read; never use this bounded history to authorize a
+    // late wheel. Retain the original null timeout and fatal native gate.
+    try {
+      const diagnostic = await execute(attacker.base, attacker.sessionId,
+        "return window.__MYASO_M41_LAST_TIMEOUT__ ?? null;");
+      if (diagnostic?.timedOut === true) {
+        console.log("M41_NATIVE_CUE_TIMEOUT " + JSON.stringify(diagnostic));
+      }
+    } catch (error) {
+      console.log("M41_NATIVE_CUE_TIMEOUT_READ_ERROR "
+        + JSON.stringify({ message: String(error).slice(0, 160) }));
+    }
+  }
   throw new Error("M41 native attacker never exposed a fresh current-attempt light windup");
 }
 
@@ -8367,22 +8429,47 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
         throw new Error("M41 could not record current-attempt original World cue baseline");
       }
-      // Finish genuine aim before the measured exchange. The same native
-      // 35ms DOWN/UP then runs while we observe the fresh real World cue;
-      // no full-click ACK or large evidence serialization gates the one wheel.
+      // Aim before the measured exchange. The original 125ms parry is
+      // evaluated from the server's REAL Block admission, not the wheel ACK.
+      // With physical-wheel source0 submitted directly before RAF, M41's
+      // earlier Heavy-charging cue armed Block 133.3ms before HIT (genuine
+      // original World BLOCK, outside Parry125). Prearm the SAME actor-bound
+      // native watcher, but dispatch the one real wheel only on the actual
+      // subsequent Light Windup; never forge a delayed Block admission.
+      // No full-click ACK or evidence serialization gates this wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
-      const observed = await dispatchM41ObservedParry({
-        sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
-        awaitWorldCue: () => waitForM41WorldWindup(
-          attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-          scenario === "uiparrytell",
-        ),
-        // M33 now uses the original actor-bound windup gate and one real
-        // viewport-center native Firefox wheel, keeping M35 unchanged.
-        sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
-          ? scrollM41ViewportWheel(defender, defenderViewport)
-          : setArenaBlock(defender, defenderElementId, true),
-      });
+      const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")
+        ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+          {allowHeavy: false}) : null;
+      if (prearmed) {
+        const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
+          script: m35PrearmedCueScript(),
+          args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180,
+            false],
+        });
+        if (armed !== true) { prearmed.close(); throw new Error("M35 could not arm native Windup observer before physical click"); }
+      }
+      let observed;
+      try {
+        observed = await dispatchM41ObservedParry({
+          sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
+          awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup(
+            attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
+            false,
+          ),
+          // M33/M41 retain the viewport wheel; M35 retains its element wheel.
+          sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
+            ? scrollM41ViewportWheel(defender, defenderViewport)
+            : setArenaBlock(defender, defenderElementId, true),
+        });
+      } finally {
+        if (prearmed) {
+          prearmed.close();
+          const diagnostic = await execute(attacker.base, attacker.sessionId,
+            "window.__MYASO_M35_CUE_WATCH__?.close(); return window.__MYASO_M41_LAST_TIMEOUT__ ?? null;");
+          if (diagnostic?.timedOut === true) console.log("M35_NATIVE_CUE_TIMEOUT " + JSON.stringify(diagnostic));
+        }
+      }
       console.log("M41_ORIGINAL_WORLD_WINDUP_STAGE " + JSON.stringify({
         scenario, attacker: attacker.name, ...observed,
       }));
@@ -11516,6 +11603,42 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
 
   let baseline = await Promise.all(entries.map(readUiEvidence));
   let observerBefore = baseline.find((entry) => entry.browser === observer.name);
+  // A native hold duration is not proof of World displacement. Reuse M121's
+  // existing replica-driven, interior-Light-range movement planner, with real
+  // bounded WASD only. Stage before the recovery/input proof window begins.
+  const { planM121NativeGeometry } = await import("./m121-native-geometry-plan.mjs");
+  const nativeGeometry = [];
+  let geometryReady = false;
+  await sleep(310); // separate any corrective key from the original D/A taps
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    baseline = await Promise.all(entries.map(readUiEvidence));
+    observerBefore = baseline.find(entry => entry.browser === observer.name);
+    const fighters = observerBefore?.acceptance?.fighters ?? [];
+    const victim = fighters.find(fighter => fighter.netId === jumpId);
+    const punisher = fighters.find(fighter => fighter.netId === observerId);
+    const plan = planM121NativeGeometry(victim, punisher, true);
+    nativeGeometry.push({serverTick: observerBefore.acceptance.serverTick, fighters, plan});
+    if (plan) {
+      await pulseMovementKeyBoundedW3c(jumpAttacker, plan.key, plan.durationMs);
+      await sleep(310); // genuine repeated keys must not accidentally request Dash
+      continue;
+    }
+    await sleep(80);
+    const stable = await readUiEvidence(observer);
+    const stableVictim = stable.acceptance?.fighters?.find(fighter => fighter.netId === jumpId);
+    const stablePunisher = stable.acceptance?.fighters?.find(fighter => fighter.netId === observerId);
+    if (stable.acceptance?.serverTick > observerBefore.acceptance.serverTick
+      && !planM121NativeGeometry(stableVictim, stablePunisher, true)
+      && Math.hypot(stableVictim.x - victim.x, stableVictim.y - victim.y) <= 2
+      && Math.hypot(stablePunisher.x - punisher.x, stablePunisher.y - punisher.y) <= 2) {
+      geometryReady = true;
+      baseline = await Promise.all(entries.map(readUiEvidence));
+      observerBefore = baseline.find(entry => entry.browser === observer.name);
+      break;
+    }
+  }
+  console.log("M147_NATIVE_INTERIOR_GEOMETRY " + JSON.stringify({nativeGeometry, geometryReady}));
+  if (!geometryReady) throw new Error(`${milestone} actual replica geometry did not converge before the single JumpAttack`);
   for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
     // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
     // The first 260ms staging A and previous corrective A are real taps too.
@@ -11542,6 +11665,22 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   if (baseline.length !== 3 || !baseline.every(entry => entry.playerHp === 100 && entry.playerGuard === 100)) {
     throw new Error(`${milestone} preflight vitals must be pristine: ${JSON.stringify(baseline)}`);
   }
+  const stagingFighters = observerBefore.acceptance?.fighters ?? [];
+  const stagedVictim = stagingFighters.find(f => f.netId === jumpId);
+  const stagedPunisher = stagingFighters.find(f => f.netId === observerId);
+  const stagedCloser = stagingFighters.find(f => f.netId === closerId);
+  const stagingGap = stagedVictim && stagedPunisher
+    ? Math.hypot(stagedVictim.x - stagedPunisher.x, stagedVictim.y - stagedPunisher.y) : null;
+  console.log("M147_STAGING_GEOMETRY " + JSON.stringify({
+    serverTick: observerBefore.acceptance?.serverTick, fighters: stagingFighters,
+    victimId: jumpId, punisherId: observerId, closerId, stagingGap,
+    unchangedContactReach: COMBAT.attack.reach + COMBAT.fighterRadius,
+  }));
+  if (!stagedVictim || !stagedPunisher || !stagedCloser || !Number.isFinite(stagingGap)
+    || stagingGap > COMBAT.attack.reach + COMBAT.fighterRadius
+    || !(stagedVictim.x < stagedPunisher.x && stagedPunisher.x < stagedCloser.x)) {
+    throw new Error(`${milestone} actual staged replicas are outside the original Light contact geometry`);
+  }
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const observerPointerOffset = observerBefore.pointers.length;
@@ -11557,7 +11696,10 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   const worldProofOffset = m201ServerOutput().length;
   // Independent real drivers: observe the rendered cue without awaiting the
   // other driver's jump command ACK. Every command is still awaited below.
-  const jumpCommand = performArenaJumpAttackChord(jumpAttacker, jumpArena, -200, 90)
+  // The mouse is already aimed above. Reuse the existing pointer-first native
+  // chord: an extra pointerMove tick let Space precede LMB by 163ms in #1077.
+  // Actual trusted-event spacing and original World gates remain mandatory.
+  const jumpCommand = performArenaPreAimedJumpAttackChord(jumpAttacker, 90)
     .then(() => null, (error) => error);
   let recoveryCue = null;
   try {
@@ -11588,34 +11730,60 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
               && focus === 'PUNISH TARGET #' + victimId && pristine
               ? { ...entry, focusLabel: focus } : null;
           };
-          // Independent original-browser snapshots can arrive 9–22ms
-          // after Firefox first renders recovery. Require SAME real focus,
-          // recovery state and pristine vitals for 30ms; do not fabricate
-          // contact or relax native/World assertions. Fail on timeout.
+          // A physically authentic click can be dispatched as soon as the
+          // first REAL selected recovery cue appears; the 30ms continuous
+          // UI/focus/vitals verification remains independently mandatory.
+          // Previously serializing this verification BEFORE native WebDriver
+          // consumed 30ms of the unchanged 450ms World recovery. Run its
+          // read-only 4ms observer in parallel, and FAIL the same trial if
+          // the original cue/focus disappears before 30ms.
+          const stability = window.__MYASO_M147_NATIVE_CUE_STABILITY__ = {
+            status: 'waiting', first: null, verifiedMs: null,
+          };
           let poll;
           let stableCue = null;
           let stableSince = null;
+          let dispatched = false;
           const check = () => {
             const cue = inspect();
             const now = performance.now();
             if (cue) {
               if (!stableCue || stableCue.epochMs !== cue.epochMs
                   || stableCue.focusLabel !== cue.focusLabel) {
+                if (dispatched) {
+                  stability.status = 'invalidated';
+                  stability.reason = 'original cue identity or focus changed before 30ms';
+                  clearInterval(poll);
+                  return;
+                }
                 stableCue = cue;
                 stableSince = now;
               }
+              if (!dispatched) {
+                dispatched = true;
+                stability.status = 'verifying';
+                stability.first = { ...cue, observedAtPerfMs: now };
+                done(cue); // authorized genuine W3C action; not a DOM event
+              }
               if (now - stableSince >= 30) {
+                stability.status = 'verified';
+                stability.verifiedMs = now - stableSince;
                 clearInterval(poll);
-                done(cue);
                 return;
               }
-            } else {
-              stableCue = null;
-              stableSince = null;
+            } else if (dispatched) {
+              stability.status = 'invalidated';
+              stability.reason = 'real recovery/focus/vitals disappeared before 30ms';
+              clearInterval(poll);
+              return;
             }
             if (now - started >= timeoutMs) {
               clearInterval(poll);
-              done(null);
+              if (!dispatched) done(null);
+              else {
+                stability.status = 'invalidated';
+                stability.reason = '30ms genuine recovery verification timed out';
+              }
             }
           };
           poll = setInterval(check, 4);
@@ -11626,12 +11794,48 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     if (!isM147RenderedRecoveryCue(recoveryCue, jumpId)) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    // M147: once the genuine recovery cue is visibly present, dispatch one
-    // real, pre-aimed W3C pointer DOWN/UP without an additional pause tick.
-    // Even a 5ms requested pause can cost a whole headless driver tick before
-    // the original 60Hz sender samples release. The physical release remains
-    // genuine and the strict original World HIT-before-exit gate is unchanged.
+    // Physical Firefox DOWN/UP is still exactly one real, already pre-aimed
+    // W3C pointer transaction with zero pause. Check the 30ms actual cue
+    // stability AFTER its issue rather than serializing this avoidable wait
+    // inside the 450ms World recovery. Any invalidation is a terminal RED.
+    // The authoritative original World HIT-before-exit gate is unchanged.
+    const nativeIssuedEpochMs = Date.now();
     await performArenaM221GuardBreakClick(observer, 0);
+    const nativeAckEpochMs = Date.now();
+    const cueStability = await webdriver(observer.base, "POST",
+      `/session/${observer.sessionId}/execute/async`, {
+        script: `
+          const done = arguments[arguments.length - 1];
+          const started = performance.now();
+          const read = () => {
+            const status = window.__MYASO_M147_NATIVE_CUE_STABILITY__;
+            if (!status || status.status === 'verified'
+                || status.status === 'invalidated') {
+              clearInterval(poll);
+              done(status ?? {status: 'missing'});
+            } else if (performance.now() - started >= 600) {
+              clearInterval(poll);
+              done({ ...status, status: 'unverified-timeout' });
+            }
+          };
+          const poll = setInterval(read, 4);
+          read();
+        `,
+        args: [],
+      });
+    console.log("M147_NATIVE_CUE_PARALLEL_STABILITY " + JSON.stringify({
+      cue: recoveryCue,
+      stability: cueStability,
+      nativeIssuedEpochMs,
+      nativeAckEpochMs,
+      originalHostRequestDurationMs: nativeAckEpochMs - nativeIssuedEpochMs,
+    }));
+    if (cueStability?.status !== 'verified'
+        || !(cueStability.verifiedMs >= 30)
+        || cueStability.first?.epochMs !== recoveryCue.epochMs
+        || cueStability.first?.focusLabel !== recoveryCue.focusLabel) {
+      throw new Error(`${milestone} genuine recovery cue did not remain stable for 30ms during physical pointer input: ${JSON.stringify(cueStability)}`);
+    }
   } finally {
     const jumpError = await jumpCommand;
     if (jumpError) throw jumpError;
@@ -11663,7 +11867,18 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     await sleep(10);
   }
   if (!hitEvidence) {
-    throw new Error(`${milestone} real Firefox light did not damage selected jump-recovery target #${jumpId}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+    const failureStates = await Promise.all(entries.map(readUiEvidence));
+    console.log("M147_MISSED_CONTACT_DIAGNOSTIC " + JSON.stringify({
+      actors: {victim: jumpId, punisher: observerId, closer: closerId},
+      staging: {fighters: stagingFighters, stagingGap}, cue: recoveryCue,
+      final: failureStates.map(row => ({browser: row.browser, id: row.playerNetId,
+        hp: row.playerHp, guard: row.playerGuard, focus: row.focusLabel,
+        serverTick: row.acceptance?.serverTick, fighters: row.acceptance?.fighters,
+        ownActions: row.acceptance?.ownActionTransitions, pointers: row.pointers.slice(-4)})),
+      world: m201ServerOutput().slice(worldProofOffset).split(/\r?\n/)
+        .filter(line => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line)),
+    }));
+    throw new Error(`${milestone} real Firefox light did not damage selected jump-recovery target #${jumpId}; see M147_MISSED_CONTACT_DIAGNOSTIC`);
   }
 
   // Wait for #1 to finish recovery and for Firefox to return to the still-idle
@@ -11742,16 +11957,41 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));
+  // The victim and punisher are different REAL browser event loops. Their
+  // snapshot callbacks can stamp the very same World recovery 10–20ms apart:
+  // in genuine first-red #40506439872 a real Firefox PUNISH cue was recorded
+  // at epoch ...0574, its trusted DOWN at ...0580, but the victim browser did
+  // not observe its own already-active recovery until ...0590. Do not turn
+  // that cross-client UI delivery order into fictional World ordering.
+  //
+  // Instead STRICTLY require the original Rust World proof NOW: exactly
+  // one source-owned Light windup, active, HIT34/HP66 against actor1 WHILE
+  // its Action18 recovery was active and BEFORE its exact 27-tick exit.
+  // The punisher's own real selected recovery cue must still precede its
+  // trusted physical DOWN, checked below; no early/out-of-window HIT passes.
+  const actualWorldTrace = beforeLifecycleWorldTrace;
+  const worldRecoveryProof = verifyM147WorldRecoveryProof(
+    actualWorldTrace, { jumpId, punisherId: observerId, closerId },
+  );
+  console.log("M147_CROSS_BROWSER_SNAPSHOT_CHRONOLOGY " + JSON.stringify({
+    cueEpochMs: recoveryCue?.epochMs,
+    physicalDownEpochMs: punishDown.epochMs,
+    victimUiRecoveryEntryEpochMs: recovery?.epochMs,
+    victimUiRecoveryExitEpochMs: idle?.epochMs,
+    victimUiEntryMinusPhysicalDownMs: Number.isFinite(recovery?.epochMs)
+      ? recovery.epochMs - punishDown.epochMs : null,
+    originalWorldRecoveryTick: worldRecoveryProof.jump.recovery.tick,
+    originalWorldHitTick: worldRecoveryProof.hit.tick,
+    originalWorldRecoveryExitTick: worldRecoveryProof.jump.idle.tick,
+  }));
   if (jumpState.acceptance?.scenario !== "uijumppunishffa"
     || observerState.acceptance?.scenario !== "uijumppunishffa"
     || closerState.acceptance?.scenario !== "uijumppunishffa"
     || recoveryIndex < 0 || idleIndex <= recoveryIndex
-    || punishDown.epochMs < recovery.epochMs || punishDown.epochMs >= idle.epochMs) {
-    throw new Error(`${milestone} Firefox did not commit its real light inside #${jumpId}'s authoritative recovery: ${JSON.stringify({
-      punishDown,
-      recovery,
-      idle,
-      lifecycle,
+    || !Number.isFinite(recoveryCue?.epochMs)
+    || punishDown.epochMs < recoveryCue.epochMs) {
+    throw new Error(`${milestone} Firefox did not act on the selected genuine recovery cue during original World recovery: ${JSON.stringify({
+      punishDown, recoveryCue, recovery, idle, lifecycle, worldRecoveryProof,
     })}`);
   }
 
@@ -11796,7 +12036,6 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // Read-only native chronology BEFORE the strict World proof. Keep a
   // bounded actor/tick/input timeline even when the HIT is too late; this
   // does not create input, change the choreography, or waive any assertion.
-  const actualWorldTrace = m201ServerOutput().slice(worldProofOffset);
   console.log("M147_PRE_GATE_CHRONOLOGY " + JSON.stringify({
     actors: { victim: jumpId, punisher: observerId, idle: closerId },
     cue: { epochMs: recoveryCue.epochMs, t: recoveryCue.t,
@@ -11813,10 +12052,6 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));
-  const worldRecoveryProof = verifyM147WorldRecoveryProof(
-    actualWorldTrace,
-    { jumpId, punisherId: observerId, closerId },
-  );
   console.log(`M147_WORLD_RECOVERY_PROOF ${JSON.stringify(worldRecoveryProof)}`);
 
   return evidence.map((entry) => ({

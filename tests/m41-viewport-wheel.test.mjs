@@ -32,13 +32,17 @@ test("M41 native wheel remains downstream of genuine actor-bound cue; M35 still 
   assert.ok(start>=0&&end>start);
   const block=source.slice(start,end);
   assert.ok(block.includes("dispatchM41ObservedParry({"));
-  assert.ok(block.includes("awaitWorldCue: () => waitForM41WorldWindup("));
+  assert.ok(block.includes("awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup("));
+  assert.ok(block.includes('const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")'),
+    "M35, M33 and corrected M41 all prearm the real actor-bound Light cue");
   assert.ok(block.includes('scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry"'),
     "M33 short-click parry requires an original fresh actor-bound light windup");
   assert.ok(block.includes('(scenario === "uiparrytell" || scenario === "uiparry")'),
     "M33/M41 issue one native viewport wheel; M35 stays unchanged");
-  assert.ok(block.includes('scenario === "uiparrytell",'),
-    "M33 never accepts early heavy windup, only M41 can");
+  assert.ok(block.includes('allowHeavy: false'),
+    "M41 cannot prearm Block from speculative Heavy charge with immediate source0 Block input");
+  assert.ok(!block.includes('allowHeavy: scenario === "uiparrytell"'),
+    "premature Heavy cue is not a qualifying Light Windup");
   assert.ok(block.includes("scrollM41ViewportWheel(defender, defenderViewport)"));
   assert.ok(block.includes("setArenaBlock(defender, defenderElementId, true)"));
   assert.ok(block.includes("performArenaM221GuardBreakClick(attacker, 35)"));
