@@ -11730,34 +11730,60 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
               && focus === 'PUNISH TARGET #' + victimId && pristine
               ? { ...entry, focusLabel: focus } : null;
           };
-          // Independent original-browser snapshots can arrive 9–22ms
-          // after Firefox first renders recovery. Require SAME real focus,
-          // recovery state and pristine vitals for 30ms; do not fabricate
-          // contact or relax native/World assertions. Fail on timeout.
+          // A physically authentic click can be dispatched as soon as the
+          // first REAL selected recovery cue appears; the 30ms continuous
+          // UI/focus/vitals verification remains independently mandatory.
+          // Previously serializing this verification BEFORE native WebDriver
+          // consumed 30ms of the unchanged 450ms World recovery. Run its
+          // read-only 4ms observer in parallel, and FAIL the same trial if
+          // the original cue/focus disappears before 30ms.
+          const stability = window.__MYASO_M147_NATIVE_CUE_STABILITY__ = {
+            status: 'waiting', first: null, verifiedMs: null,
+          };
           let poll;
           let stableCue = null;
           let stableSince = null;
+          let dispatched = false;
           const check = () => {
             const cue = inspect();
             const now = performance.now();
             if (cue) {
               if (!stableCue || stableCue.epochMs !== cue.epochMs
                   || stableCue.focusLabel !== cue.focusLabel) {
+                if (dispatched) {
+                  stability.status = 'invalidated';
+                  stability.reason = 'original cue identity or focus changed before 30ms';
+                  clearInterval(poll);
+                  return;
+                }
                 stableCue = cue;
                 stableSince = now;
               }
+              if (!dispatched) {
+                dispatched = true;
+                stability.status = 'verifying';
+                stability.first = { ...cue, observedAtPerfMs: now };
+                done(cue); // authorized genuine W3C action; not a DOM event
+              }
               if (now - stableSince >= 30) {
+                stability.status = 'verified';
+                stability.verifiedMs = now - stableSince;
                 clearInterval(poll);
-                done(cue);
                 return;
               }
-            } else {
-              stableCue = null;
-              stableSince = null;
+            } else if (dispatched) {
+              stability.status = 'invalidated';
+              stability.reason = 'real recovery/focus/vitals disappeared before 30ms';
+              clearInterval(poll);
+              return;
             }
             if (now - started >= timeoutMs) {
               clearInterval(poll);
-              done(null);
+              if (!dispatched) done(null);
+              else {
+                stability.status = 'invalidated';
+                stability.reason = '30ms genuine recovery verification timed out';
+              }
             }
           };
           poll = setInterval(check, 4);
@@ -11768,12 +11794,48 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     if (!isM147RenderedRecoveryCue(recoveryCue, jumpId)) {
       throw new Error(`${milestone} never rendered the actual pristine jump-recovery PUNISH cue`);
     }
-    // M147: once the genuine recovery cue is visibly present, dispatch one
-    // real, pre-aimed W3C pointer DOWN/UP without an additional pause tick.
-    // Even a 5ms requested pause can cost a whole headless driver tick before
-    // the original 60Hz sender samples release. The physical release remains
-    // genuine and the strict original World HIT-before-exit gate is unchanged.
+    // Physical Firefox DOWN/UP is still exactly one real, already pre-aimed
+    // W3C pointer transaction with zero pause. Check the 30ms actual cue
+    // stability AFTER its issue rather than serializing this avoidable wait
+    // inside the 450ms World recovery. Any invalidation is a terminal RED.
+    // The authoritative original World HIT-before-exit gate is unchanged.
+    const nativeIssuedEpochMs = Date.now();
     await performArenaM221GuardBreakClick(observer, 0);
+    const nativeAckEpochMs = Date.now();
+    const cueStability = await webdriver(observer.base, "POST",
+      `/session/${observer.sessionId}/execute/async`, {
+        script: `
+          const done = arguments[arguments.length - 1];
+          const started = performance.now();
+          const read = () => {
+            const status = window.__MYASO_M147_NATIVE_CUE_STABILITY__;
+            if (!status || status.status === 'verified'
+                || status.status === 'invalidated') {
+              clearInterval(poll);
+              done(status ?? {status: 'missing'});
+            } else if (performance.now() - started >= 600) {
+              clearInterval(poll);
+              done({ ...status, status: 'unverified-timeout' });
+            }
+          };
+          const poll = setInterval(read, 4);
+          read();
+        `,
+        args: [],
+      });
+    console.log("M147_NATIVE_CUE_PARALLEL_STABILITY " + JSON.stringify({
+      cue: recoveryCue,
+      stability: cueStability,
+      nativeIssuedEpochMs,
+      nativeAckEpochMs,
+      originalHostRequestDurationMs: nativeAckEpochMs - nativeIssuedEpochMs,
+    }));
+    if (cueStability?.status !== 'verified'
+        || !(cueStability.verifiedMs >= 30)
+        || cueStability.first?.epochMs !== recoveryCue.epochMs
+        || cueStability.first?.focusLabel !== recoveryCue.focusLabel) {
+      throw new Error(`${milestone} genuine recovery cue did not remain stable for 30ms during physical pointer input: ${JSON.stringify(cueStability)}`);
+    }
   } finally {
     const jumpError = await jumpCommand;
     if (jumpError) throw jumpError;

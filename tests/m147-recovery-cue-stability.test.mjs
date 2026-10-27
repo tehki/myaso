@@ -54,43 +54,42 @@ function scenario() {
     changeFocus(value) { focus = value; },
     changeRecoveryVisible(visible) { recovery.hidden = !visible; },
     completed, get cleared() {return cleared;},
+    get stability() {return world.__MYASO_M147_NATIVE_CUE_STABILITY__;},
   };
 }
 
-test("real recovery focus remains genuinely eligible 30ms before native click cue resolves", () => {
+test("first genuine recovery cue issues W3C earlier; independently verifies identical 30ms focus and vitals", () => {
   const s = scenario();
   s.advance(100);
   s.addRealCue();
   s.advance(4);
-  assert.equal(s.completed.length, 0);
-  s.advance(25);
-  assert.equal(s.completed.length, 0);
-  s.advance(5);
-  assert.equal(s.completed.length, 1);
+  assert.equal(s.completed.length, 1, "no unnecessary 30ms stall before native physical input");
   assert.equal(s.completed[0].epochMs, 100);
   assert.equal(s.completed[0].focusLabel, "PUNISH TARGET #1");
+  assert.equal(s.stability.status, "verifying");
+  s.advance(25);
+  assert.equal(s.stability.status, "verifying");
+  s.advance(5);
+  assert.equal(s.stability.status, "verified");
+  assert.ok(s.stability.verifiedMs >= 30);
+  assert.equal(s.completed.length, 1, "only one real native pointer action is authorized");
   assert.equal(s.cleared, 1);
 });
 
-test("stale focus or hidden recovery restarts bounded genuine cue verification", () => {
-  const s = scenario();
-  s.addRealCue();
-  s.advance(5);
-  s.changeFocus("NEAREST #3");
-  s.advance(5);
-  s.changeFocus("PUNISH TARGET #1");
-  s.advance(5);
-  s.advance(24);
-  assert.equal(s.completed.length, 0);
-  s.changeRecoveryVisible(false);
-  s.advance(1);
-  s.changeRecoveryVisible(true);
-  s.advance(1);
-  s.advance(29);
-  assert.equal(s.completed.length, 0);
-  s.advance(1);
-  assert.equal(s.completed.length, 1);
-  assert.equal(s.cleared, 1);
+test("transient focus or hidden real recovery INVALIDATES early native trial rather than waiving stability", () => {
+  for (const disrupt of ["focus", "hidden"]) {
+    const s = scenario();
+    s.addRealCue();
+    s.advance(5);
+    assert.equal(s.completed.length, 1);
+    s.advance(20);
+    if (disrupt === "focus") s.changeFocus("NEAREST #3");
+    else s.changeRecoveryVisible(false);
+    s.advance(4);
+    assert.equal(s.stability.status, "invalidated", "real cue must be continuous for 30ms");
+    assert.equal(s.cleared, 1);
+    assert.equal(s.completed.length, 1);
+  }
 });
 
 test("unqualified native recovery cue fails closed on original deadline", () => {
@@ -104,6 +103,9 @@ test("unqualified native recovery cue fails closed on original deadline", () => 
 test("native 30ms stability preserves one real W3C click and original strict World HIT", () => {
   assert.match(original, /await performArenaM221GuardBreakClick\(observer, 0\)/);
   assert.match(original, /now - stableSince >= 30/);
+  assert.match(original, /stability.status = 'verified'/);
+  assert.match(original, /cueStability\?\.status !== 'verified'/);
+  assert.match(original, /cueStability\.verifiedMs >= 30/);
   assert.match(original, /if \(now - started >= timeoutMs\)/);
   assert.match(original, /verifyM147WorldRecoveryProof\(/);
   assert.match(original, /punishDown\.epochMs < recovery\.epochMs/);
