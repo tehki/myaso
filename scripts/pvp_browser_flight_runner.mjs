@@ -11957,16 +11957,41 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));
+  // The victim and punisher are different REAL browser event loops. Their
+  // snapshot callbacks can stamp the very same World recovery 10–20ms apart:
+  // in genuine first-red #40506439872 a real Firefox PUNISH cue was recorded
+  // at epoch ...0574, its trusted DOWN at ...0580, but the victim browser did
+  // not observe its own already-active recovery until ...0590. Do not turn
+  // that cross-client UI delivery order into fictional World ordering.
+  //
+  // Instead STRICTLY require the original Rust World proof NOW: exactly
+  // one source-owned Light windup, active, HIT34/HP66 against actor1 WHILE
+  // its Action18 recovery was active and BEFORE its exact 27-tick exit.
+  // The punisher's own real selected recovery cue must still precede its
+  // trusted physical DOWN, checked below; no early/out-of-window HIT passes.
+  const actualWorldTrace = beforeLifecycleWorldTrace;
+  const worldRecoveryProof = verifyM147WorldRecoveryProof(
+    actualWorldTrace, { jumpId, punisherId: observerId, closerId },
+  );
+  console.log("M147_CROSS_BROWSER_SNAPSHOT_CHRONOLOGY " + JSON.stringify({
+    cueEpochMs: recoveryCue?.epochMs,
+    physicalDownEpochMs: punishDown.epochMs,
+    victimUiRecoveryEntryEpochMs: recovery?.epochMs,
+    victimUiRecoveryExitEpochMs: idle?.epochMs,
+    victimUiEntryMinusPhysicalDownMs: Number.isFinite(recovery?.epochMs)
+      ? recovery.epochMs - punishDown.epochMs : null,
+    originalWorldRecoveryTick: worldRecoveryProof.jump.recovery.tick,
+    originalWorldHitTick: worldRecoveryProof.hit.tick,
+    originalWorldRecoveryExitTick: worldRecoveryProof.jump.idle.tick,
+  }));
   if (jumpState.acceptance?.scenario !== "uijumppunishffa"
     || observerState.acceptance?.scenario !== "uijumppunishffa"
     || closerState.acceptance?.scenario !== "uijumppunishffa"
     || recoveryIndex < 0 || idleIndex <= recoveryIndex
-    || punishDown.epochMs < recovery.epochMs || punishDown.epochMs >= idle.epochMs) {
-    throw new Error(`${milestone} Firefox did not commit its real light inside #${jumpId}'s authoritative recovery: ${JSON.stringify({
-      punishDown,
-      recovery,
-      idle,
-      lifecycle,
+    || !Number.isFinite(recoveryCue?.epochMs)
+    || punishDown.epochMs < recoveryCue.epochMs) {
+    throw new Error(`${milestone} Firefox did not act on the selected genuine recovery cue during original World recovery: ${JSON.stringify({
+      punishDown, recoveryCue, recovery, idle, lifecycle, worldRecoveryProof,
     })}`);
   }
 
@@ -12011,7 +12036,6 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   // Read-only native chronology BEFORE the strict World proof. Keep a
   // bounded actor/tick/input timeline even when the HIT is too late; this
   // does not create input, change the choreography, or waive any assertion.
-  const actualWorldTrace = m201ServerOutput().slice(worldProofOffset);
   console.log("M147_PRE_GATE_CHRONOLOGY " + JSON.stringify({
     actors: { victim: jumpId, punisher: observerId, idle: closerId },
     cue: { epochMs: recoveryCue.epochMs, t: recoveryCue.t,
@@ -12028,10 +12052,6 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
       .filter((line) => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line))
       .slice(-24),
   }));
-  const worldRecoveryProof = verifyM147WorldRecoveryProof(
-    actualWorldTrace,
-    { jumpId, punisherId: observerId, closerId },
-  );
   console.log(`M147_WORLD_RECOVERY_PROOF ${JSON.stringify(worldRecoveryProof)}`);
 
   return evidence.map((entry) => ({

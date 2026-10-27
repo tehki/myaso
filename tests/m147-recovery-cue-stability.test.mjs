@@ -108,7 +108,8 @@ test("native 30ms stability preserves one real W3C click and original strict Wor
   assert.match(original, /cueStability\.verifiedMs >= 30/);
   assert.match(original, /if \(now - started >= timeoutMs\)/);
   assert.match(original, /verifyM147WorldRecoveryProof\(/);
-  assert.match(original, /punishDown\.epochMs < recovery\.epochMs/);
+  assert.match(original, /M147_CROSS_BROWSER_SNAPSHOT_CHRONOLOGY/);
+  assert.match(original, /originalWorldRecoveryTick: worldRecoveryProof\.jump\.recovery\.tick/);
   assert.match(original, /punishDown\.epochMs < recoveryCue\.epochMs/);
   assert.doesNotMatch(original.slice(scriptEnd, original.indexOf("await performArenaM221GuardBreakClick(observer, 0)")),
     /await sleep\(/, "no WebDriver sleep between valid cue and authentic input");
