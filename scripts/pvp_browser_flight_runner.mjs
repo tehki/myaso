@@ -11610,6 +11610,22 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   if (baseline.length !== 3 || !baseline.every(entry => entry.playerHp === 100 && entry.playerGuard === 100)) {
     throw new Error(`${milestone} preflight vitals must be pristine: ${JSON.stringify(baseline)}`);
   }
+  const stagingFighters = observerBefore.acceptance?.fighters ?? [];
+  const stagedVictim = stagingFighters.find(f => f.netId === jumpId);
+  const stagedPunisher = stagingFighters.find(f => f.netId === observerId);
+  const stagedCloser = stagingFighters.find(f => f.netId === closerId);
+  const stagingGap = stagedVictim && stagedPunisher
+    ? Math.hypot(stagedVictim.x - stagedPunisher.x, stagedVictim.y - stagedPunisher.y) : null;
+  console.log("M147_STAGING_GEOMETRY " + JSON.stringify({
+    serverTick: observerBefore.acceptance?.serverTick, fighters: stagingFighters,
+    victimId: jumpId, punisherId: observerId, closerId, stagingGap,
+    unchangedContactReach: COMBAT.attack.reach + COMBAT.fighterRadius,
+  }));
+  if (!stagedVictim || !stagedPunisher || !stagedCloser || !Number.isFinite(stagingGap)
+    || stagingGap > COMBAT.attack.reach + COMBAT.fighterRadius
+    || !(stagedVictim.x < stagedPunisher.x && stagedPunisher.x < stagedCloser.x)) {
+    throw new Error(`${milestone} actual staged replicas are outside the original Light contact geometry`);
+  }
   const jumpKeyOffset = jumpBefore.keyTransitions.length;
   const jumpPointerOffset = jumpBefore.pointers.length;
   const observerPointerOffset = observerBefore.pointers.length;
@@ -11734,7 +11750,18 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
     await sleep(10);
   }
   if (!hitEvidence) {
-    throw new Error(`${milestone} real Firefox light did not damage selected jump-recovery target #${jumpId}: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
+    const failureStates = await Promise.all(entries.map(readUiEvidence));
+    console.log("M147_MISSED_CONTACT_DIAGNOSTIC " + JSON.stringify({
+      actors: {victim: jumpId, punisher: observerId, closer: closerId},
+      staging: {fighters: stagingFighters, stagingGap}, cue: recoveryCue,
+      final: failureStates.map(row => ({browser: row.browser, id: row.playerNetId,
+        hp: row.playerHp, guard: row.playerGuard, focus: row.focusLabel,
+        serverTick: row.acceptance?.serverTick, fighters: row.acceptance?.fighters,
+        ownActions: row.acceptance?.ownActionTransitions, pointers: row.pointers.slice(-4)})),
+      world: m201ServerOutput().slice(worldProofOffset).split(/\r?\n/)
+        .filter(line => /^M201_AUTH_(?:ACTION|HIT|BLOCK|PARRY|BREAK) /.test(line)),
+    }));
+    throw new Error(`${milestone} real Firefox light did not damage selected jump-recovery target #${jumpId}; see M147_MISSED_CONTACT_DIAGNOSTIC`);
   }
 
   // Wait for #1 to finish recovery and for Firefox to return to the still-idle

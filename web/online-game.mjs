@@ -686,6 +686,7 @@ function recordAcceptanceState(state, ownId) {
     );
   }
   if (acceptanceScenario === "uidirectionallight"
+    || acceptanceScenario === "uijumppunishffa"
     || acceptanceScenario === "uijumprecoveryffa"
     || acceptanceScenario === "uiparrypunishffahit"
     || acceptanceScenario === "uirollknockdownbounded"
