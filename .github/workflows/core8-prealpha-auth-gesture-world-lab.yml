@@ -82,6 +82,11 @@ jobs:
           CORE8A_LAB_DROP_FIRST_ACK: "1"
         run: |
           timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
+      - name: Genuine W3C lost PRESS then precontact UPGRADE original QUIC replay
+        env:
+          CORE8A_LAB_LOST_PRESS_EARLY_UPGRADE: "1"
+        run: |
+          timeout --signal=TERM --kill-after=5s 90s node scripts/core8_native_v2_shared_typed_outbox_quic_lab.mjs
       - name: Genuine W3C held E causes no Combat; same actor accepts source0 LMB afterward
         env:
           CORE8A_LAB_STANDALONE_KEYE_HELD: "1"
