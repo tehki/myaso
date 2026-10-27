@@ -3450,6 +3450,11 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     "idle after the successful jump attack",
   );
 
+  // Leave half the conversion cost as headroom for regeneration while the
+  // processed ACK waits for a fresh own snapshot. A 23 -> 9 setup can become
+  // 12 at confirmation; the client correctly refuses that stamina claim.
+  const setupStaminaExclusiveMax = COMBAT.jump.staminaCost
+    + Math.floor(COMBAT.jumpAttack.staminaCost / 2);
   let ready = null;
   let drainHolds = 0;
   for (let index = 0; index < 8 && !ready; index += 1) {
@@ -3458,7 +3463,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     const idle = state.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle;
     if (Number.isFinite(stamina)
       && stamina >= COMBAT.jump.staminaCost
-      && stamina < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+      && stamina < setupStaminaExclusiveMax
       && idle) {
       ready = state;
       break;
@@ -3468,7 +3473,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
         (candidate) => Number.isFinite(candidate.acceptance?.authoritativeStamina)
           && candidate.acceptance.authoritativeStamina >= COMBAT.jump.staminaCost + 2
           && candidate.acceptance.authoritativeStamina
-            < COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost - 1
+            < setupStaminaExclusiveMax
           && candidate.acceptance?.ownActionTransitions?.at(-1)?.action === COMBAT_ACTION.idle,
         1600,
         "regen into the jump-only stamina window",
@@ -3484,7 +3489,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
     await sleep(140);
   }
   if (!ready) {
-    throw new Error(milestone + " could not establish 14-25 authoritative stamina: "
+    throw new Error(milestone + " could not establish 14-19 authoritative stamina: "
       + JSON.stringify(await readUiEvidence(attacker)));
   }
 
@@ -3498,7 +3503,7 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
   const airborne = await waitForAttacker(
     (state) => {
       const actions = state.acceptance?.ownActionTransitions?.slice(jumpActionOffset) ?? [];
-      return actions.some((entry) => entry.action === COMBAT_ACTION.jump)
+      return actions.at(-1)?.action === COMBAT_ACTION.jump
         && Number.isFinite(state.acceptance?.authoritativeStamina)
         && state.acceptance.authoritativeStamina < COMBAT.jumpAttack.staminaCost;
     },
@@ -3520,8 +3525,9 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
   const pointerOffset = airborne.pointers.length;
   const eventOffset = airborne.events.length;
   const feedbackOffset = airborne.feedbackTransitions.length;
-  await sleep(20);
-  await performArenaAttack(attacker, attackerElementId, awayOffset);
+  // The pointer is already aimed away. Submit the genuine click immediately;
+  // another pointer move and hold consume the short airborne denial window.
+  await performArenaM221GuardBreakClick(attacker, 0);
 
   const rejected = await waitForAttacker(
     (state) => {
@@ -3693,7 +3699,7 @@ async function runM173JumpAttackChordDenialPhase(entries, attacker, defender, at
   const defenderBefore = await readUiEvidence(defender);
   const focusOffset = defenderBefore.acceptance?.focusActionTransitions?.length ?? 0;
 
-  await performArenaJumpAttackChord(attacker, attackerElementId, awayOffset, 90);
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const rejected = await waitForAttacker(
     (state) => {

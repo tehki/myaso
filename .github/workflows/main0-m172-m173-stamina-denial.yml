@@ -1,0 +1,63 @@
+name: Main0 M172 M173 confirmed stamina denial (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m173-world-stamina-proof.mjs"
+      - "tests/m172-stamina-denial-staging.test.mjs"
+      - "tests/m173-world-stamina-proof.test.mjs"
+      - "web/online-game.mjs"
+      - "src/browser/combat-readability.mjs"
+      - "server/src/simulation.rs"
+      - ".github/workflows/main0-m172-m173-stamina-denial.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  confirmed-stamina-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2, 3]
+    env:
+      MYASO_PVP_SCENARIO: uijumpattack
+      CANDIDATE_SOURCE: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SOURCE }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pin exact source and preserve strict native and World tests
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SOURCE"
+          git rev-parse HEAD > candidate-source.txt
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --test tests/m172-stamina-denial-staging.test.mjs tests/m173-world-stamina-proof.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build the original server-authoritative World (no private features)
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Strict native JumpAttack success, airborne denial and chord denial
+        run: |
+          set -o pipefail
+          echo "MAIN0_M172_M173_SOURCE_SHA=$CANDIDATE_SOURCE"
+          echo "MAIN0_M172_M173_NATIVE_TRIAL=${{ matrix.trial }}"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee main0-m172-m173-native.log
+      - name: Preserve immutable authentic first-failure and successful traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-m172-m173-${{ matrix.trial }}-${{ env.CANDIDATE_SOURCE }}
+          path: |
+            candidate-source.txt
+            main0-m172-m173-native.log
+          if-no-files-found: warn
