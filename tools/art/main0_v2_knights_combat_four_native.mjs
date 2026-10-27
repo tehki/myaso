@@ -207,7 +207,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   // barriers between dispatching these genuine native button sequences.
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
-    {type:"pointerDown",button:0},{type:"pause",duration:25},{type:"pointerUp",button:0},
+    // The Firefox W3C 25ms pause can expand to a 142-150ms *real* physical
+    // hold under four-browser contention (original CI first red). This
+    // inserts no pause tick: true trusted DOWN/UP still originate from the
+    // same native W3C request. Keep the strict measured <135ms Light gate.
+    {type:"pointerDown",button:0},{type:"pointerUp",button:0},
    ]}]
   });
  }
