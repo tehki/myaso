@@ -33,8 +33,8 @@ test("M41 native wheel remains downstream of genuine actor-bound cue; M35 still 
   const block=source.slice(start,end);
   assert.ok(block.includes("dispatchM41ObservedParry({"));
   assert.ok(block.includes("awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup("));
-  assert.ok(block.includes('const prearmed = (scenario === "uistun" || scenario === "uiparry")'),
-    "M35 and M33 share the Light-only scheduling correction; M41 retains its original cue path");
+  assert.ok(block.includes('const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")'),
+    "M35 and M33 retain Light-only; M41 prearms real earlier actor-bound Heavy or Light cue");
   assert.ok(block.includes('scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry"'),
     "M33 short-click parry requires an original fresh actor-bound light windup");
   assert.ok(block.includes('(scenario === "uiparrytell" || scenario === "uiparry")'),

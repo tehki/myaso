@@ -6,7 +6,7 @@ import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "../scripts/m41-
 
 const light = "Attack committed - your windup is readable.";
 const heavy = "Heavy strike committed - the long windup is readable.";
-function observer(receipt, registry) {
+function observer(receipt, registry, {allowHeavy = false} = {}) {
   let now = 0, poll, pointer, mutation, disconnected = false;
   const timers = new Map();
   const state = {online: "Online - player #1 - server tick 100", events: [], eventTransitions: [], startedAt: 0};
@@ -17,7 +17,7 @@ function observer(receipt, registry) {
     removeEventListener(type, fn) { if (pointer === fn) pointer = null; },
   };
   const script = "(function(){" + m35PrearmedCueScript()
-    + "}).apply(null,[token,0,1,180]);";
+    + "}).apply(null,[token,0,1,180," + (allowHeavy ? "true" : "false") + "]);";
   const armed = vm.runInNewContext(script, {
     window, token: receipt.token, document: {querySelector: () => arena},
     performance: {now: () => now},
@@ -122,4 +122,25 @@ test("M35 registry rejects forged roles, stale indices, Heavy, invalid time and 
   assert.deepEqual(await receipt.wait(), cue);
   receipt.close();
   assert.equal(registry.receive({token: receipt.token, cue}), false);
+});
+
+
+test("M41 genuine prearmed Heavy rendered cue beats queued W3C click ACK exactly once", async () => {
+  const registry=createM35CueRegistry(), receipt=registry.issue(0,1,{allowHeavy:true});
+  const b=observer(receipt,registry,{allowHeavy:true});
+  let finishClick, wheels=0;
+  const clickAck=new Promise(resolve=>{finishClick=resolve;});
+  const flight=dispatchM41ObservedParry({
+    sendAttack:()=>{b.down();return clickAck;},
+    awaitWorldCue:()=>receipt.wait(),
+    sendWheel:async()=>{wheels++;}
+  });
+  b.event(heavy);b.mutations();
+  await new Promise(setImmediate);
+  assert.equal(wheels,1,"one native wheel triggered from live Heavy cue before click ACK");
+  b.event(light);b.mutations();
+  assert.equal(wheels,1,"no duplicate wheel on next real Light cue");
+  finishClick();assert.equal((await flight).nativeClickAck,true);
+  assert.equal(registry.receive(b.packets[0]),false,"replayed receipt rejected");
+  receipt.close();
 });

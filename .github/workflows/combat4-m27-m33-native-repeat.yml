@@ -1,0 +1,74 @@
+name: Combat4 M27 and M33-M41 genuine native first-attempt repeat (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/combat4-m27-m33-native-repeat.yml"
+      - "src/combat/m27-directional-block-staging.mjs"
+      - "web/pvp-flight.mjs"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m35-prearmed-windup-cue.mjs"
+      - "scripts/m41-native-observed-parry.mjs"
+      - "tests/m27-directional-block-staging.test.mjs"
+      - "tests/m41-prearmed-directional-parry.test.mjs"
+      - "tests/m35-prearmed-windup-cue.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-browser-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: backblock
+            trial: 1
+          - scenario: backblock
+            trial: 2
+          - scenario: uiparrytell
+            trial: 1
+          - scenario: uiparrytell
+            trial: 2
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+      MYASO_PVP_FLIGHT_DURATION_MS: "7000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Exact original source and strict first-red checks
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git rev-parse HEAD > original-source-sha.txt
+          node --test tests/m27-directional-block-staging.test.mjs tests/m41-prearmed-directional-parry.test.mjs tests/m35-prearmed-windup-cue.test.mjs tests/m41-authoritative-parry-admission.test.mjs
+          node --check web/pvp-flight.mjs
+          node --check scripts/pvp_browser_flight_runner.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build unchanged authoritative Rust World
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Genuine first-attempt Chrome Firefox same-source original World flight
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "COMBAT4_M27_M41_SOURCE=$SOURCE_SHA SCENARIO=$MYASO_PVP_SCENARIO TRIAL=${{ matrix.trial }}"
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee native-first-attempt.log
+      - name: Preserve success and every genuine first-red
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combat4-${{ matrix.scenario }}-${{ matrix.trial }}-${{ env.SOURCE_SHA }}
+          path: |
+            original-source-sha.txt
+            native-first-attempt.log
+          if-no-files-found: warn

@@ -6,7 +6,7 @@ import { readM41ScalarWorldCue, summarizeM41CueTimeout } from "./m41-native-obse
 export function createM35CueRegistry() {
   const pending = new Map();
   return {
-    issue(baseline, actorId) {
+    issue(baseline, actorId, {allowHeavy = false} = {}) {
       if (!Number.isInteger(baseline) || baseline < 0 || !Number.isSafeInteger(actorId) || actorId < 1) {
         throw new TypeError("M35 requires a current actor-bound event baseline");
       }
@@ -17,7 +17,7 @@ export function createM35CueRegistry() {
         pending.delete(token);
         resolve(null);
       }, 1500);
-      pending.set(token, { baseline, actorId, resolve });
+      pending.set(token, { baseline, actorId, allowHeavy, resolve });
       return {
         token, wait: () => promise,
         close() { clearTimeout(timer); pending.delete(token); resolve(null); },
@@ -31,7 +31,8 @@ export function createM35CueRegistry() {
           || !Number.isInteger(cue.eventIndex) || cue.eventIndex < entry.baseline
           || cue.eventCount !== cue.eventIndex + 1
           || !Number.isFinite(cue.t) || cue.t < 0
-          || cue.text !== "Attack committed - your windup is readable."
+          || !(cue.text === "Attack committed - your windup is readable."
+            || (entry.allowHeavy === true && cue.text === "Heavy strike committed - the long windup is readable."))
           || cue.latestText !== cue.text)) return false;
       pending.delete(packet.token);
       entry.resolve(cue);
@@ -44,7 +45,7 @@ export function m35PrearmedCueScript() {
   return "const observe = " + readM41ScalarWorldCue.toString() + ";"
     + "const summarize = " + summarizeM41CueTimeout.toString() + ";"
     + `
-      const [token, baseline, actorId, timeoutMs] = arguments;
+      const [token, baseline, actorId, timeoutMs, allowHeavy] = arguments;
       const arena = document.querySelector('#arena');
       const target = document.querySelector('#event-text');
       if (!arena || !target || window.__MYASO_M35_CUE_WATCH__) return false;
@@ -70,7 +71,7 @@ export function m35PrearmedCueScript() {
       };
       const check = () => {
         if (finished || started === undefined) return;
-        const cue = observe(window.__MYASO_M30_UI__, attemptBaseline, actorId, false);
+        const cue = observe(window.__MYASO_M30_UI__, attemptBaseline, actorId, allowHeavy);
         if (cue) finish({ ...cue, observationLagMs: Math.max(0,
           performance.now() - window.__MYASO_M30_UI__.startedAt - cue.t) });
         else if (performance.now() - started >= timeoutMs) finish(null);
