@@ -22,8 +22,11 @@ test('original snapshot pipeline presents genuine actor-bound cue before RAF wit
   const start=source.indexOf('function observeCombatState(state) {');
   const end=source.indexOf('function observeThreatCommitment(',start);
   const observe=source.slice(start,end);
-  assert.match(observe,/const originalWindupHint = authoritativeWindupHudHint\(state\.get\(ownId\),/);
-  assert.match(observe,/if \(originalWindupHint\) setStatus\(originalWindupHint\)/);
+  assert.match(observe,/const ownActor = state\.get\(ownId\)/);
+  assert.match(observe,/const originalWindupHint = authoritativeWindupHudHint\(ownActor,/);
+  assert.match(observe,/combatMessage: freshWorldLightWindup \? null : combatMessage/);
+  assert.match(observe,/if \(originalWindupHint\) setStatus\(originalWindupHint, \{/);
+  assert.match(observe,/force: freshWorldLightWindup/);
   assert.ok(observe.indexOf('if (originalWindupHint) setStatus') < observe.indexOf('const event = combatReadability.observe'));
   assert.doesNotMatch(observe,/networkClient\.sendInput|currentInput|simulatePrediction/);
   assert.match(source,/function updateHud\(ownId\)/);

@@ -109,6 +109,10 @@ const remoteDamage = createRemoteDamageTracker();
 let networkStatus = "Connecting to authoritative server...";
 let combatMessage = null;
 let combatMessageUntil = 0;
+// A distinct authenticated LightWindup must remain readable even if an earlier
+// attack left the same status string on screen. Never create a client attack.
+let lastWorldStatusAction = null;
+let lastWorldStatusActorId = null;
 let combatFeedbackTimer = 0;
 let authoritativeStamina = null;
 let pendingStaminaDenial = null;
@@ -609,14 +613,29 @@ void import("../src/browser/chat-c1-activation.mjs")
 function observeCombatState(state) {
   const ownId = networkClient?.playerNetId;
   if (!ownId) return;
+  const ownActor = state.get(ownId);
+  const freshWorldLightWindup = ownActor?.action === COMBAT_ACTION.attackWindup
+    && (lastWorldStatusAction !== COMBAT_ACTION.attackWindup
+      || lastWorldStatusActorId !== ownId);
+  lastWorldStatusAction = ownActor?.action ?? null;
+  lastWorldStatusActorId = ownId;
   recordAcceptanceState(state, ownId);
   // M41: a real authenticated original World snapshot can arrive between
   // render frames. Surface ONLY its own actor's committed windup immediately,
   // never a prediction/client-owned action; the same HUD is redrawn in RAF.
-  const originalWindupHint = authoritativeWindupHudHint(state.get(ownId), {
-    now: performance.now(), combatMessage, combatMessageUntil,
+  // A newly committed ORIGINAL World LightWindup is later gameplay than a
+  // previous 980ms parry feedback banner. Surface this ONE genuine actor-bound
+  // transition even while that prior message is still visible; otherwise a
+  // second real Light can have no fresh HUD cue and native Firefox cannot
+  // react. Ordinary snapshots retain the existing message-priority contract.
+  const originalWindupHint = authoritativeWindupHudHint(ownActor, {
+    now: performance.now(),
+    combatMessage: freshWorldLightWindup ? null : combatMessage,
+    combatMessageUntil,
   });
-  if (originalWindupHint) setStatus(originalWindupHint);
+  if (originalWindupHint) setStatus(originalWindupHint, {
+    force: freshWorldLightWindup,
+  });
   observeThreatCommitment(state, ownId);
   const match = fighterMatchPresentation(state.values(), ownId);
   if (match.visible && !matchOver) {
@@ -2125,8 +2144,8 @@ function setMeter(cacheKey, bar, label, value) {
   label.textContent = String(rounded);
 }
 
-function setStatus(text) {
-  if (hudCache.status === text) return;
+function setStatus(text, { force = false } = {}) {
+  if (!force && hudCache.status === text) return;
   hudCache.status = text;
   eventText.textContent = text;
 }
