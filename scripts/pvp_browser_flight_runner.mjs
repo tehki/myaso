@@ -3270,7 +3270,13 @@ async function runOnlineUiJumpAttackFlight(entries, expectedScenario = "uijumpat
   const keyTransitionOffset = beforeAttacker.keyTransitions.length;
   const pointerOffset = beforeAttacker.pointers.length;
 
-  await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+  // M136 first-red: an in-command W3C pointerMove allowed 138ms between
+  // physical Space DOWN and LMB DOWN on a loaded Chrome driver. Pre-aim
+  // while still Idle, then reuse the already-qualified M335 pointer-first
+  // single native W3C chord. The strict <=60ms physical timing, 42HP World
+  // HIT, both browser replicas and phase/guard checks remain unchanged.
+  await aimArena(attacker, attackerElementId, attackOffset);
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const deadline = Date.now() + 1800;
   let evidence = null;
