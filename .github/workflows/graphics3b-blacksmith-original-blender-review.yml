@@ -5,6 +5,8 @@ on:
     paths:
       - "assets/environment/greyhaven/blacksmith-p1/**"
       - "tools/art/render_greyhaven_blacksmith_p1.py"
+      - "tools/art/bake_blacksmith_r4_2d5_review.py"
+      - "tools/art/verify_blacksmith_r4_2d5_package.py"
       - "tools/art/verify_blacksmith_original_native_browsers.mjs"
       - "docs/art/GRAPHICS3B_P1_ORIGINAL_BLACKSMITH_BLENDER.md"
       - ".github/workflows/graphics3b-blacksmith-original-blender-review.yml"
@@ -34,7 +36,7 @@ jobs:
             exit 1
           fi
           node tools/art/verify_quaternius_standard_source.mjs
-          python3 -m py_compile tools/art/render_greyhaven_blacksmith_p1.py
+          python3 -m py_compile tools/art/render_greyhaven_blacksmith_p1.py tools/art/bake_blacksmith_r4_2d5_review.py tools/art/verify_blacksmith_r4_2d5_package.py
           node --check tools/art/verify_blacksmith_original_native_browsers.mjs
           python3 - <<'PY'
           import json
@@ -57,6 +59,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq blender python3-numpy python3-pil
           blender --version
+      - name: Verify approved original Blender Blacksmith R4 alpha-preserving review assets
+        run: |
+          set -euo pipefail
+          python3 tools/art/verify_blacksmith_r4_2d5_package.py \
+            --directory assets/environment/greyhaven/blacksmith-p1/review-only
       - name: Render genuine source-authored Blacksmith day, dusk and editable scene
         run: |
           set -euo pipefail
@@ -129,6 +136,14 @@ jobs:
           path: .artifacts/graphics3b-blacksmith-native-review/*
           retention-days: 7
           if-no-files-found: ignore
+      - name: Upload SHA-locked and alpha-verified P1 Blacksmith R4 review sprite pair
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-blacksmith-r4-original-blender-2d5-review-only
+          path: assets/environment/greyhaven/blacksmith-p1/review-only/*
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload genuine original Blender source and visual evidence
         if: always()
         uses: actions/upload-artifact@v4

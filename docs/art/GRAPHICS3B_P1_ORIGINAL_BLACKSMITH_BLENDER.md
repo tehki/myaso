@@ -54,3 +54,9 @@ On the authorized Windows Machine, Blender **4.5.14 LTS** imported the original 
 - Native source CI now fails closed if authentic door glass or authored smoke evidence is missing. The original complete game quality gate remains mandatory.
 
 This revision is **not an image-generation mockup** and was built with the actual Blender executable through Remote Desktop Commander. No merge, deployment, or runtime activation has occurred.
+
+## Approved R4 source pixels and portable preview, not live placement (October 27, 2026)
+
+The project owner inspected the **actual** Blender 4.5.14 LTS day/dusk R4 screenshots captured from the authorized Windows Machine and accepted the visual result (original door-glass dusk emission; source-anchored chimney smoke; closed gables, physical anvil/forge and verified clearances). This is **visual design acceptance only**. The approved editable .blend / original RGBA PNG remain on the owner machine under `Downloads/BlacksmithBlenderR4/review-final-v2/`; they are not embedded in the application.
+
+The separate `assets/environment/greyhaven/blacksmith-p1/review-only/` directory contains two transparent original-Blender WebPs and a SHA-locked audit manifest produced and verified with `bake_blacksmith_r4_2d5_review.py` / `verify_blacksmith_r4_2d5_package.py`. Pixel alpha is verified identical to the original 640x640 Blender source; contents are for Graphics/World architecture review only. **No World9 replacement, server-approved item/drop, entrance, interactive door, collision, Combat modification, merge or production deployment** is authorized by these assets. Actual live 960×540 online-game rendering and authentic 4-player Chrome/Firefox proof remain untested on the Blacksmith integration head.
