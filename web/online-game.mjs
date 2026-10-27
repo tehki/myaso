@@ -389,16 +389,20 @@ canvas.addEventListener("wheel", (event) => {
   const m41WheelToken = typeof m41PhysicalChronology !== "undefined"
     ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
-  canvas.focus();
   if (event.deltaY < 0) {
+    canvas.focus();
     rollRequested = true;
     audio.play("roll");
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
-    // Send this genuine Block edge before potentially expensive audio/render.
+    // Submit the true Block edge before focus/layout or audio can stall it.
+    // Focus still happens in the same physical callback for keyboard controls.
     sendImmediatePhysicalBlockEdge(event.isTrusted === true);
+    canvas.focus();
     audio.play("guard");
+  } else {
+    canvas.focus();
   }
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.wheelEnd(m41WheelToken);
 }, { passive: false });

@@ -62,7 +62,7 @@ test("negative wheel still belongs to original roll path, never the urgent Block
  const start=source.indexOf('canvas.addEventListener("wheel"');
  const end=source.indexOf('canvas.addEventListener("pointermove"',start);
  const actual=source.slice(start,end);
- assert.match(actual,/if \(event.deltaY < 0\) \{\s*rollRequested = true;/);
+ assert.match(actual,/if \(event.deltaY < 0\) \{\s*canvas\.focus\(\);\s*rollRequested = true;/);
  assert.match(actual,/else if \(event.deltaY > 0\) \{/);
  assert.match(actual,/sendImmediatePhysicalBlockEdge\(event.isTrusted === true\)/);
 });

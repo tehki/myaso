@@ -42,7 +42,7 @@ function harness(){
     originalFunction("sendImmediatePhysicalBlockEdge"),originalFunction("handleVisibilityChange"),
     source.slice(wheelStart,wheelEnd),...bindings].join("\n"),context);
   return {context,canvas,window,document,clock:value=>{clock=value;},
-    wheel:deltaY=>canvas.listeners.get("wheel").callback({deltaY,preventDefault(){preventCalls++;}}),
+    wheel:(deltaY,isTrusted=false)=>canvas.listeners.get("wheel").callback({deltaY,isTrusted,preventDefault(){preventCalls++;}}),
     sample:()=>{context.sampleInput();return {...context.currentInput};},
     counts:()=>({focusCalls,preventCalls,cancelCalls})};
 }
@@ -80,4 +80,26 @@ test("actual hidden-page handler clears pending standard defense before stopping
   assert.equal(h.counts().cancelCalls,1);
   const sample=h.sample();assert.equal(sample.block,false);assert.equal(sample.dodge,false);
   assert.equal(sample.attack,false);assert.equal(sample.heavyAttack,false);
+});
+
+// Physical defense must be authored before synchronous focus/layout can stall
+// the native callback. Only the original source0 writer may submit this edge.
+test("trusted wheel sends original Block before slow canvas focus, with one source0 frame",()=>{
+  const h=harness();
+  const order=[];
+  h.context.clientTick=41;
+  h.context.networkClient={playerNetId:2,sendInput:packet=>order.push({
+    kind:"send",atPerfMs:h.context.performance.now(),...packet,
+  })};
+  h.context.markStaminaDenialSubmitted=()=>{};
+  h.canvas.focus=()=>{order.push({kind:"focus"});h.clock(320);}; // Simulated 220ms focus/layout stall.
+  h.wheel(120,true);
+  assert.equal(order[0]?.atPerfMs,100,"urgent input sent before expensive focus/layout");
+  assert.deepEqual(order.map(event=>event.kind),["send","focus"],
+    "canvas focus must never precede the real authenticated Block-edge submission");
+  assert.equal(order[0].tick,41);
+  assert.equal(order[0].block,true);
+  assert.equal(h.context.clientTick,42);
+  assert.equal(h.context.shortBlockUntil,340, "unchanged 240ms Block window");
+  assert.equal(COMBAT.block.parryWindowMs,125, "unchanged Parry window");
 });
