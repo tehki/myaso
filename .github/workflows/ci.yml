@@ -41,6 +41,48 @@ jobs:
       - name: Compile governance scripts
         run: python -m py_compile scripts/*.py
 
+      # P1 metadata-only validation; no downloads, vendor assets or runtime code.
+      - name: Validate Graphics 3A P1 free asset archive intake
+        run: |
+          python -m py_compile scripts/graphics3a_p1_standard_intake.py tests/test_graphics3a_p1_standard_intake.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_standard_intake.py' -v
+          python -m py_compile scripts/graphics3a_p1_rig_probe.py tests/test_graphics3a_p1_rig_probe.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_rig_probe.py' -v
+          python -m py_compile scripts/graphics3a_p1_outfit_blender_review.py tests/test_graphics3a_p1_outfit_review.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_outfit_review.py' -v
+          python -m py_compile scripts/graphics3a_p1_egl_static_review.py tests/test_graphics3a_p1_egl_static_review.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_egl_static_review.py' -v
+          python -m py_compile scripts/graphics3a_p1_cpu_skin_retarget.py tests/test_graphics3a_p1_cpu_skin_retarget.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_cpu_skin_retarget.py' -v
+          python -m py_compile scripts/graphics3a_p1_head_attach_rules.py scripts/graphics3a_p1_head_attachment_review.py tests/test_graphics3a_p1_head_attach_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_head_attach_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_skin_paint_ab.py tests/test_graphics3a_p1_skin_paint_ab.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_skin_paint_ab.py' -v
+          python -m py_compile scripts/graphics3a_p1_hood_review_rules.py tests/test_graphics3a_p1_hood_review_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_hood_review_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_hood_motion_rules.py scripts/graphics3a_p1_hood_motion_review.py tests/test_graphics3a_p1_hood_motion_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_hood_motion_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_hood_pbr_rules.py tests/test_graphics3a_p1_hood_pbr_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_hood_pbr_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_ranger_palette_rules.py tests/test_graphics3a_p1_ranger_palette_rules.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_ranger_palette_rules.py' -v
+          python -m py_compile scripts/graphics3a_p1_modular_character_contract.py tests/test_graphics3a_p1_modular_character_contract.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_modular_character_contract.py' -v
+          python -m py_compile scripts/graphics3a_p1_modular_source_audit.py tests/test_graphics3a_p1_modular_source_audit.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_modular_source_audit.py' -v
+          python -m py_compile scripts/graphics3a_p1_neck_cap_geometry.py tests/test_graphics3a_p1_neck_cap_geometry.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_neck_cap_geometry.py' -v
+          python -m py_compile scripts/graphics3a_p1_lower_body_neck_cap.py tests/test_graphics3a_p1_lower_body_neck_cap.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_lower_body_neck_cap.py' -v
+          python -m py_compile scripts/graphics3a_p1_animated_neck_interface.py tests/test_graphics3a_p1_animated_neck_interface.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_animated_neck_interface.py' -v
+          python -m py_compile scripts/graphics3a_p1_neck_seam_qc.py tests/test_graphics3a_p1_neck_seam_qc.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_neck_seam_qc.py' -v
+          python -m py_compile scripts/graphics3a_p1_neck_surface_qc.py tests/test_graphics3a_p1_neck_surface_qc.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_neck_surface_qc.py' -v
+          python -m py_compile scripts/graphics3a_p1_head_plane_clip.py tests/test_graphics3a_p1_head_plane_clip.py
+          python -m unittest discover -s tests -p 'test_graphics3a_p1_head_plane_clip.py' -v
+
       - name: Validate combat JavaScript
         run: |
           node --version
