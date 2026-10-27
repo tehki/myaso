@@ -33,7 +33,7 @@ an observed evidence-window failure, not evidence of a wrong World cost.
 
 M172 now establishes14–19 using genuine run input, leaving at most5 after
 Jump. Its prerequisite requires the latest observed action to remain Jump.
-The already aimed pointer uses the existing genuine immediate-click helper,
+The already aimed pointer uses the existing genuine click helper with a positive5ms hold for down/up chronology,
 removing an extra20ms sleep, redundant pointer move and40ms click hold.
 M173 reuses the existing pre-aimed native chord helper. Its actual physical
 Space/LMB gap must still be at most60ms.

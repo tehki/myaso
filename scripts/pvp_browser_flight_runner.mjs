@@ -3525,9 +3525,9 @@ async function runM172AirborneDenialPhase(entries, attacker, defender, attackerE
   const pointerOffset = airborne.pointers.length;
   const eventOffset = airborne.events.length;
   const feedbackOffset = airborne.feedbackTransitions.length;
-  // The pointer is already aimed away. Submit the genuine click immediately;
+  // The pointer is already aimed away. Keep a positive 5ms hold for strict down/up chronology;
   // another pointer move and hold consume the short airborne denial window.
-  await performArenaM221GuardBreakClick(attacker, 0);
+  await performArenaM221GuardBreakClick(attacker, 5);
 
   const rejected = await waitForAttacker(
     (state) => {

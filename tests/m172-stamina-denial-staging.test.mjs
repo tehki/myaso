@@ -37,7 +37,7 @@ test("M172 requires current ordinary Jump, rather than an earlier airborne obser
     ownActionTransitions: actions.map(action => ({action}))}});
   assert.equal(predicate(state([COMBAT_ACTION.jump])), true);
   assert.equal(predicate(state([COMBAT_ACTION.jump, COMBAT_ACTION.idle])), false);
-  assert.match(phase, /await performArenaM221GuardBreakClick\(attacker, 0\)/);
+  assert.match(phase, /await performArenaM221GuardBreakClick\(attacker, 5\)/);
   const chord = source.slice(source.indexOf("async function runM173JumpAttackChordDenialPhase"));
   assert.match(chord, /await performArenaPreAimedJumpAttackChord\(attacker, 90\)/);
 });
