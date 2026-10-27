@@ -30,8 +30,13 @@ export function createDormantPrecontactHoldReview({
     if (observation || s.closed || !s.active || s.pointerId !== pointerId
       || s.upgraded || s.jump) return false;
     const t = now();
-    if (!Number.isFinite(t)) return false;
-    observation = {pointerId, gestureId:s.gestureId, pressMs:t, lastMs:t};
+    const pressMs = s.pressMs;
+    // A delayed arm() cannot restart a fresh 135ms Light deadline.
+    // Both clocks must be from the same explicitly bound local monotonic
+    // source; only the original server may authorize a Heavy upgrade.
+    if (!Number.isFinite(t) || !Number.isFinite(pressMs)
+        || pressMs < 0 || t < pressMs) return false;
+    observation = {pointerId, gestureId:s.gestureId, pressMs, lastMs:t};
     done = false;
     return true;
   }

@@ -95,3 +95,24 @@ guaranteed network budget. 4A/4B/Core8A must still resolve the intended
 hold-classification policy under observed network jitter and prove the
 original World decision with native W3C/QUIC; no public activation may
 derive from an isolated typed UPGRADE being queued.
+
+### Original physical-press clock binding under browser load
+
+The dormant UI10 gate now captures the monotonic local
+`acceptedPressNow()` exactly at the accepted physical pointer DOWN
+callback and exposes it only in its local, immutable review snapshot.
+The separate hold-intent review controller uses that timestamp, not
+the later time at which `arm()` happens on a potentially starved browser
+event loop. A delayed observation after the configured precontact expiry
+**cannot** manufacture a new early upgrade; it fails closed. A
+nonfinite/invalid local clock denies PRESS before adding any typed edge.
+The caller must inject the **same monotonic clock source** into both
+dormant components; mismatched clocks are rejected by ordering. Neither
+timestamp is serialized into the authenticated proposal wire, used as a
+World clock, nor trusted by the server for damage or HeavyReady.
+
+This corrects a review-prototype time-origin defect, **NOT** Firefox's
+historical native 192ms tail, M33's genuine 133.3ms Block-age first-red
+or M59 compositor/secondary threat evidence. Nothing here authorizes
+production controls, a public v2 listener, a protocol switch or a
+change to Light135/Parry125/Block240/HeavyReady320.

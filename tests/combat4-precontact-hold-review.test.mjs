@@ -16,7 +16,8 @@ function fixture() {
   });
   let ms=0,tick=1,jump=false;
   const gate=createDormantPrealphaLmbDomGate({
-    outbox,getClientTick:()=>tick,isCanvasTarget:e=>e.target===canvas,
+    outbox,getClientTick:()=>tick,acceptedPressNow:()=>ms,
+    isCanvasTarget:e=>e.target===canvas,
     isJumpAttackChord:()=>jump,
   });
   const make=(options={})=>createDormantPrecontactHoldReview({
@@ -124,4 +125,41 @@ test("one lease may handle a new legitimate gesture only after retiring the prev
    GESTURE_ACTION.PRESS,GESTURE_ACTION.UPGRADE,GESTURE_ACTION.RELEASE,
  ]);
  assert.deepEqual(es.map(e=>e.gestureId),[1,1,1,2,2,2]);
+});
+
+test("delayed browser arm() cannot restart the physical DOWN-to-contact clock or revive a late upgrade",()=>{
+  const expired=fixture();
+  assert.equal(expired.gate.pointerDown(event()),true);
+  assert.equal(expired.gate.snapshot.pressMs,0);
+  expired.at(112);
+  const r=expired.make();
+  assert.equal(r.arm(7),true,"must preserve real physical identity while held");
+  assert.equal(r.poll(),"expired","elapsed physical hold already exceeds pre-contact budget");
+  expired.gate.pointerUp(event(7,0));
+  assert.deepEqual(expired.edges().map(e=>e.action),
+    [GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE],
+    "late arm MUST NOT produce upgraded Heavy");
+
+  const early=fixture();
+  early.gate.pointerDown(event());
+  early.at(43);
+  const e=early.make();
+  assert.equal(e.arm(7),true);
+  early.at(50);
+  assert.equal(e.poll(),"submitted","upgrade threshold measured from DOWN, not delayed arm()");
+  early.gate.pointerUp(event(7,0));
+  assert.deepEqual(early.edges().map(x=>x.action),
+    [GESTURE_ACTION.PRESS,GESTURE_ACTION.UPGRADE,GESTURE_ACTION.RELEASE]);
+});
+test("review physical press clock invalidity denies the original dormant edge before enqueue",()=>{
+ const outbox=new ProposedLmbGestureOutbox({
+  negotiatedVersion:2,trustedLease:Object.freeze({}),maxPending:16,
+ });
+ const gate=createDormantPrealphaLmbDomGate({
+  outbox, getClientTick:()=>1,isCanvasTarget:e=>e.target===canvas,
+  acceptedPressNow:()=>Number.NaN,
+ });
+ assert.equal(gate.pointerDown(event()),false);
+ assert.equal(gate.snapshot.active,false);
+ assert.equal(outbox.snapshot.pending,0);
 });
