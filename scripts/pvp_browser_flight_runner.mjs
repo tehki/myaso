@@ -8429,18 +8429,23 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       if (!Number.isInteger(attemptAttackerBaseline?.events?.length)) {
         throw new Error("M41 could not record current-attempt original World cue baseline");
       }
-      // Finish genuine aim before the measured exchange. The same native
-      // 35ms DOWN/UP then runs while we observe the fresh real World cue;
-      // no full-click ACK or large evidence serialization gates the one wheel.
+      // Aim before the measured exchange. The original 125ms parry is
+      // evaluated from the server's REAL Block admission, not the wheel ACK.
+      // With physical-wheel source0 submitted directly before RAF, M41's
+      // earlier Heavy-charging cue armed Block 133.3ms before HIT (genuine
+      // original World BLOCK, outside Parry125). Prearm the SAME actor-bound
+      // native watcher, but dispatch the one real wheel only on the actual
+      // subsequent Light Windup; never forge a delayed Block admission.
+      // No full-click ACK or evidence serialization gates this wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
       const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")
         ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-          {allowHeavy: scenario === "uiparrytell"}) : null;
+          {allowHeavy: false}) : null;
       if (prearmed) {
         const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
           script: m35PrearmedCueScript(),
           args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180,
-            scenario === "uiparrytell"],
+            false],
         });
         if (armed !== true) { prearmed.close(); throw new Error("M35 could not arm native Windup observer before physical click"); }
       }
@@ -8450,7 +8455,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
           awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup(
             attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-            scenario === "uiparrytell",
+            false,
           ),
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
