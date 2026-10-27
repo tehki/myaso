@@ -8421,7 +8421,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // 35ms DOWN/UP then runs while we observe the fresh real World cue;
       // no full-click ACK or large evidence serialization gates the one wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
-      const prearmed = scenario === "uistun"
+      const prearmed = (scenario === "uistun" || scenario === "uiparry")
         ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId) : null;
       if (prearmed) {
         const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {

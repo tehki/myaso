@@ -14,7 +14,7 @@ test("M41 native parry waits for the original replicated World windup before its
   assert.ok(aim >= 0 && dispatch > aim, "real aim completes before concurrent click/cue choreography");
   assert.match(rest, /sendAttack: \(\) => performArenaM221GuardBreakClick\(attacker, 35\)/);
   assert.match(rest, /awaitWorldCue: \(\) => prearmed \? prearmed.wait\(\) : waitForM41WorldWindup\(/);
-  assert.match(rest, /const prearmed = scenario === "uistun"/);
+  assert.match(rest, /const prearmed = \(scenario === "uistun" \|\| scenario === "uiparry"\)/);
   assert.ok(rest.indexOf("script: m35PrearmedCueScript()") < dispatch,
     "M35 arms the same strict browser cue check before sending native input");
   assert.match(rest, /sendWheel: \(\) => \(scenario === "uiparrytell" \|\| scenario === "uiparry"\)\s*\? scrollM41ViewportWheel\(defender, defenderViewport\)\s*: setArenaBlock\(defender, defenderElementId, true\)/,

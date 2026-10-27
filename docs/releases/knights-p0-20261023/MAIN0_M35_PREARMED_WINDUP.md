@@ -25,7 +25,7 @@ historical M35 failure had that sole cause.
 
 ## Narrow correction
 
-For `uistun` only, arm a nonblocking read-only browser observer before issuing
+For the Light-only `uistun` and `uiparry` fixtures, arm a nonblocking read-only browser observer before issuing
 the same physical35ms W3C LMB. The observer starts its4ms checks only after a
 trusted native pointerDOWN and takes a fresh event baseline there, so events
 from aim/earlier actions cannot qualify. It calls the existing
@@ -42,7 +42,8 @@ HP/guard/stun and rendering assertions. A delayed receipt can still fail those
 strict native/World checks. The180ms observation deadline starts at genuine
 pointerDOWN; no gameplay timing or acceptance window is extended.
 
-M33/M41 retain their original observation and wheel paths. Reused Draft #1061
+M41 retains its separately qualified Heavy-enabled observation path. All three
+fixtures retain their original physical wheel paths. Reused Draft #1061
 failure-only timeout provenance (`4bb352c0`) adds bounded original event history;
 timeouts still return null and never admit a wheel. M35 also emits that timeout
 summary on rejection. Browser watcher and pending receipt are retired after the
@@ -63,3 +64,19 @@ attempt, including failure; no second input/Combat writer is introduced.
 Rollback: revert this work-unit commit on the child Draft. Preserve original
 red logs. Release remains HARD HOLD; canonical #1036 and Living World #1067 are
 unchanged by this correction.
+
+## First native candidate and shared-path follow-up
+
+Exact `71c134e5b626909895c74120f3c1a18b3ba2f9a5` passed dedicated M35
+[3/3](https://github.com/tehki/myaso/actions/runs/40462714562) and standard
+[11/11](https://github.com/tehki/myaso/actions/runs/40462714714), including two
+more M35 trials. Actual World Parry ticks1393/1314/3376/2630/1757 had intact
+HP100/guard100. Linux Node864/864 passed.
+
+However [full quality40462714668](https://github.com/tehki/myaso/actions/runs/40462714668)
+failed at M176's preliminary `uiparry` call to the same `runOnlineUiParryFlight`:
+`waitForM41WorldWindup` returned no fresh Light cue. That scenario was still on
+the old queued observer path. Retain this first-red, do not report full PASS.
+Apply the same correction to `uiparry`, which has the identical Light-only
+admission requirement. Do not broaden it to `uiparrytell`/M41's distinct Heavy
+cue. Fresh exact-head full/native qualification remains necessary.
