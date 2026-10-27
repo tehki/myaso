@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-blacksmith-r4-original-blender-2d5-review",
+  "source": "actual native Blender 4.5.14 and original Quaternius CC0",
+  "ownerVisualDirectionApproved": true,
+  "genuineSourceBlenderSha256": "26ef652f2493a66a01e174a1865f8beac787adcf953db0b0d69162747f1d7f3d",
+  "approvedSourcePinnedCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "importedCreatorModules": 15,
+  "realCreatorVertices": 7260,
+  "originalDoorGlassAndRoofSmoke": true,
+  "realGeometryCollisionClearanceVerified": true,
+  "images": {
+    "day": {
+      "file": "greyhaven-blacksmith-r4-day-2d5-review.webp",
+      "width": 640,
+      "height": 640,
+      "sourceBlenderPngSha256": "523af37e2489528071d5fdaf15722c6de875cc4f87964f704906a7816c99ab56",
+      "sourceBytes": 277425,
+      "spriteSha256": "17d2d6be576a00d1d3275412bed4552ccfbd3a85ad8fbde5b2ba4baca94da702",
+      "spriteBytes": 25332,
+      "alphaBoundsPx": [
+        117,
+        109,
+        478,
+        540
+      ],
+      "alphaPixelBytesUnchanged": true
+    },
+    "dusk": {
+      "file": "greyhaven-blacksmith-r4-dusk-2d5-review.webp",
+      "width": 640,
+      "height": 640,
+      "sourceBlenderPngSha256": "4867ce8e94321a4fb69c3f62b4c2b384cff6539e57bfddab2e1427e112b7b562",
+      "sourceBytes": 278666,
+      "spriteSha256": "88d8486b613546801107a7c4e19367a5f153290885871e8e0f795d3cd8ad45b3",
+      "spriteBytes": 25446,
+      "alphaBoundsPx": [
+        117,
+        83,
+        478,
+        540
+      ],
+      "alphaPixelBytesUnchanged": true
+    }
+  },
+  "readOnlyWorldReference": {
+    "mapId": "moonvale-overworld",
+    "candidateAuthoredId": "smith"
+  },
+  "world9FacadeReplacementAuthorized": false,
+  "authoredWorldPlacementModified": false,
+  "realFourPlayerWorld9IntegrationTested": false,
+  "gameplayItemsPortalsCombatChanged": false,
+  "mergeDeployAuthorized": false
+}
