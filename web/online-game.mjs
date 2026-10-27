@@ -392,6 +392,8 @@ canvas.addEventListener("wheel", (event) => {
     queueStaminaDenial("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
+    // Send this genuine Block edge before potentially expensive audio/render.
+    sendImmediatePhysicalBlockEdge(event.isTrusted === true);
     audio.play("guard");
   }
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.wheelEnd(m41WheelToken);
@@ -949,7 +951,7 @@ function releaseInputs() {
   pendingStaminaDenial = null;
 }
 
-function sampleInput() {
+function sampleInput({ playStepAudio = true } = {}) {
   if (matchOver) {
     currentInput.moveX = 0;
     currentInput.moveY = 0;
@@ -977,8 +979,49 @@ function sampleInput() {
   currentInput.kick = kickRequested;
   currentInput.run = rightButtonGesture.isRunning() || runningAttackRequested;
   currentInput.jump = jumpRequested;
-  if (local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
+  if (playStepAudio && local.action === COMBAT_ACTION.idle && (currentInput.moveX || currentInput.moveY)) {
     audio.play("step", { level: currentInput.run ? .90 : .55 });
+  }
+}
+
+// A real wheel-back is a latency-sensitive 240ms Block / 125ms Parry edge.
+// The normal source0 sender is driven by RAF prediction ticks; genuine Firefox
+// wheel callbacks have waited ~73ms for that render loop under native load.
+// Submit ONE fresh, original v1 sample immediately from the trusted DOM edge,
+// with the SAME monotonic client tick and the SAME authoritative QUIC writer.
+// No synthetic input, alternate combat engine, protocol or server clock.
+function sendImmediatePhysicalBlockEdge(trusted) {
+  if (!trusted || document.hidden || matchOver || !networkClient?.playerNetId) return;
+  sampleInput({ playStepAudio: false });
+  if (!currentInput.block) return;
+  const outgoingTick = clientTick;
+  markStaminaDenialSubmitted(outgoingTick, currentInput);
+  networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+  clientTick = (clientTick + 1) >>> 0;
+  // A physical edge can also coincide with an authentic one-shot attack/jump.
+  // It must never be replayed again at the next RAF-driven source0 tick.
+  attackRequested = false;
+  runningAttackRequested = false;
+  committedLightMove = null;
+  heavyAttackRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
+  if (typeof m41PhysicalChronology !== "undefined" && m41PhysicalChronology) {
+    const submission = m41PhysicalChronology.immediateSendInvocation(outgoingTick, currentInput);
+    const debug = window.__MYASO_ACCEPTANCE_STATE__;
+    if (debug) {
+      debug.inputSubmissions ??= [];
+      debug.inputSubmissions.push({
+        clientTick: outgoingTick, epochMs: Date.now(),
+        block: true, source: "physical-wheel-original-v1",
+        m41PhysicalInput: submission,
+      });
+      if (debug.inputSubmissions.length > 32) debug.inputSubmissions.shift();
+    }
   }
 }
 

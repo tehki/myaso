@@ -20,7 +20,7 @@ function harness(){
   let clock=100,focusCalls=0,preventCalls=0,cancelCalls=0;
   canvas.focus=()=>{focusCalls++;};
   const context={canvas,window,document,COMBAT,COMBAT_ACTION,performance:{now:()=>clock},
-    audio:{play(){}},m41PhysicalChronology:null,queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
+    audio:{play(){}},networkClient:null,m41PhysicalChronology:null,queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
     currentInput:{},reviewedGestureLab:false,matchOver:false,dashGesture:{clearTaps(){}},
     leftButtonCharge:{cancel(){},isCharging:()=>false},rightButtonGesture:{cancel(){},isRunning:()=>false},
     shortBlockUntil:0,middleBlockHeld:false,rollRequested:false,dashRequested:false,dashMove:null,
@@ -39,7 +39,8 @@ function harness(){
     'document.addEventListener("visibilitychange", handleVisibilityChange);'];
   for(const binding of bindings)assert.ok(source.includes(binding));
   runInNewContext([originalFunction("releaseInputs"),originalFunction("sampleInput"),
-    originalFunction("handleVisibilityChange"),source.slice(wheelStart,wheelEnd),...bindings].join("\n"),context);
+    originalFunction("sendImmediatePhysicalBlockEdge"),originalFunction("handleVisibilityChange"),
+    source.slice(wheelStart,wheelEnd),...bindings].join("\n"),context);
   return {context,canvas,window,document,clock:value=>{clock=value;},
     wheel:deltaY=>canvas.listeners.get("wheel").callback({deltaY,preventDefault(){preventCalls++;}}),
     sample:()=>{context.sampleInput();return {...context.currentInput};},
