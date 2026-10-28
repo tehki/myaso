@@ -9,6 +9,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { NETWORK } from "../src/network/constants.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -8458,6 +8459,13 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
             attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
             false,
           ),
+          // Original World reproduction: Light at tick0, Block at tick1
+          // resolves at age133.3ms -> BLOCK, while tick2 is116.7ms -> PARRY.
+          // Pace this native reaction by ONE original 60Hz tick instead of
+          // demanding an instantaneous response at the earliest Light cue.
+          // This never alters packet time, World admission or Parry125. A
+          // stalled/late native wheel still fails on genuine BLOCK/HIT.
+          waitForReaction: () => sleep(Math.ceil(1000 / NETWORK.serverSimulationHz)),
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
             ? scrollM41ViewportWheel(defender, defenderViewport)

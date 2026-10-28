@@ -32,7 +32,13 @@ server=None;http=None;driver=None;sessions=[];drv_port=port()
 diagnostics=Path(os.environ.get("MYASO_NATIVE_DIAGNOSTICS_DIR") or tempfile.mkdtemp(prefix="myaso-g3a-native-"))
 diagnostics.mkdir(parents=True,exist_ok=True)
 driver_output=(diagnostics/"driver-output.log").open("w")
-browser_binary=(shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable") or "/usr/bin/chromium")
+requested_browser=os.environ.get("MYASO_NATIVE_CHROME_BINARY")
+# CI validates Google Chrome and its matching driver. Do not silently launch
+# the separately installed Chromium build instead. Local Linux may still use
+# its distro Chromium when no particular binary was requested.
+browser_binary=(shutil.which(requested_browser) if requested_browser else
+ (shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable")))
+assert browser_binary,"Requested native Chrome executable is unavailable; no browser substitution allowed"
 driver_binary=shutil.which("chromedriver") or "chromedriver"
 def capture_startup_state(stage):
  data={"stage":stage,"sessionsCreated":len(sessions),"driverExit":driver.poll() if driver else None,
@@ -44,7 +50,7 @@ def capture_startup_state(stage):
  try:data["memory"]=Path("/proc/meminfo").read_text()[:4000]
  except OSError:pass
  (diagnostics/(stage+".json")).write_text(json.dumps(data,indent=2))
- print("G3A_NATIVE_STARTUP_STATE",json.dumps(data),flush=True)
+ print("G3A_NATIVE_STARTUP_STATE",json.dumps({k:v for k,v in data.items() if k not in ("processes","memory")}),flush=True)
 try:
  capture_startup_state("before-launch")
  server=subprocess.Popen([str(BIN)],env={**os.environ,"MYASO_BIND":"127.0.0.1:0","MYASO_CHAT_RADIUS":"160","MYASO_CHAT_C1_ENABLED":"1"},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)

@@ -154,7 +154,7 @@ fn repeated_release_during_and_after_contact_never_restarts_retired_gesture() {
             3,
             1
         ),
-        AckStatus::Stale,
+        AckStatus::Rejected,
         "a new sequence cannot resurrect the retired gesture identity"
     );
     assert!(advance(&mut p, &mut w, 30).is_empty());

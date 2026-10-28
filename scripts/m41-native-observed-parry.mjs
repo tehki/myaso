@@ -23,9 +23,9 @@ export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId
 }
 
 export async function dispatchM41ObservedParry({
-  sendAttack, awaitWorldCue, sendWheel, now = () => Date.now(),
+  sendAttack, awaitWorldCue, sendWheel, waitForReaction = async () => {}, now = () => Date.now(),
 }) {
-  if (![sendAttack, awaitWorldCue, sendWheel, now].every(fn => typeof fn === "function")) {
+  if (![sendAttack, awaitWorldCue, sendWheel, waitForReaction, now].every(fn => typeof fn === "function")) {
     throw new TypeError("M41 requires native click, observed World cue, wheel and clock callbacks");
   }
   // Read-only host chronology. Neither these timestamps nor native ACKs
@@ -48,6 +48,7 @@ export async function dispatchM41ObservedParry({
     cue = await awaitWorldCue();
     if (!cue || cue?.timedOut === true) throw new Error("M41 missing fresh actor-bound World cue; no native wheel allowed");
     chronology.cueResolvedEpochMs = now();
+    await waitForReaction();
     wheel = await Promise.resolve().then(() => {
       chronology.wheelIssuedEpochMs = now();
       return sendWheel();
