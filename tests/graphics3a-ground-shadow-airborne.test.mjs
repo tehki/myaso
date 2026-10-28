@@ -42,15 +42,16 @@ test("genuine authoritative jump: Silver shadow stays on arena floor while 18px 
   assert.equal(originalY(),-18, "caller canvas transformation must be restored");
 });
 
-test("idle and roll shadows stay unchanged without lift, and Combat fallbacks draw no counterfeit art", () => {
+test("idle shadow stays grounded and unsupported Combat draws the genuine idle knight with independent tells", () => {
   const {ctx,events,renderer} = make();
   assert.equal(renderer.draw(ctx,{netId:1,x:0,y:0,action:COMBAT_ACTION.idle,facing:0},
     {actorKind:"player",nowMs:1000}),true);
   assert.equal(events.find(e=>e.kind==="ground").y,-18+11*KNIGHT_PRESENTATION_SCALE);
   assert.equal(events.filter(e=>e.kind==="translate").length,0);
   assert.equal(renderer.draw(ctx,{netId:1,x:0,y:0,action:COMBAT_ACTION.kickActive,facing:0},
-    {actorKind:"player",nowMs:1100,visualLift:18}),false);
-  assert.equal(events.filter(e=>e.kind==="ground").length,1);
+    {actorKind:"player",nowMs:1100,visualLift:18}),true);
+  assert.equal(events.filter(e=>e.kind==="ground").length,2);
+  assert.equal(events.filter(e=>e.kind==="sprite").length,2);
 });
 
 test("actual multiplayer fighter call forwards already-established presentation jump lift into the authentic renderer", () => {

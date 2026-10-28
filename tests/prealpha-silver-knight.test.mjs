@@ -28,7 +28,7 @@ test("Pre-Alpha bundles only five authentic Silver Knight movement clips, not Se
   }
 });
 
-test("unsupported attack/kick/stun/death retain real Combat tells, not counterfeit Silver animation", () => {
+test("unsupported attack/kick/stun/death retain Combat tells over real Silver idle, not circles", () => {
   for (const action of [
     COMBAT_ACTION.kickWindup, COMBAT_ACTION.kickActive, COMBAT_ACTION.kickRecovery,
     COMBAT_ACTION.attackWindup, COMBAT_ACTION.attackActive,
@@ -36,7 +36,7 @@ test("unsupported attack/kick/stun/death retain real Combat tells, not counterfe
     COMBAT_ACTION.runningAttackActive, COMBAT_ACTION.block,
     COMBAT_ACTION.knockdown, COMBAT_ACTION.stunned, COMBAT_ACTION.dead,
     COMBAT_ACTION.jumpAttackActive,
-  ]) assert.equal(knightClip(action, "player"), null);
+  ]) assert.equal(knightClip(action, "player"), "silver_idle");
   assert.equal(showPrototypeWeaponStroke(true), false);
   assert.equal(showPrototypeWeaponStroke(false), true);
 });
@@ -73,20 +73,20 @@ test("same source Silver atlases draw for local and remote authenticated human s
   assert.equal(renderer.draw(ctx, {netId: 3,x:10,y:20,action:COMBAT_ACTION.idle},
     {actorKind:"npc",remote:true,nowMs:1000}), false);
   assert.equal(renderer.draw(ctx, {netId: 2,x:10,y:20,action:COMBAT_ACTION.dead},
-    {actorKind:"player",remote:true,nowMs:1100}), false);
-  assert.equal(draws.length, 2);
+    {actorKind:"player",remote:true,nowMs:1100}), true);
+  assert.equal(draws.length, 3);
 });
 
 test("actual server-derived Greyhaven-free arena renderer uses Silver for both human viewpoints", () => {
   const src = readFileSync(new URL("../web/online-game.mjs", import.meta.url),"utf8");
   assert.match(src,/const knightSprites = params\.get\("knights"\) === "1"/);
-  assert.match(src,/createKnightSpriteRenderer\(\{sourceArtVariant: params\.get\("knightArt"\) === "relit" \? "relit" : "original"\}\)/);
+  assert.match(src,/createKnightSpriteRenderer\(\{sourceArtVariant: params\.get\("knightArt"\) === "original" \? "original" : "relit"\}\)/);
   assert.match(src,/drawFighterWorld\(sampled,/);
   assert.match(src,/drawFighterScreen\(canvas\.width \/ 2,/);
   assert.match(src,/knightSprites\?\.draw\(ctx, fighter,/);
   assert.match(src,/remote, actorKind: "player", rotation: presentationRotation/);
   assert.match(src,/const drewKnight/);
-  assert.match(src,/if \(!drewKnight\)/);
+  assert.match(src,/if \(!drewKnight && !knightSprites\)/);
   assert.match(src,/drawAttackTell\(action, remote\)/);
   assert.match(src,/drawHeavyAttackTell\(action, remote\)/);
   assert.match(src,/drawKickTell\(action\)/);

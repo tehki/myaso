@@ -54,12 +54,12 @@ export function knightClip(action, actorKind, speed = 0, moving = false) {
   if (action === COMBAT_ACTION.dodge || action === COMBAT_ACTION.dodgeRecovery) {
     return actorKind === "npc" ? "t1_roll" : "silver_roll";
   }
-  // The optional atlases cover only a subset of authoritative Combat actions.
-  // An unrelated idle/walk pose would falsely depict readiness during kicks,
-  // stun, knockdown, jump attacks, or committed local sword attacks. Let the
-  // existing combat renderer draw those actions and their truthful tells.
+  // Every authenticated human remains a Silver Knight. When no source clip
+  // exists for an authoritative action, show the directional idle knight while
+  // the existing Combat renderer independently paints attack/guard/stun/death
+  // tells. This is presentation only; it never claims an action was idle.
   if (action === COMBAT_ACTION.jump) return "silver_jump";
-  if (action !== COMBAT_ACTION.idle) return null;
+  if (action !== COMBAT_ACTION.idle) return "silver_idle";
   if (moving && speed >= 280) return "silver_sprint";
   return moving ? "silver_walk" : "silver_idle";
 }
@@ -134,13 +134,11 @@ export function createKnightSpriteRenderer({ ImageCtor = Image,
       state.y = fighter.y;
       state.atMs = nowMs;
       const moving = nowMs - state.lastMoveMs < 135;
-      const clip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving);
-      if (!clip) {
-        // End the previous clip on unsupported states. A future roll must
-        // start at frame zero rather than resume its previous final frame.
-        state.clip = null;
-        return false;
-      }
+      const requestedClip = knightClip(fighter.action ?? COMBAT_ACTION.idle, actorKind, state.speed, moving);
+      // A missing/in-flight movement atlas falls back to the genuine Silver
+      // idle atlas, never to the prototype circle. Keep the original action
+      // telegraphs in the calling renderer.
+      const clip = atlases.get(requestedClip)?.ready ? requestedClip : "silver_idle";
       const atlas = atlases.get(clip);
       if (!atlas?.ready) return false;
       if (state.clip !== clip) {
