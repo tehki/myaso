@@ -42,7 +42,8 @@ test("M147 original native three-player focus fixture never uses split WebDriver
   const stage = source.slice(start, end);
   assert.ok(stage.includes('pulseM147FocusStageKey(jumpAttacker, "d", 210)'), "genuine bounded attacker KeyD");
   assert.ok(stage.includes('pulseM147FocusStageKey(closerIdle, "a", 260)'), "genuine bounded closer KeyA");
-  assert.ok(stage.includes('pulseM147FocusStageKey(closerIdle, "a", 45)'), "bounded physical correction KeyA");
+  assert.ok(stage.includes('pulseMovementKeyBoundedW3c(closerIdle, plan.key, plan.durationMs)'), "replica-driven bounded physical correction");
+  assert.ok(stage.includes('planM147CloserIdleGeometry('), "native durations alone cannot qualify ordinary focus geometry");
   assert.ok(!stage.includes('pulseMovementKey('), "no detached keyDown/keyup HTTP transactions");
   assert.ok(stage.includes('NEAREST #${closerId}'), "physical geometry focus gate stays strict");
 });

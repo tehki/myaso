@@ -48,7 +48,7 @@ export async function dispatchM41ObservedParry({
     cue = await awaitWorldCue();
     if (!cue || cue?.timedOut === true) throw new Error("M41 missing fresh actor-bound World cue; no native wheel allowed");
     chronology.cueResolvedEpochMs = now();
-    await waitForReaction();
+    await waitForReaction(cue);
     wheel = await Promise.resolve().then(() => {
       chronology.wheelIssuedEpochMs = now();
       return sendWheel();

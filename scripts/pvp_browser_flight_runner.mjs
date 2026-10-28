@@ -9,7 +9,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
-import { NETWORK } from "../src/network/constants.mjs";
+import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -37,6 +37,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
 import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
+import { planM147CloserIdleGeometry } from "./m147-closer-idle-geometry.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
@@ -8398,6 +8399,8 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   const parryIngress = await calibrateNativeParryIngress(
     attacker, defender, attackerElementId, defenderElementId, attackOffset,
   );
+  const nativeReaction = planM35NativeReaction(parryIngress.wheelMs);
+  console.log("M35_NATIVE_REACTION_PLAN " + JSON.stringify(nativeReaction));
   await Promise.all(entries.map(installUiObserver));
   let evidence = null;
   let lastAttemptBaseline = null;
@@ -8434,15 +8437,15 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // Aim before the measured exchange. The original 125ms parry is
       // evaluated from the server's REAL Block admission, not the wheel ACK.
       // With physical-wheel source0 submitted directly before RAF, M41's
-      // earlier Heavy-charging cue armed Block 133.3ms before HIT (genuine
-      // original World BLOCK, outside Parry125). Prearm the SAME actor-bound
-      // native watcher, but dispatch the one real wheel only on the actual
-      // subsequent Light Windup; never forge a delayed Block admission.
+      // earlier unpaced charging cue could arm Block outside Parry125.
+      // Fast measured ingress waits for released Light; slow W3C ingress
+      // may use the original charging cue with explicit reaction pacing.
+      // Both remain genuine actor-bound World cues, never predictions.
       // No full-click ACK or evidence serialization gates this wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
       const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")
         ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-          {allowHeavy: false}) : null;
+          {allowHeavy: nativeReaction.allowHeavy}) : null;
       if (prearmed) {
         const channelDeadline = Date.now() + 1500;
         let channelReady = false;
@@ -8455,7 +8458,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
           script: m35PrearmedCueScript(),
           args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180,
-            false],
+            nativeReaction.allowHeavy],
         });
         if (armed !== true) { prearmed.close(); throw new Error("M35 could not arm native Windup observer before physical click"); }
       }
@@ -8473,7 +8476,8 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           // demanding an instantaneous response at the earliest Light cue.
           // This never alters packet time, World admission or Parry125. A
           // stalled/late native wheel still fails on genuine BLOCK/HIT.
-          waitForReaction: () => sleep(Math.ceil(1000 / NETWORK.serverSimulationHz)),
+          waitForReaction: cue => sleep(cue.text === "Heavy strike committed - the long windup is readable."
+            ? nativeReaction.heavyReactionMs : nativeReaction.lightReactionMs),
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
             ? scrollM41ViewportWheel(defender, defenderViewport)
@@ -11679,17 +11683,28 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   }
   console.log("M147_NATIVE_INTERIOR_GEOMETRY " + JSON.stringify({nativeGeometry, geometryReady}));
   if (!geometryReady) throw new Error(`${milestone} actual replica geometry did not converge before the single JumpAttack`);
-  for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  let closerGeometryReady=false;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const replicas=observerBefore.acceptance?.fighters ?? [];
+    const plan=planM147CloserIdleGeometry(replicas.find(f=>f.netId===observerId),
+      replicas.find(f=>f.netId===jumpId),replicas.find(f=>f.netId===closerId));
+    console.log("M147_CLOSER_IDLE_GEOMETRY "+JSON.stringify({attempt:attempt+1,
+      serverTick:observerBefore.acceptance?.serverTick,replicas,plan,focus:observerBefore.focusLabel}));
+    if(!plan && observerBefore.focusLabel === `NEAREST #${closerId}`) {
+      closerGeometryReady=true;
+      break;
+    }
     // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
     // The first 260ms staging A and previous corrective A are real taps too.
     // Separate every additional physical tap by >240ms: no synthetic
     // movement, no change to World authority, and no false focus acceptance.
     await sleep(300);
-    await pulseM147FocusStageKey(closerIdle, "a", 45);
-    await sleep(55);
+    if(plan) await pulseMovementKeyBoundedW3c(closerIdle, plan.key, plan.durationMs);
+    await sleep(80);
     baseline = await Promise.all(entries.map(readUiEvidence));
     observerBefore = baseline.find((entry) => entry.browser === observer.name);
   }
+  if(!closerGeometryReady) throw new Error(`${milestone} closer replica geometry and rendered ordinary focus did not converge`);
   const jumpBefore = baseline.find((entry) => entry.browser === jumpAttacker.name);
   const closerBefore = baseline.find((entry) => entry.browser === closerIdle.name);
   if (!jumpBefore || !observerBefore || !closerBefore) {
