@@ -34,3 +34,18 @@ export function inspectM35ParryFirstRed({worldLog, attackerId, defenderId, input
       recordedSendInvocationEpochMs:wheel.m41PhysicalInput.originalV1SendInvocationEpochMs,
     }:null};
 }
+
+// Earlier charging may schedule a native wheel, but cannot qualify M33/M35:
+// the same attempt must still become actual original World Light and Parry.
+export function verifyM35OriginalLightParry(options) {
+  const proof=inspectM35ParryFirstRed(options);
+  const actions=options.worldLog.split(/\r?\n/).flatMap(line=>{
+    const m=/^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=\d+ to=(\d+)(?:\s|$)/.exec(line);
+    return m && +m[2]===options.attackerId && +m[1]<=proof.contact?.tick
+      ? [{tick:+m[1],action:+m[3]}] : [];
+  });
+  const light=actions.find(e=>e.action===1);
+  if(proof.verdict!=="WORLD_PARRY" || !light || actions.some(e=>e.action===10))
+    throw new Error("M35 requires original World LightWindup then PARRY125, never a charging cue or Heavy substitute");
+  return {...proof,originalLightWindupTick:light.tick};
+}

@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import { activateLoopbackGestureLab } from "../web/prealpha-gesture-live-lab.mjs";
 import { decodeProposedTypedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 
-const pause = ms => new Promise(resolve=>setTimeout(resolve,ms));
 function event(type, fields) {
   const e = new Event(type,{cancelable:true,bubbles:true});
   Object.assign(e,fields);
@@ -27,45 +26,75 @@ function createFixture(pageHost="localhost",serverHost="127.0.0.1") {
   };
 }
 
-test("actual first-party pointerdown submits source0 light PRESS before mouse up, without v1 sampler",async()=>{
+test("actual first-party pointerdown submits source0 light PRESS before mouse up, without v1 sampler",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
  try {
   assert.equal(f.grantCalls,1);
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:7,button:0,buttons:1}));
-  await pause(10);
+  await settleMicrotasks();
   assert.deepEqual(f.wire.map(e=>[e.source,e.action]),[[0,1]]);
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:7,button:0,buttons:0}));
-  await pause(10);
+  await settleMicrotasks();
   assert.deepEqual(f.wire.filter(e=>e.action===3).map(e=>e.source),[0]);
   assert.equal(lab.outbox.snapshot.activeSources.length,0);
  }finally{lab.close("test");}
 });
 
-test("genuine hold upgrade is an intent before server-controlled READY, terminal remains physical UP",async()=>{
+test("170ms without ACK repeats the same RELEASE identity, never authors a second gesture",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
+ const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
+ try{
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:7,button:0,buttons:1}));
+  await settleMicrotasks();
+  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:7,button:0,buttons:0}));
+  await settleMicrotasks();
+  const lease=lab.lease;
+  t.mock.timers.tick(170);await settleMicrotasks();
+  const releases=f.wire.filter(e=>e.action===3);
+  assert.deepEqual(releases.map(e=>e.source),[0,0],"reproduces original first-red observation");
+  assert.deepEqual(releases[1],releases[0],"all decoded wire fields are identical");
+  assert.equal(lab.lease,lease,"same authenticated-connection lease token");
+  assert.deepEqual(f.win.__MYASO_LOCAL_GESTURE_PROOF__().attemptedTransmissions.filter(e=>e.action===3),[
+   {source:0,action:3,sequence:2,gestureId:1,attempt:1,currentLease:true},
+   {source:0,action:3,sequence:2,gestureId:1,attempt:2,currentLease:true},
+  ]);
+  assert.equal(lab.outbox.snapshot.nextSequence,3,"no duplicate producer allocated a new identity");
+  assert.equal(lab.outbox.snapshot.activeSources.length,0,"retry cannot resurrect retired gesture");
+  acknowledgeSent(f,lab);
+  assert.equal(lab.snapshot.pending,0);
+  t.mock.timers.tick(510);await settleMicrotasks();
+  assert.equal(f.wire.length,4,"authenticated ACK settles both original edges and stops retries");
+ }finally{lab.close("test");}
+});
+
+test("genuine hold upgrade is an intent before server-controlled READY, terminal remains physical UP",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
  try{
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:8,button:0,buttons:1}));
-  await pause(125);
+  t.mock.timers.tick(125);await settleMicrotasks();
   assert.ok(f.wire.some(e=>e.source===0&&e.action===2),"held pointer queues upgrade request");
   assert.ok(!f.wire.some(e=>e.action===3),"no phantom RELEASE at 85ms/125ms");
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:8,button:0,buttons:0}));
-  await pause(10);
+  await settleMicrotasks();
   assert.ok(f.wire.some(e=>e.source===0&&e.action===3),"only actual physical UP terminates hold");
  }finally{lab.close("test");}
 });
 
-test("Key E is reserved for Use, while original LMB stays the only Combat gesture source",async()=>{
+test("Key E is reserved for Use, while original LMB stays the only Combat gesture source",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
  try{
   f.win.dispatchEvent(event("keydown",{code:"KeyE",repeat:false}));
   f.win.dispatchEvent(event("keyup",{code:"KeyE"}));
-  await pause(10);
+  await settleMicrotasks();
   assert.deepEqual(f.wire,[],"Use has no Combat sender");
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:10,button:0,buttons:1}));
-  await pause(10);
+  await settleMicrotasks();
   assert.ok(f.wire.some(e=>e.source===0&&e.action===1));
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:10,button:0,buttons:0}));
-  await pause(10);
+  await settleMicrotasks();
   assert.deepEqual([...new Set(f.wire.map(e=>e.source))],[0]);
   assert.deepEqual([...new Set(f.wire.map(e=>e.sequence))],[1,2]);
  }finally{lab.close("test");}
@@ -79,17 +108,18 @@ test("public target or public webpage refuses before any grant or physical event
  }
 });
 
-test("blur/pagehide retires source owner, never sends a phantom RELEASE or reuses old QUIC",async()=>{
+test("blur/pagehide retires source owner, never sends a phantom RELEASE or reuses old QUIC",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:14,button:0,buttons:1}));
- await pause(10);
+ await settleMicrotasks();
  f.win.dispatchEvent(event("pagehide",{}));
- await pause(10);
+ await settleMicrotasks();
  assert.equal(f.closed,true);
  assert.equal(lab.snapshot.closed,true);
  assert.ok(!f.wire.some(e=>e.action===3),"navigation must not synthesize strike");
  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:14,button:0,buttons:0}));
- await pause(10);
+ t.mock.timers.tick(510);await settleMicrotasks();
  assert.ok(!f.wire.some(e=>e.action===3),"old lease cannot send terminal after pagehide");
 });
 

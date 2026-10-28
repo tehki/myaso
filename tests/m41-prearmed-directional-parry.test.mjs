@@ -27,10 +27,11 @@ test("M41 actor-bound browser prearm dispatches one original viewport wheel; ori
   const runner=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const script=m35PrearmedCueScript();
   assert.match(runner,/const prearmed = \(scenario === "uiparrytell" \|\| scenario === "uistun" \|\| scenario === "uiparry"\)/);
-  // On actual early source0 Block delivery, triggering from Heavy charges the
-  // 125ms parry timer prematurely; require the later real Light Windup.
-  assert.match(runner,/allowHeavy: false/);
-  assert.match(runner,/attackerReady\.playerNetId, 180,\s*false\]/);
+  assert.match(runner,/allowHeavy: nativeReaction\.allowHeavy/);
+  assert.match(runner,/attackerReady\.playerNetId, 180,\s*nativeReaction\.allowHeavy\]/);
+  assert.match(runner,/planM35NativeReaction\(parryIngress\.wheelMs\)/);
+  assert.match(runner,/verifyM35OriginalLightParry\(worldOptions\)/,
+    "earlier cue cannot replace original World Light then PARRY acceptance");
   assert.match(script,/const \[token, baseline, actorId, timeoutMs, allowHeavy\] = arguments/);
   assert.match(script,/observe\(window\.__MYASO_M30_UI__, attemptBaseline, actorId, allowHeavy\)/);
   assert.match(runner,/scrollM41ViewportWheel\(defender, defenderViewport\)/);

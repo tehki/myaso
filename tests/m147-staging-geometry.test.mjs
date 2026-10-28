@@ -47,7 +47,7 @@ test("M147 accepts real in-range ordered replicas and logs compact original geom
 
 function runStaging(observedGaps) {
   const start = source.indexOf("  // A native hold duration is not proof of World displacement.");
-  const end = source.indexOf("  for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel", start);
+  const end = source.indexOf("  let closerGeometryReady=false;", start);
   assert.ok(start > 0 && end > start);
   const block = source.slice(start, end).replace(
     /  const \{ planM121NativeGeometry \} = await import\("\.\/m121-native-geometry-plan\.mjs"\);\r?\n/, "");

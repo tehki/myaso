@@ -93,6 +93,25 @@ test("no fresh M41 actor cue means no wheel despite chronology instrumentation",
   assert.equal(wheels, 0);
 });
 
+test("native reaction pacing waits after the genuine cue and before one wheel without waiting for click ACK", async () => {
+  const attack=deferred(), reaction=deferred(), seen=[];
+  const flight=dispatchM41ObservedParry({
+    sendAttack:()=>{seen.push("click");return attack.promise;},
+    awaitWorldCue:()=>{seen.push("cue");return readM41ScalarWorldCue(state,0,1);},
+    waitForReaction:()=>{seen.push("reaction");return reaction.promise;},
+    sendWheel:async()=>{seen.push("wheel");},
+  });
+  await tick();assert.deepEqual(seen,["click","cue","reaction"]);
+  reaction.resolve();await tick();
+  assert.deepEqual(seen,["click","cue","reaction","wheel"]);
+  attack.resolve();assert.equal((await flight).nativeWheelAck,true);
+  let reactions=0;
+  await assert.rejects(dispatchM41ObservedParry({sendAttack:async()=>{},
+    awaitWorldCue:async()=>null,waitForReaction:async()=>{reactions++;},
+    sendWheel:async()=>{throw new Error("no wheel without cue");}}),/missing fresh/);
+  assert.equal(reactions,0,"pacing cannot turn a missing cue into permission for input");
+});
+
 // First-red #40354245925: original World delivered 34HP while the async
 // observer returned no fresh current-attempt light cue. Retain that failure.
 test("M41 timeout retains bounded original event provenance without treating past windup as fresh", () => {

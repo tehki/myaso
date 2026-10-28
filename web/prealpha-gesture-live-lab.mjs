@@ -27,6 +27,8 @@ export async function activateLoopbackGestureLab({
   let failed = false, detached = false, retryTimer = null;
   const removeListeners = [];
   const upgradeTimers = new Set();
+  // Bounded loopback-only attempted-write evidence, never an ACK or a hit.
+  const attemptedTransmissions = [];
   let writeBatchPending = false, writeWatchdog = null;
   let gates = null, detachGates = null;
 
@@ -72,6 +74,12 @@ export async function activateLoopbackGestureLab({
     writeWatchdog = setTimeout(() => fail("typed gesture writer stalled for 1500ms"),1500);
     try {
       const writes = packets.map(packet => {
+        attemptedTransmissions.push(Object.freeze({
+          source:packet.source, action:packet.action, sequence:packet.sequence,
+          gestureId:packet.gestureId, attempt:packet.attempt,
+          currentLease:gameClient.transport === lease,
+        }));
+        if (attemptedTransmissions.length > 16) attemptedTransmissions.shift();
         try { return Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes)); }
         catch (error) { return Promise.reject(error); }
       });
@@ -173,6 +181,7 @@ export async function activateLoopbackGestureLab({
       pending:outbox.snapshot.pending,
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
+      attemptedTransmissions:Object.freeze(attemptedTransmissions.slice()),
       acknowledged:receipts.map(x=>({...x})),
       // Actual replicated fields only: no prediction, inferred damage,
       // allocation or gameplay writes. Each read returns detached snapshots.

@@ -3,7 +3,7 @@
 // nor this endpoint can inject browser inputs or mutate game/server state.
 import { createHash } from "node:crypto";
 
-export function attachM325TrustedWheelSocket(server, registry) {
+export function attachM325TrustedWheelSocket(server, registry, cueRegistry = null) {
   const sockets = new Set();
   server.on("upgrade", (request, socket, head) => {
     try {
@@ -12,7 +12,9 @@ export function attachM325TrustedWheelSocket(server, registry) {
       const local = socket.remoteAddress === "127.0.0.1"
         || socket.remoteAddress === "::1" || socket.remoteAddress === "::ffff:127.0.0.1";
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      if (url.pathname !== "/__myaso_m325_trusted_wheel"
+      const receiver = url.pathname === "/__myaso_m325_trusted_wheel" ? registry
+        : url.pathname === "/__myaso_m35_rendered_windup" ? cueRegistry : null;
+      if (!receiver
         || !local || origin !== "http://" + request.headers.host
         || request.headers.upgrade?.toLowerCase() !== "websocket"
         || request.headers["sec-websocket-version"] !== "13"
@@ -49,7 +51,7 @@ export function attachM325TrustedWheelSocket(server, registry) {
           buffer = buffer.subarray(offset + 4 + length);
           try {
             const packet = JSON.parse(payload.toString("utf8"));
-            registry.receive(packet); // Rejects stale, untrusted, wrong-direction tokens.
+            receiver.receive(packet); // Each registry validates its own single-use actor/event token.
           } catch {
             socket.destroy();
             return;

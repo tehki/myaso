@@ -39,8 +39,10 @@ test("M41 native wheel remains downstream of genuine actor-bound cue; M35 still 
     "M33 short-click parry requires an original fresh actor-bound light windup");
   assert.ok(block.includes('(scenario === "uiparrytell" || scenario === "uiparry")'),
     "M33/M41 issue one native viewport wheel; M35 stays unchanged");
-  assert.ok(block.includes('allowHeavy: false'),
-    "M41 cannot prearm Block from speculative Heavy charge with immediate source0 Block input");
+  assert.ok(block.includes('allowHeavy: nativeReaction.allowHeavy'),
+    "earlier original charging cue requires measured W3C ingress and reaction pacing");
+  assert.ok(block.includes('verifyM35OriginalLightParry(worldOptions)'),
+    "a charging cue or Heavy outcome never qualifies the required original Light Parry");
   assert.ok(!block.includes('allowHeavy: scenario === "uiparrytell"'),
     "premature Heavy cue is not a qualifying Light Windup");
   assert.ok(block.includes("scrollM41ViewportWheel(defender, defenderViewport)"));

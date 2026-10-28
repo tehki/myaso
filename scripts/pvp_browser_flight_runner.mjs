@@ -9,6 +9,7 @@ import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
+import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -36,6 +37,7 @@ import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-wi
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
 import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
+import { planM147CloserIdleGeometry } from "./m147-closer-idle-geometry.mjs";
 import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs";
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
@@ -47,7 +49,7 @@ import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
 import { createM35CueRegistry, m35PrearmedCueScript } from "./m35-prearmed-windup-cue.mjs";
-import { inspectM35ParryFirstRed } from "./m35-original-world-first-red.mjs";
+import { inspectM35ParryFirstRed, verifyM35OriginalLightParry } from "./m35-original-world-first-red.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -567,7 +569,7 @@ async function startStaticServer() {
   });
   // M325: receive a genuine Firefox wheel from a pre-connected local socket.
   // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
-  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry);
+  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry, m35CueRegistry);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(staticPort, "127.0.0.1", resolve);
@@ -596,7 +598,7 @@ async function startGameServer() {
         // defender Block preceded server contact within the 125ms window.
         // Read-only M201_AUTH_ACTION and CORE8C_WORLD_CONTACT on loopback;
         // no World stepping, input synthesis, HIT recipient, or protocol change.
-        || scenario === "uistun" || scenario === "uiparrytell"
+        || scenario === "uistun" || scenario === "uiparrytell" || scenario === "uiparry"
         || scenario === "uiheavydodge"
         || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
@@ -8397,10 +8399,13 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   const parryIngress = await calibrateNativeParryIngress(
     attacker, defender, attackerElementId, defenderElementId, attackOffset,
   );
+  const nativeReaction = planM35NativeReaction(parryIngress.wheelMs);
+  console.log("M35_NATIVE_REACTION_PLAN " + JSON.stringify(nativeReaction));
   await Promise.all(entries.map(installUiObserver));
   let evidence = null;
   let lastAttemptBaseline = null;
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
+    const attemptWorldLogOffset=m201ServerOutput().length;
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     // M33/M41/M146: use the same genuinely observed browser latencies that
@@ -8433,20 +8438,28 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // Aim before the measured exchange. The original 125ms parry is
       // evaluated from the server's REAL Block admission, not the wheel ACK.
       // With physical-wheel source0 submitted directly before RAF, M41's
-      // earlier Heavy-charging cue armed Block 133.3ms before HIT (genuine
-      // original World BLOCK, outside Parry125). Prearm the SAME actor-bound
-      // native watcher, but dispatch the one real wheel only on the actual
-      // subsequent Light Windup; never forge a delayed Block admission.
+      // earlier unpaced charging cue could arm Block outside Parry125.
+      // Fast measured ingress waits for released Light; slow W3C ingress
+      // may use the original charging cue with explicit reaction pacing.
+      // Both remain genuine actor-bound World cues, never predictions.
       // No full-click ACK or evidence serialization gates this wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
       const prearmed = (scenario === "uiparrytell" || scenario === "uistun" || scenario === "uiparry")
         ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId,
-          {allowHeavy: false}) : null;
+          {allowHeavy: nativeReaction.allowHeavy}) : null;
       if (prearmed) {
+        const channelDeadline = Date.now() + 1500;
+        let channelReady = false;
+        while (Date.now() < channelDeadline && !channelReady) {
+          channelReady = await execute(attacker.base, attacker.sessionId,
+            "return window.__MYASO_M35_CUE_CHANNEL__?.readyState === WebSocket.OPEN;");
+          if (!channelReady) await sleep(10);
+        }
+        if (!channelReady) { prearmed.close(); throw new Error("M35 read-only cue socket did not open before physical click"); }
         const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
           script: m35PrearmedCueScript(),
           args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180,
-            false],
+            nativeReaction.allowHeavy],
         });
         if (armed !== true) { prearmed.close(); throw new Error("M35 could not arm native Windup observer before physical click"); }
       }
@@ -8458,6 +8471,14 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
             attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
             false,
           ),
+          // Original World reproduction: Light at tick0, Block at tick1
+          // resolves at age133.3ms -> BLOCK, while tick2 is116.7ms -> PARRY.
+          // Pace this native reaction by ONE original 60Hz tick instead of
+          // demanding an instantaneous response at the earliest Light cue.
+          // This never alters packet time, World admission or Parry125. A
+          // stalled/late native wheel still fails on genuine BLOCK/HIT.
+          waitForReaction: cue => sleep(cue.text === "Heavy strike committed - the long windup is readable."
+            ? nativeReaction.heavyReactionMs : nativeReaction.lightReactionMs),
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
             ? scrollM41ViewportWheel(defender, defenderViewport)
@@ -8488,6 +8509,21 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       ]);
     }
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
+    // Keep successful and failed admission timing together. This is a read-only
+    // original-World witness, never a cue, retry decision or acceptance waiver.
+    if (["uiparrytell", "uistun", "uiparry"].includes(scenario)) {
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const defense = states.find(entry => entry.browser === defender.name);
+      const worldOptions={worldLog:m201ServerOutput().slice(attemptWorldLogOffset),
+        attackerId:attackerReady.playerNetId, defenderId:defenderReady.playerNetId,
+        inputSubmissions:defense?.acceptance?.inputSubmissions};
+      console.log("M35_ORIGINAL_WORLD_EXCHANGE " + JSON.stringify({
+        scenario, attempt:attempt+1,
+        ...(evidence ? verifyM35OriginalLightParry(worldOptions) : inspectM35ParryFirstRed(worldOptions)),
+        defenderWheels:defense?.wheels,
+        defenderActions:defense?.acceptance?.ownActionTransitions,
+      }));
+    }
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
       const stagedAttacker = after.find((entry) => entry.browser === attacker.name);
@@ -8507,7 +8543,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         // Failure-only original-World provenance; no changes to the physical
         // W3C wheel, 125ms Parry window, fatal gate or replay policy.
         const diagnostic = inspectM35ParryFirstRed({
-          worldLog: m201ServerOutput(),
+          worldLog: m201ServerOutput().slice(attemptWorldLogOffset),
           attackerId: attackerReady.playerNetId,
           defenderId: defenderReady.playerNetId,
           inputSubmissions: stagedDefender?.acceptance?.inputSubmissions,
@@ -11649,17 +11685,28 @@ async function runOnlineUiJumpRecoveryFfaPunishFlight(entries) {
   }
   console.log("M147_NATIVE_INTERIOR_GEOMETRY " + JSON.stringify({nativeGeometry, geometryReady}));
   if (!geometryReady) throw new Error(`${milestone} actual replica geometry did not converge before the single JumpAttack`);
-  for (let attempt = 0; attempt < 3 && observerBefore?.focusLabel !== `NEAREST #${closerId}`; attempt += 1) {
+  let closerGeometryReady=false;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const replicas=observerBefore.acceptance?.fighters ?? [];
+    const plan=planM147CloserIdleGeometry(replicas.find(f=>f.netId===observerId),
+      replicas.find(f=>f.netId===jumpId),replicas.find(f=>f.netId===closerId));
+    console.log("M147_CLOSER_IDLE_GEOMETRY "+JSON.stringify({attempt:attempt+1,
+      serverTick:observerBefore.acceptance?.serverTick,replicas,plan,focus:observerBefore.focusLabel}));
+    if(!plan && observerBefore.focusLabel === `NEAREST #${closerId}`) {
+      closerGeometryReady=true;
+      break;
+    }
     // Original R2 interprets two real KeyA DOWN edges <=240ms apart as Dash.
     // The first 260ms staging A and previous corrective A are real taps too.
     // Separate every additional physical tap by >240ms: no synthetic
     // movement, no change to World authority, and no false focus acceptance.
     await sleep(300);
-    await pulseM147FocusStageKey(closerIdle, "a", 45);
-    await sleep(55);
+    if(plan) await pulseMovementKeyBoundedW3c(closerIdle, plan.key, plan.durationMs);
+    await sleep(80);
     baseline = await Promise.all(entries.map(readUiEvidence));
     observerBefore = baseline.find((entry) => entry.browser === observer.name);
   }
+  if(!closerGeometryReady) throw new Error(`${milestone} closer replica geometry and rendered ordinary focus did not converge`);
   const jumpBefore = baseline.find((entry) => entry.browser === jumpAttacker.name);
   const closerBefore = baseline.find((entry) => entry.browser === closerIdle.name);
   if (!jumpBefore || !observerBefore || !closerBefore) {
@@ -13592,6 +13639,13 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    if (${["uiparrytell", "uistun", "uiparry"].includes(scenario)}) {
+      const prior = window.__MYASO_M35_CUE_CHANNEL__;
+      if (!prior || prior.readyState === WebSocket.CLOSING || prior.readyState === WebSocket.CLOSED) {
+        window.__MYASO_M35_CUE_CHANNEL__ = new WebSocket(
+          "ws://" + location.host + "/__myaso_m35_rendered_windup");
+      }
+    }
     // M338/M339: M151/M152 and M40 share the exact M194 guard-break wheel verifier.
     // Open the same real Firefox-only, localhost trusted-proof socket in all
     // four scenarios. Parent FFA flights reinstall UI observers: reuse the

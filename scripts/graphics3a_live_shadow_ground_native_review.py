@@ -4,7 +4,7 @@ Read-only source-Canvas instrumentation pairs per-frame original Silver WebP
 and its shadow. Real TLS-pinned WebTransport game, trusted native jump and
 movement. Does not claim server physics, human operators or production GO.
 """
-import json,os,re,select,shutil,socket,subprocess,time,urllib.parse,urllib.request
+import json,os,re,select,shutil,socket,subprocess,tempfile,time,urllib.parse,urllib.request
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,7 +26,33 @@ def action(session,actions):return request("POST",f"/session/{session}/actions",
 def keyact(key,down):
  return [{"type":"key","id":"movement","actions":[{"type":"keyDown" if down else "keyUp","value":key}]}]
 server=None;http=None;driver=None;sessions=[];drv_port=port()
+# Preserve actual launch evidence, including failures before a session ID exists.
+# No retries or relaxed browser/gameplay deadlines. Only this flight's processes
+# are owned/terminated here; process diagnostics contain no command arguments.
+diagnostics=Path(os.environ.get("MYASO_NATIVE_DIAGNOSTICS_DIR") or tempfile.mkdtemp(prefix="myaso-g3a-native-"))
+diagnostics.mkdir(parents=True,exist_ok=True)
+driver_output=(diagnostics/"driver-output.log").open("w")
+requested_browser=os.environ.get("MYASO_NATIVE_CHROME_BINARY")
+# CI validates Google Chrome and its matching driver. Do not silently launch
+# the separately installed Chromium build instead. Local Linux may still use
+# its distro Chromium when no particular binary was requested.
+browser_binary=(shutil.which(requested_browser) if requested_browser else
+ (shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable")))
+assert browser_binary,"Requested native Chrome executable is unavailable; no browser substitution allowed"
+driver_binary=shutil.which("chromedriver") or "chromedriver"
+def capture_startup_state(stage):
+ data={"stage":stage,"sessionsCreated":len(sessions),"driverExit":driver.poll() if driver else None,
+       "browserBinary":browser_binary,"driverBinary":driver_binary,"load":os.getloadavg()}
+ for name,args in (("browserVersion",[browser_binary,"--version"]),("driverVersion",[driver_binary,"--version"]),
+                   ("processes",["ps","-eo","pid,ppid,stat,pcpu,pmem,rss,comm"])):
+  try:data[name]=subprocess.run(args,capture_output=True,text=True,timeout=3).stdout[-16000:]
+  except Exception as error:data[name]=type(error).__name__
+ try:data["memory"]=Path("/proc/meminfo").read_text()[:4000]
+ except OSError:pass
+ (diagnostics/(stage+".json")).write_text(json.dumps(data,indent=2))
+ print("G3A_NATIVE_STARTUP_STATE",json.dumps({k:v for k,v in data.items() if k not in ("processes","memory")}),flush=True)
 try:
+ capture_startup_state("before-launch")
  server=subprocess.Popen([str(BIN)],env={**os.environ,"MYASO_BIND":"127.0.0.1:0","MYASO_CHAT_RADIUS":"160","MYASO_CHAT_C1_ENABLED":"1"},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
  url=None;cert=None
  os.set_blocking(server.stdout.fileno(),False)
@@ -47,15 +73,23 @@ try:
  print("REAL_RUST_SERVER",url,cert[:12],flush=True)
  siteport=port()
  http=subprocess.Popen(["python3","-m","http.server",str(siteport),"--bind","127.0.0.1","--directory",str(ROOT)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
- driver=subprocess.Popen([shutil.which("chromedriver") or "chromedriver",f"--port={drv_port}"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+ driver=subprocess.Popen([driver_binary,f"--port={drv_port}","--verbose",f"--log-path={diagnostics/'chromedriver.log'}"],
+  env={**os.environ,"CHROME_LOG_FILE":str(diagnostics/"chrome.log")},stdout=driver_output,stderr=driver_output)
+ driver_ready=False
  for _ in range(30):
-  try:urllib.request.urlopen(f"http://127.0.0.1:{drv_port}/status",timeout=2);break
+  try:
+   with urllib.request.urlopen(f"http://127.0.0.1:{drv_port}/status",timeout=2) as response:
+    driver_ready=json.load(response).get("value",{}).get("ready") is True
+   if driver_ready:break
   except Exception:time.sleep(.1)
+ assert driver_ready,"ChromeDriver never reported readiness; inspect preserved launch diagnostics"
  page=f"http://127.0.0.1:{siteport}/web/?server={urllib.parse.quote(url,safe='')}&cert={cert}&knights=1&knightArt=relit&chatC1Preview=1&netstats=1&scenario=uijumpbuffer"
  for i in range(4):
-  props={"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"binary":(shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("google-chrome-stable") or "/usr/bin/chromium"),"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-background-networking","--window-size=1200,850"]}}}}
+  props={"capabilities":{"alwaysMatch":{"browserName":"chrome","goog:chromeOptions":{"binary":browser_binary,"args":["--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-background-networking","--window-size=1200,850","--enable-logging"]}}}}
+  session_started=time.monotonic()
   session=request("POST","/session",props,drv_port)["sessionId"]
   sessions.append(session)
+  print("G3A_NATIVE_SESSION_CREATED",json.dumps({"seat":i+1,"elapsedMs":round((time.monotonic()-session_started)*1000)}),flush=True)
   request("POST",f"/session/{session}/url",{"url":page},drv_port)
   for _ in range(90):
    val=script(session,"const t=document.querySelector('#event-text')?.textContent||'';const m=t.match(/Online - player #([0-9]+) - server tick ([0-9]+)/);return {ok:!!m,playerId:m?Number(m[1]):null,serverTick:m?Number(m[2]):null,event:t};")
@@ -160,6 +194,15 @@ return a ? {playerNetId:a.playerNetId,serverTick:a.serverTick,
    assert clips["silver_jump_relit.webp"]["max"]<-4, "Ground-shadow must remain below lifted true jump sprite"
  assert seen_jump, "Real server never admitted a jump during native Space choreography"
  print("G3A_REAL_FOUR_PLAYER_SHADOW_SOURCE_AUDIT_COMPLETE",flush=True)
+except BaseException:
+ capture_startup_state("failure")
+ for name in ("chromedriver.log","driver-output.log","chrome.log"):
+  try:
+   with (diagnostics/name).open("rb") as log:
+    log.seek(max(0,os.fstat(log.fileno()).st_size-12000))
+    print("G3A_NATIVE_FAILURE_LOG",name,log.read().decode("utf-8","replace"),flush=True)
+  except OSError:pass
+ raise
 finally:
  for s in sessions:
   try:request("DELETE",f"/session/{s}",wdport=drv_port)
@@ -169,3 +212,5 @@ finally:
    proc.terminate()
    try:proc.wait(timeout=3)
    except Exception:proc.kill()
+ driver_output.close()
+ print("G3A_NATIVE_DIAGNOSTICS",str(diagnostics),flush=True)
