@@ -8488,6 +8488,20 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       ]);
     }
     evidence = await waitForUiParryEvidence(entries, attacker, defender, 350, false, lastAttemptBaseline);
+    // Keep successful and failed admission timing together. This is a read-only
+    // original-World witness, never a cue, retry decision or acceptance waiver.
+    if (["uiparrytell", "uistun", "uiparry"].includes(scenario)) {
+      const states = await Promise.all(entries.map(readUiEvidence));
+      const defense = states.find(entry => entry.browser === defender.name);
+      console.log("M35_ORIGINAL_WORLD_EXCHANGE " + JSON.stringify({
+        scenario, attempt:attempt+1,
+        ...inspectM35ParryFirstRed({worldLog:m201ServerOutput(),
+          attackerId:attackerReady.playerNetId, defenderId:defenderReady.playerNetId,
+          inputSubmissions:defense?.acceptance?.inputSubmissions}),
+        defenderWheels:defense?.wheels,
+        defenderActions:defense?.acceptance?.ownActionTransitions,
+      }));
+    }
     if (!evidence) {
       const after = await Promise.all(entries.map(readUiEvidence));
       const stagedAttacker = after.find((entry) => entry.browser === attacker.name);
