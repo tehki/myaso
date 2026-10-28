@@ -113,7 +113,7 @@ try{
  const actors=[];
  for(let i=0;i<4;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000);
   assert.equal(actor.id,i+1,"genuine sequential Rust actor IDs required");

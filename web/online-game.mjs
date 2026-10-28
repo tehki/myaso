@@ -18,6 +18,7 @@ import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mj
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
 import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
+import { paintArenaLiteFloor } from "../src/browser/prealpha-arena-lite-floor.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 import { activateLoopbackGestureLab } from "./prealpha-gesture-live-lab.mjs";
 
@@ -124,12 +125,11 @@ const params = new URLSearchParams(window.location.search);
 // Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
 // Knights via the official lobby knights=1. Direct legacy Combat test URLs
 // and rollback without this flag keep original Combat-circle visuals.
-// Unsupported Silver animations always fall back to the original tells.
-// Visual-art review only: default original SHA-pinned five-clip Pre-Alpha.
-// A separate explicit knights=1&knightArt=relit previews only authentic
-// source-lit locomotion; the server roster and Combat stay authoritative.
+// Every official Silver Knight uses the real Blender-relit atlas by default;
+// a deliberate ?knightArt=original permits comparison/visual rollback. Roll
+// remains the original source clip. Combat state/tells remain authoritative.
 const knightSprites = params.get("knights") === "1"
-  ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "relit" ? "relit" : "original"})
+  ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "original" ? "original" : "relit"})
   : null;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
@@ -1495,7 +1495,7 @@ function drawFighterScreen(x, y, fighter, body, shadow, remote = false, damageTe
     remote, actorKind: "player", rotation: presentationRotation,
     visualLift: lift, nowMs: performance.now(),
   }) ?? false;
-  if (!drewKnight) {
+  if (!drewKnight && !knightSprites) {
     ctx.fillStyle = shadow;
     ctx.beginPath();
     ctx.ellipse(-2, 8, 20, 13, 0, 0, Math.PI * 2);
@@ -2159,6 +2159,17 @@ function createArenaLayer() {
   layer.width = canvas.width;
   layer.height = canvas.height;
   const layerContext = layer.getContext("2d", { alpha: false });
+  // Graphics 3C Arena Lite is a pre-rendered, opaque 960x540 floor. It paints
+  // once and never changes the World, input, hitboxes, terrain collisions or
+  // game camera. Keep ?arenaGrid=1 as an instant client-only visual rollback.
+  if (params.get("arenaGrid") !== "1") {
+    try {
+      paintArenaLiteFloor(layerContext);
+      return layer;
+    } catch (error) {
+      console.warn("Arena Lite art failed; restoring original grid", error);
+    }
+  }
   layerContext.fillStyle = "#1c1913";
   layerContext.fillRect(0, 0, layer.width, layer.height);
   layerContext.strokeStyle = "rgba(214, 195, 148, .065)";

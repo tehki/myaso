@@ -1,0 +1,28 @@
+{
+  "canvasSize": [
+    960,
+    540
+  ],
+  "chatElements": 0,
+  "groundPixel": [
+    77,
+    68,
+    53,
+    255
+  ],
+  "knightImages": [
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_walk_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_idle_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_sprint_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_jump_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/silver_roll.webp"
+  ],
+  "knightRelit": [
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_walk_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_idle_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_sprint_relit.webp",
+    "http://127.0.0.1:18140/web/assets/knights/review/silver_jump_relit.webp"
+  ],
+  "status": "Online - player #1 - server tick 72",
+  "url": "http://127.0.0.1:18140/web/?server=https%3A%2F%2F127.0.0.1%3A54490%2Fgame&cert=35be0ba7ef7a9efdb9524e820477692d83710da3b56b57afc75f95fdcb94bce2&knights=1"
+}

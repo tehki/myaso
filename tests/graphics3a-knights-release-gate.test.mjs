@@ -11,7 +11,7 @@ const originalConfig=Object.freeze({
 });
 const launch=(cfg)=>new URL(alphaPlayPath(parseAlphaConfig(cfg)),"https://game.open-trust-layer.org");
 
-test("ready Silver 5 release is disabled unless trusted operator explicitly selects relit art",()=>{
+test("official Silver lobby retains a stable URL; default source renderer is relit",()=>{
   const baseline=launch(originalConfig);
   assert.equal(baseline.pathname,"/web/");
   assert.equal(baseline.searchParams.get("knights"),"1");
@@ -41,7 +41,7 @@ test("strict optional first-party launcher switch can release exactly four relit
     ["silver_idle","silver_jump","silver_roll","silver_sprint","silver_walk"]);
   const client=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
   assert.match(client,/params\.get\("knights"\) === "1"/);
-  assert.match(client,/params\.get\("knightArt"\) === "relit"/);
+  assert.match(client,/params\.get\("knightArt"\) === "original"/);
   assert.match(client,/createKnightSpriteRenderer/);
 });
 
