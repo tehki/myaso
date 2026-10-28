@@ -420,7 +420,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   actors.splice(actors.indexOf(old),1);
   await waitFor(async()=>{const all=await readAll();return all.every(r=>r.proof.replicatedFighters.length===3&&!own(r.proof,2));},12000);
   const s=await startW3C(old.s.engine,4),u=new URL(host+"/web/index.html");
-  for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",gestureLab:"1"}))u.searchParams.set(k,v);
+  for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",arenaGrid:"1",gestureLab:"1"}))u.searchParams.set(k,v);
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const joined=await waitFor(async()=>{const p=await evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");return p?.ownPlayerNetId===5&&p.transportState==="granted"?p:false;},16000);
   assert.equal(joined.ownPlayerNetId,5,"fresh native QUIC connection owns new server actor and lease");
@@ -466,7 +466,7 @@ try{
  const seatCount=["space-guard","jump-review"].includes(physicalMode)?1:physicalMode==="jump-two-hit"?2:4;
  for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000).catch(async error=>{
    if(physicalMode==="jump-two-hit"){

@@ -62,3 +62,13 @@ test("owner-selected default Arena Lite paints before grid with an explicit visu
  assert.match(live,/ctx\.drawImage\(arenaLayer, 0, 0\)/);
  assert.doesNotMatch(live,/\/greyhaven\//);
 });
+
+test("legacy genuine four-browser QA requests the unchanged debug grid explicitly",()=>{
+ for (const file of ["main0_knights_four_native.mjs","main0_v2_knights_combat_four_native.mjs"]){
+  const source=readFileSync(new URL("../tools/art/"+file,import.meta.url),"utf8");
+  assert.match(source,/u\.searchParams\.set\("arenaGrid","1"\)/,
+    file+" must keep historical original-grid luminance checks valid");
+  assert.match(source,/centerLuminance<\(flag==="1"\?155:39\)/,
+    file+" must not weaken the original-grid pixel threshold");
+ }
+});
