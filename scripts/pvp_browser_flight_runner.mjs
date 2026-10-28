@@ -568,7 +568,7 @@ async function startStaticServer() {
   });
   // M325: receive a genuine Firefox wheel from a pre-connected local socket.
   // Unlike a per-wheel fetch, it does not need to establish HTTP transport.
-  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry);
+  m325Dispose = attachM325TrustedWheelSocket(server, m221Registry, m35CueRegistry);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(staticPort, "127.0.0.1", resolve);
@@ -8444,6 +8444,14 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         ? m35CueRegistry.issue(attemptAttackerBaseline.events.length, attackerReady.playerNetId,
           {allowHeavy: false}) : null;
       if (prearmed) {
+        const channelDeadline = Date.now() + 1500;
+        let channelReady = false;
+        while (Date.now() < channelDeadline && !channelReady) {
+          channelReady = await execute(attacker.base, attacker.sessionId,
+            "return window.__MYASO_M35_CUE_CHANNEL__?.readyState === WebSocket.OPEN;");
+          if (!channelReady) await sleep(10);
+        }
+        if (!channelReady) { prearmed.close(); throw new Error("M35 read-only cue socket did not open before physical click"); }
         const armed = await webdriver(attacker.base, "POST", `/session/${attacker.sessionId}/execute/sync`, {
           script: m35PrearmedCueScript(),
           args: [prearmed.token, attemptAttackerBaseline.events.length, attackerReady.playerNetId, 180,
@@ -13614,6 +13622,13 @@ async function installUiObserver(session) {
     const threatGuardArc = document.querySelector('#threat-guard-arc');
     if (!target || !arena || !arenaStage || !overlay || !recovery || !focusLabel || !threat || !threatCount || !threatSecondary || !threatSecondaryBearing || !threatSecondaryPhase || !threatSecondaryGuardArc || !threatBearing || !threatGuardArc) throw new Error('missing online UI flight target');
     const state = { events: [], eventTransitions: [], keys: [], keyTransitions: [], pointers: [], wheels: [], overlayTransitions: [], feedbackTransitions: [], recoveryTransitions: [], focusTransitions: [], threatTransitions: [], recoveryTellMaxPixels: 0, parryTellMaxPixels: 0, online: '', startedAt: performance.now() };
+    if (${["uiparrytell", "uistun", "uiparry"].includes(scenario)}) {
+      const prior = window.__MYASO_M35_CUE_CHANNEL__;
+      if (!prior || prior.readyState === WebSocket.CLOSING || prior.readyState === WebSocket.CLOSED) {
+        window.__MYASO_M35_CUE_CHANNEL__ = new WebSocket(
+          "ws://" + location.host + "/__myaso_m35_rendered_windup");
+      }
+    }
     // M338/M339: M151/M152 and M40 share the exact M194 guard-break wheel verifier.
     // Open the same real Firefox-only, localhost trusted-proof socket in all
     // four scenarios. Parent FFA flights reinstall UI observers: reuse the

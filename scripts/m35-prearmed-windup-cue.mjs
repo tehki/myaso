@@ -48,7 +48,9 @@ export function m35PrearmedCueScript() {
       const [token, baseline, actorId, timeoutMs, allowHeavy] = arguments;
       const arena = document.querySelector('#arena');
       const target = document.querySelector('#event-text');
-      if (!arena || !target || window.__MYASO_M35_CUE_WATCH__) return false;
+      const channel = window.__MYASO_M35_CUE_CHANNEL__;
+      if (!arena || !target || window.__MYASO_M35_CUE_WATCH__
+          || channel?.readyState !== WebSocket.OPEN) return false;
       delete window.__MYASO_M41_LAST_TIMEOUT__;
       let poll, deadline, started, finished = false, attemptBaseline = baseline;
       const mutationObserver = new MutationObserver(() => check());
@@ -64,10 +66,10 @@ export function m35PrearmedCueScript() {
         if (!cue) window.__MYASO_M41_LAST_TIMEOUT__ = summarize(
           window.__MYASO_M30_UI__, baseline, actorId, performance.now() - started);
         close();
-        fetch('/__myaso_m35_rendered_windup', {
-          method: 'POST', headers: {'content-type': 'application/json'},
-          body: JSON.stringify({token, cue}), keepalive: true,
-        }).catch(() => {});
+        // Opened and verified before the physical click. Per-event fetch
+        // added ~90ms to the preserved native late-HIT first red. This
+        // read-only receipt is never a game input or authoritative outcome.
+        if (channel.readyState === WebSocket.OPEN) channel.send(JSON.stringify({token, cue}));
       };
       const check = () => {
         if (finished || started === undefined) return;

@@ -10,7 +10,11 @@ function observer(receipt, registry, {allowHeavy = false} = {}) {
   let now = 0, poll, pointer, mutation, disconnected = false;
   const timers = new Map();
   const state = {online: "Online - player #1 - server tick 100", events: [], eventTransitions: [], startedAt: 0};
-  const window = {__MYASO_M30_UI__: state};
+  const window = {__MYASO_M30_UI__: state, __MYASO_M35_CUE_CHANNEL__: {
+    readyState:1, send(body) {
+      const packet=JSON.parse(body);packets.push(packet);registry.receive(packet);
+    },
+  }};
   const packets = [];
   const arena = {
     addEventListener(type, fn) { assert.equal(type, "pointerdown"); pointer = fn; },
@@ -20,6 +24,7 @@ function observer(receipt, registry, {allowHeavy = false} = {}) {
     + "}).apply(null,[token,0,1,180," + (allowHeavy ? "true" : "false") + "]);";
   const armed = vm.runInNewContext(script, {
     window, token: receipt.token, document: {querySelector: () => arena},
+    WebSocket:{OPEN:1},
     performance: {now: () => now},
     MutationObserver: class {
       constructor(fn) { mutation = fn; }
@@ -30,12 +35,6 @@ function observer(receipt, registry, {allowHeavy = false} = {}) {
     clearInterval() { poll = null; },
     setTimeout(fn, ms) { timers.set(2, fn); assert.equal(ms, 1500); return 2; },
     clearTimeout(id) { timers.delete(id); },
-    fetch(url, options) {
-      assert.equal(url, "/__myaso_m35_rendered_windup");
-      const packet = JSON.parse(options.body); packets.push(packet);
-      registry.receive(packet);
-      return Promise.resolve();
-    },
   });
   assert.equal(armed, true);
   return {
