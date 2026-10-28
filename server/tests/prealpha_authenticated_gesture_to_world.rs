@@ -111,7 +111,15 @@ fn repeated_release_during_and_after_contact_never_restarts_retired_gesture() {
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
     for (action, sequence) in [(GestureAction::Press, 1), (GestureAction::Release, 2)] {
         assert_eq!(
-            admit(&mut p, &mut w, LEASE, GestureSource::Lmb, action, sequence, 1),
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                action,
+                sequence,
+                1
+            ),
             AckStatus::Accepted
         );
     }
@@ -120,7 +128,15 @@ fn repeated_release_during_and_after_contact_never_restarts_retired_gesture() {
     // and after Idle. None may reset windup or authorize another World hit.
     for _ in 0..90 {
         assert_eq!(
-            admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Release, 2, 1),
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2,
+                1
+            ),
             AckStatus::Duplicate
         );
         hits.extend(advance(&mut p, &mut w, 1));
@@ -129,7 +145,15 @@ fn repeated_release_during_and_after_contact_never_restarts_retired_gesture() {
     assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert_eq!(
-        admit(&mut p, &mut w, LEASE, GestureSource::Lmb, GestureAction::Press, 3, 1),
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            1
+        ),
         AckStatus::Stale,
         "a new sequence cannot resurrect the retired gesture identity"
     );
