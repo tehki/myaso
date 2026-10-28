@@ -47,6 +47,7 @@ import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
 import { createM35CueRegistry, m35PrearmedCueScript } from "./m35-prearmed-windup-cue.mjs";
+import { inspectM35ParryFirstRed } from "./m35-original-world-first-red.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -8503,6 +8504,15 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         && !stagedDefender?.events.some((entry) => entry.startsWith("Hit taken"))
         && !stagedAttacker?.events.some((entry) => entry.startsWith("Opponent hit"));
       if (!pristine) {
+        // Failure-only original-World provenance; no changes to the physical
+        // W3C wheel, 125ms Parry window, fatal gate or replay policy.
+        const diagnostic = inspectM35ParryFirstRed({
+          worldLog: m201ServerOutput(),
+          attackerId: attackerReady.playerNetId,
+          defenderId: defenderReady.playerNetId,
+          inputSubmissions: stagedDefender?.acceptance?.inputSubmissions,
+        });
+        console.error("M35_ORIGINAL_WORLD_FIRST_RED " + JSON.stringify(diagnostic));
         throw new Error("M33 genuine short-click parry resolved unexpectedly: " + JSON.stringify(after));
       }
       await sleep(260);
