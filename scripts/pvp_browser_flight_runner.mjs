@@ -49,7 +49,7 @@ import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
 import { planM41ViewportWheel } from "./m41-viewport-wheel.mjs";
 import { createM35CueRegistry, m35PrearmedCueScript } from "./m35-prearmed-windup-cue.mjs";
-import { inspectM35ParryFirstRed } from "./m35-original-world-first-red.mjs";
+import { inspectM35ParryFirstRed, verifyM35OriginalLightParry } from "./m35-original-world-first-red.mjs";
 
 const root = process.cwd();
 const durationMs = Number(process.env.MYASO_PVP_FLIGHT_DURATION_MS ?? 7000);
@@ -8405,6 +8405,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   let evidence = null;
   let lastAttemptBaseline = null;
   for (let attempt = 0; attempt < 4 && !evidence; attempt += 1) {
+    const attemptWorldLogOffset=m201ServerOutput().length;
     await pulseMovementKey(attacker, movementKey, attempt === 0 ? 120 : 80);
     lastAttemptBaseline = await Promise.all(entries.map(readUiEvidence));
     // M33/M41/M146: use the same genuinely observed browser latencies that
@@ -8513,11 +8514,12 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
     if (["uiparrytell", "uistun", "uiparry"].includes(scenario)) {
       const states = await Promise.all(entries.map(readUiEvidence));
       const defense = states.find(entry => entry.browser === defender.name);
+      const worldOptions={worldLog:m201ServerOutput().slice(attemptWorldLogOffset),
+        attackerId:attackerReady.playerNetId, defenderId:defenderReady.playerNetId,
+        inputSubmissions:defense?.acceptance?.inputSubmissions};
       console.log("M35_ORIGINAL_WORLD_EXCHANGE " + JSON.stringify({
         scenario, attempt:attempt+1,
-        ...inspectM35ParryFirstRed({worldLog:m201ServerOutput(),
-          attackerId:attackerReady.playerNetId, defenderId:defenderReady.playerNetId,
-          inputSubmissions:defense?.acceptance?.inputSubmissions}),
+        ...(evidence ? verifyM35OriginalLightParry(worldOptions) : inspectM35ParryFirstRed(worldOptions)),
         defenderWheels:defense?.wheels,
         defenderActions:defense?.acceptance?.ownActionTransitions,
       }));
@@ -8541,7 +8543,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
         // Failure-only original-World provenance; no changes to the physical
         // W3C wheel, 125ms Parry window, fatal gate or replay policy.
         const diagnostic = inspectM35ParryFirstRed({
-          worldLog: m201ServerOutput(),
+          worldLog: m201ServerOutput().slice(attemptWorldLogOffset),
           attackerId: attackerReady.playerNetId,
           defenderId: defenderReady.playerNetId,
           inputSubmissions: stagedDefender?.acceptance?.inputSubmissions,

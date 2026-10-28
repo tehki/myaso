@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inspectM35ParryFirstRed } from "../scripts/m35-original-world-first-red.mjs";
+import { inspectM35ParryFirstRed, verifyM35OriginalLightParry } from "../scripts/m35-original-world-first-red.mjs";
 const red=[
  "M201_AUTH_ACTION tick=264 fighter=1 from=9 to=1",
  "M201_AUTH_ACTION tick=265 fighter=2 from=0 to=6",
@@ -11,6 +11,17 @@ const source0=[{clientTick:116,epochMs:1793130236158,block:true,
  source:"physical-wheel-original-v1",
  m41PhysicalInput:{wheel:{trusted:true,callbackStartEpochMs:1793130236158},
  originalV1SendInvocationEpochMs:1793130236158}}];
+
+test("charging observation cannot qualify native M35 without actual current-attempt original Light and PARRY125",()=>{
+ const worldLog=red.replace("outcome=BLOCK","outcome=PARRY")
+   .replace("defenderActionElapsedMs=133.3","defenderActionElapsedMs=66.7")
+   .replace("defenderGuard=62.0","defenderGuard=100.0");
+ const options={worldLog,attackerId:1,defenderId:2,inputSubmissions:source0};
+ assert.equal(verifyM35OriginalLightParry(options).originalLightWindupTick,264);
+ assert.throws(()=>verifyM35OriginalLightParry({...options,worldLog:red}),/LightWindup then PARRY125/);
+ assert.throws(()=>verifyM35OriginalLightParry({...options,worldLog:worldLog.replace("to=1\n","to=9\n")}),/LightWindup/);
+ assert.throws(()=>verifyM35OriginalLightParry({...options,worldLog:worldLog.replace("to=1\n","to=10\n")}),/Heavy substitute/);
+});
 test("real original M35 first-red Block133.3 is not a Parry",()=>{
  const r=inspectM35ParryFirstRed({worldLog:red,attackerId:1,defenderId:2,inputSubmissions:source0});
  assert.equal(r.verdict,"WORLD_EARLY_BLOCK_OUTSIDE_PARRY");

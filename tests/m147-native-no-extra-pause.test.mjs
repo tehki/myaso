@@ -76,7 +76,7 @@ test("M147 correction KeyA pulses cannot accidentally trigger genuine 240ms R2 D
   assert.match(stage, /pulseM147FocusStageKey\(closerIdle, "a", 260\)/,
     "original initial KeyA staging remains real");
   assert.match(stage,
-    /for \(let attempt = 0; attempt < 3[^\n]*\{[\s\S]*?await sleep\(300\);\s*await pulseM147FocusStageKey\(closerIdle, "a", 45\);/,
+    /for \(let attempt = 0; attempt < 8[^\n]*\{[\s\S]*?await sleep\(300\);\s*if\(plan\) await pulseMovementKeyBoundedW3c\(closerIdle, plan.key, plan.durationMs\);/,
     "each genuine corrective KeyA tap is separated from the prior KeyA by at least 300ms");
   assert.equal(DASH_DOUBLE_TAP_MS, 240, "original R2 dash interval remains unchanged");
   const accidental = createDirectionalDash();
