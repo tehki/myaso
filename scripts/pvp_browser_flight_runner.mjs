@@ -598,7 +598,7 @@ async function startGameServer() {
         // defender Block preceded server contact within the 125ms window.
         // Read-only M201_AUTH_ACTION and CORE8C_WORLD_CONTACT on loopback;
         // no World stepping, input synthesis, HIT recipient, or protocol change.
-        || scenario === "uistun" || scenario === "uiparrytell"
+        || scenario === "uistun" || scenario === "uiparrytell" || scenario === "uiparry"
         || scenario === "uiheavydodge"
         || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
