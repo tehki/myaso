@@ -440,9 +440,8 @@ async fn main() -> Result<()> {
     }
     // C1 requires BOTH an explicit operator gate and trusted first-party
     // served /game-config.json chatC1Enabled:true. A URL query is never server
-    // authority. Experimental V2 also consumes optional uni streams; until
-    // its stream multiplexer is tested, enabling both fails closed rather
-    // than allowing one protocol to steal the other's QUIC stream.
+    // authority. With C1 enabled, gesture negotiation uses the original
+    // length-prefixed game bi stream; C1 exclusively owns optional uni streams.
     let chat_enabled = match env::var("MYASO_CHAT_C1_ENABLED").as_deref() {
         Ok("1") => true,
         Ok("0") | Err(env::VarError::NotPresent) => false,
@@ -455,9 +454,6 @@ async fn main() -> Result<()> {
         .context("MYASO_CHAT_RADIUS must be numeric")?;
     if !chat_radius.is_finite() || !(32.0..=160.0).contains(&chat_radius) {
         bail!("MYASO_CHAT_RADIUS must be within 32..=160 world units");
-    }
-    if chat_enabled && v2_lab {
-        bail!("Chat C1 and experimental V2 cannot both accept optional uni streams");
     }
     // An additional review-only gate beyond the old v2 source0 protocol.
     let jump_review = match env::var("MYASO_EXPERIMENTAL_JUMP_ATTACK_V2").as_deref() {
@@ -1143,29 +1139,46 @@ async fn handle_connection(
             // Cancellation-safe incremental reads on the ORIGINAL bi stream.
             // No bytes are consumed when the private compile/runtime gates are off.
             private_read = async {
-                if hit_lab_enabled && v2_enabled && !private_write_pending {
-                    reliable_recv.read(&mut private_control_buffer[private_control_used..]).await
+                if (v2_lab && !v2_enabled) || (hit_lab_enabled && v2_enabled && !private_write_pending) {
+                    // Read only the current bounded frame. Never swallow a
+                    // subsequent private control while completing a HELLO.
+                    let end = if private_control_used < 2 { 2 } else {
+                        2 + u16::from_le_bytes(private_control_buffer[..2].try_into().unwrap()) as usize
+                    };
+                    reliable_recv.read(&mut private_control_buffer[private_control_used..end]).await
                         .map_err(|error| anyhow::anyhow!("private HIT control read: {error}"))
                 } else { std::future::pending().await }
             } => {
                 let count = private_read?.ok_or_else(|| anyhow::anyhow!("private HIT control stream closed"))?;
                 private_control_used += count;
-                if private_control_used >= 2 && u16::from_le_bytes(private_control_buffer[..2].try_into().unwrap()) != 32 {
-                    bail!("private HIT controls require exactly 32-byte frames");
+                if private_control_used < 2 { continue; }
+                let size = u16::from_le_bytes(private_control_buffer[..2].try_into().unwrap()) as usize;
+                if !((size == 8 && v2_lab && !v2_enabled)
+                    || (size == 32 && hit_lab_enabled && v2_enabled)) {
+                    bail!("unnegotiated or invalid original-stream control frame");
                 }
-                if private_control_used == private_control_buffer.len() {
+                if private_control_used == size + 2 {
                     if private_control_window.elapsed() >= Duration::from_secs(1) {
                         private_control_window = tokio::time::Instant::now();
                         private_control_count = 0;
                     }
                     private_control_count += 1;
                     if private_control_count > 32 { bail!("private HIT control rate exceeded"); }
-                    #[cfg(feature = "experimental-hit-delivery-lab")]
-                    {
+                    if size == 8 {
+                        if private_control_buffer[2..10] != V2_LAB_HELLO || legacy_combat_seen {
+                            bail!("invalid or late original-stream gesture HELLO");
+                        }
+                        v2_enabled = grant_gesture_session(
+                            &game, &connection, player_id, lease_epoch, jump_review, &reliable_tx
+                        ).await?;
+                    } else {
+                        #[cfg(feature = "experimental-hit-delivery-lab")]
+                        {
                         let mut state = game.state.lock().await;
                         let GameState { world, hit_lab, .. } = &mut *state;
                         hit_lab.as_mut().ok_or_else(|| anyhow::anyhow!("private HIT disabled"))?
                             .control(world, lease_epoch, &private_control_buffer[2..])?;
+                        }
                     }
                     private_control_used = 0;
                 }
@@ -1196,7 +1209,7 @@ async fn handle_connection(
             } => { bail!("private HIT reliable writer exceeded 1500ms; no delivery claimed"); }
             // Separate negotiated client uni stream, on the admitted QUIC
             // connection. No datagram or query parameter can enable v2.
-            negotiation = connection.accept_uni(), if v2_lab && !v2_enabled => {
+            negotiation = connection.accept_uni(), if v2_lab && !v2_enabled && !game.chat_enabled => {
                 if let Ok(mut stream) = negotiation {
                     let mut hello = [0u8; 8];
                     if let Ok(Ok(())) = tokio::time::timeout(
@@ -1213,22 +1226,9 @@ async fn handle_connection(
                             Ok(Ok(None))
                         );
                         if complete && hello == V2_LAB_HELLO && !legacy_combat_seen {
-                            let mut state = game.state.lock().await;
-                            if let Some(mut path) = SessionGestureWorldPath::from_admitted_world(
-                                &state.world, player_id, lease_epoch, state.boot_nonce
-                            ) {
-                                #[cfg(feature = "experimental-hit-delivery-lab")]
-                                {
-                                    let GameState { world, hit_lab, .. } = &mut *state;
-                                    if let Some(lab) = hit_lab { lab.admit(world, player_id, lease_epoch, Arc::clone(&connection))?; }
-                                }
-                                if jump_review { path.enable_jump_review(); }
-                                state.gesture_sessions.insert(lease_epoch, path);
-                                v2_enabled = true;
-                                drop(state);
-                                reliable_tx.send(ReliablePayload::Bytes(V2_LAB_GRANTED.to_vec()))
-                                    .await.context("send reliable experimental v2 grant")?;
-                            }
+                            v2_enabled = grant_gesture_session(
+                                &game, &connection, player_id, lease_epoch, jump_review, &reliable_tx
+                            ).await?;
                         }
                     }
                 }
@@ -1613,6 +1613,42 @@ async fn handle_connection(
             }
         }
     }
+}
+
+async fn grant_gesture_session(
+    game: &SharedGame,
+    _connection: &Arc<Connection>,
+    player_id: u32,
+    lease_epoch: u64,
+    jump_review: bool,
+    reliable_tx: &mpsc::Sender<ReliablePayload>,
+) -> Result<bool> {
+    let mut state = game.state.lock().await;
+    let Some(mut path) = SessionGestureWorldPath::from_admitted_world(
+        &state.world,
+        player_id,
+        lease_epoch,
+        state.boot_nonce,
+    ) else {
+        return Ok(false);
+    };
+    #[cfg(feature = "experimental-hit-delivery-lab")]
+    {
+        let GameState { world, hit_lab, .. } = &mut *state;
+        if let Some(lab) = hit_lab {
+            lab.admit(world, player_id, lease_epoch, Arc::clone(_connection))?;
+        }
+    }
+    if jump_review {
+        path.enable_jump_review();
+    }
+    state.gesture_sessions.insert(lease_epoch, path);
+    drop(state);
+    reliable_tx
+        .send(ReliablePayload::Bytes(V2_LAB_GRANTED.to_vec()))
+        .await
+        .context("send reliable experimental v2 grant")?;
+    Ok(true)
 }
 
 async fn read_chat_frame(recv: &mut RecvStream) -> Result<Vec<u8>> {

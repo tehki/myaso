@@ -14,6 +14,7 @@ import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWor
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
+const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
 assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
@@ -57,7 +58,7 @@ async function startOriginalRust(){
  const bin=join(root,"server","target","debug","myaso-server");
  const build=spawnSync("cargo",["build",...(physicalMode==="private-hit"?["--features","experimental-hit-delivery-lab"]:[]),...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
- const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_EXPERIMENTAL_JUMP_ATTACK_V2:["jump-review","jump-two-hit"].includes(physicalMode)?"1":"0",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_CHAT_C1_ENABLED:chatC1?"1":"0",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_EXPERIMENTAL_JUMP_ATTACK_V2:["jump-review","jump-two-hit"].includes(physicalMode)?"1":"0",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
  child.stdout.on("data",d=>buffer+=d.toString());
  child.stderr.on("data",d=>err+=d.toString());
@@ -421,6 +422,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   await waitFor(async()=>{const all=await readAll();return all.every(r=>r.proof.replicatedFighters.length===3&&!own(r.proof,2));},12000);
   const s=await startW3C(old.s.engine,4),u=new URL(host+"/web/index.html");
   for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",arenaGrid:"1",gestureLab:"1"}))u.searchParams.set(k,v);
+  if(chatC1)u.searchParams.set("chatC1Preview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const joined=await waitFor(async()=>{const p=await evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");return p?.ownPlayerNetId===5&&p.transportState==="granted"?p:false;},16000);
   assert.equal(joined.ownPlayerNetId,5,"fresh native QUIC connection owns new server actor and lease");
@@ -467,6 +469,7 @@ try{
  for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
+  if(chatC1)u.searchParams.set("chatC1Preview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000).catch(async error=>{
    if(physicalMode==="jump-two-hit"){
@@ -527,6 +530,24 @@ try{
  }
  assert.equal(trial.length,seatCount,"required real native fighter sessions must all start");
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
+
+ async function nativeChatRound(message) {
+  const sender=actors[1].s,recipient=actors[0].s;
+  for(const {s} of actors)await waitFor(()=>evaluate(s,"return document.querySelector('[data-local-chat]')?.dataset.connected==='true';"));
+  const keys=async values=>request(sender.base,"POST","/session/"+sender.id+"/actions",{actions:[{
+   type:"key",id:"actual-combat-chat-keyboard",actions:values.flatMap(value=>[{type:"keyDown",value},{type:"keyUp",value}]),
+  }]});
+  await evaluate(sender,"document.querySelector('#arena').focus();return true;");
+  await keys(["\uE007"]);
+  assert.equal(await evaluate(sender,"return document.activeElement?.matches('.local-chat-input');"),true);
+  await keys([...message]);
+  await keys(["\uE007"]);
+  assert.equal(await evaluate(sender,"return document.activeElement?.id==='arena'&&document.querySelector('[data-local-chat]').dataset.open==='false';"),true);
+  await waitFor(()=>evaluate(recipient,"return [...document.querySelectorAll('.local-chat-text')].filter(x=>x.textContent==="+JSON.stringify(message)+").length===1;"));
+  await waitFor(()=>evaluate(sender,"return document.querySelector('.local-chat-status')?.textContent.includes('Server accepted');"));
+  console.log("COMBAT4_TYPED_NATIVE_CHAT_ROUND_PASS",JSON.stringify({message,sender:actors[1].actor.id,recipient:actors[0].actor.id}));
+ }
+ if(chatC1)await nativeChatRound("Before physical Light and Heavy");
 
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
  // True WebDriver key/pointer actions run against a fresh admitted original
@@ -1278,7 +1299,8 @@ try{
   actualIndependentHumanOperators:false,publicListener:false,
  }));
  }
- const report={physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
+ if(chatC1&&physicalMode==="held-lmb")await nativeChatRound("After physical Heavy release");
+ const report={physicalMode,chatC1,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:seatCount,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:physicalMode==="space-guard",defaultArenaPreserved:true,

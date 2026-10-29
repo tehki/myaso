@@ -14,6 +14,7 @@ class OriginalQuicFixture {
     this.hello = null;
     this.writes = [];
     this.reliableWrites = [];
+    this.uniOpened = 0;
     this.closedByClient = false;
     this.ready = Promise.resolve();
     this.closed = new Promise(resolve => { this.resolveClosed = resolve; });
@@ -30,6 +31,10 @@ class OriginalQuicFixture {
   async createBidirectionalStream() {
     const writable = new WritableStream({ write: bytes => {
       this.reliableWrites.push(Uint8Array.from(bytes));
+      if (bytes.length === 10 && bytes[0] === 8 && bytes[2] === 2 && bytes[3] === 0x10
+          && OriginalQuicFixture.grantOnHello) {
+        queueMicrotask(() => this.reliableSource.enqueue(Uint8Array.from([4,0,2,0x13,0,0])));
+      }
       if (bytes.length === 34 && bytes[3] === 6 && bytes[4] === HIT_CONTROL_OP.CLIENT_HELLO) {
         const grant = new Uint8Array(34);
         grant[0] = 32;
@@ -42,6 +47,7 @@ class OriginalQuicFixture {
     return { writable, readable };
   }
   async createUnidirectionalStream() {
+    this.uniOpened += 1;
     return new WritableStream({
       write: async bytes => {
         this.hello = Uint8Array.from(bytes);
@@ -66,6 +72,33 @@ const v2 = (seq, id) => {
   b[4] = seq; b[8] = id;
   return b;
 };
+
+test("gesture negotiation shares original reliable game stream without consuming Chat C1 uni streams", () => withFixture(async () => {
+  const c = await connectGameTransport({webTransportUrl:"https://localhost:4433/game"});
+  await c.negotiateExperimentalGestureV2({reliableStream:true});
+  assert.equal(c.experimentalGestureState,"granted");
+  assert.equal(c.transport.uniOpened,0);
+  assert.deepEqual([...c.transport.reliableWrites[0]],[8,0,2,0x10,77,89,65,83,79,49]);
+  await c.sendExperimentalGestureEdge(v2(1,1));
+  assert.equal(c.transport.writes.length,1);
+  c.close("test");
+}));
+
+test("blocked original-stream negotiation expires and no old HELLO escapes after retirement", () => withFixture(async () => {
+  const c = await connectGameTransport({webTransportUrl:"https://localhost:4433/game"});
+  let unblock;
+  const writer = c.reliableWriter;
+  c.reliableWriter = {
+    ready:new Promise(resolve=>{unblock=resolve;}),
+    write:bytes=>writer.write(bytes), releaseLock:()=>writer.releaseLock(),
+  };
+  await assert.rejects(c.negotiateExperimentalGestureV2({reliableStream:true,timeoutMs:100}),/timed out/);
+  assert.equal(c.transport.closedByClient,true);
+  unblock();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(c.transport.reliableWrites.length,0);
+  assert.equal(c.transport.uniOpened,0);
+}));
 
 test("private HIT uses the same granted bi stream, presents before ACK, and retires on peer close", () => withFixture(async () => {
   const forwarded = [], presentations = [];
