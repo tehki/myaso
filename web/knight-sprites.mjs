@@ -27,6 +27,24 @@ export function knightPresentationRect(rolling, scale = KNIGHT_PRESENTATION_SCAL
     width: size, height: size,
   };
 }
+// A remote Silver may remain partially visible after its actor origin leaves
+// the viewport. Bound source Roll (the largest five-motion atlas), existing
+// knockout scale, heavy lean and airborne lift in SCREEN pixels. This ONLY
+// controls Canvas render culling; it cannot change interest, offscreen HUD,
+// authoritative actor replication, camera or collision.
+export function knightVisibilityMargin(zoom, scale = KNIGHT_PRESENTATION_SCALE) {
+  if (!Number.isFinite(zoom) || zoom <= 0 || zoom > 1) {
+    throw new RangeError("Valid presentation zoom required for Silver culling");
+  }
+  const rect = knightPresentationRect(true, scale);
+  const x = Math.max(Math.abs(rect.x), Math.abs(rect.x + rect.width));
+  const y = Math.max(Math.abs(rect.y), Math.abs(rect.y + rect.height));
+  // Render-only maxima from current original Canvas presentation. Conservative
+  // combination intentionally covers all motion poses, not a hitbox radius.
+  const combatX = x * 1.38 + 16;
+  const airborneY = y + 18;
+  return Math.max(64, Math.ceil(Math.hypot(combatX, airborneY) * zoom));
+}
 export const KNIGHT_DIRECTIONS = Object.freeze([
   "south", "southwest", "west", "northwest", "north", "northeast", "east", "southeast",
 ]);
