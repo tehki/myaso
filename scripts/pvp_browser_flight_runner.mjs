@@ -10,6 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
+import { M158_NATIVE_GEOMETRY } from "./m158-native-geometry.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -144,6 +145,19 @@ if (scenario === "uimultiknockdownffahit") {
       },
     },
   });
+}
+
+// Allow concurrent departments to keep their own native driver sessions.
+// This changes listener addresses only; browser actions and World are identical.
+const driverBasePort = Number(process.env.MYASO_PVP_WEBDRIVER_BASE_PORT ?? 9515);
+if (!Number.isInteger(driverBasePort) || driverBasePort < 1024 || driverBasePort > 65531) {
+  throw new RangeError("bounded native WebDriver base port required");
+}
+for (const browser of browsers) {
+  browser.port += driverBasePort - 9515;
+  browser.args = browser.name === "firefox"
+    ? ["--host", "127.0.0.1", "--port", String(browser.port)]
+    : [`--port=${browser.port}`];
 }
 
 const children = new Set();
@@ -603,7 +617,7 @@ async function startGameServer() {
         || scenario === "uijumprecoveryffa"
         || scenario === "uikickknockdownffahit"
         || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa"
-        || scenario === "uimultiknockdownffahit"
+        || scenario === "uimultiknockdownffahit" || scenario === "uimultiknockdownffa"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
       // Existing M121/M156 original-v1 ingress evidence is never enabled for
@@ -5100,6 +5114,8 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   const rollerElementId = await resolveArenaElement(roller, milestone + " roller");
   const rollRight = rollerId < firstVictimId;
   const rollOffset = rollRight ? 200 : -200;
+  // Keep both collision knockbacks clear of the spawn-side World boundary.
+  await pulseMovementKeyBoundedW3c(firstVictim, "s", 250);
 
   const positionRelativeToAuthoritativeTarget = async (
     entry,
@@ -5153,23 +5169,15 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       + JSON.stringify(last));
   };
 
-  // Stage from replicated world coordinates instead of assuming a WebDriver
-  // key-hold duration equals a fixed authoritative distance. #3 sits 40 px
-  // ahead of #2 and 31 px off-axis. This restores the proven M158 cluster shape:
-  // #2's unchanged 34 px knockback cannot eject #3 beyond the roll corridor,
-  // while one unchanged 170 ms roll still reaches both victims in order.
-  // A deterministic tolerance sweep over every +/-5 px staging extreme produces
-  // both contacts with 67-117 ms stagger and the second contact by 150 ms.
-  // Production geometry/timing is untouched.
-  // R2 3-second WASD dash can legitimately fire during repeated real staging
-  // pulses. Re-measure both actual fighter positions, and stage the second
-  // opponent firmly inside the SAME 170ms mouse-roll collision corridor.
-  // Old (40,31) was at the farthest edge: exact-head 39153033803 showed a
-  // genuine roll knocking #2 down but entirely missing #3 at 42/36 offset.
-  // Keep both server-owned contacts, #2-first ordering and untouched HP gates.
-  const secondaryDx = rollRight ? 34 : -34;
-  const secondaryDy = 24;
-  const rollerDx = rollRight ? -62 : 62;
+  // Close the loop on replicated coordinates before the sole real roll.
+  // Original World tests cover all81 combinations of unchanged±5px tolerance:
+  // two ordered contacts, unchangedHP/guard, and at least seven ticks between
+  // recoveries. Unlike the preserved short-window first-red, one skipped20Hz
+  // snapshot cannot erase the secondary-only state. No focus is manufactured.
+  const secondaryDx = (rollRight ? 1 : -1) * M158_NATIVE_GEOMETRY.secondaryDx;
+  const secondaryDy = M158_NATIVE_GEOMETRY.secondaryDy;
+  const rollerDx = (rollRight ? 1 : -1) * M158_NATIVE_GEOMETRY.rollerDx;
+  const rollerDy = M158_NATIVE_GEOMETRY.rollerDy;
   let stagedGeometry = null;
   for (let pass = 0; pass < 5; pass += 1) {
     await positionRelativeToAuthoritativeTarget(
@@ -5185,7 +5193,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       rollerId,
       firstVictimId,
       rollerDx,
-      0,
+      rollerDy,
       "roller",
     );
     await sleep(70);
@@ -5203,7 +5211,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
         secondaryDy: secondFighter.y - firstFighter.y,
       };
       const stable = Math.abs(geometry.rollerDx - rollerDx) <= 5
-        && Math.abs(geometry.rollerDy) <= 5
+        && Math.abs(geometry.rollerDy - rollerDy) <= 5
         && Math.abs(geometry.secondaryDx - secondaryDx) <= 5
         && Math.abs(geometry.secondaryDy - secondaryDy) <= 5;
       if (stable) {
@@ -5235,6 +5243,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
   await scrollArenaWheel(roller, rollerElementId, -120, 0);
 
   let overlap = null;
+  let nativeRetreat = false;
   const overlapDeadline = Date.now() + COMBAT.dodge.durationMs + COMBAT.dodge.collisionKnockdownMs + 520;
   while (Date.now() < overlapDeadline) {
     const states = await Promise.all(entries.map(readUiEvidence));
@@ -5262,6 +5271,19 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       && rollerState?.recoveryState === "knockdown"
       && rollerState?.recoveryLabel === "PUNISH"
       && rollerState?.recoveryDetail === "Knockdown recovery";
+
+    // The longer contact stagger can carry the roller nearer#3 before the
+    // roll ends. Restore#2 as the genuine nearest downed rival with ONE real
+    // backward WASD transaction during recovery, before testing its recovery
+    // handoff. Never set a focus label or modify either victim's state.
+    if (!nativeRetreat && firstKnockdown && secondKnockdown
+      && firstCurrentAction === COMBAT_ACTION.knockdown
+      && secondCurrentAction === COMBAT_ACTION.knockdown
+      && rollerActions.at(-1)?.action === COMBAT_ACTION.dodgeRecovery) {
+      nativeRetreat = true;
+      await pulseMovementKeyBoundedW3c(roller, rollRight ? "a" : "d", 250);
+      continue;
+    }
 
     if (rollTransition && firstKnockdown && secondKnockdown
       && firstCurrentAction === COMBAT_ACTION.knockdown
@@ -8263,6 +8285,7 @@ async function runM176BlockAttackArbitrationPhase(
 async function calibrateNativeParryIngress(
   attacker, defender, attackerElementId, defenderElementId, attackOffset,
   targetAfterPointerDownMs = 50,
+  issueCalibrationWheel = () => scrollArenaWheel(defender, defenderElementId, 120, 0),
 ) {
   // Measure only trusted input delivery, never synthesize game controls.
   // Three harmless mouse moves and real isolated wheel-back blocks before
@@ -8299,7 +8322,7 @@ async function calibrateNativeParryIngress(
       measure(attacker, "pointermove",
         () => aimArena(attacker, attackerElementId, attackOffset)),
       measure(defender, "wheel",
-        () => scrollArenaWheel(defender, defenderElementId, 120, 0)),
+        issueCalibrationWheel),
     ]);
     pointerSamples.push(pointerMs);
     wheelSamples.push(wheelMs);
@@ -8398,6 +8421,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
   // the M33/M41/M146 exchange still has exactly ONE trusted parry wheel.
   const parryIngress = await calibrateNativeParryIngress(
     attacker, defender, attackerElementId, defenderElementId, attackOffset,
+    50, () => (scenario === "uiparrytell" || scenario === "uiparry")
+      ? scrollM41ViewportWheel(defender, defenderViewport)
+      : scrollArenaWheel(defender, defenderElementId, 120, 0),
   );
   const nativeReaction = planM35NativeReaction(parryIngress.wheelMs);
   console.log("M35_NATIVE_REACTION_PLAN " + JSON.stringify(nativeReaction));
@@ -8439,8 +8465,9 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       // evaluated from the server's REAL Block admission, not the wheel ACK.
       // With physical-wheel source0 submitted directly before RAF, M41's
       // earlier unpaced charging cue could arm Block outside Parry125.
-      // Fast measured ingress waits for released Light; slow W3C ingress
-      // may use the original charging cue with explicit reaction pacing.
+      // Calibration cannot bound the next delivery. Retain the earliest
+      // current charging cue with explicit reaction pacing; if it was not
+      // observed, the actual released Light cue remains admissible.
       // Both remain genuine actor-bound World cues, never predictions.
       // No full-click ACK or evidence serialization gates this wheel.
       await aimArena(attacker, attackerElementId, attackOffset);
@@ -14939,6 +14966,7 @@ async function readUiEvidence(session) {
         staminaDenialTransitions: (window.__MYASO_ACCEPTANCE_STATE__.staminaDenialTransitions ?? []).map((entry) => ({ ...entry })),
         ownActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.ownActionTransitions ?? []).map((entry) => ({ ...entry })),
         focusActionTransitions: (window.__MYASO_ACCEPTANCE_STATE__.focusActionTransitions ?? []).map((entry) => ({ ...entry })),
+        knockdownSnapshots: window.__MYASO_ACCEPTANCE_STATE__.knockdownSnapshots ?? [],
         fighters: (window.__MYASO_ACCEPTANCE_STATE__.fighters ?? []).map((fighter) => ({ ...fighter })),
         m233RecoveryHandoff: (window.__MYASO_ACCEPTANCE_STATE__.m233RecoveryHandoff ?? []).slice(-96).map((entry) => ({
           ...entry,
