@@ -264,6 +264,22 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (interrupted) status.textContent = "Connection changed — previous message not confirmed.";
   }
 
+  // When the player composes, the text field owns mouse and wheel input.
+  // Canvas capture runs before Combat listeners and the window pointerUP
+  // fallback; regular canvas blur already retires all held Combat inputs.
+  function suppressArenaInputWhileComposing(event) {
+    if (root.dataset.open !== "true" || doc.activeElement !== input) return;
+    if (event.cancelable !== false) event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  const suppressedArenaEvents = [
+    "pointerdown", "pointerup", "mousedown", "mouseup",
+    "wheel", "contextmenu", "auxclick",
+  ];
+  for (const type of suppressedArenaEvents) {
+    canvas.addEventListener(type, suppressArenaInputWhileComposing, true);
+  }
+
   function onArenaKey(event) {
     if (event.key !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
     event.preventDefault();
@@ -271,7 +287,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     setExpanded(true, true);
   }
   function onComposerKey(event) {
-    if (event.key === "Escape") {
+    // Keyboard text cannot bubble into a present or future gameplay handler.
+    event.stopPropagation();
+    if (event.key === "Escape" && !event.isComposing) {
       event.preventDefault();
       event.stopPropagation();
       input.value = "";
@@ -307,6 +325,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       observer?.disconnect();
       unsubscribe?.();
       canvas.removeEventListener("keydown", onArenaKey, true);
+      for (const type of suppressedArenaEvents) {
+        canvas.removeEventListener(type, suppressArenaInputWhileComposing, true);
+      }
       input.removeEventListener("keydown", onComposerKey);
       form.removeEventListener("submit", onSubmit);
       toggle.removeEventListener("click", onToggle);

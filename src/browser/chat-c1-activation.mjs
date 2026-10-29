@@ -27,18 +27,21 @@ export async function activateChatC1Preview({
   doc, location, gameClient, openBridge = openLocalChatUiBridge,
 } = {}) {
   if (!isChatC1Eligible(location)) return null;
-  const panel = installLocalChat(doc, { online: true });
-  if (!panel || gameClient?.transport?.kind !== "webtransport") return null;
+  // A URL flag alone cannot create a misleading, unconnected Chat UI.
+  // Verify the real existing WebTransport chat stream before mounting controls.
+  if (gameClient?.transport?.kind !== "webtransport") return null;
+  let panel = null;
   try {
     const adapter = await openBridge(gameClient.transport, {
-      onDisconnect() { panel.bindAdapter(null); },
+      onDisconnect() { panel?.bindAdapter(null); },
     });
-    if (panel.root.isConnected === false) {
-      await adapter.close();
-      return null;
-    }
     if (!adapter?.ready) {
       await adapter?.close?.();
+      return null;
+    }
+    panel = installLocalChat(doc, { online: true });
+    if (!panel || panel.root.isConnected === false) {
+      await adapter.close();
       return null;
     }
     panel.bindAdapter(adapter);
@@ -48,9 +51,8 @@ export async function activateChatC1Preview({
     }, { once: true });
     return adapter;
   } catch {
-    // Combat must remain fully active if optional chat negotiation fails.
-    panel.bindAdapter(null);
-    panel.status.textContent = "Chat preview unavailable — gameplay remains connected.";
+    panel?.bindAdapter(null);
+    if (panel) panel.status.textContent = "Chat disconnected — gameplay remains connected.";
     return null;
   }
 }

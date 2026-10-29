@@ -5,7 +5,7 @@
   left: 12px;
   bottom: 12px;
   width: min(312px, calc(100% - 24px));
-  max-height: min(252px, 75%);
+  max-height: min(232px, 65%);
   border: 1px solid rgba(164, 140, 97, .7);
   border-radius: 9px;
   background: rgba(16, 15, 13, .94);
@@ -35,7 +35,7 @@
 .local-chat [hidden] { display: none !important; }
 .local-chat-body { padding: 0 9px 9px; }
 .local-chat[data-open="false"] .local-chat-body { display: none; }
-.local-chat-history { min-height: 50px; max-height: 132px; overflow-y: auto; margin: 0 0 7px; padding: 3px 0; list-style: none; scrollbar-width: thin; overscroll-behavior: contain; }
+.local-chat-history { min-height: 34px; max-height: 112px; overflow-y: auto; margin: 0 0 7px; padding: 3px 0; list-style: none; scrollbar-width: thin; overscroll-behavior: contain; }
 .local-chat-item { padding: 3px 0; overflow-wrap: anywhere; }
 .local-chat-sender { font-weight: 650; color: #e6ca93; margin-right: 6px; }
 .local-chat-item[data-channel="system"] .local-chat-sender { color: #a8c2bd; }
@@ -49,8 +49,15 @@
 .local-chat-status { margin: 5px 0 0; color: #b8aa96; font-size: 10px; }
 .arena-stage:has(#network-diagnostics:not([hidden])) .local-chat { bottom: 54px; }
 @media (max-width: 600px) {
-  .local-chat { position: relative; bottom: auto !important; left: auto; width: 100%; max-height: none; border-left: 0; border-right: 0; border-radius: 0; box-shadow: none; }
-  .local-chat-history { max-height: 125px; }
+  /* Anchor within the 960x540 canvas even when CSS viewport is narrow. */
+  .local-chat { position: absolute; bottom: 6px !important; left: 6px;
+    width: min(270px, calc(100% - 12px)); max-height: min(190px, 58%);
+    border-radius: 7px; box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
+  .local-chat-history { min-height: 26px; max-height: 76px; }
+}
+@media (max-height: 460px) {
+  .local-chat { max-height: 62%; }
+  .local-chat-history { max-height: 65px; }
 }
 @media (prefers-reduced-motion: reduce) { .local-chat { transition: none; } }
 @media (forced-colors: active) {
