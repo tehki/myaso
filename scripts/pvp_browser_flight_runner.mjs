@@ -5169,7 +5169,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
       + JSON.stringify(last));
   };
 
-  // Close the loop on replicated coordinates before the sole real roll.
+  // Stage from replicated world coordinates before the sole real roll.
   // Original World tests cover all81 combinations of unchanged±5px tolerance:
   // two ordered contacts, unchangedHP/guard, and at least seven ticks between
   // recoveries. Unlike the preserved short-window first-red, one skipped20Hz
