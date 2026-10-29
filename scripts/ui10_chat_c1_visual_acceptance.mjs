@@ -59,7 +59,7 @@ async function wd(port, method, path, body) {
 async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
   const driverPort = await randomPort();
   const binary = browser === "chrome" ? "chromedriver" : (process.env.C1_GECKODRIVER || "geckodriver");
-  const process = spawn(binary, ["--port=" + driverPort], { stdio:"ignore" });
+  const driverProcess = spawn(binary, ["--port=" + driverPort], { stdio:"ignore" });
   let sid;
   try {
     await poll(browser + " driver", async () => {
@@ -146,7 +146,7 @@ async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
       JSON.stringify({browser,viewWidth,geometry,screenshot:output}));
   } finally {
     if (sid) await wd(driverPort,"DELETE","/session/"+sid).catch(()=>{});
-    process.kill();
+    driverProcess.kill();
   }
 }
 
