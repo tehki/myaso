@@ -18,7 +18,7 @@ const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
 const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
 const instantLmb=process.env.MYASO_LIVE_GESTURE_INSTANT_LMB==="1";
 assert.ok(!instantLmb||!["private-hit","space-guard"].includes(physicalMode),"select a release-profile Combat acceptance mode");
-assert.ok(["original","held-lmb","recovery-buffer","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","recovery-buffer","recovery-jump","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -42,14 +42,29 @@ function driverBinary(engine){return engine==="chrome"?(process.env.CHROMEDRIVER
 async function freePort(){const x=createServer();await new Promise(ok=>x.listen(0,"127.0.0.1",ok));const p=x.address().port;await new Promise(ok=>x.close(ok));return p}
 async function startW3C(engine,index){
  const port=await freePort(),binary=driverBinary(engine);
- const child=spawn(binary,engine==="chrome"?["--port="+port]:["--host","127.0.0.1","--port",String(port)],{cwd:root,stdio:"ignore"});
+ const child=spawn(binary,engine==="chrome"?["--port="+port]:["--host","127.0.0.1","--port",String(port)],{cwd:root,stdio:["ignore","pipe","pipe"]});
+ let driverLog="";
+ for(const stream of [child.stdout,child.stderr])stream.on("data",data=>{driverLog=(driverLog+data.toString()).slice(-16000);});
  processes.push(child);
  const base="http://127.0.0.1:"+port;
  await waitFor(async()=>{if(child.exitCode!==null)throw Error(binary+" exited "+child.exitCode);try{return (await request(base,"GET","/status")).value?.ready===true;}catch{return false}},15000);
  const options=engine==="chrome"?
   {browserName:"chrome","goog:chromeOptions":{args:["--headless=new","--no-sandbox","--disable-dev-shm-usage","--window-size=1280,720","--disable-background-timer-throttling"]}}:
   {browserName:"firefox","moz:firefoxOptions":{args:["-headless"],prefs:{"layout.frame_rate":60}}};
- const created=await request(base,"POST","/session",{capabilities:{alwaysMatch:options}},engine==="firefox"?60000:30000);
+ const startupTimeoutMs=engine==="firefox"?60000:30000;
+ let created;
+ try {
+  created=await request(base,"POST","/session",{capabilities:{alwaysMatch:options}},startupTimeoutMs);
+ } catch(error) {
+  // A new-session timeout is not Combat evidence. Preserve the actual seat,
+  // engine and bounded original driver output before the normal cleanup.
+  await writeFile(join(output,`native-bootstrap-FIRST-RED-${index}-${engine}.json`),JSON.stringify({
+   sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",engine,seat:index+1,
+   stage:"W3C new-session",startupTimeoutMs,error:String(error),driverExitCode:child.exitCode,driverLog,
+   combatStarted:false,
+  },null,2)+"\n");
+  throw new Error(`${engine} seat${index+1} W3C new-session failed before Combat: ${error}`,{cause:error});
+ }
  const id=created.value?.sessionId||created.sessionId;
  assert.ok(id,"genuine driver session required");
  const s={engine,index,id,base};sessions.push(s);
@@ -557,9 +572,9 @@ try{
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
  if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
- }else if(physicalMode==="recovery-buffer"){
+ }else if(physicalMode==="recovery-buffer"||physicalMode==="recovery-jump"){
   await runNativeRecoveryBuffer({actors,evaluate,request,readAuthoritativeWorld,waitFor,sleep:sleeps,
-   save:(name,evidence)=>writeFile(join(output,name),JSON.stringify(evidence,null,2)+"\n")});
+   save:(name,evidence)=>writeFile(join(output,name),JSON.stringify(evidence,null,2)+"\n"),jumpChord:physicalMode==="recovery-jump"});
   if(chatC1)await nativeChatRound("After buffered physical Light");
  }else if(physicalMode==="jump-two-hit"){
  // P0 nonrelease genuine TWO browser clients, same authenticated Rust World.
