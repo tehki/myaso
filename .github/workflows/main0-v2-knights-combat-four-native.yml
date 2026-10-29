@@ -16,6 +16,8 @@ on:
       - "server/src/prealpha_authenticated_gesture.rs"
       - "server/src/prealpha_lmb_gesture_authority.rs"
       - "server/tests/combat4c_release_only_source_ownership.rs"
+      - "server/tests/combat4_typed_recovery_buffer.rs"
+      - "scripts/native-recovery-buffer.mjs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
       - "web/prealpha-gesture-live-lab.mjs"
@@ -35,6 +37,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - acceptance: release-buffer-chrome
+            mode: recovery-buffer
+            browsers: chrome,firefox,chrome,firefox
+            chat: "1"
+            instant: "1"
+          - acceptance: release-buffer-firefox
+            mode: recovery-buffer
+            browsers: firefox,chrome,firefox,chrome
+            chat: "1"
+            instant: "1"
           - acceptance: original
             mode: original
             browsers: chrome,firefox,chrome,chrome

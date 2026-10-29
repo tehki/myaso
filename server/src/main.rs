@@ -792,7 +792,7 @@ fn m201_flight_proof_lines(
             continue;
         }
         let action = fighter.action.wire_code();
-        if matches!(action, 6 | 9) {
+        if matches!(action, 3 | 6 | 9) {
             // Read-only, existing loopback-only flight proof. A native test
             // can release its real held LMB against the CURRENT server phase
             // without estimating two independent browser command clocks.

@@ -276,6 +276,9 @@ pub struct Fighter {
     dash_dir_x: f32,
     dash_dir_y: f32,
     buffered_light_attack: bool,
+    // Accepted recovery input order, including session-owned buffered LMB.
+    // Clearing/finishing a recovery does not manufacture a new input.
+    recovery_input_revision: u64,
     buffered_attack_lateral: f32,
     buffered_block: bool,
     buffered_dodge: bool,
@@ -338,6 +341,7 @@ impl Fighter {
             dash_dir_x: 0.0,
             dash_dir_y: 0.0,
             buffered_light_attack: false,
+            recovery_input_revision: 0,
             buffered_attack_lateral: 0.0,
             buffered_block: false,
             buffered_dodge: false,
@@ -589,6 +593,26 @@ pub enum CombatEvent {
     MatchReset,
 }
 
+// Opaque, server-captured intent. No World buffer can outlive its owning
+// session: only the session stores this token, and only World can validate it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct QueuedLmbLight {
+    actor: u32,
+    incarnation: u64,
+    world_instance: u64,
+    recovery: Action,
+    input_revision: u64,
+    expires_ms: f32,
+    lateral: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum QueuedLightState {
+    Waiting,
+    Ready,
+    Discarded,
+}
+
 #[derive(Debug)]
 pub struct World {
     pub width: f32,
@@ -747,11 +771,104 @@ impl World {
         true
     }
 
-    /// REVIEW-ONLY bridge for the separately authenticated LMBGesture v2
-    /// reducer. There are NO runtime callers and v1 input wire is unchanged.
-    /// Core8A/8C must later bind commands to the real player lease and world
-    /// tick, arbitrate Space/RMB/roll/parry, and never let a
-    /// remote caller directly select a command or an actor.
+    pub(crate) fn capture_queued_lmb_light(&self, net_id: u32) -> Option<QueuedLmbLight> {
+        let f = self.fighter(net_id)?;
+        let remaining = f.action_duration_ms - f.action_elapsed_ms;
+        if self.match_over()
+            || f.hp <= 0.0
+            || !matches!(
+                f.action,
+                Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
+            )
+            || remaining <= 0.0
+            || remaining > LIGHT_ATTACK_BUFFER_WINDOW_MS + EPSILON
+            || f.latest_input.block
+            || f.latest_input.dodge
+            || f.latest_input.kick
+            || f.latest_input.jump
+            || f.latest_input.dash
+        {
+            return None;
+        }
+        Some(QueuedLmbLight {
+            actor: net_id,
+            incarnation: f.world_incarnation(),
+            world_instance: self.world_instance,
+            recovery: f.action,
+            input_revision: f.recovery_input_revision,
+            expires_ms: self.now_ms + remaining + 2.0 * SERVER_DT_MS,
+            lateral: f.pending_attack_lateral.unwrap_or(
+                f.facing.sin() * f.latest_input.move_x - f.facing.cos() * f.latest_input.move_y,
+            ),
+        })
+    }
+
+    pub(crate) fn commit_queued_lmb_light(
+        &mut self,
+        mut intent: QueuedLmbLight,
+    ) -> Option<QueuedLmbLight> {
+        let current = self.capture_queued_lmb_light(intent.actor)?;
+        if current.world_instance != intent.world_instance
+            || current.incarnation != intent.incarnation
+            || current.recovery != intent.recovery
+            || current.input_revision != intent.input_revision
+        {
+            return None;
+        }
+        let index = self.fighter_index(intent.actor).ok()?;
+        let f = &mut self.fighters[index];
+        f.clear_recovery_input_buffer();
+        f.recovery_input_revision = f.recovery_input_revision.wrapping_add(1);
+        intent.input_revision = f.recovery_input_revision;
+        Some(intent)
+    }
+
+    pub(crate) fn queued_lmb_light_state(&self, intent: QueuedLmbLight) -> QueuedLightState {
+        let Some(f) = self.fighter(intent.actor) else {
+            return QueuedLightState::Discarded;
+        };
+        if self.match_over()
+            || intent.world_instance != self.world_instance
+            || f.world_incarnation() != intent.incarnation
+            || f.hp <= 0.0
+            || f.recovery_input_revision != intent.input_revision
+            || self.now_ms > intent.expires_ms + EPSILON
+        {
+            return QueuedLightState::Discarded;
+        }
+        if f.action == intent.recovery {
+            return QueuedLightState::Waiting;
+        }
+        // The original FSM alone ends recovery; this path cannot shorten it.
+        if f.action == Action::Idle
+            && !f.latest_input.block
+            && !f.latest_input.dodge
+            && !f.latest_input.kick
+            && !f.latest_input.jump
+            && !f.latest_input.dash
+        {
+            QueuedLightState::Ready
+        } else {
+            QueuedLightState::Discarded
+        }
+    }
+
+    pub(crate) fn start_queued_lmb_light(&mut self, intent: QueuedLmbLight) -> bool {
+        if self.queued_lmb_light_state(intent) != QueuedLightState::Ready {
+            return false;
+        }
+        let Ok(index) = self.fighter_index(intent.actor) else {
+            return false;
+        };
+        let f = &mut self.fighters[index];
+        f.begin_light_attack(intent.lateral);
+        f.gesture_review_owns_light = true;
+        f.gesture_review_light_lateral = intent.lateral;
+        true
+    }
+
+    /// Server-bound gesture bridge. Callers must own the live World lock and
+    /// validate the connection's actor/lease; the v1 input wire is unchanged.
     pub fn apply_review_only_lmb_gesture_command(
         &mut self,
         net_id: u32,
@@ -1016,6 +1133,7 @@ fn begin_requested_action(
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = false;
+            fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
             fighter.buffered_block = true;
         } else if edges.dodge
             && remaining_ms <= DODGE_BUFFER_WINDOW_MS + EPSILON
@@ -1024,6 +1142,7 @@ fn begin_requested_action(
             if fighter.stamina + EPSILON >= DODGE_STAMINA_COST {
                 fighter.clear_light_attack_buffer();
                 fighter.buffered_block = false;
+                fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
                 fighter.buffered_dodge = true;
                 fighter.buffered_dodge_dir_x = fighter.facing.cos();
                 fighter.buffered_dodge_dir_y = fighter.facing.sin();
@@ -1043,6 +1162,7 @@ fn begin_requested_action(
             fighter.clear_buffered_dodge();
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
+            fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
             fighter.buffered_jump_attack = true;
         } else if edges.jump
             && edges.attack
@@ -1060,6 +1180,7 @@ fn begin_requested_action(
             fighter.clear_buffered_dodge();
             fighter.buffered_kick = false;
             fighter.buffered_jump_attack = false;
+            fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
             fighter.buffered_jump = true;
         } else if edges.kick
             && remaining_ms <= KICK_BUFFER_WINDOW_MS + EPSILON
@@ -1071,6 +1192,7 @@ fn begin_requested_action(
                 fighter.clear_buffered_dodge();
                 fighter.buffered_jump = false;
                 fighter.buffered_jump_attack = false;
+                fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
                 fighter.buffered_kick = true;
             }
             // Exhausted short-RMB still owns a simultaneous LMB edge, while
@@ -1081,6 +1203,7 @@ fn begin_requested_action(
             fighter.buffered_kick = false;
             fighter.buffered_jump = false;
             fighter.buffered_jump_attack = false;
+            fighter.recovery_input_revision = fighter.recovery_input_revision.wrapping_add(1);
             fighter.buffered_light_attack = true;
             fighter.buffered_attack_lateral = fighter.pending_attack_lateral.unwrap_or(
                 fighter.facing.sin() * input.move_x - fighter.facing.cos() * input.move_y,

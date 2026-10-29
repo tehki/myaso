@@ -609,7 +609,7 @@ async function startGameServer() {
         || scenario === "uijumpattack"
         || scenario === "uidirectionallight"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
-        || scenario === "uiheavyguardbreakpunish"
+        || scenario === "uiheavyguardbreakpunish" || scenario === "uiheavyguardbreak"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
         || scenario === "uiheavyblock" || scenario === "uiheavyparry"
         // QA-only original-World proof for physical M35/M41 short-LMB parry:
