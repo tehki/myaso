@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-blacksmith-r4-original-blender-3c-handoff",
+  "nativeBlenderSceneSha256": "26ef652f2493a66a01e174a1865f8beac787adcf953db0b0d69162747f1d7f3d",
+  "creatorOriginalCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "sourceModels": {
+    "chimney": "Prop_Chimney",
+    "door": "Door_1_Round"
+  },
+  "blenderSourceMeters": {
+    "chimneyTop": [
+      1.172889233,
+      0.720000029,
+      7.22787571
+    ],
+    "doorGlassCenter": [
+      -0.999497533,
+      -2.091245651,
+      1.537063956
+    ],
+    "originalSmokeGeometryPuffs": 8,
+    "originalSmokeShader": "Cycles Principled Volume / 4D Noise",
+    "sourceDoorGlassRealVertices": 48
+  },
+  "originalBlenderSourceProjectionOnly": {
+    "width": 640,
+    "height": 640,
+    "orthoScale": 18.0,
+    "chimneyTopPixel": {
+      "x": 398.745918,
+      "y": 159.580002,
+      "originalCameraOnly": true
+    },
+    "doorGlassCenterPixel": {
+      "x": 285.140877,
+      "y": 333.965321,
+      "originalCameraOnly": true
+    }
+  },
+  "ownerAcceptedSourceDayDuskArt": true,
+  "3cResponsibilities": {
+    "liveSmoke": true,
+    "outdoorLighting": true,
+    "ambientLanterns": true,
+    "noDuplicatedLightHalos": true
+  },
+  "3bResponsibilities": {
+    "sourceDoorGlassDuskOnly": true,
+    "sourceWindowGlassDuskOnly": true,
+    "cosmeticSourceForgeLightOnly": true
+  },
+  "worldAuthoritativeXY": null,
+  "worldOwnedBuildingIdReadOnly": "smith",
+  "originalWorldMap": "moonvale-overworld",
+  "requiresWorld9ApprovedGeometryAndCameraTransform": true,
+  "newRuntimeEmitterAuthorized": false,
+  "newEntrancePortalAuthorized": false,
+  "serverCollisionOrItemAuthorityChanged": false,
+  "realNativeWorldGameplayProof": false,
+  "defaultOff": true,
+  "publicReleaseApproved": false
+}
