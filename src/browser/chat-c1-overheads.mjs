@@ -106,9 +106,18 @@ export function createOverheadChatBubbles({
       const canvasScaleX = canvasRect.width / width;
       const canvasScaleY = canvasRect.height / height;
       const x = canvasRect.left - stageRect.left + point.x * canvasScaleX;
-      const y = canvasRect.top - stageRect.top + (point.y - 74 - index * 40) * canvasScaleY;
-      entry.node.style.left = Math.max(12, Math.min(stageRect.width - 12, x)) + "px";
-      entry.node.style.top = Math.max(4, y) + "px";
+      // Two long wrapped messages need enough separation for three lines.
+      const y = canvasRect.top - stageRect.top + (point.y - 74 - index * 70) * canvasScaleY;
+      entry.node.hidden = false;
+      // Measure the actual rendered bubble, not an assumed fixed width:
+      // narrow-stage edges must not clip the text or the speaking tail.
+      const halfBubble = Math.max(0, (entry.node.offsetWidth ?? 0) / 2);
+      const heightBubble = Math.max(0, entry.node.offsetHeight ?? 0);
+      const insetX = Math.min(stageRect.width / 2, halfBubble + 6);
+      const finalX = Math.max(insetX, Math.min(stageRect.width - insetX, x));
+      const finalY = Math.max(heightBubble + 5, Math.min(stageRect.height - 5, y));
+      entry.node.style.left = finalX + "px";
+      entry.node.style.top = finalY + "px";
       const elapsed = Math.max(0, nowMs - entry.start);
       const fade = elapsed <= OVERHEAD_CHAT.fadeStartMs ? 1
         : Math.max(0, 1 - (elapsed - OVERHEAD_CHAT.fadeStartMs)
