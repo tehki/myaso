@@ -12,6 +12,7 @@ import { COMBAT } from "../src/combat/model.mjs";
 import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
 import { awaitM35OriginalLightAdmission, createM35WorldReceiptClock } from "./m35-original-light-admission.mjs";
 import { M158_NATIVE_GEOMETRY } from "./m158-native-geometry.mjs";
+import { planM59ThreatGeometry } from "./m59-native-threat-geometry.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -619,6 +620,7 @@ async function startGameServer() {
         || scenario === "uikickknockdownffahit"
         || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa"
         || scenario === "uimultiknockdownffahit" || scenario === "uimultiknockdownffa"
+        || scenario === "uisecondaryphase"
         || scenario === "uimultirecoveryffa"
         || scenario === "uimultirecoveryspatial") ? "1" : "0",
       // Existing M121/M156 original-v1 ingress evidence is never enabled for
@@ -10994,10 +10996,24 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
   // Authoritative spawns are 96 units apart while attack reach plus fighter radius is 94.
   // Stage both genuine attackers well inside unchanged threat geometry before synchronizing
   // their attacks so runner/input jitter cannot leave one edge attacker just outside reach.
-  await Promise.all([
-    pulseMovementKey(left, "d", 260),
-    pulseMovementKey(right, "a", 260),
-  ]);
+  if (requireSecondaryPhase) {
+    let staged=false;
+    for(let correction=0; correction<12; correction++) {
+      const state=await readUiEvidence(center);
+      const plan=planM59ThreatGeometry(state.acceptance?.fighters,ids[0],ids[1],ids[2]);
+      if(plan.ready){staged=true;break;}
+      await Promise.all(plan.moves.filter(m=>m.key).map(m=>
+        pulseMovementKeyBoundedW3c(m.id===ids[0]?left:right,m.key,m.ms)));
+      await sleep(DASH_DOUBLE_TAP_MS+20);
+    }
+    if(!staged) throw new Error("M59 could not stage two authoritative threats outside each other's reach");
+    await Promise.all([aimArena(left,leftArena,200),aimArena(right,rightArena,-200)]);
+  } else {
+    await Promise.all([
+      pulseMovementKey(left, "d", 260),
+      pulseMovementKey(right, "a", 260),
+    ]);
+  }
   // Let movement release and the persisted facing propagate before either attack commits.
   await sleep(60);
   if (requireSpatialMarkers) await Promise.all(entries.map(armThreatMarkerSampler));
@@ -11013,10 +11029,13 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
     // into server-held heavy input (observed 46HP HEAVY STRIKE on both sides).
     // Use one real, bounded W3C release per attacker for M59 only; all other
     // multi-threat flights retain their previously verified gesture contract.
+    // No artificial pause tick between the real DOWN/UP. A 35ms W3C
+    // pause produced three-tick World skew: only 33ms of simultaneous
+    // STRIKE, which the unchanged 20Hz snapshot can legitimately miss.
     if (requireSecondaryPhase) {
       await Promise.all([
-        performArenaAttackHold(left, leftArena, 200, 35),
-        performArenaAttackHold(right, rightArena, -200, 35),
+        performArenaM221GuardBreakClick(left, 0),
+        performArenaM221GuardBreakClick(right, 0),
       ]);
     } else {
       await Promise.all([
@@ -11122,6 +11141,9 @@ async function runOnlineUiMultiThreatFlight(entries, requireSecondary = false, r
             state.threatTransitions.some((event) => event.visible && event.secondaryPhase));
           if (secondaryPhaseLeak) {
             throw new Error(`M59 secondary threat phase leaked to an attacker client: ${JSON.stringify(states)}`);
+          }
+          if (centerState.playerHp !== 32 || leftState.playerHp !== 100 || rightState.playerHp !== 100) {
+            throw new Error(`M59 requires two center Light hits and undamaged attackers: ${JSON.stringify(states)}`);
           }
         }
         if (requireGuardArc) {

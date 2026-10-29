@@ -699,6 +699,13 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
+  if (["uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers"].includes(acceptanceScenario)) {
+    const acceptance=window.__MYASO_ACCEPTANCE_STATE__ ??= {
+      scenario:acceptanceScenario,ownActionTransitions:[],focusActionTransitions:[],staminaTransitions:[],
+    };
+    acceptance.playerNetId=ownId;
+    acceptance.fighters=[...state.values()].map(({netId,x,y,action})=>({netId,x,y,action}));
+  }
   if (!["uirollbuffer", "uijumpbuffer", "uijumpattack", "uijumpattackinputloss", "uijumpattackpunish", "uijumpattacktelegraph", "uijumprecoveryffa", "uijumppunishffa", "uimultirecoveryffa", "uimultirecoveryspatial", "uimultirecoverypunish", "uiparrytell", "uistun", "uiparrypunishwindow", "uiparrypunishffa", "uiparrypunishffahit", "uiguardbreakpunishffa", "uiguardbreakpunishffahit", "uikickknockdownffa", "uikickknockdownffahit", "uikickknockdownbounded", "uirollknockdownbounded", "uirollknockdownffahit", "uimultiknockdownffa", "uimultiknockdownffahit", "uirollknockdownffa", "uidirectionallight", "uistaminaauth", "uistaminaexhaustion", "uistaminafeedback", "uistaminaconfirmed", "uifeint", "uiheavyblock", "uiheavyparry", "uijumpffaprimary", "uijumpffasecondary", "uijumpattackblock", "uijumpattackparry", "uijumpattackdodge", "uijumpattackbuffer", "uikickbuffer"].includes(acceptanceScenario)) return;
   const focusNetId = fighterGuardBreakPunishNetId(state, ownId)
     || fighterParryPunishNetId(state, ownId)
