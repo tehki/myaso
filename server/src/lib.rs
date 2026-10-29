@@ -1,3 +1,4 @@
+pub mod chat;
 pub mod prealpha_authenticated_gesture;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
