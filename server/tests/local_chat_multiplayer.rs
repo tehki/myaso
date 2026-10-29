@@ -236,6 +236,72 @@ async fn real_three_connection_local_chat_and_distant_isolation() {
     assert!(alice.connection.max_datagram_size().unwrap_or(0) > 0);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn real_four_connections_route_only_to_same_world_nearby_peers() {
+    let (_server, url, digest) = start_server();
+    let mut first = Player::connect(&url, &digest).await;
+    let mut second = Player::connect(&url, &digest).await;
+    let mut third = Player::connect(&url, &digest).await;
+    let mut fourth = Player::connect(&url, &digest).await;
+
+    // Four genuine distinct QUIC/WebTransport sessions in the original
+    // authoritative World. Spawn x=42,138,234,330: near-neighbor 96,
+    // next-neighbor 192 > server-owned local-chat radius160.
+    first.send(401, b"near-first-second", 1).await;
+    let id1 = assert_result(&first.receive().await, 401, 0);
+    assert_eq!(
+        assert_received(&second.receive().await, 1, "near-first-second"),
+        id1
+    );
+    assert!(timeout(Duration::from_millis(250), third.receive())
+        .await
+        .is_err());
+    assert!(timeout(Duration::from_millis(250), fourth.receive())
+        .await
+        .is_err());
+
+    third.send(402, b"near-second-third-fourth", 1).await;
+    let id2 = assert_result(&third.receive().await, 402, 0);
+    assert_eq!(
+        assert_received(&second.receive().await, 3, "near-second-third-fourth"),
+        id2
+    );
+    assert_eq!(
+        assert_received(&fourth.receive().await, 3, "near-second-third-fourth"),
+        id2
+    );
+    assert!(
+        timeout(Duration::from_millis(250), first.receive())
+            .await
+            .is_err(),
+        "far player must never receive another actor's local chat"
+    );
+
+    // Sender identities are constructed by original Rust World admission;
+    // no client may impersonate fourth by appending an unframed ID.
+    let mut forged = vec![0x31, 1, 1];
+    forged.extend_from_slice(&403_u32.to_le_bytes());
+    forged.extend_from_slice(&5_u16.to_le_bytes());
+    forged.extend_from_slice(b"forge");
+    forged.extend_from_slice(&4_u32.to_le_bytes());
+    first.send_raw(&forged).await;
+    assert_eq!(assert_result(&first.receive().await, 403, 3), 0);
+    assert!(timeout(Duration::from_millis(250), second.receive())
+        .await
+        .is_err());
+
+    // The optional chat protocol cannot claim its own sender identity, and
+    // the original game transport remains available on every connection.
+    for connection in [
+        &first.connection,
+        &second.connection,
+        &third.connection,
+        &fourth.connection,
+    ] {
+        assert!(connection.max_datagram_size().unwrap_or(0) > 0);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn versioned_client_preface_is_not_chat_and_legacy_peer_still_receives() {
     let (_server, url, digest) = start_server();

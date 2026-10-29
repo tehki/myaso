@@ -65,7 +65,11 @@ pub fn decode_send(frame: &[u8]) -> Result<ChatRequest, ChatCode> {
     let text = std::str::from_utf8(&frame[9..]).map_err(|_| ChatCode::Invalid)?;
     if text.trim().is_empty()
         || text.chars().any(|ch| {
-            ch.is_control() || matches!(ch, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+            ch.is_control()
+                || matches!(ch,
+                    '\u{061c}' | '\u{200e}'..='\u{200f}' |
+                    '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}'
+                )
         })
     {
         return Err(ChatCode::Invalid);
@@ -291,6 +295,9 @@ mod tests {
             packet(1, b""),
             packet(1, b"   "),
             packet(1, b"x\ny"),
+            packet(1, "\u{200e}false actor".as_bytes()),
+            packet(1, "\u{061c}spoof".as_bytes()),
+            packet(1, "\u{feff}hidden".as_bytes()),
             packet(1, &[0xff]),
             packet(1, &vec![b'x'; 241]),
         ] {
