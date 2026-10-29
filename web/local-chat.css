@@ -78,7 +78,8 @@
 .chat-c1-overheads {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  /* Combat threat, kill feed, scoreboard and charge indicators stay above text. */
+  z-index: 1;
   pointer-events: none;
   overflow: hidden;
   contain: layout paint;
