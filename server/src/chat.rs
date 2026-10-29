@@ -1,5 +1,5 @@
 //! Chat C1: opt-in, server-authoritative local chat on separate WebTransport
-//! streams. No player-controlled sender IDs, coordinates, zones, NPC/system
+//! streams. No player-controlled sender IDs, coordinates, Worlds, NPC/system
 //! identities, transcripts or combat datagrams.
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -66,10 +66,8 @@ pub fn decode_send(frame: &[u8]) -> Result<ChatRequest, ChatCode> {
     if text.trim().is_empty()
         || text.chars().any(|ch| {
             ch.is_control()
-                || matches!(ch,
-                    '\u{061c}' | '\u{200e}'..='\u{200f}' |
-                    '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}'
-                )
+                || matches!(ch, '\u{061c}' | '\u{200e}'..='\u{200f}' |
+                            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
         })
     {
         return Err(ChatCode::Invalid);
@@ -105,20 +103,31 @@ pub fn encode_received(message_id: u64, sender_id: u32, tick: u32, text: &str) -
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChatPosition {
     pub player_id: u32,
-    pub zone: u32,
+    pub world_instance: u64,
+    pub lease_epoch: u64,
+    pub alive: bool,
     pub x: f32,
     pub y: f32,
 }
 
 struct ChatPeer {
+    lease_epoch: u64,
+    world_instance: u64,
     outgoing: mpsc::Sender<Vec<u8>>,
     tokens: u8,
     last_refill: Instant,
     recent: VecDeque<ChatResult>,
 }
 impl ChatPeer {
-    fn new(outgoing: mpsc::Sender<Vec<u8>>, now: Instant) -> Self {
+    fn new(
+        lease_epoch: u64,
+        world_instance: u64,
+        outgoing: mpsc::Sender<Vec<u8>>,
+        now: Instant,
+    ) -> Self {
         Self {
+            lease_epoch,
+            world_instance,
             outgoing,
             tokens: BURST,
             last_refill: now,
@@ -148,7 +157,7 @@ impl ChatPeer {
 
 /// Only current connected players with an active chat stream can receive.
 /// This prototype uses a bounded scan of the existing capped 512-player
-/// authoritative World; realm scale needs zone-partitioned spatial buckets.
+/// authoritative World; realm scale needs World-partitioned spatial buckets.
 #[derive(Default)]
 pub struct LocalChatHub {
     peers: BTreeMap<u32, ChatPeer>,
@@ -158,27 +167,46 @@ impl LocalChatHub {
     pub fn register(
         &mut self,
         player_id: u32,
+        lease_epoch: u64,
+        world_instance: u64,
         outgoing: mpsc::Sender<Vec<u8>>,
         now: Instant,
     ) -> bool {
-        if player_id == 0 || self.peers.contains_key(&player_id) {
+        if player_id == 0
+            || lease_epoch == 0
+            || world_instance == 0
+            || self.peers.contains_key(&player_id)
+        {
             return false;
         }
-        self.peers.insert(player_id, ChatPeer::new(outgoing, now));
+        self.peers.insert(
+            player_id,
+            ChatPeer::new(lease_epoch, world_instance, outgoing, now),
+        );
         true
     }
-    pub fn unregister(&mut self, player_id: u32) {
-        self.peers.remove(&player_id);
+    // A late task from an older QUIC connection must never unsubscribe its
+    // successor. A new session owns a different server-issued lease.
+    pub fn unregister(&mut self, player_id: u32, lease_epoch: u64) {
+        if self
+            .peers
+            .get(&player_id)
+            .is_some_and(|p| p.lease_epoch == lease_epoch)
+        {
+            self.peers.remove(&player_id);
+        }
     }
     pub fn route(
         &mut self,
-        sender_id: u32,
+        sender: (u32, u64),
         request: &ChatRequest,
         positions: &[ChatPosition],
         radius: f32,
         tick: u32,
         now: Instant,
     ) -> ChatResult {
+        // Both fields come only from current server-owned connection admission.
+        let (sender_id, sender_lease) = sender;
         let rejected = |code| ChatResult {
             correlation: request.correlation,
             code,
@@ -187,6 +215,9 @@ impl LocalChatHub {
         let Some(peer) = self.peers.get_mut(&sender_id) else {
             return rejected(ChatCode::Unauthorized);
         };
+        if peer.lease_epoch != sender_lease {
+            return rejected(ChatCode::Unauthorized);
+        }
         if let Some(previous) = peer
             .recent
             .iter()
@@ -201,7 +232,12 @@ impl LocalChatHub {
         }
         let Some(sender) = positions
             .iter()
-            .find(|position| position.player_id == sender_id)
+            .find(|position| {
+                position.player_id == sender_id
+                    && position.lease_epoch == sender_lease
+                    && position.world_instance == peer.world_instance
+                    && position.alive
+            })
             .copied()
         else {
             return rejected(ChatCode::NotConnected);
@@ -220,7 +256,8 @@ impl LocalChatHub {
         let distance_squared = radius * radius;
         for position in positions {
             if position.player_id == sender_id
-                || position.zone != sender.zone
+                || position.world_instance != sender.world_instance
+                || !position.alive
                 || !position.x.is_finite()
                 || !position.y.is_finite()
             {
@@ -229,7 +266,10 @@ impl LocalChatHub {
             let dx = position.x - sender.x;
             let dy = position.y - sender.y;
             if dx * dx + dy * dy <= distance_squared {
-                if let Some(recipient) = self.peers.get(&position.player_id) {
+                if let Some(recipient) = self.peers.get(&position.player_id).filter(|p| {
+                    p.world_instance == sender.world_instance
+                        && p.lease_epoch == position.lease_epoch
+                }) {
                     // A congested chat consumer loses this low-priority event.
                     // Never block simulation, steal combat queue, or allocate an
                     // unbounded buffer to preserve chat.
@@ -263,25 +303,33 @@ mod tests {
         [
             ChatPosition {
                 player_id: 1,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 1,
+                alive: true,
                 x: 50.0,
                 y: 50.0,
             },
             ChatPosition {
                 player_id: 2,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 2,
+                alive: true,
                 x: 90.0,
                 y: 70.0,
             },
             ChatPosition {
                 player_id: 3,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 3,
+                alive: true,
                 x: 800.0,
                 y: 800.0,
             },
             ChatPosition {
                 player_id: 4,
-                zone: 1,
+                world_instance: 2,
+                lease_epoch: 4,
+                alive: true,
                 x: 51.0,
                 y: 50.0,
             },
@@ -324,11 +372,11 @@ mod tests {
         let mut receivers = Vec::new();
         for id in 1..=4 {
             let (tx, rx) = mpsc::channel(OUTBOUND_QUEUE);
-            assert!(hub.register(id, tx, now));
+            assert!(hub.register(id, id as u64, if id == 4 { 2 } else { 1 }, tx, now));
             receivers.push(rx);
         }
         let request = decode_send(&packet(10, b"Greetings!")).unwrap();
-        let result = hub.route(1, &request, &positions(), 160.0, 123, now);
+        let result = hub.route((1, 1), &request, &positions(), 160.0, 123, now);
         assert_eq!(result.code, ChatCode::Accepted);
         let received = receivers[1].try_recv().unwrap();
         assert_eq!(received[0], CHAT_RECEIVED);
@@ -342,17 +390,17 @@ mod tests {
         let mut hub = LocalChatHub::default();
         let (a, _) = mpsc::channel(OUTBOUND_QUEUE);
         let (b, mut rx) = mpsc::channel(OUTBOUND_QUEUE);
-        assert!(hub.register(1, a, now) && hub.register(2, b, now));
+        assert!(hub.register(1, 1, 1, a, now) && hub.register(2, 2, 1, b, now));
         let req = ChatRequest {
             correlation: 1,
             text: "hello".into(),
         };
         assert_eq!(
-            hub.route(1, &req, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &req, &positions(), 160.0, 1, now).code,
             ChatCode::Accepted
         );
         assert_eq!(
-            hub.route(1, &req, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &req, &positions(), 160.0, 1, now).code,
             ChatCode::Duplicate
         );
         assert!(rx.try_recv().is_ok());
@@ -363,7 +411,7 @@ mod tests {
                 text: "spam".into(),
             };
             assert_eq!(
-                hub.route(1, &q, &positions(), 160.0, 1, now).code,
+                hub.route((1, 1), &q, &positions(), 160.0, 1, now).code,
                 ChatCode::Accepted
             );
         }
@@ -372,12 +420,12 @@ mod tests {
             text: "spam".into(),
         };
         assert_eq!(
-            hub.route(1, &q, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &q, &positions(), 160.0, 1, now).code,
             ChatCode::RateLimited
         );
         assert_eq!(
             hub.route(
-                1,
+                (1, 1),
                 &q,
                 &positions(),
                 160.0,
@@ -395,25 +443,31 @@ mod tests {
         let (a, _) = mpsc::channel(OUTBOUND_QUEUE);
         let (b, _slow) = mpsc::channel(1);
         let (c, mut quick) = mpsc::channel(OUTBOUND_QUEUE);
-        hub.register(1, a, now);
-        hub.register(2, b, now);
-        hub.register(3, c, now);
+        hub.register(1, 1, 1, a, now);
+        hub.register(2, 2, 1, b, now);
+        hub.register(3, 3, 1, c, now);
         let positions = [
             ChatPosition {
                 player_id: 1,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 1,
+                alive: true,
                 x: 0.0,
                 y: 0.0,
             },
             ChatPosition {
                 player_id: 2,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 2,
+                alive: true,
                 x: 1.0,
                 y: 1.0,
             },
             ChatPosition {
                 player_id: 3,
-                zone: 0,
+                world_instance: 1,
+                lease_epoch: 3,
+                alive: true,
                 x: 1.0,
                 y: 1.0,
             },
@@ -424,15 +478,15 @@ mod tests {
                 text: "hi".into(),
             };
             assert_eq!(
-                hub.route(1, &q, &positions, 10.0, 1, now).code,
+                hub.route((1, 1), &q, &positions, 10.0, 1, now).code,
                 ChatCode::Accepted
             );
         }
         assert!(quick.try_recv().is_ok() && quick.try_recv().is_ok());
-        hub.unregister(1);
+        hub.unregister(1, 1);
         assert_eq!(
             hub.route(
-                1,
+                (1, 1),
                 &ChatRequest {
                     correlation: 3,
                     text: "stale".into()
@@ -446,6 +500,176 @@ mod tests {
             ChatCode::Unauthorized
         );
     }
+
+    #[test]
+    fn server_world_lease_and_membership_are_mandatory_even_with_reused_player_id() {
+        let now = Instant::now();
+        let mut hub = LocalChatHub::default();
+        let (a, _) = mpsc::channel(OUTBOUND_QUEUE);
+        let (b, mut near) = mpsc::channel(OUTBOUND_QUEUE);
+        let (c, mut other_world) = mpsc::channel(OUTBOUND_QUEUE);
+        assert!(hub.register(1, 11, 17, a, now));
+        assert!(hub.register(2, 22, 17, b, now));
+        assert!(hub.register(3, 33, 18, c, now));
+        let request = ChatRequest {
+            correlation: 1,
+            text: "hello".to_string(),
+        };
+        let mut positions = [
+            ChatPosition {
+                player_id: 1,
+                world_instance: 17,
+                lease_epoch: 11,
+                alive: true,
+                x: 0.0,
+                y: 0.0,
+            },
+            ChatPosition {
+                player_id: 2,
+                world_instance: 17,
+                lease_epoch: 22,
+                alive: true,
+                x: 160.0,
+                y: 0.0,
+            },
+            ChatPosition {
+                player_id: 3,
+                world_instance: 18,
+                lease_epoch: 33,
+                alive: true,
+                x: 0.0,
+                y: 0.0,
+            },
+        ];
+        assert_eq!(
+            hub.route((1, 11), &request, &positions, 160.0, 1, now).code,
+            ChatCode::Accepted
+        );
+        assert!(near.try_recv().is_ok());
+        assert!(other_world.try_recv().is_err());
+        positions[1].x = 160.01;
+        assert_eq!(
+            hub.route(
+                (1, 11),
+                &ChatRequest {
+                    correlation: 2,
+                    text: "far".into()
+                },
+                &positions,
+                160.0,
+                2,
+                now
+            )
+            .code,
+            ChatCode::Accepted
+        );
+        assert!(near.try_recv().is_err());
+        positions[1].x = 0.0;
+        positions[1].alive = false; // Dead players do not receive local chat.
+        assert_eq!(
+            hub.route(
+                (1, 11),
+                &ChatRequest {
+                    correlation: 3,
+                    text: "dead".into()
+                },
+                &positions,
+                160.0,
+                3,
+                now
+            )
+            .code,
+            ChatCode::Accepted
+        );
+        assert!(near.try_recv().is_err());
+        positions[1].alive = true; // Same authenticated session after respawn.
+        assert_eq!(
+            hub.route(
+                (1, 11),
+                &ChatRequest {
+                    correlation: 4,
+                    text: "respawned".into()
+                },
+                &positions,
+                160.0,
+                4,
+                now
+            )
+            .code,
+            ChatCode::Accepted
+        );
+        assert!(near.try_recv().is_ok());
+        assert_eq!(
+            hub.route(
+                (1, 999),
+                &ChatRequest {
+                    correlation: 5,
+                    text: "spoof".into()
+                },
+                &positions,
+                160.0,
+                5,
+                now
+            )
+            .code,
+            ChatCode::Unauthorized
+        );
+        assert!(near.try_recv().is_err());
+        hub.unregister(1, 11);
+        let (next, _) = mpsc::channel(OUTBOUND_QUEUE);
+        assert!(hub.register(1, 44, 17, next, now));
+        hub.unregister(1, 11); // Late old task cannot remove new subscription.
+        positions[0].lease_epoch = 44;
+        assert_eq!(
+            hub.route(
+                (1, 11),
+                &ChatRequest {
+                    correlation: 6,
+                    text: "old".into()
+                },
+                &positions,
+                160.0,
+                6,
+                now
+            )
+            .code,
+            ChatCode::Unauthorized
+        );
+        assert_eq!(
+            hub.route(
+                (1, 44),
+                &ChatRequest {
+                    correlation: 6,
+                    text: "new".into()
+                },
+                &positions,
+                160.0,
+                6,
+                now
+            )
+            .code,
+            ChatCode::Accepted
+        );
+        assert!(near.try_recv().is_ok());
+        positions[0].world_instance = 19; // Teleport to a different World.
+        assert_eq!(
+            hub.route(
+                (1, 44),
+                &ChatRequest {
+                    correlation: 7,
+                    text: "crossworld".into()
+                },
+                &positions,
+                160.0,
+                7,
+                now
+            )
+            .code,
+            ChatCode::NotConnected
+        );
+        assert!(near.try_recv().is_err());
+    }
+
     #[test]
     fn all_encoder_sizes_bounded() {
         let txt = "z".repeat(240);
