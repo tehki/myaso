@@ -19,4 +19,10 @@ test("Real Rust World browser acceptance covers original 4D physical first-red",
  assert.match(s,/C1_REAL_WORLD_NATIVE_CHAT_POINTER_FOCUS_PASS/);
  assert.match(s,/type:"pointer",id:"c1-native-mouse"/);
  assert.match(s,/type:"wheel",id:"c1-native-wheel"/);
+ assert.match(s,/MYASO_FLIGHT_ACTION_PROOF:"1"/);
+ assert.match(s,/C1_REAL_WORLD_NATIVE_CHAT_NO_COMBAT_PASS/);
+ assert.match(s,/M201_AUTH_ACTION tick=/);
+ assert.match(s,/M201_AUTH_HIT tick=/);
+ assert.match(s,/assert\.deepEqual\(leakedWorldActions,\[\]/);
+ assert.match(s,/assert\.deepEqual\(leakedWorldHits,\[\]/);
 });
