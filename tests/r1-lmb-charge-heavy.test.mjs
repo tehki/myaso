@@ -196,7 +196,7 @@ test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", (
     "M111 must preserve 320ms READY, release-led heavy recovery and +60ms light-punish margin");
   assert.match(proof, /await sleep\(60\)/);
   assert.match(proof, /COMBAT\.heavyAttack\.recoveryMs/);
-  assert.match(proof, /performArenaAttackBurst\(attacker,1,0,0\)/);
+  assert.match(proof, /performArenaM221GuardBreakClick\(attacker,0\)/);
   assert.doesNotMatch(proof, /performArenaAttackBurst\(attacker, 9/);
   assert.match(proof, /Opponent hit - 34 HP\./);
   assert.match(proof, /Hit taken - 34 HP\./);

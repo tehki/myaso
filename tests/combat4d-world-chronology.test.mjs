@@ -109,6 +109,6 @@ test("M111 genuine native scenario must fail closed on original 60Hz World post-
   assert.match(body, /COMBAT\.heavyAttack\.recoveryMs/);
   assert.match(body, /await sleep\(60\)/);
   assert.doesNotMatch(body, /trustedSecondKeyEDownEpoch/);
-  assert.match(body, /performArenaAttackBurst\(attacker,1,0,0\)/);
+  assert.match(body, /performArenaM221GuardBreakClick\(attacker,0\)/);
   assert.match(body, /hitDuringStun/);
 });

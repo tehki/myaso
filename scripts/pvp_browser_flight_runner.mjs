@@ -9549,7 +9549,7 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
         if((recovered.idleTick-recovered.recoveryTick)*(1000/60)<COMBAT.heavyAttack.recoveryMs)
           throw new Error("M111 actual Heavy recovery was shorter than original duration");
         await sleep(60);
-        await performArenaAttackBurst(attacker,1,0,0);
+        await performArenaM221GuardBreakClick(attacker,0);
         console.log("M111_CURRENT_WORLD_RECOVERY_PUNISH "+JSON.stringify({secondHeavyIssuedAt,...recovered,marginMs:60}));
       })()
         .then(() => ({ ok: true }), error => ({ ok: false, error }));
