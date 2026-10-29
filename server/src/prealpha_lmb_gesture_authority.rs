@@ -368,6 +368,49 @@ impl GestureAuthority {
         }
     }
 
+    // A queued intent has no attack clock until the original World starts it.
+    pub(crate) fn start_queued_light(
+        &mut self,
+        lease: u64,
+        id: u32,
+        server_ms: u64,
+    ) -> Option<Command> {
+        if lease == 0
+            || lease != self.lease_epoch
+            || self.active_id != Some(id)
+            || self.active_source != Some(GestureSource::Lmb)
+            || server_ms < self.last_server_ms
+        {
+            return None;
+        }
+        let command = match self.phase {
+            Phase::LightWindup => Command::None,
+            Phase::HeavyCharging => Command::UpgradeHeldHeavy {
+                server_elapsed_ms: 0,
+            },
+            _ => return None,
+        };
+        self.press_ms = server_ms;
+        self.last_server_ms = server_ms;
+        Some(command)
+    }
+
+    // Keep the real physical/replay fences after a higher-priority World input
+    // wins. Its remaining edges are admitted no-combat, never a new attack.
+    pub(crate) fn abandon_queued_light(&mut self, lease: u64, id: u32, server_ms: u64) -> bool {
+        if lease == 0
+            || lease != self.lease_epoch
+            || self.active_id != Some(id)
+            || server_ms < self.last_server_ms
+            || !matches!(self.phase, Phase::LightWindup | Phase::HeavyCharging)
+        {
+            return false;
+        }
+        self.phase = Phase::LightActive;
+        self.last_server_ms = server_ms;
+        true
+    }
+
     /// Integration must call this only after World confirms a full action/recovery lifecycle.
     /// The last monotonic gesture ID and accepted sequence remain fenced after retirement.
     pub fn retire(&mut self, lease: u64, gesture_id: u32) -> bool {

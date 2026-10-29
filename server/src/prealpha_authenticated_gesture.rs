@@ -8,7 +8,7 @@ use crate::prealpha_lmb_gesture_proposal::{
     decode_typed_event, AckStatus, GestureAck, GestureAction, GestureSource, BYTES, EVENT_TYPE,
     VERSION,
 };
-use crate::simulation::{Action, World};
+use crate::simulation::{Action, QueuedLightState, QueuedLmbLight, World};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ServerActorBinding {
@@ -31,7 +31,8 @@ pub struct SessionGestureWorldPath {
     // Original World tick fences an uncommitted authenticated Space+LMB.
     // Transport admission is NOT an attack or a grant of jump stamina.
     pending_jump: Option<(u32, u32)>, // (gesture ID, original World receipt tick)
-    jump_review_enabled: bool,        // separately approved loopback-only server opt-in
+    pending_light: Option<(u32, QueuedLmbLight)>,
+    jump_review_enabled: bool, // separately approved loopback-only server opt-in
 }
 
 impl SessionGestureWorldPath {
@@ -62,6 +63,7 @@ impl SessionGestureWorldPath {
             last_gesture_id: None,
             held_source_id: [None, None],
             pending_jump: None,
+            pending_light: None,
             jump_review_enabled: false,
         })
     }
@@ -80,6 +82,52 @@ impl SessionGestureWorldPath {
     pub fn retire(&mut self) {
         self.retired = true;
         self.pending_jump = None;
+        self.pending_light = None;
+    }
+
+    // Returns true only while the original recovery still owns this actor.
+    fn flush_light_under_world_lock(&mut self, world: &mut World, lease: u64) -> bool {
+        let Some((id, intent)) = self.pending_light else {
+            return false;
+        };
+        match world.queued_lmb_light_state(intent) {
+            QueuedLightState::Waiting => return true,
+            QueuedLightState::Discarded => {
+                if !self
+                    .authority
+                    .abandon_queued_light(lease, id, world.now_ms.round() as u64)
+                {
+                    self.retire();
+                }
+            }
+            QueuedLightState::Ready => {
+                let mut proposed = self.authority.clone();
+                let Some(command) =
+                    proposed.start_queued_light(lease, id, world.now_ms.round() as u64)
+                else {
+                    self.retire();
+                    return false;
+                };
+                if !world.start_queued_lmb_light(intent) {
+                    self.retire();
+                    return false;
+                }
+                if command != Command::None
+                    && !world.apply_review_only_lmb_gesture_command(self.binding.player_id, command)
+                {
+                    // No World step or hit can occur between start and rollback.
+                    world.apply_review_only_lmb_gesture_command(
+                        self.binding.player_id,
+                        Command::CancelUnlandedLight,
+                    );
+                    self.retire();
+                    return false;
+                }
+                self.authority = proposed;
+            }
+        }
+        self.pending_light = None;
+        false
     }
 
     // The original 60Hz World exclusively commits the attack. The queued
@@ -188,22 +236,38 @@ impl SessionGestureWorldPath {
                     server_tick: tick,
                 });
             }
-            // An earlier one-hit World action must finish before new PRESS.
+            self.flush_light_under_world_lock(world, lease_epoch);
+            if self.retired {
+                return Some(GestureAck {
+                    status: AckStatus::Stale,
+                    sequence: event.sequence,
+                    gesture_id: event.gesture_id,
+                    server_tick: tick,
+                });
+            }
+            let queued = if event.action == GestureAction::Press {
+                world.capture_queued_lmb_light(self.binding.player_id)
+            } else {
+                None
+            };
+            let mut proposed = self.authority.clone();
+            // An earlier one-hit World action must finish before new PRESS,
+            // except for the original bounded final-90ms Light recovery buffer.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
             if matches!(
                 event.action,
                 GestureAction::Press | GestureAction::JumpAttack
-            ) && world
-                .fighter(self.binding.player_id)
-                .is_some_and(|f| f.action == Action::Idle)
+            ) && (queued.is_some()
+                || world
+                    .fighter(self.binding.player_id)
+                    .is_some_and(|f| f.action == Action::Idle))
             {
                 if let Some(previous) = self.last_gesture_id {
                     if event.gesture_id > previous {
-                        self.authority.retire(lease_epoch, previous);
+                        proposed.retire(lease_epoch, previous);
                     }
                 }
             }
-            let mut proposed = self.authority.clone();
             let decision = proposed.process_typed(
                 lease_epoch,
                 typed.source,
@@ -212,7 +276,25 @@ impl SessionGestureWorldPath {
             );
             match decision.disposition {
                 Disposition::Accepted => {
-                    if decision.command == Command::None
+                    let pending_this_id = self
+                        .pending_light
+                        .is_some_and(|(id, _)| id == event.gesture_id);
+                    let deferred = pending_this_id
+                        && matches!(
+                            decision.command,
+                            Command::None
+                                | Command::UpgradeHeldHeavy { .. }
+                                | Command::ResumeLight { .. }
+                                | Command::CancelUnlandedLight
+                        );
+                    let committed_queue = if decision.command == Command::BeginLightWindup {
+                        queued.and_then(|intent| world.commit_queued_lmb_light(intent))
+                    } else {
+                        None
+                    };
+                    if committed_queue.is_some()
+                        || deferred
+                        || decision.command == Command::None
                         || world.apply_review_only_lmb_gesture_command(
                             self.binding.player_id,
                             decision.command,
@@ -233,6 +315,11 @@ impl SessionGestureWorldPath {
                             self.last_gesture_id = Some(event.gesture_id);
                         }
                         self.authority = proposed;
+                        if let Some(intent) = committed_queue {
+                            self.pending_light = Some((event.gesture_id, intent));
+                        } else if pending_this_id && event.action == GestureAction::Cancel {
+                            self.pending_light = None;
+                        }
                         if event.action == GestureAction::JumpAttack {
                             self.pending_jump = Some((event.gesture_id, world.tick));
                             self.flush_jump_under_world_lock(world);
@@ -306,6 +393,9 @@ impl SessionGestureWorldPath {
     ) {
         if !self.current(world, lease_epoch, boot_nonce) {
             self.retire();
+            return;
+        }
+        if self.flush_light_under_world_lock(world, lease_epoch) || self.retired {
             return;
         }
         let mut proposed = self.authority.clone();

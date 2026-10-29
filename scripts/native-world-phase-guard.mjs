@@ -3,7 +3,7 @@
 export function currentNativeWorldPhase(output, {afterOffset,fighterId,action,requireEntry=false}) {
   if (typeof output!=="string" || !Number.isSafeInteger(afterOffset) || afterOffset<0
       || afterOffset>output.length || !Number.isSafeInteger(fighterId) || fighterId<1
-      || ![6,9].includes(action)) throw new TypeError("current original World phase and actor required");
+      || ![3,6,9].includes(action)) throw new TypeError("current original World phase and actor required");
   let current=null,entered=false;
   for(const line of output.slice(afterOffset).split(/\r?\n/).slice(0,-1)) {
     const edge=/^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=\d+ to=(\d+)$/.exec(line);

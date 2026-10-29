@@ -9,6 +9,7 @@ import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
+import {runNativeRecoveryBuffer} from "../../scripts/native-recovery-buffer.mjs";
 import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -17,7 +18,7 @@ const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
 const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
 const instantLmb=process.env.MYASO_LIVE_GESTURE_INSTANT_LMB==="1";
 assert.ok(!instantLmb||!["private-hit","space-guard"].includes(physicalMode),"select a release-profile Combat acceptance mode");
-assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","recovery-buffer","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -556,6 +557,10 @@ try{
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
  if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
+ }else if(physicalMode==="recovery-buffer"){
+  await runNativeRecoveryBuffer({actors,evaluate,request,readAuthoritativeWorld,waitFor,sleep:sleeps,
+   save:(name,evidence)=>writeFile(join(output,name),JSON.stringify(evidence,null,2)+"\n")});
+  if(chatC1)await nativeChatRound("After buffered physical Light");
  }else if(physicalMode==="jump-two-hit"){
  // P0 nonrelease genuine TWO browser clients, same authenticated Rust World.
  const attacker=actors[0].s,victim=actors[1].s;

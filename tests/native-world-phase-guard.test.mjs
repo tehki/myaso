@@ -14,6 +14,15 @@ test("expired Block, wrong actor, browser cue and truncated proof cannot release
  assert.equal(currentNativeWorldPhase(phase,{...options,requireEntry:true}),null,"old held phase cannot adopt a new physical DOWN");
 });
 
+test("recovery buffer proof requires a fresh current original recovery, never its stale last sample",()=>{
+ const options={afterOffset:0,fighterId:1,action:3,requireEntry:true};
+ const phase="M201_AUTH_ACTION tick=10 fighter=1 from=2 to=3\nCOMBAT4_NATIVE_WORLD_PHASE tick=20 fighter=1 action=3 elapsedMs=166.7\n";
+ assert.equal(currentNativeWorldPhase(phase,options).elapsedMs,166.7);
+ assert.equal(currentNativeWorldPhase(phase+"M201_AUTH_ACTION tick=26 fighter=1 from=3 to=0\n",options),null);
+ assert.equal(currentNativeWorldPhase(phase+"M201_AUTH_ACTION tick=26 fighter=1 from=3 to=1\n",options),null);
+ assert.equal(currentNativeWorldPhase(phase,{...options,afterOffset:phase.length}),null);
+});
+
 test("native controller waits for actual READY320 and Block beyond125, without a fixed release clock",async()=>{
  let output="",clock=0,blockAge=-1;const calls=[];
  const result=await dispatchNativeHeldHeavyGuard({readOutput:()=>output,attackerId:1,defenderId:2,guard:"block",wheelCount:2,now:()=>clock,

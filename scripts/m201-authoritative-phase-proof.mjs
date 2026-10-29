@@ -1,6 +1,8 @@
 // Read-only loopback server proof, independent from client snapshot cadence.
 const forms = {
   action: /^M201_AUTH_ACTION tick=(\d+) fighter=(\d+) from=(\d+) to=(\d+)$/,
+  // Transport admission is a separate row, never proof of a World phase or HIT.
+  gesture: /^M201_AUTH_GESTURE_ACTION tick=(\d+) fighter=(\d+) source=([01]) gesture=(\d+) sequence=(\d+) eventAction=([1-5]) status=([1-4]) from=(\d+) to=(\d+)$/,
   // M322: M320 emits genuine server defense events in the same 60 Hz stream.
   // Parse them strictly rather than rejecting an otherwise valid M205 proof.
   block: /^M201_AUTH_BLOCK tick=(\d+) attacker=(\d+) target=(\d+)$/,
@@ -23,8 +25,14 @@ export function parseM201ServerProof(output) {
     }
     const args = [...line.match(forms[kind])].slice(1).map(Number);
     if (!args.every(Number.isSafeInteger)) throw new Error("M201 unsafe server tick/value");
-    const [tick, a, b, c, d] = args;
+    const [tick, a, b, c, d, e, f, g, h] = args;
+    if (kind === "gesture" && (args.some(value => value > 0xffffffff)
+      || a < 1 || c < 1 || d < 1 || g > 255 || h > 255)) {
+      throw new Error("M201 invalid gesture admission");
+    }
     const row = kind === "action" ? { kind, tick, fighter: a, from: b, to: c }
+      : kind === "gesture" ? { kind, tick, fighter: a, source: b, gestureId: c,
+        sequence: d, eventAction: e, status: f, from: g, to: h }
       : kind === "hit" ? { kind, tick, attacker: a, target: b, damage: c, hp: d }
         : { kind, tick, attacker: a, target: b };
     if (rows.length && row.tick < rows.at(-1).tick) {
