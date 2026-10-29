@@ -173,8 +173,14 @@ await new Promise(resolve => app.listen(0,"127.0.0.1",resolve));
 const url = "http://127.0.0.1:" + app.address().port
   + "/tests/fixtures/chat-c1-hud-visual.html";
 try {
-  for (const browser of ["chrome","firefox"]) {
-    for (const width of [960,420]) await exercise(browser,width,url,screenshots);
+  // Headless Firefox's native window manager enforces a 500px CSS viewport
+  // minimum on the hosted runner. Do NOT claim an unobserved 420px Firefox
+  // render: qualify common 500px narrow in both browsers and also exercise
+  // the narrower 420px real Chrome viewport independently.
+  for (const browser of ["chrome", "firefox"]) {
+    for (const width of browser === "firefox" ? [960, 500] : [960, 500, 420]) {
+      await exercise(browser, width, url, screenshots);
+    }
   }
-  console.log("UI10_VISUAL_FIXTURE_PASS chrome/firefox 960 and narrow, not authenticated Chat C1 routing");
+  console.log("UI10_VISUAL_FIXTURE_PASS Chrome 960/500/420; Firefox 960/500; real browser viewport, not authenticated Chat C1 routing");
 } finally { await new Promise(resolve => app.close(resolve)); }
