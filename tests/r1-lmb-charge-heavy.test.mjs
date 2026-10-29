@@ -192,9 +192,11 @@ test("M111 one genuine LMB release gives exactly one 34HP guard-break punish", (
     "M110 must deliver one genuinely held-and-released LMB heavy");
   assert.doesNotMatch(nativeHeavy, /keyDown|KeyE|pulseMovementKey/,
     "E cannot substitute for original physical LMB heavy");
-  assert.match(proof, /const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS\s*\+ COMBAT\.heavyAttack\.activeMs \+ COMBAT\.heavyAttack\.recoveryMs \+ 60/,
+  assert.match(proof, /await awaitNativeHeavyRecoveryExit/,
     "M111 must preserve 320ms READY, release-led heavy recovery and +60ms light-punish margin");
-  assert.match(proof, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
+  assert.match(proof, /await sleep\(60\)/);
+  assert.match(proof, /COMBAT\.heavyAttack\.recoveryMs/);
+  assert.match(proof, /performArenaM221GuardBreakClick\(attacker,0\)/);
   assert.doesNotMatch(proof, /performArenaAttackBurst\(attacker, 9/);
   assert.match(proof, /Opponent hit - 34 HP\./);
   assert.match(proof, /Hit taken - 34 HP\./);

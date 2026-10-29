@@ -23,3 +23,8 @@ test("first-red93ms calibration cannot subtract away reaction when the next whee
 test("missing or unbounded calibration cannot select a defensive cue",()=>{
   for(const ms of [NaN,Infinity,-1,400,undefined])assert.throws(()=>planM35NativeReaction(ms),TypeError);
 });
+
+test("legacy100ms tap exposes an actual charging snapshot without changing Light or parry pacing",()=>{
+ assert.deepEqual(planM35NativeReaction(10,100),{allowHeavy:true,lightReactionMs:17});
+ for(const hold of [0,101,135,320])assert.throws(()=>planM35NativeReaction(10,hold));
+});

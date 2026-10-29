@@ -4,7 +4,7 @@ import { NETWORK } from "../src/network/constants.mjs";
 // next W3C delivery. Observe the earliest authentic current short-click cue;
 // require original World Light and Parry separately after the real exchange.
 export function planM35NativeReaction(wheelMs, clickHoldMs = 35) {
-  if (!Number.isFinite(wheelMs) || wheelMs < 0 || wheelMs >= 400 || clickHoldMs !== 35) {
+  if (!Number.isFinite(wheelMs) || wheelMs < 0 || wheelMs >= 400 || ![35,100].includes(clickHoldMs)) {
     throw new TypeError("current bounded native wheel calibration and original short click required");
   }
   const tickMs = 1000 / NETWORK.serverSimulationHz;

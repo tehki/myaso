@@ -13,6 +13,7 @@ import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
 import { awaitM35OriginalLightAdmission, createM35WorldReceiptClock } from "./m35-original-light-admission.mjs";
 import { M158_NATIVE_GEOMETRY } from "./m158-native-geometry.mjs";
 import { planM59ThreatGeometry } from "./m59-native-threat-geometry.mjs";
+import { dispatchNativeHeldHeavyGuard, awaitNativeHeavyRecoveryExit } from "./native-world-phase-guard.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
 import { measureM200WheelFeedbackLatency } from "./m200-feedback-latency.mjs";
@@ -1196,6 +1197,8 @@ async function prepareHeavyCounterplayFlight(
     defender,
     attackerElementId,
     defenderElementId,
+    attackerId: attackerReady.playerNetId,
+    defenderId: defenderReady.playerNetId,
     movementCode,
   };
 }
@@ -1287,127 +1290,27 @@ async function calibrateHeavyIngress(
 // Any wrong result is still a terminal failure in the block/parry callers.
 async function performHeavyCounterplayWindowWheel(
   attacker, defender, attackerElementId, defenderElementId,
-  attackOffset, blockOffset, targetAfterWindupMs,
+  attackOffset, blockOffset, guard,
 ) {
-  const calibration = await calibrateHeavyIngress(
-    attacker, defender, attackerElementId, defenderElementId,
-    attackOffset, blockOffset,
-  );
   const before = await Promise.all([readUiEvidence(attacker), readUiEvidence(defender)]);
-  const attackActionOffset = before[0].acceptance?.ownActionTransitions?.length ?? 0;
-  const defendActionOffset = before[1].acceptance?.ownActionTransitions?.length ?? 0;
-  const wheelOffset = before[1].wheels.length;
-  // Bound the correction from sampled held-LMB/wheel ingress to avoid
-  // path-dependent skew pushing the sole parry wheel past impact.
-  const rawSkewMs = calibration.eIngressMs - calibration.wheelIngressMs;
-  // A large negative compensation pre-arms heavy parry too early and
-  // turns the genuine parry into an ordinary -64 guard block. Use a narrower
-  // 25ms bound for parry while preserving the 40ms block-only calibration.
-  const skewLimitMs = targetAfterWindupMs >= 240 ? 25 : 40;
-  const appliedSkewMs = Math.max(-skewLimitMs, Math.min(skewLimitMs, rawSkewMs));
-  const wheelDelayMs = Math.round(targetAfterWindupMs + appliedSkewMs);
-  if (wheelDelayMs < 0 || wheelDelayMs > 450) {
-    throw new Error("M192 calibrated wheel timing outside admissible W3C pause: "
-      + JSON.stringify({ ...calibration, targetAfterWindupMs, wheelDelayMs }));
-  }
-  console.log("M192_REAL_INGRESS_PLAN " + JSON.stringify({
-    scenario, ...calibration, targetAfterWindupMs, rawSkewMs, appliedSkewMs, wheelDelayMs,
-  }));
-  if (scenario === "uiheavyblock" || scenario === "uiheavyparry") {
-    // M223: stage the real wheel from a fresh server-observed heavy windup.
-    // Do not predict charging acceptance from W3C ACK or inject synthetic events.
-    const logOffset = m201ServerOutput().length;
-    const fighterId = before[0].playerNetId;
-    const eIssuedAtMs = Date.now();
-    const eOutcome = Promise.resolve().then(() =>
-      performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)).then(
-      () => ({ ok: true }),
-      error => ({ ok: false, error }),
-    );
-    let windup;
-    try {
-      windup = await awaitM223HeavyWindup({
-        readOutput: m201ServerOutput, afterOffset: logOffset,
-        fighterId, sleep, timeoutMs: 800,
-      });
-    } catch (error) {
-      const eResult = await eOutcome;
-      if (!eResult.ok) throw eResult.error;
-      throw error;
-    }
-    // M223.1: calibration can contain ~100ms wheel-driver outliers while
-    // the actual live W3C wheel arrives in ~30ms. Subtracting the outlier
-    // schedules block too early, causing its unchanged 240ms timer to expire
-    // before impact. Bound ONLY the CI harness delay estimator.
-    const m223Plan = planM223WheelDelay({
-      targetAfterWindupMs,
-      sampledWheelIngressMs: calibration.wheelIngressMs,
-    });
-    // Combat4B M188: actual original-World protected CI on e1f2f9a
-    // still BLOCKED a genuine held-LMB heavy at tick619 after Firefox
-    // Block tick611 (8 ticks / 133ms > unchanged 125ms parry window).
-    // Exact original World CI e6f5c079: 3/3 real heavy BLOCK, 2/3 real
-    // heavy PARRY at contact age 116.7ms. Third parry BLOCK age150.0ms.
-    // Stage the SAME one physical W3C parry wheel 30ms later (+110ms
-    // total), seeking >=2 World ticks' contact-phase headroom without
-    // extending 125ms server parry. For M223 wheelIngress >=65ms, the
-    // physical pause stays within unchanged 450ms fixture bound.
-    // Keep strict 100HP, full guard, stun and no-fake-HIT assertions;
-    // heavy BLOCK 395ms and all original World/balance values unchanged.
-    const m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" ? 110 : 0;
-    const m223WheelDelayMs = m223Plan.wheelDelayMs + m188HeldLmbParryOffsetMs;
-    if (!Number.isSafeInteger(m223WheelDelayMs)
-      || m223WheelDelayMs < 0 || m223WheelDelayMs > 450) {
-      throw new Error("M188 genuine wheel timing outside bounded native pause");
-    }
-    const wheelIssuedAtMs = Date.now();
-    const [eResult, wheelResult] = await Promise.all([
-      eOutcome,
-      scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs).then(
-        () => ({ ok: true }),
-        error => ({ ok: false, error }),
-      ),
-    ]);
-    console.log("M223_SERVER_WINDUP_PLAN " + JSON.stringify({
-      scenario, fighterId, serverWindupTick: windup.serverTick,
-      observedWindupAfterMs: windup.observedAfterMs,
-      eCommandToWheelDispatchMs: wheelIssuedAtMs - eIssuedAtMs,
-      wheelIngressCalibrationMs: calibration.wheelIngressMs,
-      boundedWheelIngressMs: m223Plan.boundedWheelIngressMs,
-      wheelDelayMs: m223WheelDelayMs, targetAfterWindupMs,
-      m188HeldLmbParryOffsetMs,
-      physicalHeavySource: "held-lmb", requestedHoldMs: M110_LMB_HEAVY_HOLD_MS,
-      lmbW3cAck: eResult.ok, wheelW3cAck: wheelResult.ok,
-    }));
-    if (!eResult.ok) throw eResult.error;
-    if (!wheelResult.ok) throw wheelResult.error;
-  } else {
-    // Preserve legacy scheduling outside strict M188 heavy defense.
-    await Promise.all([
-      performM110NativeHeldLmb(attacker, attackerElementId, attackOffset),
-      scrollArenaWheel(defender, defenderElementId, 120, wheelDelayMs),
-    ]);
-  }
-  const [afterAttack, afterDefend] = await Promise.all([
-    readUiEvidence(attacker), readUiEvidence(defender),
+  await Promise.all([
+    aimArena(attacker, attackerElementId, attackOffset),
+    aimArena(defender, defenderElementId, blockOffset),
   ]);
-  if (afterDefend.wheels.length !== wheelOffset + 1) {
-    throw new Error("M192 expected exactly one real exchange wheel after calibration: "
-      + JSON.stringify(afterDefend.wheels.slice(wheelOffset)));
+  await sleep(60);
+  const control = await dispatchNativeHeldHeavyGuard({
+    readOutput:m201ServerOutput, attackerId:before[0].playerNetId,
+    defenderId:before[1].playerNetId, guard, sleep,
+    sendDown:()=>setArenaAttackButton(attacker,true),
+    sendWheel:()=>scrollArenaWheel(defender,defenderElementId,120),
+    sendUp:()=>setArenaAttackButton(attacker,false),
+  });
+  const after = await readUiEvidence(defender);
+  if(after.wheels.length !== before[1].wheels.length+1) {
+    throw new Error("M188 requires exactly one real wheel in the phase-owned exchange");
   }
-  const committed = afterAttack.acceptance?.ownActionTransitions?.slice(attackActionOffset)
-    .find(entry => entry.action === COMBAT_ACTION.heavyAttackWindup);
-  const blocked = afterDefend.acceptance?.ownActionTransitions?.slice(defendActionOffset)
-    .find(entry => entry.action === COMBAT_ACTION.block);
-  console.log("M192_REAL_INGRESS_OUTCOME " + JSON.stringify({
-    scenario,
-    committedTick: committed?.serverTick ?? null,
-    blockTick: blocked?.serverTick ?? null,
-    blockAfterWindupMs: committed && blocked
-      ? blocked.epochMs - committed.epochMs : null,
-  }));
+  console.log("M188_CURRENT_WORLD_GUARD_RELEASE "+JSON.stringify({scenario,...control}));
 }
-
 async function runOnlineUiHeavyBlockFlight(entries) {
   // R2 restored heavy reach 130 -> 82 with a physical 24px active lunge.
   // The old 180ms approach left the victim outside the restored 82px arc;
@@ -1452,7 +1355,7 @@ async function runOnlineUiHeavyBlockFlight(entries) {
     // A parry, missed block, or HP leak remains a terminal CI failure.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 395,
+      attackOffset, blockOffset, "block",
     );
     await sleep(470);
 
@@ -1550,7 +1453,7 @@ async function runOnlineUiHeavyParryFlight(entries) {
     // server-confirmed stun, zero HP/guard change, and all failure gates.
     await performHeavyCounterplayWindowWheel(
       attacker, defender, attackerElementId, defenderElementId,
-      attackOffset, blockOffset, 405,
+      attackOffset, blockOffset, "parry",
     );
     await sleep(220);
 
@@ -8434,7 +8337,11 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       ? scrollM41ViewportWheel(defender, defenderViewport)
       : scrollArenaWheel(defender, defenderElementId, 120, 0),
   );
-  const nativeReaction = planM35NativeReaction(parryIngress.wheelMs);
+  // Legacy release-to-strike needs one complete real charging snapshot before
+  // releasing Light;35ms can fit between50ms snapshots and delay the cue by49ms.
+  //100ms stays below READY320. Instant-Light retains its original35ms short tap.
+  const nativeShortHoldMs = process.env.MYASO_PVP_INSTANT_LMB === "1" ? 35 : 100;
+  const nativeReaction = planM35NativeReaction(parryIngress.wheelMs,nativeShortHoldMs);
   console.log("M35_NATIVE_REACTION_PLAN " + JSON.stringify(nativeReaction));
   await Promise.all(entries.map(installUiObserver));
   let evidence = null;
@@ -8502,7 +8409,7 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
       let observed;
       try {
         observed = await dispatchM41ObservedParry({
-          sendAttack: () => performArenaM221GuardBreakClick(attacker, 35),
+          sendAttack: () => performArenaM221GuardBreakClick(attacker, nativeShortHoldMs),
           awaitWorldCue: () => prearmed ? prearmed.wait() : waitForM41WorldWindup(
             attacker, 180, attemptAttackerBaseline.events.length, attackerReady.playerNetId,
             false,
@@ -9352,34 +9259,22 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
   let finalEvidence = null;
   let blockHeld = false;
   let secondHeavyIssuedAt = null;
+  let lastHeavyControl = null;
 
   const heavyCommitCount = (state) => state.events.filter((text) =>
     text.startsWith("Heavy strike committed")).length;
   const heavyWindupCount = (state) => state.threatTransitions.filter((entry) =>
     entry.visible && entry.phase === "HEAVY WINDUP").length;
-  const performHeavyIntoObservedShortBlock = async (windupsBefore) => {
-    // Genuine physical LMB is held beyond 320ms READY and deliberately released.
-    // Retain TWO genuine wheel-back events and their original 240ms short-block
-    // windows. Place the second early enough to age past the 125ms parry phase
-    // before the release-led heavy impact, while the guard window remains live.
-    // The original World, not these W3C ACKs, decides all HIT/guard outcomes.
-    const heavyPulse = performM110NativeHeldLmb(attacker, attackerElementId, attackOffset);
-    const blockPulse = scrollArenaWheelPair(defender, defenderElementId, 120, 220, 100);
-    let observed = false;
-    try {
-      const deadline = Date.now() + 420;
-      while (Date.now() < deadline) {
-        const state = await readUiEvidence(defender);
-        if (heavyWindupCount(state) > windupsBefore) {
-          observed = true;
-          break;
-        }
-        await sleep(10);
-      }
-    } finally {
-      await Promise.all([heavyPulse, blockPulse]);
-    }
-    return observed;
+  const performHeavyIntoObservedShortBlock = async () => {
+    lastHeavyControl = await dispatchNativeHeldHeavyGuard({
+      readOutput:m201ServerOutput,attackerId:staged.attackerId,
+      defenderId:staged.defenderId,guard:"block",wheelCount:2,sleep,
+      sendDown:()=>setArenaAttackButton(attacker,true),
+      sendWheel:()=>scrollArenaWheel(defender,defenderElementId,120),
+      sendUp:()=>setArenaAttackButton(attacker,false),
+    });
+    console.log("M110_CURRENT_WORLD_GUARD_RELEASE "+JSON.stringify(lastHeavyControl));
+    return true;
   };
 
   try {
@@ -9561,7 +9456,7 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
         // Genuine server guard break + defender STUNNED already attested.
         // Pre-arm exactly one real Chrome W3C action before slow extra reads.
         if (returnTiming && typeof onAcceptedLiveBreak === "function") {
-          onAcceptedLiveBreak(secondHeavyIssuedAt);
+          onAcceptedLiveBreak(secondHeavyIssuedAt,lastHeavyControl);
         }
         break;
       }
@@ -9639,18 +9534,24 @@ async function runOnlineUiHeavyGuardBreakPunishFlight(entries) {
   let genuineNativePunish = null;
   const guardBreakResult = await runOnlineUiHeavyGuardBreakFlight(entries, {
     returnTiming: true,
-    onAcceptedLiveBreak: (trustedSecondLmbDownEpoch) => {
+    onAcceptedLiveBreak: (trustedSecondLmbDownEpoch,control) => {
       if (genuineNativePunish || !Number.isFinite(trustedSecondLmbDownEpoch)) {
         throw new Error("M111 requires exactly one native held-LMB heavy before W3C punish");
       }
-      // Physical held LMB remains READY until real release; recovery starts
-      // afterwards. Keep the full World recovery and original 60ms margin.
       const secondHeavyIssuedAt = trustedSecondLmbDownEpoch;
-      const elapsedSinceHeavyIssue = Date.now() - secondHeavyIssuedAt;
-      const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS
-        + COMBAT.heavyAttack.activeMs + COMBAT.heavyAttack.recoveryMs + 60;
-      const initialPauseMs = Math.max(0, firstClickTargetMs - elapsedSinceHeavyIssue);
-      genuineNativePunish = performArenaAttackBurst(attacker, 1, initialPauseMs, 0)
+      // A held READY may legitimately last beyond450ms. Wait for this SAME
+      // Heavy's actual World recovery exit, then preserve the full60ms margin.
+      genuineNativePunish = (async()=>{
+        const recovered = await awaitNativeHeavyRecoveryExit({
+          readOutput:m201ServerOutput,afterOffset:control.afterOffset,
+          fighterId:control.ready.fighterId,sleep,
+        });
+        if((recovered.idleTick-recovered.recoveryTick)*(1000/60)<COMBAT.heavyAttack.recoveryMs)
+          throw new Error("M111 actual Heavy recovery was shorter than original duration");
+        await sleep(60);
+        await performArenaM221GuardBreakClick(attacker,0);
+        console.log("M111_CURRENT_WORLD_RECOVERY_PUNISH "+JSON.stringify({secondHeavyIssuedAt,...recovered,marginMs:60}));
+      })()
         .then(() => ({ ok: true }), error => ({ ok: false, error }));
     },
   });
@@ -10380,7 +10281,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
           postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0,
           sendAttackClick: wheelFirstGuardOnly
-            ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
+            ? () => performArenaM221GuardBreakClick(attacker, 0) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
           awaitTrustedWheel: () => challenge.wait(),

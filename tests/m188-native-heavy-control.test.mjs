@@ -28,9 +28,10 @@ test("M188 calibration and M223 exchange use the original native held-LMB helper
   const section=source.slice(source.indexOf("async function calibrateHeavyIngress("),source.indexOf("async function runOnlineUiHeavyBlockFlight("));
   assert.doesNotMatch(section,/pulseMovementKey\(attacker, "e"/);
   assert.match(section,/performM110NativeHeldLmb\(attacker, attackerElementId, -attackOffset\)/);
-  assert.match(section,/performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
-  assert.match(section,/await awaitM223HeavyWindup\(/);
-  assert.match(section,/const \[eResult, wheelResult\] = await Promise\.all/);
+  assert.match(section,/dispatchNativeHeldHeavyGuard\(/);
+  assert.match(section,/readOutput:m201ServerOutput/);
+  assert.match(section,/sendDown:\(\)=>setArenaAttackButton\(attacker,true\)/);
+  assert.match(section,/sendUp:\(\)=>setArenaAttackButton\(attacker,false\)/);
   assert.match(source,/defenderResult\.playerGuard !== 100/);
   assert.match(source,/Opponent blocked - guard -64\./);
   assert.match(source,/M107 heavy block accidentally resolved as parry/);
