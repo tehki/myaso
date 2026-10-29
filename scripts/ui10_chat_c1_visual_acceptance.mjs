@@ -84,6 +84,20 @@ async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
         actions:[{type:"keyDown",value},{type:"keyUp",value}] }] });
     await wd(driverPort, "POST", prefix + "/window/rect", { width:viewWidth, height:540 });
     await wd(driverPort, "POST", prefix + "/url", { url:previewUrl });
+    // WebDriver sets the *outer* window; normalize the actual CSS viewport
+    // before claiming the 960x540 or narrow screenshot is pixel exact.
+    const contentSize = await js("return {width:innerWidth,height:innerHeight};");
+    if (contentSize.width !== viewWidth || contentSize.height !== 540) {
+      const outer = await wd(driverPort, "GET", prefix + "/window/rect");
+      await wd(driverPort, "POST", prefix + "/window/rect", {
+        width: outer.width + viewWidth - contentSize.width,
+        height: outer.height + 540 - contentSize.height,
+      });
+    }
+    await poll(browser + " exact browser viewport", async () => {
+      const size = await js("return {width:innerWidth,height:innerHeight};");
+      return { ok: size.width === viewWidth && size.height === 540, ...size };
+    }, 4000);
     await poll(browser + " fixture module", async () => ({
       ok: await js("return window.__ui10Ready === true;"),
     }), 12000);
@@ -116,6 +130,8 @@ async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
     const picture = await wd(driverPort, "GET", prefix + "/screenshot");
     const bytes = Buffer.from(picture, "base64");
     assert(bytes.length > 3000 && bytes.subarray(1,4).toString() === "PNG");
+    assert.equal(bytes.readUInt32BE(16), viewWidth, "screenshot exact width");
+    assert.equal(bytes.readUInt32BE(20), 540, "screenshot exact height");
     const output = join(screenshotDir,"ui10-chat-c1-" + browser + "-" + viewWidth + ".png");
     await writeFile(output, bytes);
     const clickX = Math.floor(Math.max(60, Math.min(geometry.viewport - 40,geometry.viewport * .75)));
