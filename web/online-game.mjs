@@ -584,6 +584,11 @@ if (reviewedGestureLab) {
   }
 }
 
+// The overhead renderer is initialized only after authenticated Chat C1
+// stream admission. It reads the real render-state roster, never creates an
+// untrusted actor, changes the camera or sends Combat/input packets.
+let chatBubbleController = null;
+
 // Chat C1 uses the current authenticated WebTransport connection and separate
 // bounded reliable streams. Public requests require the operator-served
 // chatC1=1 config; localhost chatC1Preview=1 remains nonproduction-only.
@@ -591,7 +596,10 @@ if (reviewedGestureLab) {
 void import("../src/browser/chat-c1-activation.mjs")
   .then(({ isChatC1Eligible, activateChatC1Preview }) =>
     isChatC1Eligible(window.location)
-      ? activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient })
+      ? activateChatC1Preview({
+          doc: document, location: window.location, gameClient: networkClient,
+          onBubblesReady(controller) { chatBubbleController = controller; },
+        })
       : null)
   .catch(() => { /* Chat is optional, authoritative Combat continues. */ });
 
@@ -1207,6 +1215,15 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       drawRemoteIdentity(projected.x, projected.y, enemy.netId);
     }
   }
+  // Read-only spatial speech HUD: the actual interpolated remote sprites and
+  // prediction-smoothed local player share this exact frame/camera/zoom.
+  // Hidden on disconnect and when the actor no longer exists in the roster.
+  chatBubbleController?.frame({
+    ownId, own: local.initialized ? local : null,
+    remotes: visibleEnemyPositions, camera: visualCameraPosition,
+    width: canvas.width, height: canvas.height, zoom: ARENA_VIEW_ZOOM,
+    deadAction: COMBAT_ACTION.dead, nowMs,
+  });
   updateHud(ownId);
   drawThreatMarkers();
   if (local.initialized) drawOffscreenEnemyPointers(visibleEnemyPositions, ownId);

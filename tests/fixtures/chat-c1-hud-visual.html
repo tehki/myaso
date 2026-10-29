@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Chat C1 UI-only visual review (no server)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html,body { margin:0; padding:0; background:#171513; color:#eee3d0; }
+    .arena-stage { position:relative; width:min(960px,100vw); aspect-ratio:16/9; overflow:hidden;
+      background:radial-gradient(ellipse at 64% 40%,#433f32,#211f1b 73%); }
+    #arena { display:block; width:100%; height:100%; }
+    .fixture-hud { position:absolute; z-index:1; top:8px; left:10px; right:10px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
+      font:12px/1.4 system-ui; pointer-events:none; }
+    .fixture-hud div { background:#191715c9; border:1px solid #776245; padding:6px 8px; border-radius:5px; }
+    .fixture-hud b { color:#eed29e; }
+    .fixture-banner { position:absolute; z-index:2; top:44px; left:50%; transform:translateX(-50%);
+      border:1px solid #6d5940; background:#211d19e8; padding:4px 7px; white-space:nowrap;
+      font:10px/1.3 system-ui; color:#d7b88a; pointer-events:none; }
+    @media(max-width:600px){.fixture-hud{font-size:10px;}.fixture-banner{top:39px;font-size:8px;}}
+  </style>
+</head>
+<body>
+  <div class="arena-stage">
+    <canvas id="arena" width="960" height="540" tabindex="0" aria-label="UI review arena"></canvas>
+    <div class="fixture-hud" aria-hidden="true">
+      <div><b>YOU</b> · HP 100 · GUARD 100</div>
+      <div><b>KNIGHT #2</b> · HP 100</div>
+    </div>
+    <div class="fixture-banner">UI-ONLY FIXTURE · NO AUTHENTICATED CHAT SERVER</div>
+  </div>
+  <script type="module">
+    import { installLocalChat } from "../../src/browser/local-chat.mjs";
+    import { createOverheadChatBubbles } from "../../src/browser/chat-c1-overheads.mjs";
+    const canvas = document.querySelector("#arena");
+    const speech = createOverheadChatBubbles({ doc:document });
+    // Deliberately simulated message and actor: screenshots prove layout only,
+    // NOT a Rust/QUIC or real two-player chat acceptance.
+    const state = {ownId:1,own:{x:480,y:270,hp:100,action:0},
+      remotes:[{netId:2,x:700,y:340,hp:100,action:0}],
+      camera:{x:480,y:270},width:960,height:540,deadAction:-1};
+    const chat = installLocalChat(document, {
+      online: true, idFactory: () => "fixture-only",
+      onMessage: event => speech.received(event),
+      onAccepted: text => speech.acceptedOwn(state.ownId,text),
+    });
+    chat.bindAdapter({
+      ready: true,
+      subscribe() { return () => {}; },
+      send() { return Promise.reject(new Error("UI-only fixture: no server")); },
+    });
+    chat.receive({ channel:"local", serverMessageId:"ui-fixture-1",
+      sender:{ netId:2, displayName:"Player #2" }, text:"The forge is just beyond the bridge." });
+    chat.receive({ channel:"system", serverMessageId:"ui-fixture-2",
+      text:"UI example only. No player messages were delivered." });
+    chat.root.querySelector(".local-chat-connection").textContent = "FIXTURE";
+    chat.status.textContent = "Visual test only — server unconnected.";
+    chat.setExpanded(false);
+    // This actor is a static visual proxy only. The online game instead calls
+    // speech.frame() from the real interpolated Knight render loop.
+    speech.frame(state);
+    window.__ui10Speech = speech;
+    window.__ui10SpeechState = state;
+    window.__ui10CombatLeak = { keydown:0, pointerdown:0, wheel:0 };
+    canvas.addEventListener("keydown", () => window.__ui10CombatLeak.keydown++);
+    canvas.addEventListener("pointerdown", () => window.__ui10CombatLeak.pointerdown++);
+    canvas.addEventListener("wheel", () => window.__ui10CombatLeak.wheel++);
+    window.__ui10Chat = chat;
+    const stylesheet = document.querySelector("link[data-local-chat-style]");
+    await new Promise((resolve, reject) => {
+      if (stylesheet?.sheet) return resolve();
+      stylesheet?.addEventListener("load", resolve, { once: true });
+      stylesheet?.addEventListener("error", reject, { once: true });
+    });
+    window.__ui10Ready = true;
+  </script>
+</body>
+</html>
