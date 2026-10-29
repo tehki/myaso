@@ -264,21 +264,24 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (interrupted) status.textContent = "Connection changed — previous message not confirmed.";
   }
 
-  // P0 independent Combat4D real native first-red: when the chat input is
-  // focused a physical W3C canvas click must never steal composer focus or
-  // reach the Combat charge/roll/parry listeners (including window fallback).
-  // Install capture listeners before keyboard handler, and remove on dispose.
+  // Independent 4D P0: focused composer owns physical gestures, even when
+  // the pointer crosses Window's fallback input handlers. Window CAPTURE
+  // fences them before the canvas can focus/attack/roll/parry, without
+  // modifying the original Combat source0 or gameplay network writer.
   function suppressArenaInputWhileComposing(event) {
-    if (root.dataset.open !== "true" || doc.activeElement !== input) return;
+    if (root.dataset.open !== "true" || doc.activeElement !== input
+        || (event.target !== canvas && !canvas.contains?.(event.target))) return;
     if (event.cancelable !== false) event.preventDefault();
     event.stopImmediatePropagation();
   }
   const suppressedArenaEvents = [
-    "pointerdown", "pointerup", "mousedown", "mouseup",
-    "wheel", "contextmenu", "auxclick",
+    "pointerdown", "pointerup", "pointercancel", "lostpointercapture",
+    "mousedown", "mouseup", "click", "wheel", "contextmenu", "auxclick",
   ];
+  const captureOptions = { capture: true, passive: false };
   for (const type of suppressedArenaEvents) {
-    canvas.addEventListener(type, suppressArenaInputWhileComposing, true);
+    doc.defaultView?.addEventListener(type, suppressArenaInputWhileComposing, captureOptions);
+    canvas.addEventListener(type, suppressArenaInputWhileComposing, captureOptions);
   }
 
   function onArenaKey(event) {
@@ -327,7 +330,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       unsubscribe?.();
       canvas.removeEventListener("keydown", onArenaKey, true);
       for (const type of suppressedArenaEvents) {
-        canvas.removeEventListener(type, suppressArenaInputWhileComposing, true);
+        doc.defaultView?.removeEventListener(type, suppressArenaInputWhileComposing, captureOptions);
+        canvas.removeEventListener(type, suppressArenaInputWhileComposing, captureOptions);
       }
       input.removeEventListener("keydown", onComposerKey);
       form.removeEventListener("submit", onSubmit);

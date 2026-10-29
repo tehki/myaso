@@ -23,6 +23,9 @@ function fakeDocument() {
         let stopped = false, prevented = false;
         const e = {
           key: "", repeat: false, cancelable: true, isComposing: false,
+          // A real DOM-dispatched canvas pointer event always supplies target.
+          // The fake fixture must model that before validating the same guard.
+          target: this,
           preventDefault() { prevented = true; },
           stopPropagation() { stopped = true; },
           stopImmediatePropagation() { stopped = true; },
