@@ -67,22 +67,45 @@ test("Bubble follows interpolated Knight and camera using the existing arena pro
   assert.deepEqual(projectArenaPoint(170,100,170,100,960,540),{x:480,y:270});
   x.bubbles.dispose();
 });
-test("Offscreen, disconnected and dead fighters never leave floating orphan chat bubbles", () => {
+test("Delayed first World snapshot is allowed; an offscreen living Knight retains speech", () => {
   const x = fixture();
   x.bubbles.received({channel:"local",sender:{netId:2},text:"Hello"});
   x.frame({remotes:[]});
+  assert.equal(x.bubbles.count,1,"server receipt may arrive before first actor snapshot");
   assert.equal(x.bubbles.root.children[0].hidden,true);
-  x.frame({remotes:[{netId:2,x:110,y:100,hp:0,action:-1}]});
-  assert.equal(x.bubbles.root.children[0].hidden,true);
+  x.frame({remotes:[{netId:2,x:110,y:100,hp:100,action:0}]});
+  assert.equal(x.bubbles.root.children[0].hidden,false);
   x.frame({remotes:[{netId:2,x:9000,y:100,hp:100,action:0}]});
+  assert.equal(x.bubbles.count,1,"offscreen alive remains a World member");
   assert.equal(x.bubbles.root.children[0].hidden,true);
   x.frame();
   assert.equal(x.bubbles.root.children[0].hidden,false);
-  x.bubbles.clear();
-  assert.equal(x.bubbles.count,0);
+  x.bubbles.dispose();
+});
+
+test("Death permanently retires overhead text, preventing stale respawn speech", () => {
+  const x = fixture();
+  x.bubbles.received({channel:"local",sender:{netId:2},text:"Before death"});
+  x.frame();
+  assert.equal(x.bubbles.count,1);
+  x.frame({remotes:[{netId:2,x:110,y:100,hp:0,action:-1}]});
+  assert.equal(x.bubbles.count,0,"death must evict rather than just hide");
+  x.frame();
+  assert.equal(x.bubbles.root.children.length,0,"respawned same ID must not inherit text");
+  x.bubbles.dispose();
+});
+
+test("Disappeared World actor retires speech; reconnect with reused netId cannot resurrect", () => {
+  const x = fixture();
+  x.bubbles.received({channel:"local",sender:{netId:2},text:"Old session"});
+  x.frame();
+  x.frame({remotes:[]});
+  assert.equal(x.bubbles.count,0,"authoritative roster removal retires actor speech");
+  x.frame({remotes:[{netId:2,x:110,y:100,hp:100,action:0}]});
   assert.equal(x.bubbles.root.children.length,0);
   x.bubbles.dispose();
 });
+
 test("Bubble fades and expires after 4.8s; two per fighter and eight global maximum", () => {
   const x=fixture();
   for(let i=0;i<16;i++) x.bubbles.received({channel:"local",sender:{netId:i+1},text:"Player "+i});
