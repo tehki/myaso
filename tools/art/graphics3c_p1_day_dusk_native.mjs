@@ -86,7 +86,7 @@ async function staticHost(){
  return "http://127.0.0.1:"+http.address().port;
 }
 function image(data){assert.match(data,/^data:image\/png;base64,/);const b=Buffer.from(data.split(",")[1],"base64");
- assert.equal(b.subarray(0,8).toString("hex"),"89504e470d0a1a0a0a");
+ assert.equal(b.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
  assert.equal(b.readUInt32BE(16),960);assert.equal(b.readUInt32BE(20),540);return b;}
 function percentile(values,p){const a=[...values].sort((x,y)=>x-y);return a[Math.floor((a.length-1)*p)];}
 await mkdir(out,{recursive:true});
