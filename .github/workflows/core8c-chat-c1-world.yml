@@ -1,0 +1,32 @@
+name: Core 8C C1 authenticated original World chat (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "server/src/chat.rs"
+      - "server/src/lib.rs"
+      - "server/src/main.rs"
+      - "server/tests/local_chat_multiplayer.rs"
+      - "docs/CHAT_C1_CORE8C_AUTHORITY.md"
+      - ".github/workflows/core8c-chat-c1-world.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-world-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Original Rust formatting — no combat alterations
+        run: cargo fmt --manifest-path server/Cargo.toml --all -- --check
+      - name: Bounded same-World Chat C1 routing — identities, positions, radius, rejoin
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib chat::tests -- --nocapture
+      - name: Actual pinned QUIC two/three/four-player local chat + gameplay coexistence
+        run: cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer -- --nocapture
+      - name: Compile unchanged original Combat World + network integration
+        run: cargo test --locked --manifest-path server/Cargo.toml --lib
