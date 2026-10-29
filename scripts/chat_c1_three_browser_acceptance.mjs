@@ -93,7 +93,7 @@ try {
  // authoritative action transitions. Snapshot stdout before any chat-owned
  // physical gesture; no synthetic client-side action table can substitute.
  await poll("original World own player Idle baseline before composer mouse",()=>{
-   const lines=stdout.match(/M201_(?:FLIGHT_ACTOR_BASELINE|AUTH_ACTION) tick=\\d+ fighter=1 (?:action|from)=\\d+(?: to=\\d+)?/g)||[];
+   const lines=stdout.match(/M201_(?:FLIGHT_ACTOR_BASELINE|AUTH_ACTION) tick=\d+ fighter=1 (?:action|from)=\d+(?: to=\d+)?/g)||[];
    const last=lines.at(-1)||"";
    const idle=/action=0$|to=0$/.test(last);
    return {ok:idle,last};
@@ -121,10 +121,10 @@ try {
  await delay(400); // Multiple genuine 60Hz World ticks beyond input packet ACK.
  const nativeWorldAfter=stdout.slice(genuineWorldBaseline);
  const leakedWorldActions=[...nativeWorldAfter.matchAll(
-   /M201_AUTH_ACTION tick=(\\d+) fighter=1 from=(\\d+) to=(\\d+)/g
+   /M201_AUTH_ACTION tick=(\d+) fighter=1 from=(\d+) to=(\d+)/g
  )].map(m=>({tick:Number(m[1]),from:Number(m[2]),to:Number(m[3])}));
  const leakedWorldHits=[...nativeWorldAfter.matchAll(
-   /M201_AUTH_HIT tick=(\\d+) attacker=1 target=(\\d+)/g
+   /M201_AUTH_HIT tick=(\d+) attacker=1 target=(\d+)/g
  )].map(m=>({tick:Number(m[1]),target:Number(m[2])}));
  assert.deepEqual(leakedWorldActions,[],
    "P0 authentic World actor1 action transition during chat composer input");
@@ -237,7 +237,7 @@ try {
  // Keep gameplay datagram ACK telemetry moving while the optional reliable
  // chat streams are connected. This is not full combat-under-chat acceptance.
  const ackSamples=async session=>evaljs(session,
-   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\\d+)/);const e=document.querySelector('#event-text')?.textContent||'';const tick=e.match(/server tick ([0-9]+)/);return {ok:!!n&&!!tick,samples:n?Number(n[1]):0,serverTick:tick?Number(tick[1]):null,diagnostics:t,eventText:e};");
+   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\d+)/);const e=document.querySelector('#event-text')?.textContent||'';const tick=e.match(/server tick ([0-9]+)/);return {ok:!!n&&!!tick,samples:n?Number(n[1]):0,serverTick:tick?Number(tick[1]):null,diagnostics:t,eventText:e};");
  const before=await poll("gameplay ACK diagnostics before movement",()=>ackSamples(a));
  await evaljs(a,"document.querySelector('#arena').focus();");
  await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"movement",actions:[{type:"keyDown",value:"w"}]}]});
