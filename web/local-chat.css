@@ -72,3 +72,56 @@
 .local-chat[data-open="true"] .local-chat-body { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 .local-chat-history { flex:1 1 auto; min-height:0; }
 .local-chat-form, .local-chat-status { flex:0 0 auto; }
+
+/* C1 authenticated, presentation-only overhead text. Anchors use the same
+   interpolated physical Knight positions/zoom as original Combat rendering. */
+.chat-c1-overheads {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  contain: layout paint;
+}
+.chat-c1-overhead {
+  position: absolute;
+  display: block;
+  width: max-content;
+  max-width: min(210px, 49%);
+  padding: 5px 9px;
+  border: 1px solid rgba(224, 191, 133, .85);
+  border-radius: 10px;
+  background: rgba(26, 22, 18, .94);
+  color: #f8ecd0;
+  font: 600 clamp(10px, 1.25vw, 13px)/1.35 ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+  text-shadow: 0 1px 1px #100d09;
+  overflow-wrap: anywhere;
+  transform: translate(-50%, -100%);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .5);
+  /* Full text remains available in the chronological chat panel. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.chat-c1-overhead[hidden] { display: none !important; }
+.chat-c1-overhead::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 5px);
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: #262019;
+  border-right: 1px solid rgba(224, 191, 133, .85);
+  border-bottom: 1px solid rgba(224, 191, 133, .85);
+  transform: rotate(45deg);
+}
+@media (max-width: 600px) {
+  .chat-c1-overhead { max-width: min(140px, 48%); padding: 3px 5px; font-size: 10px; }
+}
+@media (forced-colors: active) {
+  .chat-c1-overhead { background: Canvas; color: CanvasText; border-color: CanvasText; }
+}
