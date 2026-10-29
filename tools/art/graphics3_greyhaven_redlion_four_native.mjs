@@ -9,7 +9,9 @@ import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
 
-// Nonrelease QA: same real Rust/Chrome/Firefox Silver + Chat client with opt-in source-verified Greyhaven Red Lion.\n// Original 3B Blender assets, 3C World9 renderer and actor painter are exercised, never fake World players.\nconst root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
+// Nonrelease QA: same real Rust/Chrome/Firefox Silver + Chat client with opt-in source-verified Greyhaven Red Lion.
+// Original 3B Blender assets, 3C World9 renderer and actor painter are exercised, never fake World players.
+const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_GRAPHICS3_NATIVE_BROWSERS||"chrome,firefox,chrome,firefox").split(",");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
