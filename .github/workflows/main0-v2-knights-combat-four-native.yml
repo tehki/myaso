@@ -152,6 +152,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Build original server before bounded native bootstrap
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
       - name: Actual three-native release-profile Light threats
         run: |
           set -euo pipefail
