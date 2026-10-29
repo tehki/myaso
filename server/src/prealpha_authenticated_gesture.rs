@@ -251,6 +251,7 @@ impl SessionGestureWorldPath {
                 None
             };
             let mut proposed = self.authority.clone();
+            let jump_allowed = world.admits_review_jump_intent(self.binding.player_id);
             // An earlier one-hit World action must finish before new PRESS,
             // except for the original bounded final-90ms Light recovery buffer.
             // Preserve per-lease monotonic sequence/gesture replay tombstones.
@@ -258,6 +259,7 @@ impl SessionGestureWorldPath {
                 event.action,
                 GestureAction::Press | GestureAction::JumpAttack
             ) && (queued.is_some()
+                || (event.action == GestureAction::JumpAttack && jump_allowed)
                 || world
                     .fighter(self.binding.player_id)
                     .is_some_and(|f| f.action == Action::Idle))
@@ -268,14 +270,17 @@ impl SessionGestureWorldPath {
                     }
                 }
             }
-            let decision = proposed.process_typed(
+            let decision = proposed.process_world_typed(
                 lease_epoch,
                 typed.source,
                 event,
                 world.now_ms.round() as u64,
+                jump_allowed,
             );
             match decision.disposition {
                 Disposition::Accepted => {
+                    let new_jump_owner = event.action == GestureAction::JumpAttack
+                        && proposed.owns_pending_jump(event.gesture_id);
                     let pending_this_id = self
                         .pending_light
                         .is_some_and(|(id, _)| id == event.gesture_id);
@@ -307,7 +312,7 @@ impl SessionGestureWorldPath {
                         // the authoritative fighter returns to Idle.
                         if (event.action == GestureAction::Press
                             && matches!(decision.command, Command::BeginLightWindup))
-                            || event.action == GestureAction::JumpAttack
+                            || new_jump_owner
                         {
                             // A new source0 press retires any expired prior
                             // chord rather than attacking from two owners.
@@ -320,7 +325,8 @@ impl SessionGestureWorldPath {
                         } else if pending_this_id && event.action == GestureAction::Cancel {
                             self.pending_light = None;
                         }
-                        if event.action == GestureAction::JumpAttack {
+                        if new_jump_owner {
+                            self.pending_light = None;
                             self.pending_jump = Some((event.gesture_id, world.tick));
                             self.flush_jump_under_world_lock(world);
                         }

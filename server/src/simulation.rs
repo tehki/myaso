@@ -771,6 +771,34 @@ impl World {
         true
     }
 
+    // Admission is only intent: the existing sampled Jump must still commit
+    // its original stamina debit before the session can request JumpAttack.
+    pub(crate) fn admits_review_jump_intent(&self, net_id: u32) -> bool {
+        let Some(f) = self.fighter(net_id) else {
+            return false;
+        };
+        if self.match_over() || f.hp <= 0.0 {
+            return false;
+        }
+        if f.action == Action::Jump {
+            return true;
+        }
+        if f.stamina + EPSILON < JUMP_STAMINA_COST
+            || f.latest_input.block
+            || f.latest_input.dodge
+            || f.latest_input.kick
+            || f.latest_input.dash
+        {
+            return false;
+        }
+        f.action == Action::Idle
+            || (matches!(
+                f.action,
+                Action::AttackRecovery | Action::AttackLeftRecovery | Action::AttackRightRecovery
+            ) && f.action_duration_ms - f.action_elapsed_ms > 0.0
+                && f.action_duration_ms - f.action_elapsed_ms <= JUMP_BUFFER_WINDOW_MS + EPSILON)
+    }
+
     pub(crate) fn capture_queued_lmb_light(&self, net_id: u32) -> Option<QueuedLmbLight> {
         let f = self.fighter(net_id)?;
         let remaining = f.action_duration_ms - f.action_elapsed_ms;

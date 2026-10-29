@@ -134,6 +134,21 @@ impl GestureAuthority {
         event: GestureEvent,
         server_ms: u64,
     ) -> Decision {
+        self.process_world_typed(lease, source, event, server_ms, true)
+    }
+
+    pub(crate) fn owns_pending_jump(&self, id: u32) -> bool {
+        self.phase == Phase::JumpPending && self.active_id == Some(id)
+    }
+
+    pub(crate) fn process_world_typed(
+        &mut self,
+        lease: u64,
+        source: GestureSource,
+        event: GestureEvent,
+        server_ms: u64,
+        jump_allowed: bool,
+    ) -> Decision {
         // E is reserved for future Use. Never admit its legacy Combat source.
         if source == GestureSource::KeyE {
             return Decision::rejected();
@@ -175,9 +190,12 @@ impl GestureAuthority {
             // Its PRESSED/terminal edges are still real transport inputs and
             // must not fatally retire the shared Core8A outbox. Retire them as
             // no-combat events, not as a second attack or a fabricated hit.
-            GestureAction::Press
-                if self.active_id.is_some()
-                    && (self.active_source != Some(source) || self.released)
+            GestureAction::Press | GestureAction::JumpAttack
+                if ((self.active_id.is_some()
+                    && (self.active_source != Some(source) || self.released))
+                    || (event.action == GestureAction::JumpAttack
+                        && !jump_allowed
+                        && self.active_id.is_none()))
                     && self.busy_source.is_none()
                     && event.gesture_id > self.highest_gesture_id =>
             {
