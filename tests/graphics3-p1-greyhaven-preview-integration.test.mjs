@@ -18,11 +18,11 @@ test("Graphics 3 P1 is deliberately double opt-in and excluded from QA scenarios
   assert.match(client,/!params\.has\("scenario"\)/);
   assert.match(client,/if \(greyhavenPreviewRequested\) \{\s*void Promise\.all\(\[/);
   assert.match(client,/import\("\.\.\/src\/browser\/authored-world-renderer\.mjs"\)/);
-  assert.match(client,/if \(greyhavenPreview && local\.initialized\)/);
+  assert.match(client,/if \(!redLionFrame && greyhavenPreview && local\.initialized\)/);
   assert.match(client,/greyhavenPreview\.renderer\.draw\(ctx, greyhavenPreview\.mapId,\s*visualCameraPosition/);
   assert.match(client,/greyhavenPreview = null;/);
   assert.doesNotMatch(client,/^import .*authored-world-renderer/m);
-  const graphicsDrawSection=client.split("// Decorative authored roads, terrain, trees and World-owned building outlines")[1]?.split("for (const entity of networkClient.state.values())")[0];
+  const graphicsDrawSection=client.split("// The real original Blender A2.32 Red Lion facade")[1]?.split("for (const entity of networkClient.state.values())")[0];
   assert.ok(graphicsDrawSection,"new P1 render section must exist");
   assert.doesNotMatch(graphicsDrawSection,/networkClient\.(sendInput|state\.set)|local\.[xy]\s*=/);
 });

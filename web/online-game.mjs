@@ -137,6 +137,18 @@ if (greyhavenPreviewRequested) {
     greyhavenPreview = {renderer: createAuthoredWorldRenderer(), mapId: MAP_IDS.overworld};
   }).catch(() => { greyhavenPreview = null; });
 }
+// Separate original 3B A2.32 review: source SHA/size are verified before
+// World9 may suppress its one approved "red-lion" placeholder. Never load
+// these optional image assets in the Combat/Chat default or acceptance lab.
+let redLionPreview = null;
+if (greyhavenPreviewRequested && params.get("redlion") === "1") {
+  void import("../src/browser/red-lion-live-art.mjs").then(async module => {
+    const art = module.createOriginalRedLionLiveArt();
+    if (await art.load()) {
+      redLionPreview = {art, draw: module.drawScreenLayerInZoomedGame};
+    }
+  }).catch(() => { redLionPreview = null; });
+}
 // Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
 // Knights via the official lobby knights=1. Direct legacy Combat test URLs
 // and rollback without this flag keep original Combat-circle visuals.
@@ -1296,19 +1308,33 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-  // Decorative authored roads, terrain, trees and World-owned building outlines
-  // share the real reconciled camera with Silver Knights. Do not override
-  // server actor coordinates or fabricate building interactions.
-  if (greyhavenPreview && local.initialized) {
+  // The real original Blender A2.32 Red Lion facade may replace only the
+  // canonical World9 "red-lion" placeholder, AFTER all source hashes decode.
+  // Prepare world+facade offscreen, or retain the regular authored placeholder.
+  let redLionFrame = null;
+  if (redLionPreview && local.initialized) {
+    try {
+      redLionFrame = redLionPreview.art.prepare(visualCameraPosition,
+        canvas.width, canvas.height, ARENA_VIEW_ZOOM,
+        params.get("dusk") === "1" ? "dusk" : "day");
+      if (redLionFrame)
+        redLionPreview.draw(ctx, redLionFrame.world,
+          canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    } catch {
+      // No partial authoring contract can take over real Combat or Chat.
+      redLionPreview = null;
+      redLionFrame = null;
+    }
+  }
+  if (!redLionFrame && greyhavenPreview && local.initialized) {
     try {
       greyhavenPreview.renderer.draw(ctx, greyhavenPreview.mapId,
         visualCameraPosition, canvas.width, canvas.height, ARENA_VIEW_ZOOM);
     } catch {
-      // Fail closed to the unchanged arena floor on the next frame. Never
-      // allow a P1 art failure to break authenticated Combat or Chat C1.
       greyhavenPreview = null;
     }
   }
+  const redLionActorsInFront = redLionFrame ? [] : null;
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
@@ -1318,18 +1344,33 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       remoteScratch.set(entity.netId, scratch);
     }
     const sampled = networkClient.remoteInterpolator.sample(entity.netId, renderServerTick, scratch) ?? entity;
-    // Keep all remote sprites for the screen-space HUD pass. The offscreen
-    // pointer helper excludes dead fighters on its own.
-    visibleEnemyPositions.push(sampled);
+    // Do not reveal a genuine remote name/HP or offscreen marker THROUGH the
+    // verified opaque Red Lion facade. The default arena list stays identical.
+    const inFront = !redLionFrame || !redLionPreview.art.behindFacade(sampled);
+    if (inFront) visibleEnemyPositions.push(sampled);
     const damageTell = remoteDamage.visible(entity.netId, nowMs);
     const recoveryTell = entity.netId === recoveryFocusNetId;
-    drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
+    if (redLionFrame && inFront) {
+      redLionActorsInFront.push({sampled, damageTell, recoveryTell});
+    } else {
+      drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
+    }
   }
-  // Presentation only: bind the local Silver animation cache to the same
-  // authenticated server actor identity already used for remote Knights.
+  // Presentation only: keep exact real actor identity and Silver source art.
+  const ownBehindRedLion = !!(redLionFrame && redLionPreview.art.behindFacade(local));
   if (ownId && local.initialized) {
     local.netId = ownId;
-    drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+    if (!redLionFrame || ownBehindRedLion)
+      drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
+  }
+  if (redLionFrame) {
+    // Validated World9 y=4075 depth, not a gameplay collision/portal rule.
+    redLionPreview.draw(ctx, redLionFrame.facade,
+      canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    for (const {sampled, damageTell, recoveryTell} of redLionActorsInFront)
+      drawFighterWorld(sampled, "#b96350", "#47251f", damageTell, recoveryTell);
+    if (ownId && local.initialized && !ownBehindRedLion)
+      drawFighterScreen(canvas.width / 2, canvas.height / 2, local, "#e2d5b4", "#51452d");
   }
   ctx.restore();
   // R1 wider view: health/guard bars and player identity badges are UI,
