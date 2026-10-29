@@ -74,9 +74,12 @@ test("C1 bootstrap and real-client focus cleanup remain explicit", () => {
   const boot = readFileSync(new URL("../web/bootstrap.mjs", import.meta.url), "utf8");
   for (const path of ["game.mjs", "online-game.mjs"]) {
     const src = readFileSync(new URL("../web/" + path, import.meta.url), "utf8");
-    assert.match(src, /canvas\.addEventListener\("blur", releaseInputs\)/);
     assert.match(src, /canvas\.addEventListener\("keydown",/);
   }
+  const offline = readFileSync(new URL("../web/game.mjs", import.meta.url), "utf8");
+  assert.match(offline, /window\.addEventListener\("blur", releaseInputs\)/);
+  const onlineLive = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(onlineLive, /canvas\.addEventListener\("blur", releaseInputs\)/);
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(online, /void import\("\.\.\/src\/browser\/chat-c1-activation\.mjs"\)/);
   assert.match(online, /activateChatC1Preview/);
