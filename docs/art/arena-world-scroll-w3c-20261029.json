@@ -1,0 +1,12 @@
+{
+  "worldAdmission": "Online - player #1 - server tick 66",
+  "pixelSamples": 960,
+  "unchangedIdleChannels": 960,
+  "changedMovementChannels": 294,
+  "sampleAtBefore": "b60f38699e0e3619a87d72c66983272fbc5ca89c8730c2498c6d4c4c967ec8ea",
+  "sampleAtIdle": "b60f38699e0e3619a87d72c66983272fbc5ca89c8730c2498c6d4c4c967ec8ea",
+  "sampleAtAfterMovement": "8f82c1e0965313619f35daa9eaa085943f48a1755c40e14c2e6d3f59f733d85c",
+  "sourceHead": "local branch",
+  "server": "actual original Rust World",
+  "movement": "W3C physical key D 750ms"
+}
