@@ -24,6 +24,9 @@ fn start_server() -> (TestServer, String, Sha256Digest) {
     start_server_with_gestures(false)
 }
 fn start_server_with_gestures(gestures: bool) -> (TestServer, String, Sha256Digest) {
+    start_server_profile(gestures, false)
+}
+fn start_server_profile(gestures: bool, instant_lmb: bool) -> (TestServer, String, Sha256Digest) {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myaso-server"))
         .env("MYASO_BIND", "127.0.0.1:0")
         .env("MYASO_CHAT_RADIUS", "160")
@@ -31,6 +34,10 @@ fn start_server_with_gestures(gestures: bool) -> (TestServer, String, Sha256Dige
         .env(
             "MYASO_EXPERIMENTAL_GESTURE_V2",
             if gestures { "1" } else { "0" },
+        )
+        .env(
+            "MYASO_INSTANT_LMB_ENABLED",
+            if instant_lmb { "1" } else { "0" },
         )
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -213,6 +220,30 @@ async fn real_chat_and_gesture_negotiation_coexist_in_both_orders_with_idle_lega
     let id = assert_result(&bob.receive().await, 902, 0);
     assert_eq!(
         assert_received(&alice.receive().await, 2, "Idle chat first, gesture next"),
+        id
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_instant_lmb_release_profile_grants_without_experimental_flags_and_preserves_chat() {
+    let (_server, url, digest) = start_server_profile(false, true);
+    let mut alice = Player::connect_ordered(&url, &digest, Some(true)).await;
+    let mut bob = Player::connect_ordered(&url, &digest, Some(false)).await;
+    alice.send(921, b"Release capability before chat", 1).await;
+    let id = assert_result(&alice.receive().await, 921, 0);
+    assert_eq!(
+        assert_received(&bob.receive().await, 1, "Release capability before chat"),
+        id
+    );
+    bob.send(922, b"Idle chat before release capability", 1)
+        .await;
+    let id = assert_result(&bob.receive().await, 922, 0);
+    assert_eq!(
+        assert_received(
+            &alice.receive().await,
+            2,
+            "Idle chat before release capability"
+        ),
         id
     );
 }

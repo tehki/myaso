@@ -21,6 +21,9 @@ export function parseAlphaConfig(raw, expectedHost = "game.open-trust-layer.org"
   if (raw.chatC1Enabled !== undefined && typeof raw.chatC1Enabled !== "boolean") {
     throw new TypeError("chat C1 rollout must be a boolean");
   }
+  if (raw.instantLmbEnabled !== undefined && typeof raw.instantLmbEnabled !== "boolean") {
+    throw new TypeError("instant LMB rollout must be a boolean");
+  }
   // Operator-owned first-party release profile; keep original five clips as
   // default until Main enables art in the served, certificate-pinned config.
   if (raw.silverKnightRelitEnabled !== undefined && typeof raw.silverKnightRelitEnabled !== "boolean") {
@@ -31,6 +34,7 @@ export function parseAlphaConfig(raw, expectedHost = "game.open-trust-layer.org"
     certificateSha256: raw.certificateSha256.toLowerCase(),
     maxPlayers: raw.maxPlayers,
     ...(raw.chatC1Enabled === true ? {chatC1Enabled: true} : {}),
+    ...(raw.instantLmbEnabled === true ? {instantLmbEnabled: true} : {}),
     ...(raw.silverKnightRelitEnabled === true ? {silverKnightRelitEnabled: true} : {}),
   });
 }
@@ -48,5 +52,6 @@ export function alphaPlayPath(config) {
     // Only a trusted, operator-served alpha config can advertise chat.
     // The Rust server separately requires MYASO_CHAT_C1_ENABLED=1.
     ...(config.chatC1Enabled === true ? {chatC1: "1"} : {}),
+    ...(config.instantLmbEnabled === true ? {instantLmb: "1"} : {}),
   });
 }

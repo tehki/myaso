@@ -23,7 +23,7 @@ test("4A cancel is exact-pointer scoped; stale capture-loss cannot cancel a newe
     leftButtonDown: true,
     leftButtonPressMovement: { moveX: 1, moveY: 0 },
     chordedLeftDown: true,
-    reviewedGestureLab: false,
+    typedLmbEnabled: false,
   };
   runInNewContext(source.slice(start, end), context);
   assert.equal(typeof context.cancelActiveLeftPointer, "function");
@@ -87,7 +87,7 @@ test("4A genuine pointerUP rejects stale pointer ID without erasing the next ges
     leftButtonDown: true,
     leftButtonPressMovement: { moveX: 1, moveY: -1 },
     middleBlockHeld: false,
-    reviewedGestureLab: false,
+    typedLmbEnabled: false,
     m111InputProbe: null,
     audio: { isUnlocked: () => true },
     updateMouse: () => { moved++; },

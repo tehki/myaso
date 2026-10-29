@@ -26,7 +26,7 @@ function harness(phase){
   const context={canvas,createLeftButtonCharge,captureLightAttackMovement,resolveLightAttackReleaseMovement,
     COMBAT,COMBAT_ACTION,NETWORK,performance:{now:()=>clock},Date:{now:()=>clock},
     audio:{play(){},isUnlocked:()=>true},keys:new Set(),local:{action:0,initialized:true,x:300,y:300,facing:0,hp:100,guard:100,stamina:100},
-    reviewedGestureLab:false,matchOver:false,currentInput:{},predictionStep:phase,clientTick:57,
+    typedLmbEnabled:false,matchOver:false,currentInput:{},predictionStep:phase,clientTick:57,
     networkClient:{sendInput(sample){sent.push({...sample});}},markStaminaDenialSubmitted(){},
     acceptanceScenario:"uirollknockdownffahit",m111InputProbe:null,pendingStaminaDenial:null,
     rightButtonGesture:{isRunning:()=>false,cancel(){}},queueStaminaDenial(){},

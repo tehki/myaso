@@ -21,7 +21,8 @@ import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-
 import { paintArenaLiteFloor } from "../src/browser/prealpha-arena-lite-floor.mjs";
 import { createWorldAnchoredArenaFloor } from "../src/browser/arena-world-floor.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
-import { activateLoopbackGestureLab } from "./prealpha-gesture-live-lab.mjs";
+import { activateLoopbackGestureLab, activateInstantLmb } from "./prealpha-gesture-live-lab.mjs";
+import { resolveInstantLmbProfile } from "../src/browser/instant-lmb-activation.mjs";
 
 const canvas = document.querySelector("#arena");
 const chargeHud = {
@@ -177,7 +178,8 @@ const m147InputProbe = acceptanceScenario === "uijumppunishffa"
 if (m147InputProbe) window.__MYASO_M147_INPUT_PLANE__ = m147InputProbe.events;
 const cert = params.get("cert");
 // Opt-in NONRELEASE: the actual game page and the ORIGINAL pinned Rust World
-// must both be loopback. Public /web/ and official lobby never select v2.
+// must both be loopback. The separate operator-owned instant-LMB release
+// profile below never turns this experimental query into public authority.
 const gestureLabRequested = params.get("gestureLab") === "1";
 // P0 extension only: requires explicit opt-in on both localhost endpoints.
 const jumpCombatReviewRequested = params.get("jumpCombatReview") === "1";
@@ -191,6 +193,12 @@ if (gestureLabRequested && !reviewedGestureLab) {
 if (jumpCombatReviewRequested && !reviewedGestureLab) {
   throw new Error("JumpAttack review requires original loopback gestureLab");
 }
+const instantLmbProfile = await resolveInstantLmbProfile(window.location);
+if ((params.get("instantLmb") === "1" || params.get("instantLmbPreview") === "1")
+    && !instantLmbProfile.enabled) {
+  throw new Error("Combat controls are unavailable. Return to the game lobby.");
+}
+const typedLmbEnabled = reviewedGestureLab || instantLmbProfile.enabled;
 const privateHitLabRequested = params.get("hitDeliveryLab") === "1";
 // Private receipts require the actor proven by an actual processed-input ACK.
 // The first sender frame runs only after module initialization; awaiting that
@@ -310,7 +318,7 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (event.button === 0) {
-    if (reviewedGestureLab) return; // v2 capture owns edge, no sampled attack
+    if (typedLmbEnabled) return; // one typed owner, no sampled LMB attack
     leftButtonDown = true;
     leftButtonPressMovement = captureLightAttackMovement(keys);
     leftButtonCharge.press(event.pointerId, {
@@ -325,7 +333,7 @@ function onLeftPointerUp(event) {
     return;
   }
   if (event.button !== 0) return;
-  if (reviewedGestureLab) return; // v2 capture owns physical terminal
+  if (typedLmbEnabled) return; // one typed owner handles physical terminal
   if (typeof m147InputProbe !== "undefined") m147InputProbe?.pointerUp(event);
   updateMouse(event);
   if (typeof m147InputProbe !== "undefined") m147InputProbe?.releaseInvocation();
@@ -355,7 +363,7 @@ canvas.addEventListener("pointerup", onLeftPointerUp);
 const CHORDED_LEFT_POINTER_ID = -1;
 let chordedLeftDown = false;
 canvas.addEventListener("mousedown", (event) => {
-  if (reviewedGestureLab || event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
+  if (typedLmbEnabled || event.button !== 0 || !(event.buttons & 2) || leftButtonCharge.isPressed()) return;
   canvas.focus();
   updateMouse(event);
   leftButtonDown = true;
@@ -366,7 +374,7 @@ canvas.addEventListener("mousedown", (event) => {
   });
 });
 function onChordedLeftMouseUp(event) {
-  if (reviewedGestureLab || event.button !== 0 || !chordedLeftDown) return;
+  if (typedLmbEnabled || event.button !== 0 || !chordedLeftDown) return;
   chordedLeftDown = false;
   leftButtonDown = false;
   updateMouse(event);
@@ -380,7 +388,7 @@ window.addEventListener("pointerup", onLeftPointerUp);
 // One pointer-owned cancellation path; pointercancel may report button=-1.
 // Never clear a newer LMB gesture for stale pointer capture loss.
 function cancelActiveLeftPointer(pointerId) {
-  if (reviewedGestureLab) return false; // selected v2 gate owns its own input
+  if (typedLmbEnabled) return false; // selected typed gate owns its own input
   if (!leftButtonCharge.cancel(pointerId)) return false;
   leftButtonDown = false;
   leftButtonPressMovement = null;
@@ -548,9 +556,10 @@ networkClient = await connectAuthoritativeClient({
 // Original first-party game-page v2 lab: this is the ONLY experimental
 // source0 LMB-only Combat gesture path. Key E is reserved for Use. A denied grant
 // closes the connection: there is NEVER a fallback phantom v1 attack.
-if (reviewedGestureLab) {
+if (typedLmbEnabled) {
   try {
-    experimentalGestureLab = await activateLoopbackGestureLab({
+    const activateLmb = instantLmbProfile.enabled ? activateInstantLmb : activateLoopbackGestureLab;
+    experimentalGestureLab = await activateLmb({
       gameClient: networkClient, canvas, windowObj: window,
       documentObj: document, getClientTick: () => clientTick >>> 0,
       isJumpAttackChord: () => jumpRequested || keys.has("Space")
@@ -611,6 +620,10 @@ if (reviewedGestureLab) {
     }
   } catch (error) {
     networkClient?.close("original World gesture grant rejected");
+    if (instantLmbProfile.enabled) {
+      networkStatus = "Combat controls could not connect. Reload to retry.";
+      setStatus(networkStatus);
+    }
     throw error;
   }
 }
@@ -1028,8 +1041,8 @@ function sampleInput({ playStepAudio = true } = {}) {
     ? committedLightMove.moveY : (keys.has("KeyS") ? 1 : 0) - (keys.has("KeyW") ? 1 : 0);
   currentInput.facing = Math.atan2(mouse.y - canvas.height / 2, mouse.x - canvas.width / 2);
   const leftChargeHeld = leftButtonCharge.isCharging();
-  currentInput.attack = !reviewedGestureLab && (attackRequested || leftChargeHeld);
-  currentInput.heavyAttack = !reviewedGestureLab && (heavyAttackRequested || leftChargeHeld);
+  currentInput.attack = !typedLmbEnabled && (attackRequested || leftChargeHeld);
+  currentInput.heavyAttack = !typedLmbEnabled && (heavyAttackRequested || leftChargeHeld);
   currentInput.dodge = rollRequested;
   currentInput.dash = dashRequested;
   currentInput.block = middleBlockHeld || performance.now() < shortBlockUntil;
@@ -1096,7 +1109,7 @@ function simulatePrediction(stepMs) {
     // reached the Rust World. Preserve attack/release and quiet samples too.
     // QA only, original packet/World/render path remains byte-for-byte intact.
     if ((acceptanceScenario === "uidirectionallight"
-      || acceptanceScenario === "uijumppunishffa") && !reviewedGestureLab) {
+      || acceptanceScenario === "uijumppunishffa") && !typedLmbEnabled) {
       const debug = window.__MYASO_ACCEPTANCE_STATE__;
       if (debug) {
         debug.m121SentSamples ??= [];

@@ -8,8 +8,9 @@ test("M121 original v1 server receipt trace is loopback gated, World-locked and 
   const source = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
 
   assert.ok(server.includes('env::var("MYASO_FLIGHT_M121_INPUT_PROOF")'));
-  assert.ok(server.includes('!bind.ip().is_loopback() || !flight_action_proof || v2_lab'),
-    "never allow M121 v1 observation on public binds or experimental v2");
+  assert.ok(server.includes('let gesture_enabled = instant_lmb || v2_lab;'));
+  assert.ok(server.includes('!bind.ip().is_loopback() || !flight_action_proof || gesture_enabled'),
+    "never allow M121 v1 observation on public binds or either typed LMB profile");
   assert.ok(native.includes('MYASO_FLIGHT_M121_INPUT_PROOF: scenario === "uidirectionallight" || scenario === "uirollknockdownffahit" || scenario === "uijumppunishffa" ? "1" : "0"'));
   assert.ok(native.includes('|| scenario === "uidirectionallight"'));
   assert.ok(server.includes("let accepted = ingress.ingest(&packet);"));

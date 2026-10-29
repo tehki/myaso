@@ -599,6 +599,8 @@ async function startGameServer() {
     env: {
       ...process.env,
       MYASO_BIND: "127.0.0.1:0",
+      MYASO_INSTANT_LMB_ENABLED: process.env.MYASO_PVP_INSTANT_LMB === "1" ? "1" : "0",
+      MYASO_EXPERIMENTAL_GESTURE_V2: "0",
       MYASO_FLIGHT_ACTION_PROOF: (scenario === "uiguardbreakpunishffahit"
         || scenario === "uiguardbreakpunishffa"
         // M173 exact original World same-tick Jump stamina-spend evidence.
@@ -699,6 +701,7 @@ async function navigate(session, gameUrl, certificateHash) {
   const url = new URL(`http://127.0.0.1:${staticPort}/web/${page}`);
   url.searchParams.set("server", gameUrl);
   url.searchParams.set("cert", certificateHash);
+  if (process.env.MYASO_PVP_INSTANT_LMB === "1") url.searchParams.set("instantLmbPreview", "1");
   if (scenario !== "ui") {
     url.searchParams.set("duration", String(durationMs));
     url.searchParams.set("scenario", scenario);

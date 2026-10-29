@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { activateLoopbackGestureLab } from "../web/prealpha-gesture-live-lab.mjs";
+import { activateLoopbackGestureLab, activateInstantLmb } from "../web/prealpha-gesture-live-lab.mjs";
 import { decodeProposedTypedGestureEvent } from "../src/network/prealpha-lmb-gesture-proposal.mjs";
 
 function event(type, fields) {
@@ -13,15 +13,17 @@ function createFixture(pageHost="localhost",serverHost="127.0.0.1") {
   const canvas=new EventTarget(),win=new EventTarget(),doc=new EventTarget(),wire=[];
   doc.activeElement=canvas; doc.hidden=false;
   win.location={hostname:pageHost};
-  let grantCalls=0, closed=false;
+  let grantCalls=0, instantCalls=0, closed=false;
   const gameClient={
     transport:{webTransportUrl:"https://"+serverHost+":4433/game"},
     async negotiateExperimentalGestureV2(){grantCalls++;return true;},
+    async negotiateInstantLmb(){instantCalls++;return true;},
     async sendExperimentalGestureEdge(bytes){wire.push(decodeProposedTypedGestureEvent(bytes));},
     close(){closed=true;},
   };
   return {canvas,win,doc,wire,gameClient,
     get grantCalls(){return grantCalls;},get closed(){return closed;},
+    get instantCalls(){return instantCalls;},
     options:{gameClient,canvas,windowObj:win,documentObj:doc,getClientTick:()=>5},
   };
 }
@@ -38,6 +40,59 @@ test("actual first-party pointerdown submits source0 light PRESS before mouse up
   await settleMicrotasks();
   assert.deepEqual(f.wire.filter(e=>e.action===3).map(e=>e.source),[0]);
   assert.equal(lab.outbox.snapshot.activeSources.length,0);
+ }finally{lab.close("test");}
+});
+
+test("trusted release profile owns the same physical PRESS without experimental public activation or diagnostics",async()=>{
+ const f=createFixture("game.open-trust-layer.org","game.open-trust-layer.org");
+ const pin="ab".repeat(32),server=f.gameClient.transport.webTransportUrl;
+ f.win.location=new URL("https://game.open-trust-layer.org/web/?instantLmb=1&server="+encodeURIComponent(server)+"&cert="+pin);
+ f.options.fetchConfig=async()=>({ok:true,json:async()=>({serverUrl:server,certificateSha256:pin,maxPlayers:8,instantLmbEnabled:true})});
+ const lab=await activateInstantLmb(f.options);
+ try {
+  assert.equal(f.instantCalls,1);assert.equal(f.grantCalls,0);
+  assert.equal(Object.hasOwn(f.win,"__MYASO_LOCAL_GESTURE_PROOF__"),false);
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:31,button:0,buttons:1}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>[e.source,e.action]),[[0,1]]);
+  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:31,button:0,buttons:0}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,3]);
+ }finally{lab.close("test");}
+});
+
+test("hidden page immediately flushes its physical CANCEL before any retry or Light deadline",async()=>{
+ const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
+ try {
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:32,button:0,buttons:1}));
+  await settleMicrotasks();
+  f.doc.hidden=true;f.doc.dispatchEvent(event("visibilitychange",{}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,4]);
+  assert.equal(f.wire.some(e=>e.action===3),false,"hiding is not a physical UP");
+ }finally{lab.close("test");}
+});
+
+test("trusted release configuration cannot authorize a different existing game connection",async()=>{
+ const f=createFixture("game.open-trust-layer.org","foreign.example");
+ const server="https://game.open-trust-layer.org:4433/game",pin="ab".repeat(32);
+ f.win.location=new URL("https://game.open-trust-layer.org/web/?instantLmb=1&server="+encodeURIComponent(server)+"&cert="+pin);
+ f.options.fetchConfig=async()=>({ok:true,json:async()=>({serverUrl:server,certificateSha256:pin,maxPlayers:8,instantLmbEnabled:true})});
+ await assert.rejects(activateInstantLmb(f.options),/trusted release profile/);
+ assert.equal(f.instantCalls,0);assert.equal(f.grantCalls,0);assert.equal(f.wire.length,0);
+});
+
+test("canvas focus loss immediately cancels a held pointer without inventing UP or waiting for retries",async()=>{
+ const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);
+ try {
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:33,button:0,buttons:1}));
+  await settleMicrotasks();
+  f.canvas.dispatchEvent(event("blur",{}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,4]);
+  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:33,button:0,buttons:0}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,4],"later physical UP cannot reopen a cancelled source");
  }finally{lab.close("test");}
 });
 
@@ -126,12 +181,13 @@ test("blur/pagehide retires source owner, never sends a phantom RELEASE or reuse
 test("original player-facing online client mutually excludes legacy v1 attack writer in opt-in lab",()=>{
  const game=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
  assert.match(game,/if \(gestureLabRequested && !reviewedGestureLab\)/);
- assert.match(game,/currentInput\.attack = !reviewedGestureLab &&/);
- assert.match(game,/currentInput\.heavyAttack = !reviewedGestureLab &&/);
+ assert.match(game,/const typedLmbEnabled = reviewedGestureLab \|\| instantLmbProfile.enabled/);
+ assert.match(game,/currentInput\.attack = !typedLmbEnabled &&/);
+ assert.match(game,/currentInput\.heavyAttack = !typedLmbEnabled &&/);
  assert.match(game,/if \(event\.code === "KeyE"\) return;/);
  assert.match(game,/onExperimentalGestureAck\(bytes, lease\)/);
- assert.match(game,/await activateLoopbackGestureLab\(/);
- assert.match(game,/if \(reviewedGestureLab\) return; \/\/ v2 capture owns edge/);
+ assert.match(game,/instantLmbProfile.enabled \? activateInstantLmb : activateLoopbackGestureLab/);
+ assert.match(game,/if \(typedLmbEnabled\) return; \/\/ one typed owner/);
 });
 
 

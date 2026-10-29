@@ -204,6 +204,12 @@ export async function connectAuthoritativeClient({
       }
       return transport.negotiateExperimentalGestureV2(options);
     },
+    negotiateInstantLmb(options) {
+      if (transport.kind !== "webtransport") {
+        throw new Error("instant LMB requires native QUIC transport");
+      }
+      return transport.negotiateInstantLmb(options);
+    },
     sendExperimentalGestureEdge(bytes) {
       if (transport.kind !== "webtransport") {
         throw new Error("original typed Combat requires native QUIC transport");

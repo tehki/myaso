@@ -15,6 +15,8 @@ const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
 const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
+const instantLmb=process.env.MYASO_LIVE_GESTURE_INSTANT_LMB==="1";
+assert.ok(!instantLmb||!["private-hit","space-guard"].includes(physicalMode),"select a release-profile Combat acceptance mode");
 assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
@@ -58,7 +60,7 @@ async function startOriginalRust(){
  const bin=join(root,"server","target","debug","myaso-server");
  const build=spawnSync("cargo",["build",...(physicalMode==="private-hit"?["--features","experimental-hit-delivery-lab"]:[]),...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
- const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_CHAT_C1_ENABLED:chatC1?"1":"0",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_EXPERIMENTAL_JUMP_ATTACK_V2:["jump-review","jump-two-hit"].includes(physicalMode)?"1":"0",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_CHAT_C1_ENABLED:chatC1?"1":"0",MYASO_INSTANT_LMB_ENABLED:instantLmb?"1":"0",MYASO_EXPERIMENTAL_GESTURE_V2:instantLmb?"0":"1",MYASO_EXPERIMENTAL_JUMP_ATTACK_V2:!instantLmb&&["jump-review","jump-two-hit"].includes(physicalMode)?"1":"0",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
  child.stdout.on("data",d=>buffer+=d.toString());
  child.stderr.on("data",d=>err+=d.toString());
@@ -421,7 +423,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   actors.splice(actors.indexOf(old),1);
   await waitFor(async()=>{const all=await readAll();return all.every(r=>r.proof.replicatedFighters.length===3&&!own(r.proof,2));},12000);
   const s=await startW3C(old.s.engine,4),u=new URL(host+"/web/index.html");
-  for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",arenaGrid:"1",gestureLab:"1"}))u.searchParams.set(k,v);
+  for(const [k,v] of Object.entries({server:rustUrl,cert,knights:"1",knightArt:"relit",arenaGrid:"1",...(instantLmb?{instantLmbPreview:"1"}:{gestureLab:"1"})}))u.searchParams.set(k,v);
   if(chatC1)u.searchParams.set("chatC1Preview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const joined=await waitFor(async()=>{const p=await evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");return p?.ownPlayerNetId===5&&p.transportState==="granted"?p:false;},16000);
@@ -468,7 +470,7 @@ try{
  const seatCount=["space-guard","jump-review"].includes(physicalMode)?1:physicalMode==="jump-two-hit"?2:4;
  for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");u.searchParams.set(instantLmb?"instantLmbPreview":"gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(!instantLmb&&["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
   if(chatC1)u.searchParams.set("chatC1Preview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000).catch(async error=>{
@@ -1299,8 +1301,44 @@ try{
   actualIndependentHumanOperators:false,publicListener:false,
  }));
  }
- if(chatC1&&physicalMode==="held-lmb")await nativeChatRound("After physical Heavy release");
- const report={physicalMode,chatC1,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
+ if(chatC1&&physicalMode==="held-lmb") {
+  const s=actors[0].s,id=actors[0].actor.id,start=readAuthoritativeWorld().length;
+  const proof=()=>evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+  await waitFor(async()=>{const p=await proof();return p?.replicatedFighters?.find(f=>f.netId===id)?.action===0;});
+  const source=(await proof()).nextSequence;
+  const pointer=pressed=>request(s.base,"POST","/session/"+s.id+"/actions",{actions:[{
+   type:"pointer",id:"real-held-lmb",parameters:{pointerType:"mouse"},
+   actions:[{type:pressed?"pointerDown":"pointerUp",button:0}],
+  }]});
+  const key=value=>request(s.base,"POST","/session/"+s.id+"/actions",{actions:[{
+   type:"key",id:"actual-cancel-chat",actions:[{type:"keyDown",value},{type:"keyUp",value}],
+  }]});
+  await pointer(true);
+  const ready=await waitFor(async()=>{
+   const p=await proof(),press=p?.acknowledged?.find(e=>e.sequence>=source&&e.action===1&&e.status===1);
+   const upgraded=p?.acknowledged?.some(e=>e.sequence>=source&&e.action===2&&e.status===1);
+   return press&&upgraded&&p.serverTick-press.serverTick>=20
+     &&p.replicatedFighters.find(f=>f.netId===id)?.action===9?p:false;
+  });
+  await key("\uE007");
+  assert.equal(await evaluate(s,"return document.activeElement?.matches('.local-chat-input');"),true);
+  await waitFor(async()=>{
+   const p=await proof();return p?.acknowledged?.some(e=>e.sequence>=source&&e.action===4&&e.status===1)
+     &&p.replicatedFighters.find(f=>f.netId===id)?.action===0;
+  });
+  await pointer(false);
+  await key("\uE00C");
+  assert.equal(await evaluate(s,"return document.activeElement?.id==='arena';"),true);
+  const p=await proof(),lines=readAuthoritativeWorld().slice(start).split("\n");
+  assert.equal(lines.some(line=>/^M201_AUTH_HIT /.test(line)),false,"opening chat cancels held READY without damage");
+  assert.equal(p.acknowledged.some(e=>e.sequence>=source&&e.action===3),false,"cancelled source cannot acquire a phantom release");
+  const evidence={actor:id,sourceSequence:source,readyServerTick:ready.serverTick,
+   receipts:p.acknowledged.filter(e=>e.sequence>=source),originalWorld:lines};
+  await writeFile(join(output,"combat4-chat-cancels-held-ready.json"),JSON.stringify(evidence,null,2)+"\n");
+  console.log("COMBAT4_NATIVE_CHAT_CANCEL_HELD_READY_PASS",JSON.stringify(evidence));
+  await nativeChatRound("After physical Heavy release");
+ }
+ const report={physicalMode,chatC1,instantLmb,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
   actualOriginalClient:true,realSeparateNativeBrowserProcesses:seatCount,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
   trueFourIndependentHumanOperators:false,modeIsOptional:physicalMode==="space-guard",defaultArenaPreserved:true,

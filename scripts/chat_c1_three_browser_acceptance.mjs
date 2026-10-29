@@ -12,6 +12,8 @@ const root=process.cwd(), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const randomPort=()=>new Promise((resolve,reject)=>{const s=createServer();s.on("error",reject);s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const processes=[],sessions=[];
 const typedGestures=process.env.C1_TYPED_GESTURES==="1";
+const instantLmb=process.env.C1_INSTANT_LMB==="1";
+assert.equal(typedGestures&&instantLmb,false,"select one native LMB profile");
 const browserMatrix=(process.env.C1_BROWSER_MATRIX||"chrome,chrome,chrome").split(",").map(x=>x.trim().toLowerCase());
 if (![3,4].includes(browserMatrix.length) || browserMatrix.some(x=>!["chrome","firefox"].includes(x))) {
  throw Error("C1_BROWSER_MATRIX must contain three or four chrome/firefox entries");
@@ -36,7 +38,7 @@ async function poll(label,fn,timeout=12000){
 }
 try {
  const binary=join(root,"server","target","debug","myaso-server");
- const server=launch(binary,[],{env:{MYASO_BIND:"127.0.0.1:0",MYASO_CHAT_RADIUS:"160",MYASO_CHAT_C1_ENABLED:"1",MYASO_EXPERIMENTAL_GESTURE_V2:typedGestures?"1":"0"},stdio:["ignore","pipe","pipe"]});
+ const server=launch(binary,[],{env:{MYASO_BIND:"127.0.0.1:0",MYASO_CHAT_RADIUS:"160",MYASO_CHAT_C1_ENABLED:"1",MYASO_EXPERIMENTAL_GESTURE_V2:typedGestures?"1":"0",MYASO_INSTANT_LMB_ENABLED:instantLmb?"1":"0"},stdio:["ignore","pipe","pipe"]});
  let stdout="",stderr="";
  server.stdout.on("data",d=>{stdout+=d.toString()});
  server.stderr.on("data",d=>{stderr+=d.toString()});
@@ -55,7 +57,7 @@ try {
    ["--port="+port],{stdio:"ignore"});
   await poll(browser+" driver",async()=>{const r=await fetch("http://127.0.0.1:"+port+"/status").catch(()=>null);return {ok:!!r?.ok};},6500);
  }
- const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&chatC1Preview=1&netstats=1"+(typedGestures?"&gestureLab=1":"");
+ const url="http://127.0.0.1:"+httpPort+"/web/?server="+encodeURIComponent(ready.url)+"&cert="+encodeURIComponent(ready.cert.replaceAll(":",""))+"&chatC1Preview=1&netstats=1"+(typedGestures?"&gestureLab=1":instantLmb?"&instantLmbPreview=1":"");
  for(let i=0;i<browserMatrix.length;i++){
   const browser=browserMatrix[i];
   const capabilities=browser==="chrome"
@@ -69,7 +71,7 @@ try {
   console.log("PLAYER_READY",i+1,JSON.stringify(connected));
  }
  const [a,b,c,d]=sessions;
- if(typedGestures) {
+ if(typedGestures||instantLmb) {
   for(const session of sessions) {
    const proof=await evaljs(session,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
    assert.equal(proof?.transportState,"granted","original server granted source0 while Chat C1 is connected");
