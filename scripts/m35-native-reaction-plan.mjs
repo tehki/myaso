@@ -11,11 +11,5 @@ export function planM35NativeReaction(wheelMs, clickHoldMs = 35) {
   return Object.freeze({
     allowHeavy: true,
     lightReactionMs: Math.ceil(tickMs),
-    // A calibration median is not a lower bound on the next native delivery.
-    // Original first-red #40890925050 measured93ms but delivered in25ms:
-    // subtracting93 left17ms and admitted Block at133.3ms before contact.
-    // Keep three real World ticks after the earlier charging observation,
-    // even when this wheel is much faster than its calibration samples.
-    heavyReactionMs: Math.ceil(3 * tickMs),
   });
 }

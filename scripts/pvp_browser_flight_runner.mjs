@@ -10,6 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
+import { awaitM35OriginalLightAdmission } from "./m35-original-light-admission.mjs";
 import { M158_NATIVE_GEOMETRY } from "./m158-native-geometry.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
@@ -8503,8 +8504,14 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
           // demanding an instantaneous response at the earliest Light cue.
           // This never alters packet time, World admission or Parry125. A
           // stalled/late native wheel still fails on genuine BLOCK/HIT.
-          waitForReaction: cue => sleep(cue.text === "Heavy strike committed - the long windup is readable."
-            ? nativeReaction.heavyReactionMs : nativeReaction.lightReactionMs),
+          waitForReaction: async () => {
+            const light = await awaitM35OriginalLightAdmission({
+              readOutput: m201ServerOutput, afterOffset: attemptWorldLogOffset,
+              fighterId: attackerReady.playerNetId, sleep,
+            });
+            console.log("M35_NATIVE_LIGHT_ADMISSION_STAGE " + JSON.stringify(light));
+            await sleep(nativeReaction.lightReactionMs);
+          },
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
             ? scrollM41ViewportWheel(defender, defenderViewport)
