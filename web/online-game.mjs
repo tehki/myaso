@@ -19,6 +19,7 @@ import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../
 import { NETWORK } from "../src/network/constants.mjs";
 import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { paintArenaLiteFloor } from "../src/browser/prealpha-arena-lite-floor.mjs";
+import { createWorldAnchoredArenaFloor } from "../src/browser/arena-world-floor.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 import { activateLoopbackGestureLab } from "./prealpha-gesture-live-lab.mjs";
 
@@ -226,6 +227,17 @@ const currentInput = {
   dodge: false, block: false, kick: false, run: false, jump: false,
 };
 const arenaLayer = createArenaLayer();
+const arenaFloorRenderer = params.get("arenaGrid") !== "1"
+  ? createWorldAnchoredArenaFloor(ctx, arenaLayer)
+  : null;
+function drawArenaGround(camera) {
+  if (arenaFloorRenderer) {
+    arenaFloorRenderer.draw(camera, canvas.width, canvas.height);
+  } else {
+    // Unchanged owner-accessible debug-grid visual rollback.
+    ctx.drawImage(arenaLayer, 0, 0);
+  }
+}
 const remoteScratch = new Map();
 const visibleEnemyPositions = [];
 const snapshotRenderClock = createSnapshotRenderClock();
@@ -1225,8 +1237,8 @@ function restoreAuthoritative(own) {
 function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) {
   ctx.save();
   ctx.translate(impact.shakeX, impact.shakeY);
-  ctx.drawImage(arenaLayer, 0, 0);
   if (!networkClient) {
+    drawArenaGround({x: 0, y: 0});
     ctx.restore();
     drawImpactBurst(impact);
     return;
@@ -1243,6 +1255,7 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   if (renderGapTelemetry) renderGapTelemetry.noteFrame(nowMs,
     snapshotRenderClock.metrics().targetGapTicks, NETWORK.serverSimulationHz);
   visualCamera.sample(local, nowMs, visualCameraPosition);
+  drawArenaGround(visualCameraPosition);
   updateNetworkDiagnostics(nowMs);
   const recoveryFocusNetId = fighterRecoveryNetId(networkClient.state, ownId);
   visibleEnemyPositions.length = 0;
@@ -2159,16 +2172,12 @@ function createArenaLayer() {
   layer.width = canvas.width;
   layer.height = canvas.height;
   const layerContext = layer.getContext("2d", { alpha: false });
-  // Graphics 3C Arena Lite is a pre-rendered, opaque 960x540 floor. It paints
-  // once and never changes the World, input, hitboxes, terrain collisions or
-  // game camera. Keep ?arenaGrid=1 as an instant client-only visual rollback.
+  // Graphics 3C's seamless tile is pre-painted ONCE. The renderer later
+  // repeats it in world coordinates using the existing reconciled camera.
+  // ?arenaGrid=1 keeps the unchanged original static debug-floor fallback.
   if (params.get("arenaGrid") !== "1") {
-    try {
-      paintArenaLiteFloor(layerContext);
-      return layer;
-    } catch (error) {
-      console.warn("Arena Lite art failed; restoring original grid", error);
-    }
+    paintArenaLiteFloor(layerContext, {tileable: true});
+    return layer;
   }
   layerContext.fillStyle = "#1c1913";
   layerContext.fillRect(0, 0, layer.width, layer.height);

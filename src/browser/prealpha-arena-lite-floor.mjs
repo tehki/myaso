@@ -40,16 +40,60 @@ function stone(ctx,x,y,w,h,shade,jitter=0){
   ctx.lineTo(x+w-5,y+3);
   ctx.strokeStyle="rgba(218,198,156,.17)";ctx.lineWidth=1;ctx.stroke();
 }
-export function paintArenaLiteFloor(ctx,{width=ARENA_LITE_WIDTH,height=ARENA_LITE_HEIGHT,seed=ARENA_LITE_SEED}={}){
+// Seam-wrapped decorative marks for a repeating world-space ground tile.
+// No perimeter walls: repeating the old frame would produce false barriers.
+function wrappedGroundMark(ctx,x,y,rx,ry,color,angle,width,height){
+  const r=Math.max(rx,ry)*1.5;
+  for(const dx of [0, -width, width]){
+    if(dx===-width && x+r<width)continue;
+    if(dx===width && x-r>0)continue;
+    for(const dy of [0, -height, height]){
+      if(dy===-height && y+r<height)continue;
+      if(dy===height && y-r>0)continue;
+      ellipse(ctx,x+dx,y+dy,rx,ry,color,angle);
+    }
+  }
+}
+function paintRepeatingEarth(ctx,width,height,rng){
+  ctx.fillStyle="#494032";
+  ctx.fillRect(0,0,width,height);
+  // Fine low-contrast variation without vertical gradients or image borders.
+  // All crossing marks wrap to the opposite edge for seamless repetition.
+  for(let i=0;i<140;i++){
+    const x=rng()*width,y=rng()*height;
+    wrappedGroundMark(ctx,x,y,8+rng()*36,2+rng()*9,
+      ["rgba(205,182,139,.045)","rgba(28,26,21,.04)","rgba(170,149,111,.055)"][i%3],
+      rng()*Math.PI,width,height);
+  }
+  // Sparse worn cobble patches. These are decoration, NEVER walls/colliders.
+  for(let i=0;i<88;i++){
+    const x=rng()*width,y=rng()*height,rad=5+rng()*8;
+    wrappedGroundMark(ctx,x,y,rad,rad*.53,
+      ["rgba(124,113,96,.19)","rgba(162,145,116,.15)","rgba(53,47,39,.22)"][i%3],
+      rng()*Math.PI,width,height);
+  }
+  for(let i=0;i<390;i++){
+    const x=rng()*width,y=rng()*height;
+    wrappedGroundMark(ctx,x,y,.5+rng()*1.9,.32+rng()*.8,
+      ["rgba(25,23,18,.29)","rgba(207,177,124,.15)","rgba(88,80,60,.41)"][i%3],
+      rng()*Math.PI,width,height);
+  }
+}
+export function paintArenaLiteFloor(ctx,{width=ARENA_LITE_WIDTH,height=ARENA_LITE_HEIGHT,seed=ARENA_LITE_SEED,tileable=false}={}){
   if(!ctx||typeof ctx.fillRect!=="function"||typeof ctx.createLinearGradient!=="function"||
       typeof ctx.beginPath!=="function"||typeof ctx.ellipse!=="function"||
       typeof ctx.save!=="function"||typeof ctx.restore!=="function"||
       !Number.isInteger(width)||!Number.isInteger(height)||width!==960||height!==540||
-      !Number.isInteger(seed)||seed<0||seed>0xffffffff)
+      !Number.isInteger(seed)||seed<0||seed>0xffffffff||
+      typeof tileable!=="boolean")
     throw new TypeError("Arena Lite requires original 960x540 opaque Canvas and bounded seed");
   const rng=randomSource(seed);
   ctx.save();
   try{
+    if(tileable){
+      paintRepeatingEarth(ctx,width,height,rng);
+      return;
+    }
     // Only scenery. No gameplay walls, colliders, damage or lighting physics.
     const earth=ctx.createLinearGradient(0,0,0,height);
     earth.addColorStop(0,"#51483a");

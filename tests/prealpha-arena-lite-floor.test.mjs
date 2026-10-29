@@ -56,7 +56,7 @@ test("owner-selected default Arena Lite paints before grid with an explicit visu
  const live=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
  assert.match(live,/function createArenaLayer\(\)/);
  assert.match(live,/params\.get\("arenaGrid"\) !== "1"/);
- assert.match(live,/paintArenaLiteFloor\(layerContext\)/);
+ assert.match(live,/paintArenaLiteFloor\(layerContext, \{tileable: true\}\)/);
  assert.match(live,/return layer/);
  assert.match(live,/layerContext\.strokeRect\(12, 12, layer\.width - 24, layer\.height - 24\)/);
  assert.match(live,/ctx\.drawImage\(arenaLayer, 0, 0\)/);
