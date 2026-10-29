@@ -1,27 +1,45 @@
-// ORIGINAL GAME-PAGE EXPERIMENT ONLY, never public admission or a release toggle.
-// The caller has already confirmed both the page and its pinned Rust QUIC host
-// are loopback. Only the existing original GameClient transport owns v2.
+// One original game-page physical source0 owner on its server-granted lease.
+// The experimental wrapper stays loopback-only. The instant-LMB wrapper also
+// supports an explicitly enabled first-party pinned release configuration.
 // A source event is not a hit; the original World alone applies damage.
 import { ProposedSharedTypedGestureOutbox } from "../src/network/prealpha-lmb-gesture-outbox-proposal.mjs";
 import { createDormantSharedUi10Sources, attachDormantSharedUi10Sources } from "../src/browser/prealpha-shared-ui10-sources-review.mjs";
+import { resolveInstantLmbProfile } from "../src/browser/instant-lmb-activation.mjs";
 
-export async function activateLoopbackGestureLab({
+export async function activateLoopbackGestureLab(options) {
+  return activateNegotiatedLmb(options, false);
+}
+
+export async function activateInstantLmb(options) {
+  return activateNegotiatedLmb(options, true);
+}
+
+async function activateNegotiatedLmb({
   gameClient, canvas, windowObj, documentObj, getClientTick,
   isJumpAttackChord = () => false,
   enableJumpAttackReview = false,
-} = {}) {
+  fetchConfig = globalThis.fetch,
+} = {}, instantProfile = false) {
   if (!gameClient || !canvas || !windowObj || !documentObj
       || typeof getClientTick !== "function") {
     throw new TypeError("original canvas, WebTransport client and current tick required");
   }
   const loopback = new Set(["127.0.0.1","localhost","[::1]"]);
-  if (!loopback.has(windowObj.location.hostname)
+  const local = loopback.has(windowObj.location.hostname)
+      && loopback.has(new URL(gameClient.transport.webTransportUrl).hostname);
+  if (instantProfile) {
+    if (!(await resolveInstantLmbProfile(windowObj.location,fetchConfig)).enabled
+        || new URLSearchParams(windowObj.location.search).get("server") !== gameClient.transport.webTransportUrl) {
+      throw new Error("instant LMB requires the trusted release profile or loopback preview");
+    }
+  } else if (!loopback.has(windowObj.location.hostname)
       || !loopback.has(new URL(gameClient.transport.webTransportUrl).hostname)) {
     throw new Error("real game v2 gesture lab cannot activate on public hosts");
   }
   // The native original Rust session may grant only ONCE; do not infer
   // admission from a query flag or a client-selected actor/boot epoch.
-  await gameClient.negotiateExperimentalGestureV2({reliableStream:true});
+  if (instantProfile) await gameClient.negotiateInstantLmb();
+  else await gameClient.negotiateExperimentalGestureV2({reliableStream:true});
   const lease = gameClient.transport;
   const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
   let failed = false, detached = false, retryTimer = null;
@@ -120,7 +138,7 @@ export async function activateLoopbackGestureLab({
       // exclusive authoritative JumpAttack route, fail closed rather than
       // inventing a second v1 attack writer or a false World Light.
       isJumpAttackChord,
-      enableJumpAttackReview,
+      enableJumpAttackReview:enableJumpAttackReview || instantProfile,
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
@@ -167,6 +185,12 @@ export async function activateLoopbackGestureLab({
     });
     add(windowObj,"keyup",drainNewEdges);
     add(windowObj,"blur",drainNewEdges);
+    // Element blur does not bubble to the window drain listener. The real
+    // canvas losing focus (including Chat Enter) must flush its CANCEL now.
+    add(canvas,"blur",() => { gates.blur(); drainNewEdges(); });
+    // Capture already queued CANCEL; do not defer a hidden-page terminal to
+    // the170ms retry timer, beyond the original135ms Light contact deadline.
+    add(documentObj,"visibilitychange",drainNewEdges);
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
@@ -193,7 +217,7 @@ export async function activateLoopbackGestureLab({
           hp:fighter.hp,guard:fighter.guard,stamina:fighter.stamina,
         })) : []),
     });
-    Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
+    if (local) Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
       configurable:true,value:proof,
     });
     return Object.freeze({outbox,lease,close,fail,

@@ -23,7 +23,7 @@ test("M121 observer follows exactly original v1 30Hz movement sender without add
     networkClient: { sendInput(packet) { sent.push({ ...packet }); } },
     markStaminaDenialSubmitted() {},
     currentInput: input,
-    acceptanceScenario: "uidirectionallight", reviewedGestureLab: false,
+    acceptanceScenario: "uidirectionallight", typedLmbEnabled: false,
     window: { __MYASO_ACCEPTANCE_STATE__: debug },
     keys: keySet,
     document: { activeElement: { id: "arena" } },
@@ -55,7 +55,7 @@ test("M121 observer follows exactly original v1 30Hz movement sender without add
   assert.equal(sent[1].attack, true);
   assert.equal(debug.m121SentSamples[1].keyD, false);
   assert.equal(debug.m121SentSamples[1].attack, true);
-  ctx.reviewedGestureLab = true;
+  ctx.typedLmbEnabled = true;
   const before = debug.m121SentSamples.length;
   step(); step();
   assert.equal(sent.length, 3, "original sender cadence is unchanged in v2 lab");
@@ -63,7 +63,7 @@ test("M121 observer follows exactly original v1 30Hz movement sender without add
   // M147 active read-only probe must be able to observe the SAME original
   // sender and 30Hz cadence. The isolated M121 VM deliberately omits it
   // above to guard against undeclared diagnostic dependencies.
-  ctx.reviewedGestureLab = false;
+  ctx.typedLmbEnabled = false;
   const sampled = [];
   const observedSends = [];
   ctx.m147InputProbe = {

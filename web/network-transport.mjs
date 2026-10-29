@@ -97,12 +97,29 @@ class WebTransportGameConnection {
   // server-issued capability. In particular this cannot activate public R2.
   // The existing WebTransport bidi stream and original server actor stay shared.
   async negotiateExperimentalGestureV2({ timeoutMs = 3000, reliableStream = false } = {}) {
-    if (this.closed || this.experimentalGestureState !== "off") {
-      throw new Error("experimental gesture handshake requires a fresh connection");
-    }
     const host = new URL(this.webTransportUrl).hostname;
     if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) {
       throw new Error("experimental gesture grant is loopback-only");
+    }
+    return this.#negotiateGesture({timeoutMs,reliableStream});
+  }
+
+  async negotiateInstantLmb({timeoutMs=3000}={}) {
+    const url = new URL(this.webTransportUrl);
+    const local = ["localhost","127.0.0.1","[::1]"].includes(url.hostname);
+    const official = url.hostname === "game.open-trust-layer.org" && url.port === "4433";
+    if ((!local && !official) || url.protocol !== "https:" || url.pathname !== "/game"
+        || url.username || url.password || url.search || url.hash) {
+      throw new Error("instant LMB requires the pinned first-party game endpoint or loopback preview");
+    }
+    // First-party UI separately verifies its operator-served release config.
+    // The existing original server must still grant this connection's lease.
+    return this.#negotiateGesture({timeoutMs,reliableStream:true});
+  }
+
+  async #negotiateGesture({timeoutMs,reliableStream}) {
+    if (this.closed || this.experimentalGestureState !== "off") {
+      throw new Error("experimental gesture handshake requires a fresh connection");
     }
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000) {
       throw new RangeError("bounded handshake timeout required");

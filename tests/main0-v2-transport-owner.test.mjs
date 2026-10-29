@@ -84,6 +84,20 @@ test("gesture negotiation shares original reliable game stream without consuming
   c.close("test");
 }));
 
+test("release LMB negotiates only the official endpoint and keeps the old public experimental gate closed", () => withFixture(async()=>{
+ const c=await connectGameTransport({webTransportUrl:"https://game.open-trust-layer.org:4433/game"});
+ await assert.rejects(c.negotiateExperimentalGestureV2(),/loopback-only/);
+ assert.equal(c.transport.reliableWrites.length,0);
+ await c.negotiateInstantLmb();
+ assert.equal(c.experimentalGestureState,"granted");assert.equal(c.transport.uniOpened,0);
+ assert.deepEqual([...c.transport.reliableWrites[0]],[8,0,2,0x10,77,89,65,83,79,49]);
+ c.close("test");
+ const foreign=await connectGameTransport({webTransportUrl:"https://foreign.example:4433/game"});
+ await assert.rejects(foreign.negotiateInstantLmb(),/first-party/);
+ assert.equal(foreign.transport.reliableWrites.length,0);
+ foreign.close("test");
+}));
+
 test("blocked original-stream negotiation expires and no old HELLO escapes after retirement", () => withFixture(async () => {
   const c = await connectGameTransport({webTransportUrl:"https://localhost:4433/game"});
   let unblock;

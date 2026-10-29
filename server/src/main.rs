@@ -438,6 +438,19 @@ async fn main() -> Result<()> {
     if v2_lab && !bind.ip().is_loopback() {
         bail!("experimental v2 gesture ingress is loopback-only");
     }
+    // Independent operator-owned release capability. Never inferred from a
+    // browser URL or experimental switch; the original admitted QUIC actor,
+    // server nonce, World and replay fences remain authoritative.
+    let instant_lmb = match env::var("MYASO_INSTANT_LMB_ENABLED").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(env::VarError::NotPresent) => false,
+        Ok(_) => bail!("MYASO_INSTANT_LMB_ENABLED must be 0 or 1"),
+        Err(error) => bail!("invalid MYASO_INSTANT_LMB_ENABLED: {error}"),
+    };
+    if instant_lmb && v2_lab {
+        bail!("select one instant LMB release or experimental gesture profile");
+    }
+    let gesture_enabled = instant_lmb || v2_lab;
     // C1 requires BOTH an explicit operator gate and trusted first-party
     // served /game-config.json chatC1Enabled:true. A URL query is never server
     // authority. With C1 enabled, gesture negotiation uses the original
@@ -464,9 +477,14 @@ async fn main() -> Result<()> {
     if jump_review && (!v2_lab || !bind.ip().is_loopback()) {
         bail!("JumpAttack extension requires original loopback v2 gesture ingress");
     }
+    let jump_review = jump_review || instant_lmb;
     // Legacy v1 boot remains unchanged; only the explicit v2 lab requires OS
     // CSPRNG. No entropy failure may accidentally block a disabled v1 game.
-    let boot_nonce = if v2_lab { new_server_boot_nonce()? } else { 0 };
+    let boot_nonce = if gesture_enabled {
+        new_server_boot_nonce()?
+    } else {
+        0
+    };
     let private_hit_setting = env::var("MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB").ok();
     let hit_lab_enabled = private_hit_lab_config(
         private_hit_setting.as_deref(),
@@ -504,7 +522,9 @@ async fn main() -> Result<()> {
         Ok("0") | Err(_) => false,
         Ok(_) => bail!("MYASO_FLIGHT_M121_INPUT_PROOF must be 0 or 1"),
     };
-    if flight_m121_input_proof && (!bind.ip().is_loopback() || !flight_action_proof || v2_lab) {
+    if flight_m121_input_proof
+        && (!bind.ip().is_loopback() || !flight_action_proof || gesture_enabled)
+    {
         bail!("M121 original-v1 ingress proof requires loopback, flight action proof and v2 OFF");
     }
     tokio::spawn(run_authoritative_clock(
@@ -575,7 +595,7 @@ async fn main() -> Result<()> {
                 player_id,
                 lease_epoch,
                 ExperimentalGestureSettings {
-                    v2_lab,
+                    v2_lab: gesture_enabled,
                     jump_review,
                 },
                 flight_action_proof,

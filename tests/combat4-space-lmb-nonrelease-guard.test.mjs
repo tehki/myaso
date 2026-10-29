@@ -74,8 +74,8 @@ test("original first-party opt-in page supplies real Space state and never enabl
   const page=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8");
   const server=readFileSync(new URL("../server/src/main.rs",import.meta.url),"utf8");
   assert.match(page,/isJumpAttackChord:\s*\(\) => jumpRequested \|\| keys\.has\("Space"\)/);
-  assert.match(page,/currentInput\.attack = !reviewedGestureLab &&/);
-  assert.match(page,/currentInput\.heavyAttack = !reviewedGestureLab &&/);
+  assert.match(page,/currentInput\.attack = !typedLmbEnabled &&/);
+  assert.match(page,/currentInput\.heavyAttack = !typedLmbEnabled &&/);
   assert.match(server,/if v2_enabled \{[\s\S]*?intent\.attack = false;\s*intent\.heavy_attack = false;/);
   assert.match(page,/if \(gestureLabRequested && !reviewedGestureLab\)/);
 });

@@ -21,7 +21,7 @@ function harness(){
   canvas.focus=()=>{focusCalls++;};
   const context={canvas,window,document,COMBAT,COMBAT_ACTION,performance:{now:()=>clock},
     audio:{play(){}},networkClient:null,m41PhysicalChronology:null,queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
-    currentInput:{},reviewedGestureLab:false,matchOver:false,dashGesture:{clearTaps(){}},
+    currentInput:{},typedLmbEnabled:false,matchOver:false,dashGesture:{clearTaps(){}},
     leftButtonCharge:{cancel(){},isCharging:()=>false},rightButtonGesture:{cancel(){},isRunning:()=>false},
     shortBlockUntil:0,middleBlockHeld:false,rollRequested:false,dashRequested:false,dashMove:null,
     attackRequested:false,runningAttackRequested:false,committedLightMove:null,leftButtonDown:false,

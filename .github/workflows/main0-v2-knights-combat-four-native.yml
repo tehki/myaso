@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "web/alpha-config.mjs"
+      - "web/authoritative-client.mjs"
+      - "src/browser/instant-lmb-activation.mjs"
+      - "tests/instant-lmb-activation.test.mjs"
       - "server/src/main.rs"
       - "server/tests/local_chat_multiplayer.rs"
       - "scripts/chat_c1_three_browser_acceptance.mjs"
@@ -44,6 +48,31 @@ jobs:
             mode: held-lmb
             browsers: chrome,firefox,chrome,firefox
             chat: "1"
+          - acceptance: release-held-chat-chrome
+            mode: held-lmb
+            browsers: chrome,firefox,chrome,firefox
+            chat: "1"
+            instant: "1"
+          - acceptance: release-held-chat-firefox
+            mode: held-lmb
+            browsers: firefox,chrome,firefox,chrome
+            chat: "1"
+            instant: "1"
+          - acceptance: release-jump-two-chrome
+            mode: jump-two-hit
+            browsers: chrome,firefox,chrome,firefox
+            chat: "1"
+            instant: "1"
+          - acceptance: release-jump-two-firefox
+            mode: jump-two-hit
+            browsers: firefox,chrome,firefox,chrome
+            chat: "1"
+            instant: "1"
+          - acceptance: release-four-lifecycle-chat
+            mode: four-combat-lifecycle
+            browsers: chrome,firefox,chrome,firefox
+            chat: "1"
+            instant: "1"
           - acceptance: space-chord-chrome
             mode: space-guard
             browsers: chrome,chrome,chrome,chrome
@@ -69,6 +98,7 @@ jobs:
       MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
       MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
       MYASO_LIVE_GESTURE_CHAT_C1: ${{ matrix.chat || '0' }}
+      MYASO_LIVE_GESTURE_INSTANT_LMB: ${{ matrix.instant || '0' }}
       MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
     steps:
@@ -92,10 +122,11 @@ jobs:
       - name: Four real W3C original game Silver fighters and physical gesture World (${{ matrix.acceptance }})
         run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
       - name: Four native Chat C1 focus and proximity regression with typed gestures
-        if: matrix.chat == '1'
+        if: matrix.acceptance == 'held-lmb-chat-mixed' || matrix.acceptance == 'release-held-chat-chrome'
         env:
           C1_BROWSER_MATRIX: chrome,firefox,chrome,firefox
-          C1_TYPED_GESTURES: "1"
+          C1_TYPED_GESTURES: ${{ matrix.instant == '1' && '0' || '1' }}
+          C1_INSTANT_LMB: ${{ matrix.instant || '0' }}
         run: timeout --signal=TERM --kill-after=5s 240s node scripts/chat_c1_three_browser_acceptance.mjs
       - name: Preserve original native evidence and SHA256 screenshots
         if: always()
@@ -107,8 +138,36 @@ jobs:
           retention-days: 5
 
 
+  release-profile-three-native-threat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      MYASO_PVP_INSTANT_LMB: "1"
+      MYASO_PVP_SCENARIO: uisecondaryphase
+      MYASO_PVP_WEBDRIVER_BASE_PORT: "29515"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build original server before bounded native bootstrap
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Actual three-native release-profile Light threats
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/instant-lmb-three-native
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee .artifacts/instant-lmb-three-native/world.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: instant-lmb-three-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/instant-lmb-three-native/
+          retention-days: 5
+
   review-only-immutable-package:
-    needs: four-real-browser-original-world
+    needs: [four-real-browser-original-world, release-profile-three-native-threat]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
