@@ -42,7 +42,7 @@ test("chat sends contain only version, channel, correlation and bounded text", (
   assert.equal(Object.keys(CHAT).includes("sender"), false);
 });
 test("strict validation rejects unsupported channels, controls, byte overflow and lone surrogates", () => {
-  for (const text of ["", "  ", "hello\nbye", "\u202e", "\ud800", "🍀".repeat(61)]) {
+  for (const text of ["", "  ", "hello\nbye", "\u202e", "\u200e", "\u061c", "\ufeff", "\ud800", "🍀".repeat(61)]) {
     assert.throws(() => encodeChatSend({ correlation: 1, text }), RangeError, text);
   }
   assert.throws(() => encodeChatSend({ correlation: 0, text: "Hi" }), RangeError);
