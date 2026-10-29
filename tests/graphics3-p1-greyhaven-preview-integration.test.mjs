@@ -18,7 +18,7 @@ test("Graphics 3 P1 is deliberately double opt-in and excluded from QA scenarios
   assert.match(client,/!params\.has\("scenario"\)/);
   assert.match(client,/if \(greyhavenPreviewRequested\) \{\s*void Promise\.all\(\[/);
   assert.match(client,/import\("\.\.\/src\/browser\/authored-world-renderer\.mjs"\)/);
-  assert.match(client,/if \(greyhavenPreview && local\.initialized\)/);
+  assert.match(client,/if \(!redLionFrame && greyhavenPreview && local\.initialized\)/);
   assert.match(client,/greyhavenPreview\.renderer\.draw\(ctx, greyhavenPreview\.mapId,\s*visualCameraPosition/);
   assert.match(client,/greyhavenPreview = null;/);
   assert.doesNotMatch(client,/^import .*authored-world-renderer/m);
