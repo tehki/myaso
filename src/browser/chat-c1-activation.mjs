@@ -2,6 +2,7 @@
 // The approved Core bridge opens opt-in reliable streams on the existing
 // authenticated WebTransport game session; it never owns combat datagrams.
 import { installLocalChat } from "./local-chat.mjs";
+import { createOverheadChatBubbles } from "./chat-c1-overheads.mjs";
 import { openLocalChatUiBridge } from "../network/local-chat-ui-bridge.mjs";
 import { parseAlphaConfig } from "../../web/alpha-config.mjs";
 
@@ -48,15 +49,28 @@ export async function isTrustedChatC1ReleaseConfigured(location, fetchConfig = g
 export async function activateChatC1Preview({
   doc, location, gameClient, openBridge = openLocalChatUiBridge,
   fetchConfig = globalThis.fetch,
+  onBubblesReady = () => {},
 } = {}) {
   if (!isChatC1Eligible(location)) return null;
   if (isChatC1ReleaseEligible(location)
       && !(await isTrustedChatC1ReleaseConfigured(location, fetchConfig))) return null;
-  const panel = installLocalChat(doc, { online: true });
-  if (!panel || gameClient?.transport?.kind !== "webtransport") return null;
+  // Do not create an interactive panel or overhead actor when the transport
+  // is missing. Server flags and trusted first-party config are checked above.
+  if (gameClient?.transport?.kind !== "webtransport") return null;
+  let bubbles = null;
+  const panel = installLocalChat(doc, {
+    online: true,
+    onMessage(event) { bubbles?.received(event); },
+    onAccepted(text) { bubbles?.acceptedOwn(gameClient.playerNetId, text); },
+  });
+  if (!panel) return null;
   try {
     const adapter = await openBridge(gameClient.transport, {
-      onDisconnect() { panel.bindAdapter(null); },
+      onDisconnect() {
+        panel.bindAdapter(null);
+        bubbles?.clear();
+        onBubblesReady(null);
+      },
     });
     if (panel.root.isConnected === false) {
       await adapter.close();
@@ -66,15 +80,21 @@ export async function activateChatC1Preview({
       await adapter?.close?.();
       return null;
     }
+    bubbles = createOverheadChatBubbles({ doc });
     panel.bindAdapter(adapter);
+    onBubblesReady(bubbles);
     doc.defaultView?.addEventListener?.("pagehide", () => {
       panel.bindAdapter(null);
+      bubbles?.dispose();
+      onBubblesReady(null);
       void adapter.close();
     }, { once: true });
     return adapter;
   } catch {
     // Combat must remain fully active if optional chat negotiation fails.
     panel.bindAdapter(null);
+    bubbles?.dispose();
+    onBubblesReady(null);
     panel.status.textContent = "Local chat unavailable — gameplay remains connected.";
     return null;
   }

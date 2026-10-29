@@ -52,7 +52,10 @@ function element(doc, tag, className, label) {
   return node;
 }
 
-export function installLocalChat(doc, { online = false, adapter = null, idFactory = () => globalThis.crypto?.randomUUID?.() } = {}) {
+export function installLocalChat(doc, {
+  online = false, adapter = null, idFactory = () => globalThis.crypto?.randomUUID?.(),
+  onMessage = () => {}, onAccepted = () => {},
+} = {}) {
   if (INSTANCES.has(doc)) {
     const existing = INSTANCES.get(doc);
     if (adapter) existing.bindAdapter(adapter);
@@ -164,6 +167,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (disposed || !store.push(event)) return false;
     const name = event.channel === "system" ? "System" : event.sender.displayName.slice(0, 64);
     messageRow(event.channel, name, event.text);
+    // Only after the original dedup and source validation succeed.
+    try { onMessage(event); } catch { /* Optional overheads cannot interrupt chat. */ }
     if (root.dataset.open !== "true") {
       unreadCount = Math.min(99, unreadCount + 1);
       unread.hidden = false;
@@ -214,6 +219,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       item.dataset.delivery = "accepted";
       stateLabel.textContent = "Accepted";
       status.textContent = "Server accepted message; recipient delivery not confirmed.";
+      // Own Knight speaks only after matching authoritative result, never
+      // while the message remains pending or rejected.
+      try { onAccepted(text); } catch { /* Presentation cannot alter ACK. */ }
       return true;
     } catch {
       item.dataset.delivery = "failed";
