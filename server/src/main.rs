@@ -3,7 +3,10 @@ mod private_hit_delivery_lab;
 
 use anyhow::{bail, Context, Result};
 use myaso_server::{
-    chat::{decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub, MAX_CHAT_FRAME, OUTBOUND_QUEUE},
+    chat::{
+        decode_send, encode_result, ChatPosition, ChatResult, LocalChatHub, MAX_CHAT_FRAME,
+        OUTBOUND_QUEUE,
+    },
     coalesce_accepted_input_batch, decode_input_packet, is_sequence_newer16, is_tick_newer32,
     kill_event::{encode_kill_event, KillEventPacket},
     prealpha_authenticated_gesture::{is_v2_event, new_server_boot_nonce, SessionGestureWorldPath},
@@ -66,7 +69,6 @@ impl ChatIngressBudget {
         true
     }
 }
-
 
 const V2_LAB_HELLO: [u8; 8] = [2, 0x10, b'M', b'Y', b'A', b'S', b'O', b'1'];
 const V2_LAB_GRANTED: [u8; 4] = [2, 0x13, 0, 0];
@@ -312,7 +314,12 @@ struct SharedGame {
 }
 
 impl SharedGame {
-    fn new(flight: LoopbackFlightConfig, boot_nonce: u128, chat_radius: f32, chat_enabled: bool) -> Arc<Self> {
+    fn new(
+        flight: LoopbackFlightConfig,
+        boot_nonce: u128,
+        chat_radius: f32,
+        chat_enabled: bool,
+    ) -> Arc<Self> {
         let mut state = GameState::new(flight.background_players, flight.near_pressure_players);
         state.boot_nonce = boot_nonce;
         Arc::new(Self {
