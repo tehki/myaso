@@ -84,6 +84,32 @@ try {
  await delay(700);
  const far=await evaljs(c,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].map(e=>e.textContent)");
  console.log("C_FAR",JSON.stringify(far));assert(!far.includes(first),"C outside authoritative radius");
+
+ // Independent 4D's real first-red was native canvas LMB while chat owns
+ // focus. Genuine W3C physical LMB/RMB/wheel on the authenticated Rust World.
+ // This asserts native focus ownership; 4D must separately recheck actual
+ // World attack/HIT logs before authorizing release.
+ const beforeMouse = await evaljs(a,
+  "const x=document.querySelector('[data-local-chat]');return {focused:document.activeElement===x.querySelector('input'),open:x.dataset.open};");
+ assert.deepEqual(beforeMouse,{focused:true,open:"true"},"native Chat C1 composer precondition");
+ const aim = await evaljs(a,
+  "const x=document.querySelector('#arena').getBoundingClientRect();return {x:Math.round(x.left+x.width*.65),y:Math.round(x.top+x.height*.48)};");
+ await wd("POST","/session/"+a+"/actions",{actions:[{
+  type:"pointer",id:"c1-native-mouse",parameters:{pointerType:"mouse"},
+  actions:[{type:"pointerMove",origin:"viewport",x:aim.x,y:aim.y,duration:35},
+   {type:"pointerDown",button:0},{type:"pause",duration:75},{type:"pointerUp",button:0},
+   {type:"pointerDown",button:2},{type:"pointerUp",button:2}],
+ }]});
+ await wd("POST","/session/"+a+"/actions",{actions:[{
+  type:"wheel",id:"c1-native-wheel",
+  actions:[{type:"scroll",x:aim.x,y:aim.y,deltaX:0,deltaY:120,duration:30}],
+ }]});
+ const afterMouse = await evaljs(a,
+  "const x=document.querySelector('[data-local-chat]');return {focused:document.activeElement===x.querySelector('input'),open:x.dataset.open};");
+ assert.deepEqual(afterMouse,{focused:true,open:"true"},"P0 native LMB/RMB/wheel cannot steal chat focus");
+ console.log("C1_REAL_WORLD_NATIVE_CHAT_POINTER_FOCUS_PASS",
+  JSON.stringify({lmb:true,rmb:true,wheel:true,focused:true}));
+
  if(d) {
   const farD=await evaljs(d,
     "return [...document.querySelectorAll('.local-chat-item .local-chat-text')].some(x=>x.textContent===arguments[0])",[first]);

@@ -1,0 +1,28 @@
+name: Chat C1 native physical-composer focus (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "src/browser/local-chat.mjs"
+      - "scripts/chat_c1_three_browser_acceptance.mjs"
+      - "tests/chat-c1-native-pointer-guard.test.mjs"
+      - ".github/workflows/chat-c1-native-pointer.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-original-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Strict UI10 capture contract
+        run: node --test tests/chat-c1-native-pointer-guard.test.mjs
+      - name: Build current Rust World with pinned WebTransport
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Genuine three-Chrome WebTransport C1 focused native W3C gestures
+        env:
+          C1_BROWSER_MATRIX: chrome,chrome,chrome
+        run: node scripts/chat_c1_three_browser_acceptance.mjs
