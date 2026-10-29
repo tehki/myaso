@@ -1,0 +1,59 @@
+name: Chat C1 real local multiplayer acceptance
+
+on:
+  pull_request:
+    paths:
+      - "server/src/chat.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - "server/tests/local_chat_multiplayer.rs"
+      - "src/network/chat-codec.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
+      - "tests/chat-codec.test.mjs"
+      - "tests/local-chat-ui-bridge.test.mjs"
+      - "docs/PREALPHA_01_CHAT_C1_RELEASE.md"
+      - ".github/workflows/chat-c1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/src/chat.rs"
+      - "server/src/main.rs"
+      - "server/src/lib.rs"
+      - "server/tests/local_chat_multiplayer.rs"
+      - "src/network/chat-codec.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
+      - "tests/chat-codec.test.mjs"
+      - "tests/local-chat-ui-bridge.test.mjs"
+      - ".github/workflows/chat-c1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chat-c1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          rustc --version
+          cargo --version
+          node --version
+      - name: Format and strict server lint
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+      - name: Real Rust WebTransport 3-client acceptance
+        run: cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer -- --nocapture
+      - name: Server chat parser, rate-limit and original QUIC input coexistence
+        run: |
+          cargo test --locked --manifest-path server/Cargo.toml --lib chat::
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server chat_task_lifetime_tests::retired_gameplay_lease_aborts_idle_optional_chat_reader -- --exact --nocapture
+          cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer repeated_chat_submissions_do_not_starve_authoritative_game_input_ack -- --exact --nocapture
+      - name: Browser transport and binary codec contract
+        run: |
+          node --check src/network/chat-codec.mjs
+          node --test tests/chat-codec.test.mjs
+          node --check src/network/local-chat-ui-bridge.mjs
+          node --test tests/local-chat-ui-bridge.test.mjs

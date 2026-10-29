@@ -615,6 +615,10 @@ if (reviewedGestureLab) {
   }
 }
 
+// Authenticated World speech bubbles are read-only render labels, mounted
+// only when the real Chat C1 stream is admitted and bound by its adapter.
+let chatBubbleController = null;
+
 // Chat C1 uses the current authenticated WebTransport connection and separate
 // bounded reliable streams. Public requests require the operator-served
 // chatC1=1 config; localhost chatC1Preview=1 remains nonproduction-only.
@@ -622,7 +626,10 @@ if (reviewedGestureLab) {
 void import("../src/browser/chat-c1-activation.mjs")
   .then(({ isChatC1Eligible, activateChatC1Preview }) =>
     isChatC1Eligible(window.location)
-      ? activateChatC1Preview({ doc: document, location: window.location, gameClient: networkClient })
+      ? activateChatC1Preview({
+          doc: document, location: window.location, gameClient: networkClient,
+          onBubblesReady(controller) { chatBubbleController = controller; },
+        })
       : null)
   .catch(() => { /* Chat is optional, authoritative Combat continues. */ });
 
@@ -1303,6 +1310,14 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
       drawRemoteIdentity(projected.x, projected.y, enemy.netId);
     }
   }
+  // Same reconciled World camera and interpolated Knight positions as the
+  // real renderer; no client-generated player coordinates or Combat edits.
+  chatBubbleController?.frame({
+    ownId, own: local.initialized ? local : null,
+    remotes: visibleEnemyPositions, camera: visualCameraPosition,
+    width: canvas.width, height: canvas.height, zoom: ARENA_VIEW_ZOOM,
+    deadAction: COMBAT_ACTION.dead, nowMs,
+  });
   updateHud(ownId);
   drawThreatMarkers();
   if (local.initialized) drawOffscreenEnemyPointers(visibleEnemyPositions, ownId);
