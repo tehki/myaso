@@ -16,14 +16,16 @@ const CHORDED_MOUSE_POINTER_ID = -1;
 // Combat4/Core8C must approve server-timed semantics before any runtime hookup.
 export function createDormantPrealphaLmbDomGate({
   outbox, getClientTick = defaultTick,
+  acceptedPressNow = () => performance.now(),
   isCanvasTarget, isChatFocused = () => false,
   isJumpAttackChord = () => false,
+  enableJumpAttackReview = false,
 } = {}) {
   const shared = outbox instanceof ProposedSharedTypedGestureOutbox;
   if (!(outbox instanceof ProposedLmbGestureOutbox) && !shared) {
     throw new TypeError("a negotiated, lease-bound proposed v2 outbox is required");
   }
-  for (const fn of [getClientTick,isCanvasTarget,isChatFocused,isJumpAttackChord]) {
+  for (const fn of [getClientTick,acceptedPressNow,isCanvasTarget,isChatFocused,isJumpAttackChord]) {
     if (!isFn(fn)) throw new TypeError("explicit UI control predicates required");
   }
   let active = null, closed = false;
@@ -48,20 +50,29 @@ export function createDormantPrealphaLmbDomGate({
       return false;
     }
   }
-  function beginPhysicalLmb(pointerId, chorded) {
+  function beginPhysicalLmb(pointerId, chorded, jump = false) {
+    // Bind the dormant review's local hold clock to the accepted physical
+    // pointer callback, NOT a later render/arm() task which may be delayed.
+    // This is never a server timestamp or authority to upgrade a landed hit.
+    let pressMs;
+    try { pressMs = acceptedPressNow(); } catch { return false; }
+    if (!Number.isFinite(pressMs) || pressMs < 0) return false;
     // PointerEvent and MouseEvent routes converge before the SAME source0
     // outbox. Never create parallel attack producers or duplicate PRESS.
-    const edge = submit(tick => shared ? outbox.begin(0,tick) : outbox.begin(tick));
+    const edge = submit(tick => jump
+      ? (shared && enableJumpAttackReview ? outbox.beginJumpAttack(0,tick) : false)
+      : (shared ? outbox.begin(0,tick) : outbox.begin(tick)));
     if (!edge) return false;
-    active = {pointerId,gestureId:edge.gestureId,upgraded:false,chorded};
+    active = {pointerId,gestureId:edge.gestureId,upgraded:false,chorded,jump,pressMs};
     return true;
   }
   function pointerDown(event) {
     if (closed || active || !validMousePointer(event)
       || event.button !== 0 || (event.buttons & 1) === 0
-      || isChatFocused() || isJumpAttackChord(event)
-      || !isCanvasTarget(event)) return false;
-    return beginPhysicalLmb(event.pointerId,false);
+      || isChatFocused() || !isCanvasTarget(event)) return false;
+    const jump = isJumpAttackChord(event);
+    if (jump && !enableJumpAttackReview) return false;
+    return beginPhysicalLmb(event.pointerId,false,jump);
   }
   function chordedMouseDown(event) {
     // W3C pointerdown/up only occur at zero↔nonzero button transitions.
@@ -69,8 +80,10 @@ export function createDormantPrealphaLmbDomGate({
     // buttons3) but no new pointerdown. Keep source0 on the same outbox.
     if (closed || active || !event || event.button !== 0
       || (event.buttons & 3) !== 3 || isChatFocused()
-      || isJumpAttackChord(event) || !isCanvasTarget(event)) return false;
-    return beginPhysicalLmb(CHORDED_MOUSE_POINTER_ID,true);
+      || !isCanvasTarget(event)) return false;
+    const jump = isJumpAttackChord(event);
+    if (jump && !enableJumpAttackReview) return false;
+    return beginPhysicalLmb(CHORDED_MOUSE_POINTER_ID,true,jump);
   }
   function mouseUp(event) {
     if (closed || !active || !event || event.button !== 0
@@ -83,7 +96,7 @@ export function createDormantPrealphaLmbDomGate({
   // This is an explicitly invoked REVIEW hook, not a browser timer.
   // Never call on an actual game frame until timing is approved by Combat4.
   function approvedHoldUpgrade(pointerId) {
-    if (closed || !active || active.pointerId !== pointerId || active.upgraded)
+    if (closed || !active || active.pointerId !== pointerId || active.upgraded || active.jump)
       return false;
     const edge = submit(tick => outbox.upgrade(tick));
     if (!edge) return false;
@@ -119,13 +132,15 @@ export function createDormantPrealphaLmbDomGate({
     // Chat Enter and blur can cancel held attack edges, never submit a
     // phantom RELEASE. A reconnect must instead use a fresh outbox lease.
     chatOpened:() => terminate("cancel"),
+    jumpChord:() => terminate("cancel"),
     blur:() => terminate("cancel"),
     hidden:() => terminate("cancel"),
     approvedHoldUpgrade, closeLease:shutdown,
     get snapshot() {
       return Object.freeze({active:active!==null,
         pointerId:active?.pointerId??null,
-        gestureId:active?.gestureId??null,upgraded:active?.upgraded??false,closed});
+        gestureId:active?.gestureId??null,pressMs:active?.pressMs??null,
+        upgraded:active?.upgraded??false,jump:active?.jump??false,closed});
     },
   });
 }

@@ -24,6 +24,7 @@ pub enum Phase {
     HeavyCharging,
     HeavyReady,
     HeavyActive,
+    JumpPending,
     Cancelled,
 }
 
@@ -39,6 +40,9 @@ pub enum Disposition {
 pub enum Command {
     None,
     BeginLightWindup,
+    // Review-only World gate. No typed wire event may produce this command
+    // until Main 0 approves a single authenticated Space+LMB ingress route.
+    BeginJumpAttack,
     ActivateLight,
     UpgradeHeldHeavy { server_elapsed_ms: u64 },
     HeavyReady,
@@ -205,6 +209,22 @@ impl GestureAuthority {
                 self.displaced_held_source = None;
                 Command::None
             }
+            // One authenticated source0 physical Space+LMB DOWN. It is an
+            // admitted *intent*, not an attack or a client-authorized Jump.
+            // Session World adapter waits for an actual 60Hz World Jump.
+            GestureAction::JumpAttack
+                if source == GestureSource::Lmb
+                    && self.phase == Phase::Idle
+                    && event.gesture_id > self.highest_gesture_id =>
+            {
+                self.active_id = Some(event.gesture_id);
+                self.active_source = Some(source);
+                self.highest_gesture_id = event.gesture_id;
+                self.press_ms = server_ms;
+                self.phase = Phase::JumpPending;
+                self.released = false;
+                Command::None
+            }
             GestureAction::Press
                 if self.phase == Phase::Idle && event.gesture_id > self.highest_gesture_id =>
             {
@@ -228,10 +248,29 @@ impl GestureAuthority {
                     server_elapsed_ms: elapsed,
                 }
             }
+            // A genuine same-lease UPGRADE may arrive after original Light
+            // has already activated (e.g. a busy browser or delayed QUIC).
+            // It is an admitted physical edge but is forever NO-COMBAT:
+            // the authoritative World has already committed to Light.
+            // REJECTED would unnecessarily retire the otherwise healthy
+            // shared browser outbox before its matching physical RELEASE.
+            GestureAction::Upgrade
+                if self.active_id == Some(event.gesture_id)
+                    && source == GestureSource::Lmb
+                    && !self.released
+                    && (self.phase == Phase::LightActive
+                        || (self.phase == Phase::LightWindup && elapsed >= LIGHT_WINDUP_MS)) =>
+            {
+                Command::None
+            }
             GestureAction::Release
                 if self.active_id == Some(event.gesture_id) && !self.released =>
             {
                 match self.phase {
+                    Phase::JumpPending => {
+                        self.released = true;
+                        Command::None
+                    }
                     Phase::HeavyReady => {
                         self.phase = Phase::HeavyActive;
                         self.released = true;
@@ -274,6 +313,10 @@ impl GestureAuthority {
             GestureAction::Cancel if self.active_id == Some(event.gesture_id) && !self.released => {
                 self.released = true;
                 match self.phase {
+                    Phase::JumpPending => {
+                        self.phase = Phase::Cancelled;
+                        Command::None
+                    }
                     Phase::HeavyCharging | Phase::HeavyReady => {
                         self.phase = Phase::Cancelled;
                         Command::CancelUnlandedLight

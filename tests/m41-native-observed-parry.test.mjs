@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dispatchM41ObservedParry, readM41ScalarWorldCue } from "../scripts/m41-native-observed-parry.mjs";
+import { dispatchM41ObservedParry, readM41ScalarWorldCue, summarizeM41CueTimeout, m41NativeAsyncCueScript } from "../scripts/m41-native-observed-parry.mjs";
 const heavy="Heavy strike committed - the long windup is readable.";
 const cue="Attack committed - your windup is readable.";
 const state={online:"Online - player #1 - server tick 1637",events:[heavy,cue],
@@ -88,6 +88,69 @@ test("no fresh M41 actor cue means no wheel despite chronology instrumentation",
     now: () => 100,
     sendAttack: async () => {},
     awaitWorldCue: async () => null,
+    sendWheel: () => { wheels++; },
+  }), /missing fresh actor-bound World cue/);
+  assert.equal(wheels, 0);
+});
+
+test("native reaction pacing waits after the genuine cue and before one wheel without waiting for click ACK", async () => {
+  const attack=deferred(), reaction=deferred(), seen=[];
+  const flight=dispatchM41ObservedParry({
+    sendAttack:()=>{seen.push("click");return attack.promise;},
+    awaitWorldCue:()=>{seen.push("cue");return readM41ScalarWorldCue(state,0,1);},
+    waitForReaction:()=>{seen.push("reaction");return reaction.promise;},
+    sendWheel:async()=>{seen.push("wheel");},
+  });
+  await tick();assert.deepEqual(seen,["click","cue","reaction"]);
+  reaction.resolve();await tick();
+  assert.deepEqual(seen,["click","cue","reaction","wheel"]);
+  attack.resolve();assert.equal((await flight).nativeWheelAck,true);
+  let reactions=0;
+  await assert.rejects(dispatchM41ObservedParry({sendAttack:async()=>{},
+    awaitWorldCue:async()=>null,waitForReaction:async()=>{reactions++;},
+    sendWheel:async()=>{throw new Error("no wheel without cue");}}),/missing fresh/);
+  assert.equal(reactions,0,"pacing cannot turn a missing cue into permission for input");
+});
+
+// First-red #40354245925: original World delivered 34HP while the async
+// observer returned no fresh current-attempt light cue. Retain that failure.
+test("M41 timeout retains bounded original event provenance without treating past windup as fresh", () => {
+  const previous = Array.from({ length: 10 }, (_, index) => (
+    index === 8 ? cue : "combat-message-" + index));
+  const recording = {
+    online: "Online - player #1 - server tick 1114",
+    events: previous,
+    eventTransitions: previous.map((text, index) => ({ text, t: index * 10 })),
+  };
+  const snapshot = summarizeM41CueTimeout(recording, 4, 1, 181.7);
+  assert.equal(snapshot.timedOut, true);
+  assert.equal(snapshot.observedActorId, 1);
+  assert.equal(snapshot.expectedActorId, 1);
+  assert.equal(snapshot.baselineEventCount, 4);
+  assert.equal(snapshot.eventCount, 10);
+  assert.equal(snapshot.observerElapsedMs, 182);
+  assert.deepEqual(snapshot.recentEvents.map(entry => entry.index), [6, 7, 8, 9]);
+  assert.equal(snapshot.recentEvents[2].text, cue);
+  assert.equal(readM41ScalarWorldCue(recording, 4, 1), null,
+    "superseded windup is never authorized for a late native wheel");
+  assert.equal(readM41ScalarWorldCue(recording, 10, 1), null);
+  assert.equal(summarizeM41CueTimeout(null, 0, 1, 180).observedActorId, null);
+  assert.equal(summarizeM41CueTimeout({events: ["x".repeat(250)]}, 0, 1, 180)
+    .recentEvents[0].text.length, 100, "bounded event text");
+  const script = m41NativeAsyncCueScript();
+  assert.match(script, /timeoutEvidence\(state, baseline, actorId, performance.now\(\) - started\)/);
+  assert.ok(script.includes("done(cue ?? null)"), "native timeout response stays null");
+  assert.ok(script.includes("window.__MYASO_M41_LAST_TIMEOUT__ = timeoutEvidence"),
+    "bounded failure-only read-only browser snapshot is retained separately");
+  assert.doesNotMatch(script, /dispatchEvent\(|new PointerEvent\(|\.click\(/);
+});
+
+test("M41 timeout sentinel always fails closed without dispatching any wheel", async () => {
+  let wheels = 0;
+  const timeout = summarizeM41CueTimeout(state, 2, 1, 180);
+  await assert.rejects(dispatchM41ObservedParry({
+    sendAttack: async () => {},
+    awaitWorldCue: async () => timeout,
     sendWheel: () => { wheels++; },
   }), /missing fresh actor-bound World cue/);
   assert.equal(wheels, 0);

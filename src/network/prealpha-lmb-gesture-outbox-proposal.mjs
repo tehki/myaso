@@ -209,7 +209,9 @@ export class ProposedSharedTypedGestureOutbox {
     return Object.freeze({source, action, sequence, gestureId});
   }
 
-  begin(source, clientTick = 0) {
+  begin(source, clientTick = 0) { return this.#begin(source, clientTick, false); }
+  beginJumpAttack(source, clientTick = 0) { return this.#begin(source, clientTick, true); }
+  #begin(source, clientTick, jumpAttack) {
     this.#requireOpen();
     // Reject retired source1 BEFORE any queue-capacity checks or state updates.
     // Key E is reserved for Use and cannot claim Combat sequence/capacity.
@@ -218,10 +220,12 @@ export class ProposedSharedTypedGestureOutbox {
     if (this.#reservations.has(source))
       throw new Error("source already owns an active typed gesture");
     // A valid LMB reserves PRESS, optional UPGRADE and terminal capacity.
-    const newSlots = 3;
+    const newSlots = jumpAttack ? 2 : 3;
     if (newSlots && this.#pending.size + this.#reservedCount() + newSlots > this.#maxPending)
       throw new Error("bounded typed queue lacks terminal capacity");
-    const event = this.#allocator.begin(source,clientTick);
+    const event = jumpAttack
+      ? this.#allocator.beginJumpAttack(source,clientTick)
+      : this.#allocator.begin(source,clientTick);
     this.#reservations.set(source,newSlots-1);
     return this.#track(event);
   }

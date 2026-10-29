@@ -78,7 +78,9 @@ export class ProposedSharedSourceGestureAllocator {
     return Object.freeze({source, action, sequence, gestureId, clientTick, bytes});
   }
 
-  begin(source, clientTick = 0) {
+  begin(source, clientTick = 0) { return this.#begin(source, clientTick, ACTION.PRESS); }
+  beginJumpAttack(source, clientTick = 0) { return this.#begin(source, clientTick, ACTION.JUMP_ATTACK); }
+  #begin(source, clientTick, action) {
     this.#requireOpen();
     this.#checkSource(source);
     this.#checkTick(clientTick);
@@ -97,9 +99,10 @@ export class ProposedSharedSourceGestureAllocator {
       this.#active.size > 0, // only retire if no valid older source exists
     );
     const gestureId = this.#gestureId;
-    const event = this.#event(source, ACTION.PRESS, gestureId, clientTick);
+    const event = this.#event(source, action, gestureId, clientTick);
     this.#gestureId++;
-    this.#active.set(source, {gestureId, upgraded:false});
+    // Chord never supports Heavy upgrade; only a physical terminal.
+    this.#active.set(source, {gestureId, upgraded:action===ACTION.JUMP_ATTACK});
     return event;
   }
 

@@ -5,6 +5,7 @@ import { createDormantPrealphaLmbDomGate, attachDormantPrealphaLmbDomGate } from
 
 export function createDormantSharedUi10Sources({
   outbox, getClientTick, isCanvasTarget, isChatFocused, isJumpAttackChord,
+  enableJumpAttackReview = false,
 } = {}) {
   if (!(outbox instanceof ProposedSharedTypedGestureOutbox)) {
     throw new TypeError("one shared Core8A typed source outbox required");
@@ -14,6 +15,7 @@ export function createDormantSharedUi10Sources({
   }
   const lmb = createDormantPrealphaLmbDomGate({
     outbox, getClientTick, isCanvasTarget, isChatFocused, isJumpAttackChord,
+    enableJumpAttackReview,
   });
   function closeLease() {
     lmb.closeLease();
@@ -22,6 +24,7 @@ export function createDormantSharedUi10Sources({
   return Object.freeze({
     lmb, outbox, closeLease,
     chatOpened() { lmb.chatOpened(); },
+    jumpChord() { return lmb.jumpChord(); },
     blur() { lmb.blur(); },
     hidden() { lmb.hidden(); },
   });

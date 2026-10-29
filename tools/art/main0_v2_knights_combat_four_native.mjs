@@ -9,11 +9,12 @@ import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
+import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const engines=(process.env.MYASO_LIVE_GESTURE_NATIVE_BROWSERS||"chrome,chrome,chrome,chrome").split(",");
 const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
-assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -56,7 +57,7 @@ async function startOriginalRust(){
  const bin=join(root,"server","target","debug","myaso-server");
  const build=spawnSync("cargo",["build",...(physicalMode==="private-hit"?["--features","experimental-hit-delivery-lab"]:[]),...(process.env.MYASO_LIVE_GESTURE_CARGO_OFFLINE==="0"?[]:["--offline"]),"--locked","--manifest-path","server/Cargo.toml","--bin","myaso-server","--quiet"],{cwd:root,encoding:"utf8",timeout:150000});
  if(build.status!==0)throw Error("exact source local Rust build failed: "+String(build.stderr||build.error).slice(-1900));
- const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
+ const child=spawn(bin,[],{cwd:root,env:{...process.env,MYASO_BIND:"127.0.0.1:0",MYASO_MAX_PLAYERS:"4",MYASO_EXPERIMENTAL_GESTURE_V2:"1",MYASO_EXPERIMENTAL_JUMP_ATTACK_V2:["jump-review","jump-two-hit"].includes(physicalMode)?"1":"0",MYASO_FLIGHT_ACTION_PROOF:"1",...(physicalMode==="private-hit"?{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"1"}:{MYASO_EXPERIMENTAL_HIT_DELIVERY_LAB:"0"})},stdio:["ignore","pipe","pipe"]});
  processes.push(child);let buffer="",err="";
  child.stdout.on("data",d=>buffer+=d.toString());
  child.stderr.on("data",d=>err+=d.toString());
@@ -206,7 +207,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   // barriers between dispatching these genuine native button sequences.
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
-    {type:"pointerDown",button:0},{type:"pause",duration:25},{type:"pointerUp",button:0},
+    // The Firefox W3C 25ms pause can expand to a 142-150ms *real* physical
+    // hold under four-browser contention (original CI first red). This
+    // inserts no pause tick: true trusted DOWN/UP still originate from the
+    // same native W3C request. Keep the strict measured <135ms Light gate.
+    {type:"pointerDown",button:0},{type:"pointerUp",button:0},
    ]}]
   });
  }
@@ -456,11 +461,27 @@ await mkdir(output,{recursive:true});
 try{
  const {url:rustUrl,cert,readAuthoritativeWorld}=await startOriginalRust(),host=await startStatic();
  const actors=[];
- for(let i=0;i<4;i++){
+ // This single-source0 negative test requires ONE actual browser/actor.
+ // Preserve the full four-seat standard/held/lifecycle/private qualifications.
+ const seatCount=["space-guard","jump-review"].includes(physicalMode)?1:physicalMode==="jump-two-hit"?2:4;
+ for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
-  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");
+  const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
   await request(s.base,"POST","/session/"+s.id+"/url",{url:u.toString()},45000);
   const actor=await waitFor(async()=>{let t=await evaluate(s,"return document.querySelector('#event-text')?.textContent||'';");const m=t?.match(/Online - player #(\d+) - server tick (\d+)/);return m?{id:Number(m[1]),tick:Number(m[2])}:null},16000).catch(async error=>{
+   if(physicalMode==="jump-two-hit"){
+    const browser=await evaluate(s,
+     "return {state:document.readyState,status:document.querySelector('#event-text')?.textContent||'',"
+     +"url:location.href,proof:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null}").catch(e=>({error:String(e)}));
+    const evidence={error:String(error),whichSeat:i+1,browser,
+      originalWorld:readAuthoritativeWorld().split("\n")
+       .filter(line=>/session |M201_|listening on|admission cap/.test(line)).slice(-45),
+      startedActorIds:actors.map(a=>a.actor.id),
+      limitation:"browser/bootstrap failure; no combat inference"};
+    await writeFile(join(output,"combat4-two-native-bootstrap-FIRST-RED.json"),
+      JSON.stringify(evidence,null,2)+"\n");
+    console.error("COMBAT4_TWO_NATIVE_BOOTSTRAP_FIRST_RED",JSON.stringify(evidence));
+   }
    if(physicalMode==="private-hit"){
     // Read-only evidence from the actual first-party page and authoritative
     // server. Never grant an actor, synthesize online state or waive failure.
@@ -493,7 +514,7 @@ try{
   assert.ok(data.knightWebPDraws>=8,"all real players must paint nonplaceholder Silver source WebP frames");
   assert.ok(Object.keys(data.knightSources).some(k=>k.startsWith("silver_")&&k.endsWith("_relit.webp")),
     "require actual original Blender relit Silver WebP drawImage calls, not a fallback Combat circle");
-  assert.ok(data.roster.length>=4,`genuine same-server four human roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,privateFailure:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
+  assert.ok(data.roster.length>=seatCount,`genuine admitted native roster must be visible: ${JSON.stringify({browser:s.engine,actorId:actor.id,status:data.status,roster:data.roster,expectedActors:actors.map(x=>x.actor.id),privateLab:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_PROOF__?.()??null;"):null,privateFailure:physicalMode==="private-hit"?await evaluate(s,"return window.__MYASO_PRIVATE_HIT_FAILURE__??null;"):null,serverSessions:readAuthoritativeWorld().split("\\n").filter(x=>/session |private HIT/.test(x)).slice(-24)})}`);
   assert.equal(data.canvasWidth,960);assert.equal(data.canvasHeight,540);
   assert.ok(data.floor.centerLuminance>(flag==="1"?38:15));
   assert.ok(data.floor.centerLuminance<(flag==="1"?155:39));
@@ -504,7 +525,7 @@ try{
   await writeFile(join(output,name),bytes);
   trial.push({browser:s.engine,actorId:actor.id,mode:flag==="1"?"lite":"grid",data,screenshot:name,pngSha256:sha(bytes)});
  }
- assert.equal(trial.length,4,"four real native fighter sessions required");
+ assert.equal(trial.length,seatCount,"required real native fighter sessions must all start");
  assert.ok(trial.every(x=>x.mode==="grid"),"release slice must use original grid on every browser, never optional terrain");
 
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
@@ -512,7 +533,352 @@ try{
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
  if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
- }else if(physicalMode==="held-lmb"){
+ }else if(physicalMode==="jump-two-hit"){
+ // P0 nonrelease genuine TWO browser clients, same authenticated Rust World.
+ const attacker=actors[0].s,victim=actors[1].s;
+ const proof=s=>evaluate(s,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null;");
+ const own=(p,id)=>p?.replicatedFighters?.find(f=>f.netId===id);
+ const before=await waitFor(async()=>{
+  const both=await Promise.all([proof(attacker),proof(victim)]);
+  return both.every((p,i)=>p?.transportState==="granted"
+   && p.ownPlayerNetId===i+1 && p.failed===false && p.closed===false
+   && own(p,1)?.action===0 && own(p,2)?.action===0
+   && own(p,1)?.hp===100 && own(p,2)?.hp===100
+   && p.replicatedFighters?.length===2)?both:false;
+ },15000);
+ const a0=own(before[0],1),t0=own(before[0],2);
+ assert.ok(Math.abs(a0.y-t0.y)<=3,"two actual World actors share a horizontal lane");
+ assert.ok(t0.x-a0.x>70,"two genuine actors start outside JumpAttack reach");
+ const focused=await evaluate(attacker,
+  "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
+ assert.equal(focused,true,"original gameplay canvas must own native WASD");
+ // Stage by ORIGINAL server positions, not an assumed WebDriver movement time.
+ // Every correction is actual W3C D/A with a full release + 320ms between
+ // presses, preventing accidental double-tap Dash in the game controller.
+ const movementAttempts=[];
+ let staged=null;
+ for(let n=0;n<5;n++){
+  const both=await Promise.all([proof(attacker),proof(victim)]);
+  const a=own(both[0],1),t=own(both[0],2),gap=t?.x-a?.x;
+  if(a?.action===0&&t?.action===0&&t.hp===100
+      && Math.abs(a.y-t.y)<=5&&gap>=38&&gap<=62
+      &&a.x>a0.x+20){staged=both;break;}
+  if(!a||!t||a.action!==0||t.action!==0)break;
+  const desired=54,delta=gap-desired,key=delta>0?"d":"a";
+  const duration=Math.max(35,Math.min(180,Math.round(Math.abs(delta)*1000/215)));
+  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+   actions:[{type:"key",id:"jump-two-stage-"+n,actions:[
+    {type:"keyDown",value:key},{type:"pause",duration},{type:"keyUp",value:key}]}]});
+  await sleeps(330);
+  const after=await proof(attacker);
+  movementAttempts.push({n,key,duration,before:{x:a.x,y:a.y,gap},
+    after:{x:own(after,1)?.x,y:own(after,1)?.y,gap:own(after,2)?.x-own(after,1)?.x}});
+ }
+ if(!staged){
+  const diagnostic={error:"five genuine W3C movement corrections could not establish original World JumpAttack reach",
+   movementAttempts,initial:before[0],attacker:await proof(attacker),victim:await proof(victim),
+   originalWorld:readAuthoritativeWorld().split("\n").filter(x=>/M201_AUTH_|session /.test(x)).slice(-65)};
+  await writeFile(join(output,"combat4-two-native-staging-FIRST-RED.json"),
+   JSON.stringify(diagnostic,null,2)+"\n");
+  console.error("COMBAT4_TWO_NATIVE_STAGING_FIRST_RED",JSON.stringify(diagnostic));
+  throw Error("real server-owned 2-player positioning incomplete; no JumpAttack was attempted");
+ }
+ await sleeps(180);
+ const ready=await Promise.all([proof(attacker),proof(victim)]);
+ const a1=own(ready[0],1),t1=own(ready[0],2),range=t1.x-a1.x;
+ assert.ok(range>=38&&range<=62,"real server replicas prove JumpAttack range");
+ assert.equal(own(ready[1],1)?.x,a1.x,"second browser observes same original World");
+ const pointer=await evaluate(attacker,
+  "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();"
+  +"const b=c.getBoundingClientRect(),events=[];"
+  +"for(const type of ['keydown','keyup','pointerdown','pointerup'])window.addEventListener(type,e=>{"
+  +"if(type.startsWith('key')&&e.code!=='Space')return;"
+  +"if(type.startsWith('pointer')&&e.button!==0)return;"
+  +"events.push({type,trusted:e.isTrusted,at:performance.now(),code:e.code||null,pointerId:e.pointerId??null})"
+  +"},true);window.__COMBAT4_JUMP_TWO_PHYSICAL__=()=>events.map(x=>({...x}));"
+  +"return {focus:document.activeElement===c,x:Math.round(b.left+b.width/2+190*b.width/c.width),y:Math.round(b.top+b.height/2)};");
+ assert.equal(pointer.focus,true);
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"pointer",id:"two-jump-pointer",parameters:{pointerType:"mouse"},
+   actions:[{type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0}]}]});
+ await sleeps(100);
+ const start=readAuthoritativeWorld().length,prior=await proof(attacker);
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[
+   {type:"key",id:"two-jump-space",actions:[
+    {type:"keyDown",value:" "},{type:"pause",duration:40},
+    {type:"pause",duration:30},{type:"keyUp",value:" "}]},
+   {type:"pointer",id:"two-jump-pointer",parameters:{pointerType:"mouse"},actions:[
+    {type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0},
+    {type:"pointerDown",button:0},{type:"pointerUp",button:0},{type:"pause",duration:0}]}
+  ]});
+ const hit=await waitFor(async()=>{
+  const world=readAuthoritativeWorld().slice(start);
+  const line=world.match(/^M201_AUTH_HIT tick=(\d+) attacker=1 target=2 damage=42 hp=58$/m)?.[0];
+  if(!line)return false;
+  const both=await Promise.all([proof(attacker),proof(victim)]);
+  if(!both.every(p=>own(p,2)?.hp===58&&p.failed===false&&p.closed===false
+      &&p.transportState==="granted"))return false;
+  const added=both[0].acknowledged.slice(prior.acknowledged.length);
+  if(added.filter(x=>x.source===0&&x.action===5&&x.status===1).length!==1
+    ||added.filter(x=>x.source===0&&x.action===3&&x.status===1).length!==1)return false;
+  return {line,world,both,added};
+ },9000).catch(async error=>{
+  const diagnostic={error:String(error),world:readAuthoritativeWorld().slice(start),
+   attacker:await proof(attacker).catch(e=>String(e)),
+   victim:await proof(victim).catch(e=>String(e)),
+   native:await evaluate(attacker,"return window.__COMBAT4_JUMP_TWO_PHYSICAL__?.()??[]").catch(e=>String(e))};
+  await writeFile(join(output,"combat4-two-native-jump-FIRST-RED.json"),
+   JSON.stringify(diagnostic,null,2)+"\n");
+  console.error("COMBAT4_TWO_NATIVE_JUMP_FIRST_RED",JSON.stringify(diagnostic));
+  throw error;
+ });
+ await sleeps(380); // no duplicate hit during remaining original World recovery
+ const journal=readAuthoritativeWorld().slice(start);
+ const hits=journal.split("\n").filter(line=>/^M201_AUTH_HIT tick=\d+ attacker=1 target=2 /.test(line));
+ assert.deepEqual(hits,[hit.line],"exactly one authoritative 42 HP hit; no double strike");
+ const actualStaminaBefore=own(ready[0],1)?.stamina;
+ const actualStaminaAfter=own(hit.both[0],1)?.stamina;
+ const worldJumpEntry=classifyOriginalWorldJumpAttackEntry(journal,1,{
+  startingStamina:actualStaminaBefore,observedStamina:actualStaminaAfter,
+ });
+ const remainingWorldTransitions=[[16,17],[17,18]].map(([from,to])=>({
+  from,to,observed:worldTransition(journal,1,from,to)
+ }));
+ if(!worldJumpEntry||remainingWorldTransitions.some(x=>!x.observed)){
+  const evidence={entryClassification:worldJumpEntry,stamina:{
+    before:actualStaminaBefore,after:actualStaminaAfter},
+   missing:remainingWorldTransitions.filter(x=>!x.observed),worldJournal:journal,
+   receipt:hit.added,attackerReplica:hit.both[0],victimReplica:hit.both[1]};
+  await writeFile(join(output,"combat4-two-native-action-FIRST-RED.json"),JSON.stringify(evidence,null,2)+"\n");
+  console.error("COMBAT4_TWO_NATIVE_ACTION_FIRST_RED",JSON.stringify(evidence));
+ }
+ assert.ok(worldJumpEntry&&remainingWorldTransitions.every(x=>x.observed),
+  "real World Jump→Windup (separate ticks OR authenticated same-observer 0→16), then Active→Recovery required");
+ assert.equal(worldTransition(journal,1,0,1),false,
+  "no competing ordinary Light attack");
+ const physical=await evaluate(attacker,"return window.__COMBAT4_JUMP_TWO_PHYSICAL__?.()??[]");
+ assert.deepEqual(physical.map(x=>x.type),
+  ["keydown","pointerdown","pointerup","keyup"],"genuine W3C physical Space+LMB");
+ assert.ok(physical.every(x=>x.trusted),"no untrusted/synthetic DOM edges");
+ assert.equal(hit.added[0].gestureId,hit.added[1].gestureId,
+  "one source0 gesture for actual JumpAttack and release");
+ const evidence={mode:physicalMode,
+  sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+  originalWorld:true,originalAuthenticatedQUIC:true,
+  distinctNativeBrowserProcesses:2,independentHumanWAN:false,
+  actualActorIds:actors.map(x=>x.actor.id),
+  staging:{before:before[0],staged:staged[0],ready:ready[0],range,movementAttempts},
+  nativePhysical:physical,typedReceipts:hit.added,authoritativeHit:hit.line,
+  worldJumpEntry,originalWorldStamina:{before:actualStaminaBefore,after:actualStaminaAfter},
+  worldJournal:journal,attackerReplica:hit.both[0],victimReplica:hit.both[1],
+  limitation:"two genuine browsers one local host; not WAN or two independent humans"};
+ await writeFile(join(output,"combat4-two-native-jump-world-hit.json"),
+  JSON.stringify(evidence,null,2)+"\n");
+ console.log("COMBAT4_TWO_NATIVE_JUMP_WORLD_42HP_PASS",JSON.stringify(evidence));
+}else if(physicalMode==="jump-review"){
+ // Experimental extra opt-in: original first-party game, genuine native
+ // key/pointer, same authenticated original QUIC stream and 60Hz Rust World.
+ // This one-seat test proves a true World JumpAttack action and stamina,
+ // NOT 42HP victim hit or two-person WAN gameplay.
+ const attacker=actors[0].s;
+ const coord=await evaluate(attacker,
+  "const c=document.querySelector('#arena');c.scrollIntoView({block:'center'});c.focus();"
+  +"const b=c.getBoundingClientRect();const seen=[];"
+  +"for(const type of ['keydown','keyup','pointerdown','pointerup'])window.addEventListener(type,e=>{"
+  +"if((type.startsWith('key')&&e.code!=='Space')||(type.startsWith('pointer')&&e.button!==0))return;"
+  +"seen.push({type,trusted:e.isTrusted,pointerId:e.pointerId??null,code:e.code??null,at:performance.now()});"
+  +"},true);window.__COMBAT4_JUMP_NATIVE__=()=>seen.map(x=>({...x}));"
+  +"return {focused:document.activeElement===c,x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.5)};");
+ assert(coord.focused,"real game canvas must own native Space chord");
+ const prior=await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
+ assert.equal(prior.transportState,"granted","real QUIC source0 lease required");
+ const before=readAuthoritativeWorld().length;
+ // One native WebDriver ticks request coordinates TWO real input sources.
+ // Separate HTTP requests previously delayed physical LMB 2240ms after
+ // Space: original World Jump(430ms) had already expired. Never change
+ // World duration, deadlines or test assertions to conceal this W3C delay.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[
+   {type:"key",id:"jump-review-space",actions:[
+    {type:"keyDown",value:" "},{type:"pause",duration:40},
+    {type:"pause",duration:30},{type:"keyUp",value:" "}
+   ]},
+   {type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
+    {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0},
+    {type:"pointerDown",button:0},{type:"pointerUp",button:0},
+    {type:"pause",duration:0}
+   ]}
+  ]
+ });
+ const result=await waitFor(async()=>{
+  const log=readAuthoritativeWorld().slice(before),p=await evaluate(attacker,
+   "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
+  if(!p)return false;
+  const a=p.acknowledged||[];
+  if(!a.some(e=>e.source===0&&e.action===5&&e.status===1)
+     || !a.some(e=>e.source===0&&e.action===3&&e.status===1)
+     || !worldTransition(log,1,15,16)
+     || !worldTransition(log,1,16,17))return false;
+  return {log,p};
+ },12000).catch(async error=>{
+  const diag={error:String(error),world:readAuthoritativeWorld().slice(before),
+    browser:await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null").catch(e=>String(e)),
+    native:await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]").catch(e=>String(e))};
+  console.error("COMBAT4_JUMP_NATIVE_FIRST_RED",JSON.stringify(diag));
+  throw error;
+ });
+ const live=await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]");
+ assert.deepEqual(live.map(e=>e.type),
+  ["keydown","pointerdown","pointerup","keyup"],"genuine physical Space+LMB order");
+ assert.ok(live.every(e=>e.trusted),"all native chord edges must be isTrusted");
+ const rows=result.p.acknowledged.filter(e=>e.source===0&&e.status===1);
+ assert.deepEqual(rows.map(e=>e.action),[5,3],"exact one gesture, no separate Light/Heavy");
+ assert.equal(rows[0].gestureId,rows[1].gestureId);
+ assert.ok(worldTransition(result.log,1,0,15),
+  "original World must first grant and spend for real Jump");
+ assert.ok(/M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 gesture=\d+ sequence=\d+ eventAction=5 status=1/.test(result.log),
+  "original authenticated World-lock receipt proves one typed JumpAttack action5");
+ console.log("COMBAT4_JUMP_NATIVE_FULL_WORLD_TRACE",JSON.stringify({world:result.log,receipts:rows,native:live}));
+ assert.ok(!worldTransition(result.log,1,0,1),
+  "no parallel sampled ordinary Light attack");
+ assert.equal(result.p.failed,false,"original QUIC lease still valid");
+ assert.equal(result.p.closed,false,"no fatal source0 reject");
+ const evidence={mode:physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+  originalGamePage:true,originalAuthenticatedQUIC:true,originalWorld:true,
+  native:live,typedReceipts:rows,originalWorldLog:result.log,
+  authoritativeReplica:result.p,independentHumanWAN:false,
+  limitation:"single-actor true JumpAttack action, no opponent 42HP victim proof"};
+ await writeFile(join(output,"combat4-jump-review-original-world.json"),
+  JSON.stringify(evidence,null,2)+"\n");
+ console.log("COMBAT4_NATIVE_JUMP_WORLD_ACTION_PASS",JSON.stringify(evidence));
+}else if(physicalMode==="space-guard"){
+ // Nonrelease real native W3C / original QUIC / original 60Hz Rust World.
+ // This proves ONLY that v2 never misroutes Space+LMB into ordinary Light.
+ // JumpAttack gameplay remains unimplemented until reviewed server authority.
+ const attacker=actors[0].s,actorId=actors[0].actor.id;
+ const page=await evaluate(attacker,String.raw`
+  const c=document.querySelector("#arena");c.scrollIntoView({block:"center"});c.focus();
+  const b=c.getBoundingClientRect(),events=[];
+  for(const type of ["keydown","keyup","pointerdown","pointerup"]){
+   window.addEventListener(type,e=>{
+    if((type.startsWith("pointer")&&e.button!==0) ||
+       (type.startsWith("key")&&e.code!=="Space"))return;
+    events.push({type,trusted:e.isTrusted,code:e.code||null,
+      pointerId:e.pointerId??null,at:performance.now()});
+   },true);
+  }
+  window.__COMBAT4_SPACE_NATIVE_EDGES__=()=>events.map(e=>({...e}));
+  return {focused:document.activeElement===c,
+   x:Math.round(b.left+b.width*.72),y:Math.round(b.top+b.height*.50)};
+ `);
+ assert(page.focused,"native Space chord requires original focused game canvas");
+ const proof=()=>evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
+ const edges=()=>evaluate(attacker,"return window.__COMBAT4_SPACE_NATIVE_EDGES__?.()??[]");
+ const sendKeys=async(actions)=>request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"key",id:"native-space-chord-keyboard",actions}]
+ });
+ const sendPointer=async(actions)=>request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"pointer",id:"native-space-chord-pointer",parameters:{pointerType:"mouse"},actions}]
+ });
+ const click=async()=>sendPointer([
+  {type:"pointerMove",origin:"viewport",x:page.x,y:page.y,duration:0},
+  {type:"pointerDown",button:0},{type:"pause",duration:30},{type:"pointerUp",button:0}
+ ]);
+ const baseline=await proof();
+ assert.equal(baseline.transportState,"granted","native actor must own real 0x11 lease");
+ const beforeReceipts=baseline.acknowledged.length;
+ const beforeWorld=readAuthoritativeWorld().length;
+ let spaceDown=false;
+ try {
+  await sendKeys([{type:"keyDown",value:" "}]);spaceDown=true;
+  await click();
+  await sleeps(500);
+ } finally {
+  if(spaceDown)await sendKeys([{type:"keyUp",value:" "}]).catch(()=>{});
+ }
+ const afterSpace=await proof();
+ const noLightReceipts=afterSpace.acknowledged.slice(beforeReceipts);
+ const firstWorld=readAuthoritativeWorld().slice(beforeWorld);
+ const witnessed=await edges();
+ assert.deepEqual(witnessed.slice(0,4).map(e=>e.type),
+  ["keydown","pointerdown","pointerup","keyup"],
+  "native W3C must dispatch genuine Space+LMB DOWN/UP, no missing events");
+ assert.ok(witnessed.slice(0,4).every(e=>e.trusted),"native Space events must be trusted");
+ assert.equal(noLightReceipts.filter(e=>e.source===0&&e.action===1).length,0,
+  "Space-held LMB must NOT author ordinary typed Light PRESS");
+ assert.ok(!/M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 .*eventAction=1 status=1/.test(firstWorld),
+  "original World cannot admit a fabricated ordinary LMB Light during Space");
+ assert.ok(!/M201_AUTH_HIT tick=\d+ attacker=1 /.test(firstWorld),
+  "Space-held LMB must not cause original World Light/Heavy damage");
+ assert.equal(afterSpace.failed,false,"Space chord must not retire authenticated v2 QUIC");
+ assert.equal(afterSpace.closed,false,"Space chord keeps original actor connection open");
+ // A previously blocked chord must not poison subsequent ordinary source0.
+ await waitFor(async()=>{
+  const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
+ },8000);
+ const beforeNormal=(await proof()).acknowledged.length;
+ await click();
+ const afterNormal=await waitFor(async()=>{
+  const p=await proof(),later=p.acknowledged.slice(beforeNormal);
+  return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
+ },9000);
+ const normal=afterNormal.acknowledged.slice(beforeNormal);
+ assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
+  "ordinary post-Space LMB still commits one valid pressed/released gesture");
+ assert.equal(afterNormal.failed,false,"normal source0 must not disconnect");
+ // Second genuine W3C order: LMB down BEFORE Space, then actual physical
+ // keydown must send one same-lease CANCEL, never a synthetic RELEASE.
+ // A slow driver may legitimately let early Light contact happen before
+ // cancellation; the original World cannot retroactively erase that HIT.
+ await waitFor(async()=>{
+  const p=await proof();
+  return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
+ },9000);
+ const beforeCancelReceipts=(await proof()).acknowledged.length;
+ const beforeCancelWorld=readAuthoritativeWorld().length;
+ let pointerHeld=false, spaceHeld=false;
+ try{
+  await sendPointer([
+   {type:"pointerMove",origin:"viewport",x:page.x,y:page.y,duration:0},
+   {type:"pointerDown",button:0}
+  ]);pointerHeld=true;
+  await sendKeys([{type:"keyDown",value:" "}]);spaceHeld=true;
+ }finally{
+  if(pointerHeld)await sendPointer([{type:"pointerUp",button:0}]).catch(()=>{});
+  if(spaceHeld)await sendKeys([{type:"keyUp",value:" "}]).catch(()=>{});
+ }
+ const cancelProof=await waitFor(async()=>{
+  const p=await proof(),newReceipts=p.acknowledged.slice(beforeCancelReceipts);
+  return newReceipts.some(e=>e.source===0&&e.action===4&&e.status===1)?p:false;
+ },8000);
+ const cancelled=cancelProof.acknowledged.slice(beforeCancelReceipts);
+ const firstPress=cancelled.filter(e=>e.source===0&&e.action===1&&e.status===1);
+ const terminals=cancelled.filter(e=>e.source===0&&(e.action===3||e.action===4));
+ assert.equal(firstPress.length,1,"one real first-pressed source0 gesture");
+ assert.deepEqual(terminals.map(e=>e.action),[4],
+  "Space after LMB must CANCEL without an extra typed RELEASE");
+ assert.equal(firstPress[0].gestureId,terminals[0].gestureId,
+  "cancel belongs to original authenticated physical LMB gesture");
+ assert.equal(cancelProof.failed,false,"late Space cancel must keep QUIC lease alive");
+ assert.equal(cancelProof.closed,false,"late Space cancel must not disconnect player");
+ const cancelWorld=readAuthoritativeWorld().slice(beforeCancelWorld);
+ const damaging=cancelWorld.split("\n").filter(e=>
+  new RegExp("M201_AUTH_HIT tick=\\d+ attacker="+actorId+" ").test(e));
+ assert.ok(damaging.length<=1,"mid-hold Space may not produce double Light/Heavy World HIT");
+ const evidence={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+  mode:physicalMode,originalFirstPartyPage:true,originalQUIC:true,
+  genuineChromeOrFirefox:true,independentPhysicalHumanHosts:false,
+  physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
+  ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
+  midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
+  nativePhysicalAll:await edges(),
+  before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
+  limitation:"NO actual v2 JumpAttack demonstrated or released"};
+ await writeFile(join(output,"combat4-space-chord-real-native-original-world.json"),
+  JSON.stringify(evidence,null,2)+"\n");
+ console.log("COMBAT4_NATIVE_SPACE_CHORD_NO_FALSE_LIGHT_PASS",JSON.stringify(evidence));
+}else if(physicalMode==="held-lmb"){
   // A separate fresh World preserves the original held-LMB and short-LMB acceptance
   // below. The real game page owns every canonical source0 edge and ACK.
   const attacker=actors[0].s,attackerId=actors[0].actor.id,targetId=actors[1].actor.id;
@@ -913,12 +1279,12 @@ try{
  }));
  }
  const report={physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"set-from-commit",actualRustWebTransport:true,
-  actualOriginalClient:true,realSeparateNativeBrowserProcesses:4,independentPhysicalHumanHosts:false,
+  actualOriginalClient:true,realSeparateNativeBrowserProcesses:seatCount,independentPhysicalHumanHosts:false,
   authenticSilverKnightIntegrationVerified:true,allFiveClipsVisuallyValidated:false,
-  trueFourIndependentHumanOperators:false,modeIsOptional:false,defaultArenaPreserved:true,
+  trueFourIndependentHumanOperators:false,modeIsOptional:physicalMode==="space-guard",defaultArenaPreserved:true,
   genuineFullCombatApproval:false,trials:trial};
  await writeFile(join(output,"main0-knights-original-game-native.json"),JSON.stringify(report,null,2)+"\n");
- console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:engines,floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot)}));
+ console.log( "MAIN0_KNIGHTS_ORIGINAL_GRID_REAL_W3C_PASS "+JSON.stringify({pass:true,source:report.sourceCommit,actors:trial.map(x=>x.actorId),browsers:trial.map(x=>x.browser),floors:trial.map(x=>({mode:x.mode,centerLuminance:x.data.floor.centerLuminance,frames:x.data.frames,p95:x.data.frameIntervalP95Ms,silverWebP:x.data.knightWebPDraws,sources:x.data.knightSources})),screenshots:trial.map(x=>x.screenshot)}));
 }finally{
  for(const s of sessions){try{await request(s.base,"DELETE","/session/"+s.id)}catch{}}
  for(const child of processes){try{child.kill("SIGTERM")}catch{}}

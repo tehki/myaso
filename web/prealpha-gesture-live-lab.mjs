@@ -7,6 +7,8 @@ import { createDormantSharedUi10Sources, attachDormantSharedUi10Sources } from "
 
 export async function activateLoopbackGestureLab({
   gameClient, canvas, windowObj, documentObj, getClientTick,
+  isJumpAttackChord = () => false,
+  enableJumpAttackReview = false,
 } = {}) {
   if (!gameClient || !canvas || !windowObj || !documentObj
       || typeof getClientTick !== "function") {
@@ -25,6 +27,8 @@ export async function activateLoopbackGestureLab({
   let failed = false, detached = false, retryTimer = null;
   const removeListeners = [];
   const upgradeTimers = new Set();
+  // Bounded loopback-only attempted-write evidence, never an ACK or a hit.
+  const attemptedTransmissions = [];
   let writeBatchPending = false, writeWatchdog = null;
   let gates = null, detachGates = null;
 
@@ -70,6 +74,12 @@ export async function activateLoopbackGestureLab({
     writeWatchdog = setTimeout(() => fail("typed gesture writer stalled for 1500ms"),1500);
     try {
       const writes = packets.map(packet => {
+        attemptedTransmissions.push(Object.freeze({
+          source:packet.source, action:packet.action, sequence:packet.sequence,
+          gestureId:packet.gestureId, attempt:packet.attempt,
+          currentLease:gameClient.transport === lease,
+        }));
+        if (attemptedTransmissions.length > 16) attemptedTransmissions.shift();
         try { return Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes)); }
         catch (error) { return Promise.reject(error); }
       });
@@ -106,7 +116,11 @@ export async function activateLoopbackGestureLab({
       outbox, getClientTick,
       isCanvasTarget:e => e.target === canvas,
       isChatFocused:() => Boolean(documentObj.activeElement?.closest?.("[data-local-chat]")),
-      isJumpAttackChord:() => false, // Rust World owns validity; never fake an action
+      // Space+LMB is NOT an ordinary typed Light. Until Main0 approves an
+      // exclusive authoritative JumpAttack route, fail closed rather than
+      // inventing a second v1 attack writer or a false World Light.
+      isJumpAttackChord,
+      enableJumpAttackReview,
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
@@ -114,7 +128,8 @@ export async function activateLoopbackGestureLab({
     let lastUpgradeScheduledGestureId = null;
     function scheduleSource0Upgrade() {
       if (!gates.lmb.snapshot.active) return;
-      const {pointerId,gestureId} = gates.lmb.snapshot;
+      const {pointerId,gestureId,jump} = gates.lmb.snapshot;
+      if (jump) return; // no Heavy upgrade follows an admitted Space chord
       // PointerEvents (normal LMB) and RMB-held MouseEvents share ONE source0
       // gesture and exactly ONE upgrade timer. Server alone arbitrates 135ms
       // light and 320ms charge; this timer is merely a hold-intent edge.
@@ -143,7 +158,13 @@ export async function activateLoopbackGestureLab({
     add(windowObj,"mouseup",drainNewEdges);
     add(windowObj,"pointercancel",drainNewEdges);
     add(canvas,"lostpointercapture",drainNewEdges);
-    add(windowObj,"keydown",drainNewEdges);
+    add(windowObj,"keydown",event => {
+      // Space pressed after physical LMB: terminal is a genuine CANCEL,
+      // never a phantom RELEASE or a second Light. A previously landed
+      // original World Light cannot be undone by a later keypress.
+      if (event.code === "Space" && !event.repeat) gates.jumpChord();
+      drainNewEdges();
+    });
     add(windowObj,"keyup",drainNewEdges);
     add(windowObj,"blur",drainNewEdges);
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
@@ -160,6 +181,7 @@ export async function activateLoopbackGestureLab({
       pending:outbox.snapshot.pending,
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
+      attemptedTransmissions:Object.freeze(attemptedTransmissions.slice()),
       acknowledged:receipts.map(x=>({...x})),
       // Actual replicated fields only: no prediction, inferred damage,
       // allocation or gameplay writes. Each read returns detached snapshots.

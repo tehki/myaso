@@ -1,4 +1,5 @@
 import { NETWORK } from "../src/network/constants.mjs";
+import { planM27DirectionalBackblock } from "../src/combat/m27-directional-block-staging.mjs";
 import { isM224AuthoritativeDodgeResolved } from "../src/browser/m224-dodge-completion.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
 
@@ -64,6 +65,7 @@ let directionalBlockDistance = null;
 let directionalAttackArcDelta = null;
 let directionalBlockFacingDelta = null;
 let firstDirectionalBlockHitAt = null;
+const m27OriginalWorldSamples = [];
 let initialOwnPosition = null;
 let initialPeerPosition = null;
 let ownDeadSeen = false;
@@ -224,6 +226,20 @@ function observeState(state) {
         directionalBlockFacingDelta = blockFacingDelta;
       }
     }
+    // Original replicated actor/actions/geometry for every early M27 contact,
+    // including failures; HP-only evidence remains insufficient to pass.
+    if (m27OriginalWorldSamples.length < 100 && performance.now() - startedAt < 2400) {
+      const dx = defender.x - attacker.x, dy = defender.y - attacker.y;
+      const blockAngle = Math.atan2(-dy, -dx);
+      m27OriginalWorldSamples.push({
+        atMs: Math.round(performance.now() - startedAt),
+        attackerAction: attacker.action, defenderAction: defender.action,
+        distance: Math.round(Math.hypot(dx, dy)*100)/100,
+        attackerArc: Math.round(Math.abs(normalizeAngle(Math.atan2(dy, dx)-attacker.facing))*1000)/1000,
+        defenderRearArc: Math.round(Math.abs(normalizeAngle(blockAngle-defender.facing))*1000)/1000,
+        defenderHp: defender.hp, defenderGuard: defender.guard,
+      });
+    }
     if (firstDirectionalBlockHitAt === null && defender.hp < 100 && defender.guard === 100) {
       firstDirectionalBlockHitAt = performance.now();
     }
@@ -322,7 +338,11 @@ function sendCombatInput() {
         moveY = dy / distance;
       }
       if (isAttacker) {
-        const defenderReady = !["block", "guardbreak", "backblock"].includes(scenario) || peer.action === 6;
+        // M27 attacker begins from real Idle/in-range instead of waiting for
+        // the defender's 240ms Block to start long before contact.
+        const defenderReady = scenario === "backblock"
+          ? planM27DirectionalBackblock({isAttacker, ownAction:own.action, peerAction:peer.action, distance}).attackReady
+          : !["block", "guardbreak"].includes(scenario) || peer.action === 6;
         const attackModulo = scenario === "guardbreak" ? 12 : 24;
         const attackStartDistance = scenario === "dodge" ? 60 : 74;
         attack = defenderReady && distance <= attackStartDistance && own.action === 0 && sentInputs % attackModulo === 0;
@@ -365,7 +385,9 @@ function sendCombatInput() {
           dodgeTriggered = false;
         }
       } else if (scenario === "backblock") {
-        block = true;
+        // Only the authentic replicated LightWindup arms rear-facing Block.
+        block = planM27DirectionalBackblock({isAttacker, ownAction:own.action,
+          peerAction:peer.action, distance}).blockReady;
         facing = normalizeAngle(facing + Math.PI);
       } else {
         block = true;
@@ -535,6 +557,7 @@ function finish() {
     directionalBlockDistance: round(directionalBlockDistance),
     directionalAttackArcDelta: round(directionalAttackArcDelta),
     directionalBlockFacingDelta: round(directionalBlockFacingDelta),
+    m27OriginalWorldSamples: scenario === "backblock" ? m27OriginalWorldSamples : [],
     minDefenderHp,
     minDefenderGuard,
     peerSeenMs: peerSeenAt === null ? null : round(peerSeenAt - startedAt),
