@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-blacksmith-r4-original-blender-actual-3d-raycast-layers",
+  "camera": {
+    "projection": "actual Blender source orthographic",
+    "width": 640,
+    "height": 640,
+    "blenderOrthoScale": 18.0
+  },
+  "approvedOriginalBlenderSha256": "26ef652f2493a66a01e174a1865f8beac787adcf953db0b0d69162747f1d7f3d",
+  "approvedSourceOriginalCreatorCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "originalOwnerApprovedVisualPixelsPreserved": true,
+  "genuineEvaluatedBlender3DRaycastClassifications": true,
+  "roofGeometryUntouched": true,
+  "originalRedLionUntouched": true,
+  "images": {
+    "day": {
+      "sourceSha256": "523af37e2489528071d5fdaf15722c6de875cc4f87964f704906a7816c99ab56",
+      "sourcePngBytes": 277425,
+      "geometryLabeledVisiblePixels": {
+        "walls": 13963,
+        "unclassified_visible_fallback_walls": 1734,
+        "roof": 30700,
+        "foreground": 34570
+      },
+      "fullRgbaRecompositionByteIdentical": true,
+      "losslessWebpRgbaRecompositionByteIdentical": true,
+      "separateLayers": {
+        "walls": {
+          "png": "blacksmith-r4-day-walls-pixel-exact.png",
+          "webp": "blacksmith-r4-day-walls-lossless.webp",
+          "webpSha256": "ee6d79acf1969daf82b7e4ff1a06702828ec0ccb44bd966b9838b03cfbbf4df4",
+          "webpBytes": 28810,
+          "pixels": 13963,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        },
+        "foreground": {
+          "png": "blacksmith-r4-day-foreground-pixel-exact.png",
+          "webp": "blacksmith-r4-day-foreground-lossless.webp",
+          "webpSha256": "f68121777fbd37cd94c1510f22cd1c0508d2da57d4674b54c28c3804047d4579",
+          "webpBytes": 42784,
+          "pixels": 34570,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        },
+        "roof": {
+          "png": "blacksmith-r4-day-roof-pixel-exact.png",
+          "webp": "blacksmith-r4-day-roof-lossless.webp",
+          "webpSha256": "e8153229ae8547bd940375e14bdfeb1e905e984a4a6b3556c042ca0b1ec0a55a",
+          "webpBytes": 46456,
+          "pixels": 30700,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        }
+      }
+    },
+    "dusk": {
+      "sourceSha256": "4867ce8e94321a4fb69c3f62b4c2b384cff6539e57bfddab2e1427e112b7b562",
+      "sourcePngBytes": 278666,
+      "geometryLabeledVisiblePixels": {
+        "walls": 13976,
+        "unclassified_visible_fallback_walls": 1747,
+        "roof": 32102,
+        "foreground": 34570
+      },
+      "fullRgbaRecompositionByteIdentical": true,
+      "losslessWebpRgbaRecompositionByteIdentical": true,
+      "separateLayers": {
+        "walls": {
+          "png": "blacksmith-r4-dusk-walls-pixel-exact.png",
+          "webp": "blacksmith-r4-dusk-walls-lossless.webp",
+          "webpSha256": "5de5577f23b781399d3d74f7b7fca719df85d86b09c974fee371b514e3f2f658",
+          "webpBytes": 27708,
+          "pixels": 13976,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        },
+        "foreground": {
+          "png": "blacksmith-r4-dusk-foreground-pixel-exact.png",
+          "webp": "blacksmith-r4-dusk-foreground-lossless.webp",
+          "webpSha256": "1e3eb5aa69785d8eaf0cb77850ca63270a536504a7a07203c54104332f4782cd",
+          "webpBytes": 48760,
+          "pixels": 34570,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        },
+        "roof": {
+          "png": "blacksmith-r4-dusk-roof-pixel-exact.png",
+          "webp": "blacksmith-r4-dusk-roof-lossless.webp",
+          "webpSha256": "d40a70ae5f581adad16118ce38ba56aa1f0b1f34a3b4594b58e625fcaade628b",
+          "webpBytes": 42712,
+          "pixels": 32102,
+          "originalPixelColorsPreserved": true,
+          "maskFromOriginalEvaluated3DBlenderGeometry": true
+        }
+      }
+    }
+  },
+  "counts": {
+    "walls": 27939,
+    "unclassified_visible_fallback_walls": 3481,
+    "roof": 62802,
+    "foreground": 69140
+  },
+  "sourceOnly": true,
+  "defaultOff": true,
+  "world9SmithFacadeReplacementAuthorized": false,
+  "actualGameOcclusionOrMultiplayerPassed": false,
+  "runtimeAtmosphereChanged": false,
+  "mergingDeploymentAuthorized": false
+}
