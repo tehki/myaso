@@ -1131,14 +1131,21 @@ fn begin_requested_action(
             return; // READY: advance_action commits the charged hit this tick.
         }
         if (input.attack && !input.heavy_attack) || (input.heavy_attack && !input.attack) {
-            if input.jump
-                && spend_stamina(
+            if input.jump {
+                // The pointer-first chord may admit charging one tick before
+                // Space. Preserve the same26/14/0 arbitration as an idle
+                // chord; an exhausted jump intent must never leak a Light.
+                if spend_stamina(
                     now_ms,
                     fighter,
                     JUMP_STAMINA_COST + JUMP_ATTACK_STAMINA_COST,
-                )
-            {
-                fighter.begin_jump_attack();
+                ) {
+                    fighter.begin_jump_attack();
+                } else if spend_stamina(now_ms, fighter, JUMP_STAMINA_COST) {
+                    fighter.set_action(Action::Jump, JUMP_DURATION_MS);
+                } else {
+                    fighter.set_action(Action::Idle, 0.0);
+                }
             } else if input.run && input.move_x.hypot(input.move_y) >= 0.5 {
                 if spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
                     fighter.attack_hit_targets.clear();

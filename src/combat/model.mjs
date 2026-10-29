@@ -455,8 +455,14 @@ function beginRequestedAction(world, fighter, input, attackPressed, heavyAttackP
       return; // advanceAction waits out the remaining server-authoritative windup.
     }
     if (input.attack && !input.heavyAttack) {
-      if (input.jump && spendStamina(world, fighter, COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost)) {
-        beginJumpAttack(fighter);
+      if (input.jump) {
+        // Match original idle-chord arbitration when charging was admitted
+        // before Space:26 for JumpAttack,14 for Jump, otherwise no action.
+        if (spendStamina(world, fighter, COMBAT.jump.staminaCost + COMBAT.jumpAttack.staminaCost)) {
+          beginJumpAttack(fighter);
+        } else if (spendStamina(world, fighter, COMBAT.jump.staminaCost)) {
+          setAction(fighter, "jump", COMBAT.jump.durationMs);
+        } else setAction(fighter, "idle", 0);
       } else if (input.run && Math.hypot(input.moveX, input.moveY) >= 0.5) {
         if (spendStamina(world, fighter, COMBAT.runningAttack.staminaCost)) {
           fighter.attackHitTargets.clear();
