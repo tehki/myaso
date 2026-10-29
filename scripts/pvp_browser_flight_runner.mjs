@@ -10277,6 +10277,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
     const wheelFirstGuardOnly = scenario === "uiguardbreakpunishffahit";
     const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa";
     const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak";
+    // M40 is also a multi-exchange guard-only native acceptance. The prior
+    // 100ms grace released Chrome before Firefox's trusted wheel under CI
+    // load, even though the original World legitimately blocked for -38.
+    // Wait for the original DOM wheel (190ms ceiling), then retain the
+    // existing 25ms release pacing; never waive cross-browser ordering.
+    const m40ReleaseAnchoredGuardOnly = scenario === "uiguardbreaktell";
     const m198Plan = planM198GuardBreakW3cExchange({
       parryWindowMs: COMBAT.block.parryWindowMs,
       shortBlockMs: COMBAT.block.shortBlockMs,
@@ -10332,9 +10338,9 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         // DOWN ACK barrier (52ms physical hold on e7ce01df). Actual DOM edges,
         // wheel ACK and all guard/HP/parry gates below remain mandatory.
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
-          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
+          trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly || m40ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0,
+          postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly || m40ReleaseAnchoredGuardOnly) ? 25 : 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 5) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
