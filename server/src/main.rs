@@ -907,6 +907,18 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
     }
 }
 
+// The optional stream owns no gameplay lifetime. Retiring the original
+// admitted session must cancel a pending chat read even if the peer keeps
+// its QUIC connection open and never sends another byte.
+struct ChatTaskAbortGuard(Option<tokio::task::AbortHandle>);
+impl Drop for ChatTaskAbortGuard {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.abort();
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct ExperimentalGestureSettings {
     v2_lab: bool,
@@ -1052,6 +1064,7 @@ async fn handle_connection(
     let mut private_write_deadline = None;
     #[cfg(feature = "experimental-hit-delivery-lab")]
     let mut private_write_turn = false;
+    let mut chat_task_guard = ChatTaskAbortGuard(None);
     let mut chat_started = false;
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -1080,7 +1093,7 @@ async fn handle_connection(
                 if !registered { continue; }
                 let chat_game = Arc::clone(&game);
                 let chat_connection = Arc::clone(&connection);
-                tokio::spawn(async move {
+                let task = tokio::spawn(async move {
                     let outcome = run_chat_stream(
                         chat_connection, incoming_chat, chat_tx, chat_rx,
                         player_id, lease_epoch, Arc::clone(&chat_game)
@@ -1092,6 +1105,7 @@ async fn handle_connection(
                         eprintln!("player {player_id} isolated chat stream ended: {error:#}");
                     }
                 });
+                chat_task_guard.0 = Some(task.abort_handle());
             }
             writer_result = &mut reliable_writer => {
                 match writer_result {
@@ -3066,5 +3080,27 @@ mod core8a_standard_input_freshness_tests {
         assert_eq!(fresh_connection.ingest(&block_packet(10, true)).len(), 3);
         assert_eq!(old_connection.latest_accepted_packet_tick, Some(100));
         assert_eq!(fresh_connection.latest_accepted_packet_tick, Some(10));
+    }
+}
+
+#[cfg(test)]
+mod chat_task_lifetime_tests {
+    use super::ChatTaskAbortGuard;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn retired_gameplay_lease_aborts_idle_optional_chat_reader() {
+        // An idle reliable stream may never produce a byte. Its task cannot
+        // outlive the accepted GAME lease or retain its connection Arc.
+        let task = tokio::spawn(async {
+            std::future::pending::<()>().await;
+        });
+        let guard = ChatTaskAbortGuard(Some(task.abort_handle()));
+        drop(guard);
+        let error = tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .expect("optional chat task must terminate after session guard drops")
+            .expect_err("idle chat task cannot complete without cancellation");
+        assert!(error.is_cancelled());
     }
 }

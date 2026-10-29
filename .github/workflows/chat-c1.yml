@@ -49,6 +49,7 @@ jobs:
       - name: Server chat parser, rate-limit and original QUIC input coexistence
         run: |
           cargo test --locked --manifest-path server/Cargo.toml --lib chat::
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server chat_task_lifetime_tests::retired_gameplay_lease_aborts_idle_optional_chat_reader -- --exact --nocapture
           cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer repeated_chat_submissions_do_not_starve_authoritative_game_input_ack -- --exact --nocapture
       - name: Browser transport and binary codec contract
         run: |
