@@ -35,7 +35,11 @@ test("C1B integration requires existing game connection, no second WebSocket or 
   const src = readFileSync(new URL("../src/browser/chat-c1-activation.mjs", import.meta.url), "utf8");
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(src, /gameClient\?\.transport\?\.kind !== "webtransport"/);
-  assert.ok(src.includes("onDisconnect() { panel?.bindAdapter(null); }"));
+  // The optional channel has to detach the panel AND clear old actor text.
+  // Keep this contract independent of formatting or additional cleanup.
+  assert.match(src, /onDisconnect\(\)\s*\{\s*panel\?\.bindAdapter\(null\);\s*overheads\?\.clear\(\);/);
+  assert.match(src, /onBubblesReady\(null\)/);
+  assert.match(src, /overheads\.dispose\(\)/);
   assert.match(src, /adapter\.close\(\)/);
   assert.match(online, /void import\("\.\.\/src\/browser\/chat-c1-activation\.mjs"\)/);
   assert.match(online, /gameClient: networkClient/);
