@@ -76,6 +76,11 @@ M152 and legacy M110 passed, and both Chrome-led and Firefox-led four-browser
 buffer cases produced exactly34+34HP with the original16-tick recovery.
 The initial four-browser runs checked Chat before Combat; the final harness
 also checks one-message-per-Enter and restored arena focus after buffered Combat.
+An exact-SHA repeat correctly failed its admission assertion when the generic
+110ms acceptance poll skipped the90ms buffer window and the physical second
+press reached World Idle. The corrected native controller uses the existing
+2ms current-phase observer at recovery166.7ms; stale recovery samples after
+exit cannot qualify. The recovery3→3 admission assertion is unchanged.
 
 ```sh
 cargo test --manifest-path server/Cargo.toml --test combat4_typed_recovery_buffer

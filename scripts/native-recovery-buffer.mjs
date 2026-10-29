@@ -1,6 +1,7 @@
 // Genuine W3C input and original server stdout only. Never step/edit World.
 import assert from "node:assert/strict";
 import {COMBAT} from "../src/combat/model.mjs";
+import {awaitNativeWorldPhase} from "./native-world-phase-guard.mjs";
 
 export async function runNativeRecoveryBuffer({actors,evaluate,request,readAuthoritativeWorld,waitFor,sleep,save}) {
  const a=actors[0],target=actors[1],s=a.s,id=a.actor.id,victim=target.actor.id;
@@ -47,13 +48,10 @@ export async function runNativeRecoveryBuffer({actors,evaluate,request,readAutho
   actions:[{type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0}]}]});
  try {
   await click();
-  const phase=await waitFor(()=>{
-   const current=lines().flatMap(line=>{
-    const m=/^COMBAT4_NATIVE_WORLD_PHASE tick=(\d+) fighter=(\d+) action=3 elapsedMs=([\d.]+)$/.exec(line);
-    return m&&+m[2]===id?[{tick:+m[1],elapsedMs:+m[3]}]:[];
-   }).at(-1);
-   return current&&current.elapsedMs>=175?current:false;
-  },5000);
+  // The general 110ms acceptance poll can skip this entire 90ms window.
+  // Observe the CURRENT World recovery at 2ms intervals, then issue one click.
+  const phase=await awaitNativeWorldPhase({readOutput:readAuthoritativeWorld,
+   afterOffset:worldStart,fighterId:id,action:3,minElapsedMs:166.7,sleep,requireEntry:true});
   await click();
   const accepted=await waitFor(()=>{
    const rows=admissions().filter(e=>e.status===1);
