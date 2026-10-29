@@ -699,7 +699,7 @@ function observeThreatCommitment(state, ownId) {
 }
 
 function recordAcceptanceState(state, ownId) {
-  if (acceptanceScenario === "uisecondaryphase") {
+  if (["uisecondaryphase", "uiguardarc", "uisecondaryguardarc", "uithreatmarkers"].includes(acceptanceScenario)) {
     const acceptance=window.__MYASO_ACCEPTANCE_STATE__ ??= {
       scenario:acceptanceScenario,ownActionTransitions:[],focusActionTransitions:[],staminaTransitions:[],
     };
