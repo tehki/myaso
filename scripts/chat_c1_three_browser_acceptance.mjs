@@ -73,6 +73,14 @@ try {
   assert(f.focused&&f.open==="true","native composer focus");
   await evaljs(session,"document.querySelector('.local-chat-input').value=arguments[0]",[message]);
   await key(session,"\uE007");
+  // A submitted valid message must close the composer immediately, regardless
+  // of whether the server has already acknowledged it. The next Enter opens
+  // a fresh composer instead of submitting a second message.
+  const exit=await evaljs(session,
+   "const x=document.querySelector('[data-local-chat]');return {focused:document.activeElement?.id==='arena',open:x.dataset.open,draft:x.querySelector('input').value};");
+  assert.deepEqual(exit,{focused:true,open:"false",draft:""},
+   "one Enter sends once and returns focus to the arena");
+  console.log("CHAT_C1_ONE_MESSAGE_PER_ENTER_NATIVE_PASS",JSON.stringify(exit));
  }
  const first="Greyhaven: blacksmith by the market?";
  await send(a,first);
@@ -96,7 +104,7 @@ try {
  // Real W3C movement toward -X, while B stands still, must move Player #1's
  // already authenticated speech bubble toward -X in B's canvas. This catches
  // fixed HUD labels that merely coincidentally sit above a spawn location.
- await key(a,"\uE00C"); // Escape composer, return gameplay focus.
+ // A successful send already returned focus to Combat without needing Escape.
  await wd("POST","/session/"+a+"/actions",{actions:[{
   type:"key",id:"c1-speech-world-walk",
   actions:[{type:"keyDown",value:"a"},{type:"pause",duration:250},{type:"keyUp",value:"a"}],

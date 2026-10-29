@@ -29,7 +29,7 @@ function fakeDocument() {
 }
 
 test("C1 old adapter ACK and stale inbound callback cannot enter the new chat session", async () => {
-  const { doc } = fakeDocument();
+  const { doc, canvas } = fakeDocument();
   let id = 0, finishOld, oldInbound, newInbound;
   const c = installLocalChat(doc, { online: true, idFactory: () => "id-" + ++id });
   c.bindAdapter({
@@ -43,7 +43,8 @@ test("C1 old adapter ACK and stale inbound callback cannot enter the new chat se
   await Promise.resolve();
   assert.equal(c.input.readOnly, true);
   assert.equal(c.input.disabled, false);
-  assert.equal(doc.activeElement, c.input);
+  assert.equal(doc.activeElement, canvas);
+  assert.equal(c.root.dataset.open, "false");
   c.bindAdapter({
     ready: true, send(data) { return Promise.resolve({ ok: true, clientMessageId: data.clientMessageId }); },
     subscribe(fn) { newInbound = fn; return () => {}; },
@@ -120,7 +121,7 @@ test("C1 repeated bind of same authenticated adapter is idempotent, no duplicate
   assert.equal(unsubscribes,1);
 });
 
-test("C1 pending composer Escape returns to canvas and dispose invalidates ACK", async () => {
+test("C1 submit returns to canvas while pending and dispose invalidates ACK", async () => {
   const { doc, canvas } = fakeDocument();
   const c = installLocalChat(doc, { online: true, idFactory: () => "dispose-id" });
   let finish;
@@ -134,7 +135,6 @@ test("C1 pending composer Escape returns to canvas and dispose invalidates ACK",
   await Promise.resolve();
   await Promise.resolve();
   assert.equal(c.input.readOnly, true);
-  c.input.fire("keydown", { key: "Escape" });
   assert.equal(c.root.dataset.open, "false");
   assert.equal(doc.activeElement, canvas);
   c.dispose();

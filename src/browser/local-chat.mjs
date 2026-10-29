@@ -128,7 +128,8 @@ export function installLocalChat(doc, {
     const changed = root.dataset.connected !== String(ready);
     root.dataset.connected = String(ready);
     connection.textContent = ready ? "Nearby" : online ? "Offline" : "Practice";
-    // Keep the composer focused while an ACK is pending, so Escape still works.
+    // Leave the arena interactive after send; acknowledgements update history
+    // without reopening or stealing focus from gameplay.
     input.disabled = !ready;
     input.readOnly = pending;
     send.disabled = !ready || pending;
@@ -202,6 +203,11 @@ export function installLocalChat(doc, {
     pending = true;
     const { item, stateLabel } = messageRow("local", "You", text, "pending");
     input.value = "";
+    // One message per Enter: close the composer immediately on a valid send
+    // attempt, without waiting for the authenticated server ACK. Invalid
+    // messages stay open for correction; delivery remains ACK-authoritative.
+    setExpanded(false);
+    canvas.focus(); // Also restores Combat after clicking the Send button.
     availability();
     let timeout;
     try {
@@ -296,7 +302,9 @@ export function installLocalChat(doc, {
     if (event.key !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    setExpanded(true, true);
+    // Consume Enter while the first message awaits an ACK; never open a
+    // read-only composer or accidentally queue a second send.
+    if (!pending) setExpanded(true, true);
   }
   function onComposerKey(event) {
     // Input elements own ALL typing; no key event may bubble to Combat.

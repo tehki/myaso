@@ -82,6 +82,66 @@ test("Enter opens the composer ahead of Combat; Escape restores arena focus", ()
   chat.dispose();
 });
 
+test("one Enter sends one message, closes immediately, and next Enter starts a fresh composer", async () => {
+  const { doc, canvas } = fakeDocument();
+  let id = 0, sendCount = 0, finish;
+  const chat = installLocalChat(doc, { online: true, idFactory: () => "one-shot-" + ++id });
+  chat.bindAdapter({ ready: true, subscribe() { return () => {}; },
+    send(message) {
+      sendCount++;
+      return new Promise(resolve => {
+        finish = () => resolve({ ok: true, clientMessageId: message.clientMessageId });
+      });
+    },
+  });
+
+  canvas.focus();
+  assert.equal(canvas.fire("keydown", { key: "Enter" }).prevented, true);
+  assert.equal(doc.activeElement, chat.input);
+  chat.input.value = "First message";
+  const first = chat.input.fire("keydown", { key: "Enter" });
+  assert.equal(first.prevented, true);
+  assert.equal(first.stopped, true);
+  assert.equal(chat.root.dataset.open, "false", "send must collapse before server ACK");
+  assert.equal(doc.activeElement, canvas, "combat focus returns immediately");
+  assert.equal(chat.input.value, "");
+  assert.equal(chat.history.childElementCount, 1);
+  assert.equal(chat.history.lastElementChild.dataset.delivery, "pending");
+  assert.equal(canvas.fire("keydown", { key: "Enter" }).prevented, true,
+    "Enter while ACK pending is consumed, not leaked to Combat");
+  assert.equal(chat.root.dataset.open, "false", "pending Enter must not reopen composer");
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(sendCount, 1, "one physical Enter must enqueue exactly one message");
+
+  finish();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chat.history.lastElementChild.dataset.delivery, "accepted");
+  assert.equal(doc.activeElement, canvas, "asynchronous ACK cannot steal focus");
+
+  canvas.fire("keydown", { key: "Enter" });
+  assert.equal(chat.root.dataset.open, "true");
+  assert.equal(doc.activeElement, chat.input);
+  chat.input.value = "   ";
+  chat.input.fire("keydown", { key: "Enter" });
+  assert.equal(chat.root.dataset.open, "true", "invalid text stays editable");
+  assert.equal(doc.activeElement, chat.input);
+  assert.equal(sendCount, 1);
+  chat.input.value = "Second message";
+  chat.input.fire("keydown", { key: "Enter" });
+  assert.equal(chat.root.dataset.open, "false");
+  assert.equal(doc.activeElement, canvas);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(sendCount, 2);
+  finish();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(chat.history.children.map(item => item.children[1].textContent),
+    ["First message", "Second message"]);
+  assert.equal(chat.history.lastElementChild.dataset.delivery, "accepted");
+  chat.dispose();
+});
+
 test("Focused composer capture-blocks real canvas attack, kick, wheel and mouse-up paths", () => {
   const { canvas, chat } = readyChat();
   const combat = [];
