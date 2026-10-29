@@ -4,7 +4,8 @@ use std::sync::{
     Arc,
 };
 
-// M147 review-only helpers: not registered in any live transport.
+// Chat C1 is separately gated; subsequent Combat HIT helpers are review-only.
+pub mod chat;
 pub mod combat_hit_control_ingress_proposal;
 pub mod combat_hit_control_proposal;
 pub mod combat_hit_delivery_proposal;
@@ -12,7 +13,6 @@ pub mod combat_hit_journal;
 pub mod combat_hit_lease_mint_proposal;
 pub mod combat_hit_receipt;
 pub mod combat_hit_world_commit_proposal;
-pub mod chat;
 pub mod kill_event;
 // P0 review-only authority reducer and codec; no runtime ingress or v1 changes.
 pub mod prealpha_lmb_gesture_authority;
