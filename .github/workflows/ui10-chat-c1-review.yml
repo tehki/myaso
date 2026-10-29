@@ -6,6 +6,9 @@ on:
       - "scripts/ui10_chat_c1_visual_acceptance.mjs"
       - "tests/fixtures/chat-c1-hud-visual.html"
       - "src/browser/local-chat.mjs"
+      - "src/browser/chat-c1-overheads.mjs"
+      - "src/network/local-chat-ui-bridge.mjs"
+      - "src/browser/arena-viewport.mjs"
       - "src/network/chat-codec.mjs"
       - "src/network/local-chat-ui-bridge.mjs"
       - "web/local-chat.css"
@@ -26,7 +29,8 @@ jobs:
         run: |
           node --check src/browser/local-chat.mjs
           node --check src/browser/chat-c1-activation.mjs
-          node --test tests/chat-c1-combat-input-isolation.test.mjs tests/chat-c1-adapter-lifecycle.test.mjs tests/chat-c1-core-preview.test.mjs tests/chat-c1-foundation.test.mjs tests/local-chat-ui-bridge.test.mjs tests/chat-codec.test.mjs
+          node --check src/browser/chat-c1-overheads.mjs
+          node --test tests/chat-c1-overheads.test.mjs tests/chat-c1-combat-input-isolation.test.mjs tests/chat-c1-adapter-lifecycle.test.mjs tests/chat-c1-core-preview.test.mjs tests/chat-c1-foundation.test.mjs tests/local-chat-ui-bridge.test.mjs tests/chat-codec.test.mjs
       - name: Native Chrome and Firefox layout, keyboard and mouse acceptance (UI-only)
         run: node scripts/ui10_chat_c1_visual_acceptance.mjs
       - name: Retain labeled UI-only 960x540 and narrow screenshots

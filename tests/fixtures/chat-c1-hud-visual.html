@@ -32,20 +32,36 @@
   </div>
   <script type="module">
     import { installLocalChat } from "../../src/browser/local-chat.mjs";
+    import { createOverheadChatBubbles } from "../../src/browser/chat-c1-overheads.mjs";
     const canvas = document.querySelector("#arena");
-    const chat = installLocalChat(document, { online: true, idFactory: () => "fixture-only" });
+    const speech = createOverheadChatBubbles({ doc:document });
+    // Deliberately simulated message and actor: screenshots prove layout only,
+    // NOT a Rust/QUIC or real two-player chat acceptance.
+    const state = {ownId:1,own:{x:480,y:270,hp:100,action:0},
+      remotes:[{netId:2,x:700,y:340,hp:100,action:0}],
+      camera:{x:480,y:270},width:960,height:540,deadAction:-1};
+    const chat = installLocalChat(document, {
+      online: true, idFactory: () => "fixture-only",
+      onMessage: event => speech.received(event),
+      onAccepted: text => speech.acceptedOwn(state.ownId,text),
+    });
     chat.bindAdapter({
       ready: true,
       subscribe() { return () => {}; },
       send() { return Promise.reject(new Error("UI-only fixture: no server")); },
     });
     chat.receive({ channel:"local", serverMessageId:"ui-fixture-1",
-      sender:{ displayName:"Player #2" }, text:"The forge is just beyond the bridge." });
+      sender:{ netId:2, displayName:"Player #2" }, text:"The forge is just beyond the bridge." });
     chat.receive({ channel:"system", serverMessageId:"ui-fixture-2",
       text:"UI example only. No player messages were delivered." });
     chat.root.querySelector(".local-chat-connection").textContent = "FIXTURE";
     chat.status.textContent = "Visual test only — server unconnected.";
     chat.setExpanded(false);
+    // This actor is a static visual proxy only. The online game instead calls
+    // speech.frame() from the real interpolated Knight render loop.
+    speech.frame(state);
+    window.__ui10Speech = speech;
+    window.__ui10SpeechState = state;
     window.__ui10CombatLeak = { keydown:0, pointerdown:0, wheel:0 };
     canvas.addEventListener("keydown", () => window.__ui10CombatLeak.keydown++);
     canvas.addEventListener("pointerdown", () => window.__ui10CombatLeak.pointerdown++);

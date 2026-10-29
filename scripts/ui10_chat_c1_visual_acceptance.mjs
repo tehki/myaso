@@ -21,6 +21,10 @@ const files = new Map([
     ["tests/fixtures/chat-c1-hud-visual.html", "text/html; charset=utf-8"]],
   ["/src/browser/local-chat.mjs",
     ["src/browser/local-chat.mjs", "text/javascript; charset=utf-8"]],
+  ["/src/browser/chat-c1-overheads.mjs",
+    ["src/browser/chat-c1-overheads.mjs", "text/javascript; charset=utf-8"]],
+  ["/src/browser/arena-viewport.mjs",
+    ["src/browser/arena-viewport.mjs", "text/javascript; charset=utf-8"]],
   ["/tests/fixtures/local-chat.css",
     ["web/local-chat.css", "text/css; charset=utf-8"]],
 ]);
@@ -113,6 +117,16 @@ async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
     assert.equal(typed.text,"wasd e");
     assert.equal(typed.focused,true);
     assert.deepEqual(typed.leaks,{keydown:0,pointerdown:0,wheel:0});
+    const overhead = await js(
+      "const n=document.querySelector('.chat-c1-overhead');"+
+      "return {count:document.querySelectorAll('.chat-c1-overhead').length,"+
+      "text:n?.textContent,hidden:n?.hidden,ariaHidden:n?.parentElement?.getAttribute('aria-hidden'),"+
+      "x:Number.parseFloat(n?.style.left),y:Number.parseFloat(n?.style.top)};");
+    assert.equal(overhead.count,1,"exactly one UI-only overhead bubble");
+    assert.equal(overhead.text,"The forge is just beyond the bridge.");
+    assert.equal(overhead.hidden,false,"the projected authentic-API fighter anchor is visible");
+    assert.equal(overhead.ariaHidden,"true","chat log, not duplicate bubbles, owns announcements");
+    assert(Number.isFinite(overhead.x)&&Number.isFinite(overhead.y));
     const geometry = await js(
       "const a=document.querySelector('.arena-stage').getBoundingClientRect();"+
       "const x=document.querySelector('.local-chat').getBoundingClientRect();"+
@@ -134,6 +148,13 @@ async function exercise(browser, viewWidth, previewUrl, screenshotDir) {
     assert.equal(bytes.readUInt32BE(20), 540, "screenshot exact height");
     const output = join(screenshotDir,"ui10-chat-c1-" + browser + "-" + viewWidth + ".png");
     await writeFile(output, bytes);
+    // Read-only actor presentation moves the overhead after the Knight.
+    const moved = await js(
+      "const state=window.__ui10SpeechState;state.remotes[0].x+=90;"+
+      "window.__ui10Speech.frame(state);"+
+      "return Number.parseFloat(document.querySelector('.chat-c1-overhead').style.left);");
+    assert(moved > overhead.x + 20, "overhead bubble must follow a moving actor");
+    await js("window.__ui10SpeechState.remotes[0].x-=90;window.__ui10Speech.frame(window.__ui10SpeechState);");
     const clickX = Math.floor(Math.max(60, Math.min(geometry.viewport - 40,geometry.viewport * .75)));
     const clickY = Math.floor(Math.min(geometry.stage.bottom - 15, Math.max(60, geometry.stage.bottom * .32)));
     await wd(driverPort,"POST",prefix + "/actions",{actions:[{
