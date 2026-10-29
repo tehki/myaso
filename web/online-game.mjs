@@ -123,6 +123,20 @@ const killFeedEntries = [];
 const killFeedSequences = new Set();
 
 const params = new URLSearchParams(window.location.search);
+// Graphics 3 P1 REVIEW ONLY: World9 authored visuals are loaded lazily, solely
+// after BOTH explicit switches. P0 arena/Combat/Chat never imports this stack.
+// This grants no collision, door, item, portal, spawn or zone authority.
+const greyhavenPreviewRequested = params.get("world") === "1"
+  && params.get("greyhaven") === "1" && !params.has("scenario");
+let greyhavenPreview = null;
+if (greyhavenPreviewRequested) {
+  void Promise.all([
+    import("../src/browser/authored-world-renderer.mjs"),
+    import("../src/world/authored-maps.mjs"),
+  ]).then(([{createAuthoredWorldRenderer}, {MAP_IDS}]) => {
+    greyhavenPreview = {renderer: createAuthoredWorldRenderer(), mapId: MAP_IDS.overworld};
+  }).catch(() => { greyhavenPreview = null; });
+}
 // Combat Pre-Alpha 0.1: all authenticated arena fighters are human Silver
 // Knights via the official lobby knights=1. Direct legacy Combat test URLs
 // and rollback without this flag keep original Combat-circle visuals.
@@ -1281,6 +1295,20 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+  // Decorative authored roads, terrain, trees and World-owned building outlines
+  // share the real reconciled camera with Silver Knights. Do not override
+  // server actor coordinates or fabricate building interactions.
+  if (greyhavenPreview && local.initialized) {
+    try {
+      greyhavenPreview.renderer.draw(ctx, greyhavenPreview.mapId,
+        visualCameraPosition, canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    } catch {
+      // Fail closed to the unchanged arena floor on the next frame. Never
+      // allow a P1 art failure to break authenticated Combat or Chat C1.
+      greyhavenPreview = null;
+    }
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;
