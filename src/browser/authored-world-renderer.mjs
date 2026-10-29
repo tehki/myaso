@@ -3,7 +3,8 @@
 import { AUTHORED_MAPS, MAP_IDS, getAuthoredMap } from "../world/authored-maps.mjs";
 import { normalizeWorldBuildingReplacementIds } from "../world/building-presentation.mjs";
 import { paintGreyhavenGroundDetails } from "./greyhaven-terrain-materials.mjs";
-import { paintGreyhavenLightingPools, paintGreyhavenLightingFixtures } from "./greyhaven-atmosphere.mjs";
+import { paintGreyhavenLightingPools, paintGreyhavenLightingFixtures,
+  paintGreyhavenDuskWash } from "./greyhaven-atmosphere.mjs";
 
 export const WORLD_TILE_SIZE = 512;
 export const WORLD_CACHE_CAP = 24;
@@ -106,7 +107,7 @@ function paintCityWalls(ctx,city) {
   ctx.textAlign="center";ctx.fillText(city.name,x+w/2,y+120);
 }
 
-function paintOverworld(ctx,map,tileBounds,replacedBuildings) {
+function paintOverworld(ctx,map,tileBounds,replacedBuildings,greyhavenTimeOfDay) {
   ctx.fillStyle="#627751";ctx.fillRect(0,0,map.width,map.height);
   // Authored agricultural plots, not generated terrain.
   for(const f of map.fields){
@@ -138,9 +139,9 @@ function paintOverworld(ctx,map,tileBounds,replacedBuildings) {
   }
   // Static, bounded Graphics 3C material layer on the same cached Canvas tiles.
   paintGreyhavenGroundDetails(ctx,map,tileBounds);
-  // Warm practical spill is baked into the SAME cached terrain tile.
-  // Cosmetic only; does not change any gameplay visibility or lighting rule.
-  paintGreyhavenLightingPools(ctx,map,tileBounds);
+  // Preserve the entire original P44 appearance for all existing callers.
+  // P1 day and dusk are EXPLICIT opt-in modes on separate renderer caches.
+  if(greyhavenTimeOfDay==="legacy")paintGreyhavenLightingPools(ctx,map,tileBounds);
   for(const bridge of map.bridges){
     if(!visibleBounds(tileBounds,bridge.x-bridge.w/2,bridge.y-bridge.h/2,bridge.w,bridge.h,12))continue;
     ctx.fillStyle="#766e5c";
@@ -172,7 +173,13 @@ function paintOverworld(ctx,map,tileBounds,replacedBuildings) {
       ctx.beginPath();ctx.arc(p.x,p.y,17,Math.PI*.05,Math.PI*.95);ctx.stroke();
     }
   }
-  paintGreyhavenLightingFixtures(ctx,map,tileBounds);
+  if(greyhavenTimeOfDay==="dusk"){
+    // Tint only canonical Greyhaven city tiles, not actors, Chat or Combat.
+    // Warm pools sit above the muted city terrain and authored facades.
+    paintGreyhavenDuskWash(ctx,map,tileBounds);
+    paintGreyhavenLightingPools(ctx,map,tileBounds);
+  }
+  paintGreyhavenLightingFixtures(ctx,map,tileBounds,{lit:greyhavenTimeOfDay!=="day"});
   ctx.textAlign="center";ctx.fillStyle="#f4e4b9";ctx.font="bold 23px Georgia,serif";
   ctx.fillText("BRIARFORD",1390,3810);
   ctx.fillText("STONEBROOK",6490,3720);
@@ -234,10 +241,13 @@ export function visibleWorldTiles(camera,width,height,zoom,tileSize=WORLD_TILE_S
 }
 
 export function createAuthoredWorldRenderer({makeCanvas=()=>document.createElement("canvas"),
-  cacheCap=WORLD_CACHE_CAP,buildLimit=3,replacedBuildingIds=[],worldReplacementValidator=null}={}) {
+  cacheCap=WORLD_CACHE_CAP,buildLimit=3,replacedBuildingIds=[],worldReplacementValidator=null,
+  greyhavenTimeOfDay="legacy"}={}) {
   if(!Number.isInteger(cacheCap)||cacheCap<1||cacheCap>64
     ||!Number.isInteger(buildLimit)||buildLimit<0||buildLimit>8)
     throw new RangeError("invalid authored world cache");
+  if(!["legacy","day","dusk"].includes(greyhavenTimeOfDay))
+    throw new RangeError("invalid opt-in Greyhaven time-of-day");
   // World #521 owns the one canonical named facade replacement allowlist.
   // An optional Graphics-side callback may impose ADDITIONAL restrictions,
   // but may never bypass or expand the canonical World-approved IDs.
@@ -265,7 +275,7 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     if(!c)throw new Error("2D world canvas unavailable");
     c.save();c.translate(-x*WORLD_TILE_SIZE,-y*WORLD_TILE_SIZE);
     paintOverworld(c,map,{x:x*WORLD_TILE_SIZE,y:y*WORLD_TILE_SIZE,
-      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE},replacedBuildings);c.restore();
+      width:WORLD_TILE_SIZE,height:WORLD_TILE_SIZE},replacedBuildings,greyhavenTimeOfDay);c.restore();
     return texture;
   }
   return {
@@ -273,6 +283,8 @@ export function createAuthoredWorldRenderer({makeCanvas=()=>document.createEleme
     // Replacement identity is fixed when the Canvas cache is built. Changing
     // World facade options requires a fresh renderer/cache, not cache reuse.
     replacedBuildingIds:normalizedReplacements,
+    // Mode is immutable per renderer instance: no cross-mode tile cache leak.
+    greyhavenTimeOfDay,
     clear(){cache.clear();stats.cached=0;},
     draw(ctx,mapId,camera,width,height,zoom){
       const map=getAuthoredMap(mapId);

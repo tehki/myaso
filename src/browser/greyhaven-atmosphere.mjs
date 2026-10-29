@@ -5,6 +5,24 @@ const TAU = Math.PI * 2;
 const FIXTURE_IDS = Object.freeze(["red-lion","smith","market","chapel","townhouse-b"]);
 const MAX_LIGHTS_PER_TILE = 5;
 export const GREYHAVEN_LIGHTING_VERSION = "3c-p24-1";
+export const GREYHAVEN_DAY_DUSK_VERSION = "3c-p1-day-dusk-1";
+
+// Static visual wash is only an authored, bounded city-tile overlay.
+// No clock, gameplay fog/visibility, dynamic weather or actor effects.
+export function paintGreyhavenDuskWash(ctx,map,tile) {
+  if(map?.kind!=="outdoor"||map?.city?.id!=="greyhaven"||!tile||
+    ![tile.x,tile.y,tile.width,tile.height].every(Number.isFinite)||
+    tile.width<=0||tile.height<=0||tile.width>512||tile.height>512)return 0;
+  const x=Math.max(tile.x,map.city.x),y=Math.max(tile.y,map.city.y);
+  const right=Math.min(tile.x+tile.width,map.city.x+map.city.w);
+  const bottom=Math.min(tile.y+tile.height,map.city.y+map.city.h);
+  if(right<=x||bottom<=y)return 0;
+  // Drawn on the existing cached background BEFORE warm pools and long
+  // before player/UI/Combat layers; it cannot obscure a fighter or tell.
+  ctx.fillStyle="rgba(23,26,35,.20)";
+  ctx.fillRect(x,y,right-x,bottom-y);
+  return 1;
+}
 
 // Anchors follow the authored facade; no duplicated building positions.
 // Glow overlaps neighboring 512-unit tiles with the SAME world coordinates.
@@ -57,7 +75,7 @@ export function paintGreyhavenLightingPools(ctx,map,tile) {
   return lights.length;
 }
 
-export function paintGreyhavenLightingFixtures(ctx,map,tile) {
+export function paintGreyhavenLightingFixtures(ctx,map,tile,{lit=true}={}) {
   const lights=createGreyhavenLightingPlan(map,tile);
   for(const {x,fixtureY} of lights){
     if(!footprintIntersects(tile,x,fixtureY,15))continue;
@@ -71,14 +89,16 @@ export function paintGreyhavenLightingFixtures(ctx,map,tile) {
     ctx.stroke();
     ctx.fillStyle="#493d2f";
     ctx.fillRect(x-5,fixtureY-9,10,12);
-    ctx.fillStyle="#f3bd68";
+    ctx.fillStyle=lit?"#f3bd68":"#817867";
     ctx.fillRect(x-3,fixtureY-7,6,8);
-    ctx.fillStyle="#ffe1a0";
-    ctx.fillRect(x-1,fixtureY-6,2,4);
-    ctx.fillStyle="rgba(250,208,122,.22)";
-    ctx.beginPath();
-    ctx.arc(x,fixtureY-3,10,0,TAU);
-    ctx.fill();
+    if(lit){
+      ctx.fillStyle="#ffe1a0";
+      ctx.fillRect(x-1,fixtureY-6,2,4);
+      ctx.fillStyle="rgba(250,208,122,.22)";
+      ctx.beginPath();
+      ctx.arc(x,fixtureY-3,10,0,TAU);
+      ctx.fill();
+    }
   }
   return lights.length;
 }
