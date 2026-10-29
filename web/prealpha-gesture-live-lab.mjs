@@ -21,7 +21,7 @@ export async function activateLoopbackGestureLab({
   }
   // The native original Rust session may grant only ONCE; do not infer
   // admission from a query flag or a client-selected actor/boot epoch.
-  await gameClient.negotiateExperimentalGestureV2();
+  await gameClient.negotiateExperimentalGestureV2({reliableStream:true});
   const lease = gameClient.transport;
   const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
   let failed = false, detached = false, retryTimer = null;

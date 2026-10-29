@@ -21,10 +21,17 @@ impl Drop for TestServer {
     }
 }
 fn start_server() -> (TestServer, String, Sha256Digest) {
+    start_server_with_gestures(false)
+}
+fn start_server_with_gestures(gestures: bool) -> (TestServer, String, Sha256Digest) {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myaso-server"))
         .env("MYASO_BIND", "127.0.0.1:0")
         .env("MYASO_CHAT_RADIUS", "160")
         .env("MYASO_CHAT_C1_ENABLED", "1")
+        .env(
+            "MYASO_EXPERIMENTAL_GESTURE_V2",
+            if gestures { "1" } else { "0" },
+        )
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -67,6 +74,13 @@ struct Player {
 }
 impl Player {
     async fn connect(url: &str, digest: &Sha256Digest) -> Self {
+        Self::connect_ordered(url, digest, None).await
+    }
+    async fn connect_ordered(
+        url: &str,
+        digest: &Sha256Digest,
+        gesture_first: Option<bool>,
+    ) -> Self {
         // Pin the actual short-lived server certificate even in loopback tests.
         let endpoint = Endpoint::client(
             ClientConfig::builder()
@@ -79,7 +93,7 @@ impl Player {
             .await
             .expect("connect timeout")
             .expect("connect");
-        let (game_send, game_recv) = timeout(Duration::from_secs(8), async {
+        let (mut game_send, mut game_recv) = timeout(Duration::from_secs(8), async {
             connection
                 .open_bi()
                 .await
@@ -89,6 +103,9 @@ impl Player {
         })
         .await
         .expect("game bi timeout");
+        if gesture_first == Some(true) {
+            negotiate_gestures(&mut game_send, &mut game_recv).await;
+        }
         let chat_send = timeout(Duration::from_secs(8), async {
             connection
                 .open_uni()
@@ -103,6 +120,9 @@ impl Player {
             .await
             .expect("server chat reply timeout")
             .expect("server chat reply");
+        if gesture_first == Some(false) {
+            negotiate_gestures(&mut game_send, &mut game_recv).await;
+        }
         Self {
             _endpoint: endpoint,
             connection,
@@ -146,6 +166,101 @@ impl Player {
         .await
         .expect("chat frame timeout")
     }
+}
+async fn negotiate_gestures(send: &mut SendStream, recv: &mut RecvStream) {
+    // Existing source0 HELLO, framed on the already-owned reliable game stream.
+    // Legacy C1 may open an idle uni stream and await its reply before writing;
+    // negotiation must never race it for connection.accept_uni().
+    send.write_all(&[8, 0, 2, 0x10, b'M', b'Y', b'A', b'S', b'O', b'1'])
+        .await
+        .expect("write bounded original-stream gesture HELLO");
+    await_gesture_grant(recv).await;
+}
+async fn await_gesture_grant(recv: &mut RecvStream) {
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let mut header = [0; 2];
+            recv.read_exact(&mut header)
+                .await
+                .expect("game reliable frame length");
+            let len = u16::from_le_bytes(header) as usize;
+            assert!((4..=16_384).contains(&len));
+            let mut frame = vec![0; len];
+            recv.read_exact(&mut frame)
+                .await
+                .expect("game reliable frame");
+            if frame == [2, 0x13, 0, 0] {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("server-bound original-stream gesture grant");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_chat_and_gesture_negotiation_coexist_in_both_orders_with_idle_legacy_chat() {
+    let (_server, url, digest) = start_server_with_gestures(true);
+    let mut alice = Player::connect_ordered(&url, &digest, Some(true)).await;
+    let mut bob = Player::connect_ordered(&url, &digest, Some(false)).await;
+    alice.send(901, b"Gesture first, chat next", 1).await;
+    let id = assert_result(&alice.receive().await, 901, 0);
+    assert_eq!(
+        assert_received(&bob.receive().await, 1, "Gesture first, chat next"),
+        id
+    );
+    bob.send(902, b"Idle chat first, gesture next", 1).await;
+    let id = assert_result(&bob.receive().await, 902, 0);
+    assert_eq!(
+        assert_received(&alice.receive().await, 2, "Idle chat first, gesture next"),
+        id
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn partial_game_negotiation_header_and_body_do_not_block_chat_or_lose_bytes() {
+    let (_server, url, digest) = start_server_with_gestures(true);
+    let mut alice = Player::connect(&url, &digest).await;
+    let mut bob = Player::connect(&url, &digest).await;
+    alice
+        ._game_send
+        .write_all(&[8])
+        .await
+        .expect("partial game header");
+    alice
+        .send(911, b"Chat while gesture header is incomplete", 1)
+        .await;
+    let id = assert_result(&alice.receive().await, 911, 0);
+    assert_eq!(
+        assert_received(
+            &bob.receive().await,
+            1,
+            "Chat while gesture header is incomplete"
+        ),
+        id
+    );
+    alice
+        ._game_send
+        .write_all(&[0, 2, 0x10, b'M'])
+        .await
+        .expect("partial game body");
+    bob.send(912, b"Reply while gesture body is incomplete", 1)
+        .await;
+    let id = assert_result(&bob.receive().await, 912, 0);
+    assert_eq!(
+        assert_received(
+            &alice.receive().await,
+            2,
+            "Reply while gesture body is incomplete"
+        ),
+        id
+    );
+    alice
+        ._game_send
+        .write_all(b"YASO1")
+        .await
+        .expect("finish exact game HELLO");
+    await_gesture_grant(&mut alice._game_recv).await;
 }
 fn assert_result(frame: &[u8], correlation: u32, code: u8) -> u64 {
     assert_eq!(frame.len(), 15);

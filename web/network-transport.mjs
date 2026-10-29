@@ -96,7 +96,7 @@ class WebTransportGameConnection {
   // Only a LOCAL loopback original-Rust flight may negotiate this experimental
   // server-issued capability. In particular this cannot activate public R2.
   // The existing WebTransport bidi stream and original server actor stay shared.
-  async negotiateExperimentalGestureV2({ timeoutMs = 3000 } = {}) {
+  async negotiateExperimentalGestureV2({ timeoutMs = 3000, reliableStream = false } = {}) {
     if (this.closed || this.experimentalGestureState !== "off") {
       throw new Error("experimental gesture handshake requires a fresh connection");
     }
@@ -107,6 +107,7 @@ class WebTransportGameConnection {
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000) {
       throw new RangeError("bounded handshake timeout required");
     }
+    if (typeof reliableStream !== "boolean") throw new TypeError("explicit reliable negotiation mode required");
     this.experimentalGestureState = "pending";
     let resolveGrant, rejectGrant;
     const acknowledged = new Promise((resolve, reject) => {
@@ -115,19 +116,32 @@ class WebTransportGameConnection {
     // Prevent an unhandled rejected handshake if the QUIC uni write itself fails.
     void acknowledged.catch(() => {});
     this.gestureGrantWaiter = { resolve: resolveGrant, reject: rejectGrant };
+    let rejectDeadline;
+    const deadline = new Promise((_, reject) => { rejectDeadline = reject; });
     const timeout = setTimeout(() => {
-      this.gestureGrantWaiter?.reject(new Error("original Rust v2 grant timed out"));
+      const error = new Error("original Rust v2 grant timed out");
+      this.gestureGrantWaiter?.reject(error);
+      rejectDeadline(error);
       this.gestureGrantWaiter = null;
     }, timeoutMs);
     try {
-      const stream = await this.transport.createUnidirectionalStream();
-      const writer = stream.getWriter();
-      try {
-        // Original server accepts exactly this 8-byte HELLO on the admitted
-        // existing connection, then returns 02 13 00 00 on its bidi stream.
-        await writer.write(Uint8Array.from([2, 0x10, 77, 89, 65, 83, 79, 49]));
-        await writer.close();
-      } finally { try { writer.releaseLock(); } catch {} }
+      const sendHello = async () => {
+        const hello = Uint8Array.from([2, 0x10, 77, 89, 65, 83, 79, 49]);
+        if (reliableStream) {
+          // Chat C1 retains optional uni streams. sendReliable frames the
+          // same original HELLO exactly once on the admitted game bi stream.
+          await this.sendReliable(hello);
+          return;
+        }
+        const stream = await this.transport.createUnidirectionalStream();
+        const writer = stream.getWriter();
+        try {
+          // Older loopback-only peers retain their exact 8byte uni HELLO.
+          await writer.write(hello);
+          await writer.close();
+        } finally { try { writer.releaseLock(); } catch {} }
+      };
+      await Promise.race([sendHello(), deadline]);
       await acknowledged;
       return true;
     } catch (error) {

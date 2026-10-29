@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "web/online-game.mjs"
+      - "server/src/main.rs"
+      - "server/tests/local_chat_multiplayer.rs"
+      - "scripts/chat_c1_three_browser_acceptance.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "server/tests/prealpha_boot_nonce_authority.rs"
       - "server/src/prealpha_authenticated_gesture.rs"
@@ -37,6 +40,10 @@ jobs:
           - acceptance: held-lmb-firefox
             mode: held-lmb
             browsers: firefox,chrome,chrome,chrome
+          - acceptance: held-lmb-chat-mixed
+            mode: held-lmb
+            browsers: chrome,firefox,chrome,firefox
+            chat: "1"
           - acceptance: space-chord-chrome
             mode: space-guard
             browsers: chrome,chrome,chrome,chrome
@@ -61,6 +68,7 @@ jobs:
     env:
       MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
       MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
+      MYASO_LIVE_GESTURE_CHAT_C1: ${{ matrix.chat || '0' }}
       MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
     steps:
@@ -73,6 +81,7 @@ jobs:
       - name: Source syntax and genuine native browser prerequisites
         run: |
           node --test tests/combat4-native-gesture-admission.test.mjs
+          node --test tests/main0-v2-transport-owner.test.mjs
           node --check tools/art/main0_v2_knights_combat_four_native.mjs
           node --check web/online-game.mjs
           node --check web/prealpha-gesture-live-lab.mjs
@@ -82,6 +91,12 @@ jobs:
           geckodriver --version
       - name: Four real W3C original game Silver fighters and physical gesture World (${{ matrix.acceptance }})
         run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
+      - name: Four native Chat C1 focus and proximity regression with typed gestures
+        if: matrix.chat == '1'
+        env:
+          C1_BROWSER_MATRIX: chrome,firefox,chrome,firefox
+          C1_TYPED_GESTURES: "1"
+        run: timeout --signal=TERM --kill-after=5s 240s node scripts/chat_c1_three_browser_acceptance.mjs
       - name: Preserve original native evidence and SHA256 screenshots
         if: always()
         uses: actions/upload-artifact@v4
