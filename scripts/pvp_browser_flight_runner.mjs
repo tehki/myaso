@@ -10,7 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { COMBAT_ACTION, FFA_KILL_TARGET, fighterThreatPhaseState } from "../src/browser/combat-readability.mjs";
 import { COMBAT } from "../src/combat/model.mjs";
 import { planM35NativeReaction } from "./m35-native-reaction-plan.mjs";
-import { awaitM35OriginalLightAdmission } from "./m35-original-light-admission.mjs";
+import { awaitM35OriginalLightAdmission, createM35WorldReceiptClock } from "./m35-original-light-admission.mjs";
 import { M158_NATIVE_GEOMETRY } from "./m158-native-geometry.mjs";
 import { DASH_DOUBLE_TAP_MS } from "../src/browser/dash-input.mjs";
 import { planM198GuardBreakW3cExchange } from "./m198-guardbreak-input-plan.mjs";
@@ -635,11 +635,13 @@ async function startGameServer() {
   let listeningUrl = null;
   let certificateHash = null;
   let buffer = "";
+  const worldReceiptClock = createM35WorldReceiptClock();
   let stderr = "";
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (chunk) => { stderr += chunk; process.stderr.write(chunk); });
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (chunk) => {
+    worldReceiptClock.append(chunk, Date.now());
     process.stdout.write(chunk);
     buffer += chunk;
     for (const line of buffer.split(/\r?\n/)) {
@@ -660,7 +662,9 @@ async function startGameServer() {
   if (!listeningUrl || !certificateHash) {
     throw new Error(`game server did not publish flight endpoint/hash: ${buffer}\n${stderr}`);
   }
-  return { child, url: listeningUrl, certificateHash, output: () => buffer };
+  const output = () => buffer;
+  output.observedAt = worldReceiptClock.observedAt;
+  return { child, url: listeningUrl, certificateHash, output };
 }
 
 async function startBrowser(browser) {
@@ -8509,8 +8513,10 @@ async function runOnlineUiParryFlight(entries, postParrySleepMs = 80, roles = nu
               readOutput: m201ServerOutput, afterOffset: attemptWorldLogOffset,
               fighterId: attackerReady.playerNetId, sleep,
             });
-            console.log("M35_NATIVE_LIGHT_ADMISSION_STAGE " + JSON.stringify(light));
-            await sleep(nativeReaction.lightReactionMs);
+            const remainingMs = Math.max(0,
+              light.observedEpochMs + nativeReaction.lightReactionMs - Date.now());
+            console.log("M35_NATIVE_LIGHT_ADMISSION_STAGE " + JSON.stringify({...light, remainingMs}));
+            if (remainingMs > 0) await sleep(remainingMs);
           },
           // M33/M41 retain the viewport wheel; M35 retains its element wheel.
           sendWheel: () => (scenario === "uiparrytell" || scenario === "uiparry")
