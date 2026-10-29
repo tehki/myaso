@@ -317,11 +317,6 @@ struct SharedGame {
 }
 
 impl SharedGame {
-    #[cfg(test)]
-    fn new(flight: LoopbackFlightConfig, boot_nonce: u128) -> Arc<Self> {
-        Self::new_with_chat(flight, boot_nonce, 160.0, false)
-    }
-
     fn new_with_chat(
         flight: LoopbackFlightConfig,
         boot_nonce: u128,
