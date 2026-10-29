@@ -11,6 +11,7 @@ on:
       - "src/browser/arena-viewport.mjs"
       - "tests/greyhaven-*.test.mjs"
       - "tests/graphics3c-*.test.mjs"
+      - "tools/art/graphics3c_p1_day_dusk_native.mjs"
   workflow_dispatch:
 
 permissions:
@@ -44,3 +45,33 @@ jobs:
             tests/greyhaven-environment-3c-culling.test.mjs \
             tests/graphics3c-first-playable-alpha-contract.test.mjs \
             tests/graphics3c-p44-world571-source-integration.test.mjs
+  greyhaven-p1-native-source:
+    name: Real Chrome Firefox source Canvas at Red Lion and Blacksmith day dusk
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact P1 source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify browser provenance and source script
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          node --check tools/art/graphics3c_p1_day_dusk_native.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Capture 8 original Greyhaven Canvas PNGs with exact source hashes
+        run: |
+          timeout --signal=TERM --kill-after=5s 480s node tools/art/graphics3c_p1_day_dusk_native.mjs
+      - name: Archive genuine Chrome Firefox source-renderer captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3c-p1-greyhaven-day-dusk-real-browser-source
+          path: artifacts/graphics3c-p1-greyhaven-native/**
+          if-no-files-found: ignore
+          retention-days: 7
