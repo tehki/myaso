@@ -83,7 +83,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
   const history = element(doc, "ol", "local-chat-history");
   history.setAttribute("role", "log");
   history.setAttribute("aria-label", "Local chat messages");
-  history.setAttribute("aria-live", "off");
+  history.setAttribute("aria-live", "polite");
+  history.setAttribute("aria-relevant", "additions");
   const form = element(doc, "form", "local-chat-form");
   const input = element(doc, "input", "local-chat-input");
   input.type = "text";

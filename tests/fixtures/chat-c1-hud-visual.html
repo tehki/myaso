@@ -51,6 +51,12 @@
     canvas.addEventListener("pointerdown", () => window.__ui10CombatLeak.pointerdown++);
     canvas.addEventListener("wheel", () => window.__ui10CombatLeak.wheel++);
     window.__ui10Chat = chat;
+    const stylesheet = document.querySelector("link[data-local-chat-style]");
+    await new Promise((resolve, reject) => {
+      if (stylesheet?.sheet) return resolve();
+      stylesheet?.addEventListener("load", resolve, { once: true });
+      stylesheet?.addEventListener("error", reject, { once: true });
+    });
     window.__ui10Ready = true;
   </script>
 </body>
