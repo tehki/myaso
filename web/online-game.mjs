@@ -17,7 +17,7 @@ import { createReconciliationCamera, createSnapshotRenderClock } from "../src/br
 import { createRenderGapTelemetry } from "../src/browser/render-gap-telemetry.mjs";
 import { ARENA_VIEW_ZOOM, nearbyOffscreenPointers, projectArenaPoint } from "../src/browser/arena-viewport.mjs";
 import { NETWORK } from "../src/network/constants.mjs";
-import { createKnightSpriteRenderer, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
+import { createKnightSpriteRenderer, knightVisibilityMargin, showPrototypeWeaponStroke } from "./knight-sprites.mjs";
 import { paintArenaLiteFloor } from "../src/browser/prealpha-arena-lite-floor.mjs";
 import { createWorldAnchoredArenaFloor } from "../src/browser/arena-world-floor.mjs";
 import { connectAuthoritativeClient, parseSha256Hex } from "./authoritative-client.mjs";
@@ -132,6 +132,9 @@ const params = new URLSearchParams(window.location.search);
 const knightSprites = params.get("knights") === "1"
   ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "original" ? "original" : "relit"})
   : null;
+// Preserve partially visible remote Silver clips at viewport edges; keep
+// the original 64px culling behavior when Knight art is disabled.
+const knightCullMargin = knightSprites ? knightVisibilityMargin(ARENA_VIEW_ZOOM) : 64;
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
@@ -1445,8 +1448,8 @@ function drawFighterWorld(fighter, body, shadow, damageTell = false, recoveryTel
   const screenY = canvas.height / 2 + fighter.y - visualCameraPosition.y;
   const projected = projectArenaPoint(fighter.x, fighter.y,
     visualCameraPosition.x, visualCameraPosition.y, canvas.width, canvas.height);
-  if (projected.x < -64 || projected.x > canvas.width + 64
-    || projected.y < -64 || projected.y > canvas.height + 64) return;
+  if (projected.x < -knightCullMargin || projected.x > canvas.width + knightCullMargin
+    || projected.y < -knightCullMargin || projected.y > canvas.height + knightCullMargin) return;
   drawFighterScreen(screenX, screenY, fighter, body, shadow, true, damageTell, recoveryTell);
 }
 
