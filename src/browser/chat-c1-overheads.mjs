@@ -47,7 +47,7 @@ export function createOverheadChatBubbles({
     node.textContent = text; // NEVER innerHTML, even for server-borne strings.
     node.hidden = true; // Wait for matching authoritative Knight on a frame.
     layer.append(node);
-    entries.push({ fighterId, text, node, start: time });
+    entries.push({ fighterId, text, node, start: time, seen: false });
     while (entries.length > OVERHEAD_CHAT.maxVisible) remove(entries[0]);
     return true;
   }
@@ -93,9 +93,22 @@ export function createOverheadChatBubbles({
     const stacked = new Map();
     for (const entry of [...entries].reverse()) {
       const fighter = roster.get(entry.fighterId);
-      const hidden = !fighter || fighter.action === deadAction
-        || (Number.isFinite(fighter.hp) && fighter.hp <= 0);
-      if (hidden) { entry.node.hidden = true; continue; }
+      // An incoming authenticated ChatReceived can precede its first World
+      // snapshot. Wait for that first appearance, but once a real Knight has
+      // been seen, disappearance means a retired actor/lease, not a pause.
+      if (!fighter) {
+        if (entry.seen) remove(entry);
+        else entry.node.hidden = true;
+        continue;
+      }
+      // Never resurrect a dead Knight's old speech upon respawn, even if
+      // the World reuses the same numeric ephemeral player ID within 4.8s.
+      if (fighter.action === deadAction
+          || (Number.isFinite(fighter.hp) && fighter.hp <= 0)) {
+        remove(entry);
+        continue;
+      }
+      entry.seen = true;
       const point = projectArenaPoint(fighter.x, fighter.y,
         camera.x, camera.y, width, height, zoom);
       if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) {

@@ -338,6 +338,33 @@ impl SharedGame {
         })
     }
 
+    // Chat registration is optional: never wait on a congested chat hub
+    // while holding the authoritative World mutex. A rejected attempt does
+    // not consume this session's one successful Chat C1 subscription.
+    async fn try_register_chat_stream(
+        &self,
+        player_id: u32,
+        lease_epoch: u64,
+        outgoing: mpsc::Sender<Vec<u8>>,
+    ) -> bool {
+        let state = self.state.lock().await;
+        let current = state.chat_leases.get(&player_id) == Some(&lease_epoch);
+        let alive = state.world.fighter(player_id).is_some_and(|fighter| {
+            fighter.hp > 0.0 && fighter.action != myaso_server::simulation::Action::Dead
+        });
+        current
+            && alive
+            && self.chat.try_lock().ok().is_some_and(|mut hub| {
+                hub.register(
+                    player_id,
+                    lease_epoch,
+                    state.world.world_instance(),
+                    outgoing,
+                    Instant::now(),
+                )
+            })
+    }
+
     fn allocate_player_id(&self) -> Option<u32> {
         self.next_player_id
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
@@ -907,6 +934,18 @@ async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: boo
     }
 }
 
+// The optional stream owns no gameplay lifetime. Retiring the original
+// admitted session must cancel a pending chat read even if the peer keeps
+// its QUIC connection open and never sends another byte.
+struct ChatTaskAbortGuard(Option<tokio::task::AbortHandle>);
+impl Drop for ChatTaskAbortGuard {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.abort();
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct ExperimentalGestureSettings {
     v2_lab: bool,
@@ -1052,35 +1091,35 @@ async fn handle_connection(
     let mut private_write_deadline = None;
     #[cfg(feature = "experimental-hit-delivery-lab")]
     let mut private_write_turn = false;
+    let mut chat_task_guard = ChatTaskAbortGuard(None);
     let mut chat_started = false;
+    // Rejected registration can be retried after respawn or transient
+    // chat-lock contention, without allowing unlimited stream-open churn.
+    let mut chat_retry_allowed_at = Instant::now();
     let mut snapshot_interval = tokio::time::interval(SNAPSHOT_INTERVAL);
     snapshot_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         tokio::select! {
-            incoming_chat = connection.accept_uni(), if game.chat_enabled && !chat_started => {
+            incoming_chat = connection.accept_uni(),
+                if game.chat_enabled && !chat_started && Instant::now() >= chat_retry_allowed_at => {
                 // Stream belongs only to this already-admitted QUIC game
                 // connection, not a second identity or recipient list.
                 let incoming_chat = incoming_chat.context("accept local chat stream")?;
-                chat_started = true;
                 let (chat_tx, chat_rx) = mpsc::channel(OUTBOUND_QUEUE);
-                let registered = {
-                    let state = game.state.lock().await;
-                    let current = state.chat_leases.get(&player_id) == Some(&lease_epoch);
-                    let alive = state.world.fighter(player_id).is_some_and(|f|
-                        f.hp > 0.0 && f.action != myaso_server::simulation::Action::Dead
-                    );
-                    // Never await while the 60Hz World lock is held. If chat
-                    // is congested the optional stream fails closed; Combat
-                    // continues on its original datagram/bi channels.
-                    current && alive && game.chat.try_lock().ok().is_some_and(|mut hub|
-                        hub.register(player_id, lease_epoch, state.world.world_instance(), chat_tx.clone(), Instant::now())
-                    )
-                };
-                if !registered { continue; }
+                if !game.try_register_chat_stream(player_id, lease_epoch, chat_tx.clone()).await {
+                    // E.g. actor was still dead or the optional chat hub was
+                    // occupied. Only this stream is refused, not the Combat
+                    // session. Allow a later attempt after a bounded pause.
+                    chat_retry_allowed_at = Instant::now() + Duration::from_millis(500);
+                    continue;
+                }
+                // A failed registration must NOT permanently burn the only
+                // C1 stream slot for this authenticated gameplay session.
+                chat_started = true;
                 let chat_game = Arc::clone(&game);
                 let chat_connection = Arc::clone(&connection);
-                tokio::spawn(async move {
+                let task = tokio::spawn(async move {
                     let outcome = run_chat_stream(
                         chat_connection, incoming_chat, chat_tx, chat_rx,
                         player_id, lease_epoch, Arc::clone(&chat_game)
@@ -1092,6 +1131,7 @@ async fn handle_connection(
                         eprintln!("player {player_id} isolated chat stream ended: {error:#}");
                     }
                 });
+                chat_task_guard.0 = Some(task.abort_handle());
             }
             writer_result = &mut reliable_writer => {
                 match writer_result {
@@ -1861,6 +1901,45 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn c1_optional_stream_registration_can_retry_after_contention_and_respawn() {
+        let game = SharedGame::new(
+            LoopbackFlightConfig {
+                background_players: 0,
+                near_pressure_players: 0,
+                reliable_write_delay: Duration::ZERO,
+                drop_new_action_datagrams: false,
+                drop_following_input_datagrams: 0,
+            },
+            1,
+            160.0,
+            true,
+        );
+        let (tx, _rx) = mpsc::channel(OUTBOUND_QUEUE);
+        {
+            let mut state = game.state.lock().await;
+            state.chat_leases.insert(1, 77);
+            // Actor does not exist yet (same restriction as a dead actor):
+            // a client-owned uni stream cannot register by merely asking.
+        }
+        assert!(!game.try_register_chat_stream(1, 77, tx.clone()).await);
+        {
+            let mut state = game.state.lock().await;
+            assert!(state.world.add_player(1)); // Original World respawn.
+        }
+        assert!(!game.try_register_chat_stream(1, 76, tx.clone()).await);
+        let hub_guard = game.chat.lock().await;
+        assert!(!game.try_register_chat_stream(1, 77, tx.clone()).await);
+        drop(hub_guard); // Optional chat congestion clears.
+        assert!(game.try_register_chat_stream(1, 77, tx.clone()).await);
+        assert!(!game.try_register_chat_stream(1, 77, tx.clone()).await); // No duplicate.
+        game.chat.lock().await.unregister(1, 77);
+        // Old retired lease cannot re-register after same player ID rejoins.
+        game.state.lock().await.chat_leases.insert(1, 88);
+        assert!(!game.try_register_chat_stream(1, 77, tx.clone()).await);
+        assert!(game.try_register_chat_stream(1, 88, tx).await);
+    }
 
     #[test]
     fn private_hit_activation_requires_every_independent_engineering_gate() {
@@ -3066,5 +3145,27 @@ mod core8a_standard_input_freshness_tests {
         assert_eq!(fresh_connection.ingest(&block_packet(10, true)).len(), 3);
         assert_eq!(old_connection.latest_accepted_packet_tick, Some(100));
         assert_eq!(fresh_connection.latest_accepted_packet_tick, Some(10));
+    }
+}
+
+#[cfg(test)]
+mod chat_task_lifetime_tests {
+    use super::ChatTaskAbortGuard;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn retired_gameplay_lease_aborts_idle_optional_chat_reader() {
+        // An idle reliable stream may never produce a byte. Its task cannot
+        // outlive the accepted GAME lease or retain its connection Arc.
+        let task = tokio::spawn(async {
+            std::future::pending::<()>().await;
+        });
+        let guard = ChatTaskAbortGuard(Some(task.abort_handle()));
+        drop(guard);
+        let error = tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .expect("optional chat task must terminate after session guard drops")
+            .expect_err("idle chat task cannot complete without cancellation");
+        assert!(error.is_cancelled());
     }
 }
