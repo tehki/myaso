@@ -18,7 +18,7 @@ test("restored short heavy reaches during the guarded active window through real
   assert.match(span, /prepareHeavyCounterplayFlight\(\s*entries, "M107 heavy block", \{ movementMs: 400 \}/);
   // The selected held-LMB lineage qualifies 395ms native wheel staging.
   // Preserve its passing choreography and original 125/240ms World windows.
-  assert.match(span, /attackOffset, blockOffset, 395,/);
+  assert.match(span, /attackOffset, blockOffset, "block",/);
   assert.doesNotMatch(span, /attackOffset, blockOffset, 155,/);
   assert.match(span, /defenderResult\.playerHp === 100/);
   assert.match(span, /"parried"/);
@@ -29,8 +29,8 @@ test("restored short heavy reaches during the guarded active window through real
 test("M188 retains actual M223 authenticated windup and unchanged defense periods", () => {
   const heavy = runner.slice(runner.indexOf("async function performHeavyCounterplayWindowWheel("),
     runner.indexOf("async function runOnlineUiHeavyBlockFlight("));
-  assert.match(heavy, /awaitM223HeavyWindup\(/);
-  assert.match(heavy, /scrollArenaWheel\(defender, defenderElementId, 120, m223WheelDelayMs\)/);
+  assert.match(heavy, /dispatchNativeHeldHeavyGuard\(/);
+  assert.match(heavy, /scrollArenaWheel\(defender,defenderElementId,120\)/);
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.block.parryWindowMs, 125);
 });
@@ -40,7 +40,7 @@ test("genuine heavy parry also stages within shortened physical reach before 125
   const span = runner.slice(runner.indexOf("async function runOnlineUiHeavyParryFlight("),
     runner.indexOf("async function runOnlineUiHeavyDodgeFlight("));
   assert.match(span, /prepareHeavyCounterplayFlight\(\s*entries, "M107 heavy parry", \{ movementMs: 400 \}/);
-  assert.match(span, /attackOffset, blockOffset, 405/);
+  assert.match(span, /attackOffset, blockOffset, "parry"/);
   assert.match(span, /"parry-success"/);
   assert.match(span, /"parried"/);
   assert.doesNotMatch(span, /dispatchEvent\(|simulateAttack|skipDefense/);

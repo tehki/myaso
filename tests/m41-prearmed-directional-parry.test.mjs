@@ -29,7 +29,7 @@ test("M41 actor-bound browser prearm dispatches one original viewport wheel; ori
   assert.match(runner,/const prearmed = \(scenario === "uiparrytell" \|\| scenario === "uistun" \|\| scenario === "uiparry"\)/);
   assert.match(runner,/allowHeavy: nativeReaction\.allowHeavy/);
   assert.match(runner,/attackerReady\.playerNetId, 180,\s*nativeReaction\.allowHeavy\]/);
-  assert.match(runner,/planM35NativeReaction\(parryIngress\.wheelMs\)/);
+  assert.match(runner,/planM35NativeReaction\(parryIngress\.wheelMs,nativeShortHoldMs\)/);
   assert.match(runner,/verifyM35OriginalLightParry\(worldOptions\)/,
     "earlier cue cannot replace original World Light then PARRY acceptance");
   assert.match(script,/const \[token, baseline, actorId, timeoutMs, allowHeavy\] = arguments/);

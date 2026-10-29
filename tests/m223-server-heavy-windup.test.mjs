@@ -49,13 +49,12 @@ test("M223 preserves one genuine held-LMB release and one wheel plus strict comb
   const source=readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs",import.meta.url),"utf8");
   const code=source.slice(source.indexOf("async function performHeavyCounterplayWindowWheel("),
     source.indexOf("async function runOnlineUiHeavyBlockFlight("));
-  assert.ok(code.includes("awaitM223HeavyWindup({"));
-  assert.ok(code.includes('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset)'));
+  assert.ok(code.includes("dispatchNativeHeldHeavyGuard({"));
+  assert.ok(code.includes("sendDown:()=>setArenaAttackButton(attacker,true)"));
+  assert.ok(code.includes("sendUp:()=>setArenaAttackButton(attacker,false)"));
   assert.ok(!code.includes('pulseMovementKey(attacker, "e", heavyKeyPulseMs)'));
-  assert.ok(code.includes("scrollArenaWheel(defender, defenderElementId, 120, m223WheelDelayMs)"));
-  assert.ok(code.includes("M192_REAL_INGRESS_OUTCOME"));
-  assert.ok(code.includes("M223_SERVER_WINDUP_PLAN"));
-  assert.ok(source.includes('scenario === "uiheavyblock" || scenario === "uiheavyparry"'));
+  assert.ok(code.includes("scrollArenaWheel(defender,defenderElementId,120)"));
+  assert.ok(code.includes("M188_CURRENT_WORLD_GUARD_RELEASE"));
   assert.ok(source.includes('Opponent blocked - guard -64.'));
   assert.ok(source.includes('feedbackTransitions.includes("parried")'));
 });
@@ -108,22 +107,24 @@ test("Combat4B M188 physical held-LMB parry preserves one bounded wheel and stri
   // A real original World event trace at 1fa6f494 proved 405ms native parry
   // resulted in BLOCK (64 guard), not PARRY. The World timers stay unchanged;
   // qualify the +110ms physically-delayed wheel on exact-head native CI.
-  assert.match(helper, /m188HeldLmbParryOffsetMs = scenario === "uiheavyparry" \? 110 : 0/);
-  assert.match(helper, /m223WheelDelayMs = m223Plan\.wheelDelayMs \+ m188HeldLmbParryOffsetMs/);
-  assert.match(helper, /m223WheelDelayMs < 0 \|\| m223WheelDelayMs > 450/);
+  const phase=readFileSync(new URL("../scripts/native-world-phase-guard.mjs",import.meta.url),"utf8");
+  assert.match(helper, /dispatchNativeHeldHeavyGuard/);
+  assert.match(phase, /minElapsedMs:320/);
+  assert.match(phase, /minElapsedMs:guard==="block"\?133\.3:0/);
   // 405ms planner plus parry-only wheel retiming must preserve <=450ms bound.
   assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:65}).wheelDelayMs+110,450);
   assert.equal(planM223WheelDelay({targetAfterWindupMs:405,sampledWheelIngressMs:85}).wheelDelayMs+110,430);
-  assert.match(helper, /performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
-  assert.match(helper, /scrollArenaWheel\(defender, defenderElementId, 120, m223WheelDelayMs\)/);
+  assert.match(helper, /sendDown:\(\)=>setArenaAttackButton\(attacker,true\)/);
+  assert.match(helper, /sendUp:\(\)=>setArenaAttackButton\(attacker,false\)/);
+  assert.match(helper, /scrollArenaWheel\(defender,defenderElementId,120\)/);
   const block = source.slice(source.indexOf("async function runOnlineUiHeavyBlockFlight("),
     source.indexOf("async function runOnlineUiHeavyParryFlight("));
   const parry = source.slice(source.indexOf("async function runOnlineUiHeavyParryFlight("),
     source.indexOf("async function runOnlineUi", source.indexOf("async function runOnlineUiHeavyParryFlight(") + 20));
-  assert.match(block, /attackOffset, blockOffset, 395,/);
+  assert.match(block, /attackOffset, blockOffset, "block",/);
   assert.match(block, /defenderResult\.playerHp === 100/);
   assert.match(block, /defenderGuardInWindow/);
-  assert.match(parry, /attackOffset, blockOffset, 405,/);
+  assert.match(parry, /attackOffset, blockOffset, "parry",/);
   assert.match(parry, /defenderResult\.playerHp === 100/);
   assert.match(parry, /defenderResult\.playerGuard === 100/);
   assert.match(parry, /feedbackTransitions\.includes\("parried"\)/);
@@ -146,11 +147,11 @@ test("M226 uses later genuine parry wheel only, preserving M188 and M107 strict 
   assert.ok(oldLeadMs > COMBAT.block.shortBlockMs);
   assert.ok(newLeadMs > COMBAT.block.parryWindowMs);
   assert.ok(newLeadMs < COMBAT.block.shortBlockMs);
-  assert.ok(block.includes("attackOffset, blockOffset, 395,"));
+  assert.ok(block.includes('attackOffset, blockOffset, "block",'));
   assert.ok(!block.includes("attackOffset, blockOffset, 155,"));
   // Short-reach active lunge: authoritative block tick 605, hit tick 615
   // proves 285ms is ~167ms before contact; aim genuine parry wheel later.
-  assert.ok(parry.includes("attackOffset, blockOffset, 405,"));
+  assert.ok(parry.includes('attackOffset, blockOffset, "parry",'));
   assert.ok(source.includes('feedbackTransitions.includes("parried")'));
   assert.ok(source.includes("defenderResult.playerGuard !== 100"));
   assert.ok(source.includes("defenderResult.playerHp !== 100"));

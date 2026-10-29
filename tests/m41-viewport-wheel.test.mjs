@@ -47,6 +47,6 @@ test("M41 native wheel remains downstream of genuine actor-bound cue; M35 still 
     "premature Heavy cue is not a qualifying Light Windup");
   assert.ok(block.includes("scrollM41ViewportWheel(defender, defenderViewport)"));
   assert.ok(block.includes("setArenaBlock(defender, defenderElementId, true)"));
-  assert.ok(block.includes("performArenaM221GuardBreakClick(attacker, 35)"));
+  assert.ok(block.includes("performArenaM221GuardBreakClick(attacker, nativeShortHoldMs)"));
   assert.ok(block.includes("waitForUiParryEvidence("));
 });

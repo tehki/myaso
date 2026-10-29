@@ -12,7 +12,8 @@ test("M41 native parry waits for the original replicated World windup before its
   const aim = rest.indexOf("await aimArena(attacker, attackerElementId, attackOffset);");
   const dispatch = rest.indexOf("await dispatchM41ObservedParry({");
   assert.ok(aim >= 0 && dispatch > aim, "real aim completes before concurrent click/cue choreography");
-  assert.match(rest, /sendAttack: \(\) => performArenaM221GuardBreakClick\(attacker, 35\)/);
+  assert.match(rest, /sendAttack: \(\) => performArenaM221GuardBreakClick\(attacker, nativeShortHoldMs\)/);
+  assert.match(source, /MYASO_PVP_INSTANT_LMB === "1" \? 35 : 100/);
   assert.match(rest, /awaitWorldCue: \(\) => prearmed \? prearmed.wait\(\) : waitForM41WorldWindup\(/);
   assert.match(rest, /const prearmed = \(scenario === "uiparrytell" \|\| scenario === "uistun" \|\| scenario === "uiparry"\)/);
   assert.ok(rest.indexOf("script: m35PrearmedCueScript()") < dispatch,

@@ -104,9 +104,11 @@ test("M111 genuine native scenario must fail closed on original 60Hz World post-
   // Require physical source0 proof, a hold beyond READY320 and the original
   // heavy active/recovery+60ms floor before the one genuine W3C punish click.
   assert.match(source, /const M110_LMB_HEAVY_HOLD_MS = 450;/);
-  assert.match(source, /const heavyPulse = performM110NativeHeldLmb\(attacker, attackerElementId, attackOffset\)/);
-  assert.match(body, /const firstClickTargetMs = M110_LMB_HEAVY_HOLD_MS\s*\+ COMBAT\.heavyAttack\.activeMs\s*\+ COMBAT\.heavyAttack\.recoveryMs\s*\+ 60/);
+  assert.match(source, /lastHeavyControl = await dispatchNativeHeldHeavyGuard/);
+  assert.match(body, /await awaitNativeHeavyRecoveryExit/);
+  assert.match(body, /COMBAT\.heavyAttack\.recoveryMs/);
+  assert.match(body, /await sleep\(60\)/);
   assert.doesNotMatch(body, /trustedSecondKeyEDownEpoch/);
-  assert.match(body, /performArenaAttackBurst\(attacker, 1, initialPauseMs, 0\)/);
+  assert.match(body, /performArenaAttackBurst\(attacker,1,0,0\)/);
   assert.match(body, /hitDuringStun/);
 });
