@@ -1677,7 +1677,7 @@ async fn run_chat_stream(
                                         })
                                     }).collect();
                                 game.chat.lock().await.route(
-                                    player_id, lease_epoch, &request, &positions,
+                                    (player_id, lease_epoch), &request, &positions,
                                     game.chat_radius, state.world.tick, Instant::now(),
                                 )
                             }

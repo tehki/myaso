@@ -196,14 +196,15 @@ impl LocalChatHub {
     }
     pub fn route(
         &mut self,
-        sender_id: u32,
-        sender_lease: u64,
+        sender: (u32, u64),
         request: &ChatRequest,
         positions: &[ChatPosition],
         radius: f32,
         tick: u32,
         now: Instant,
     ) -> ChatResult {
+        // Both fields come only from current server-owned connection admission.
+        let (sender_id, sender_lease) = sender;
         let rejected = |code| ChatResult {
             correlation: request.correlation,
             code,
@@ -370,7 +371,7 @@ mod tests {
             receivers.push(rx);
         }
         let request = decode_send(&packet(10, b"Greetings!")).unwrap();
-        let result = hub.route(1, 1, &request, &positions(), 160.0, 123, now);
+        let result = hub.route((1, 1), &request, &positions(), 160.0, 123, now);
         assert_eq!(result.code, ChatCode::Accepted);
         let received = receivers[1].try_recv().unwrap();
         assert_eq!(received[0], CHAT_RECEIVED);
@@ -390,11 +391,11 @@ mod tests {
             text: "hello".into(),
         };
         assert_eq!(
-            hub.route(1, 1, &req, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &req, &positions(), 160.0, 1, now).code,
             ChatCode::Accepted
         );
         assert_eq!(
-            hub.route(1, 1, &req, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &req, &positions(), 160.0, 1, now).code,
             ChatCode::Duplicate
         );
         assert!(rx.try_recv().is_ok());
@@ -405,7 +406,7 @@ mod tests {
                 text: "spam".into(),
             };
             assert_eq!(
-                hub.route(1, 1, &q, &positions(), 160.0, 1, now).code,
+                hub.route((1, 1), &q, &positions(), 160.0, 1, now).code,
                 ChatCode::Accepted
             );
         }
@@ -414,13 +415,12 @@ mod tests {
             text: "spam".into(),
         };
         assert_eq!(
-            hub.route(1, 1, &q, &positions(), 160.0, 1, now).code,
+            hub.route((1, 1), &q, &positions(), 160.0, 1, now).code,
             ChatCode::RateLimited
         );
         assert_eq!(
             hub.route(
-                1,
-                1,
+                (1, 1),
                 &q,
                 &positions(),
                 160.0,
@@ -473,7 +473,7 @@ mod tests {
                 text: "hi".into(),
             };
             assert_eq!(
-                hub.route(1, 1, &q, &positions, 10.0, 1, now).code,
+                hub.route((1, 1), &q, &positions, 10.0, 1, now).code,
                 ChatCode::Accepted
             );
         }
@@ -481,8 +481,7 @@ mod tests {
         hub.unregister(1, 1);
         assert_eq!(
             hub.route(
-                1,
-                1,
+                (1, 1),
                 &ChatRequest {
                     correlation: 3,
                     text: "stale".into()
@@ -538,7 +537,7 @@ mod tests {
             },
         ];
         assert_eq!(
-            hub.route(1, 11, &request, &positions, 160.0, 1, now).code,
+            hub.route((1, 11), &request, &positions, 160.0, 1, now).code,
             ChatCode::Accepted
         );
         assert!(near.try_recv().is_ok());
@@ -546,8 +545,7 @@ mod tests {
         positions[1].x = 160.01;
         assert_eq!(
             hub.route(
-                1,
-                11,
+                (1, 11),
                 &ChatRequest {
                     correlation: 2,
                     text: "far".into()
@@ -565,8 +563,7 @@ mod tests {
         positions[1].alive = false; // Dead players do not receive local chat.
         assert_eq!(
             hub.route(
-                1,
-                11,
+                (1, 11),
                 &ChatRequest {
                     correlation: 3,
                     text: "dead".into()
@@ -583,8 +580,7 @@ mod tests {
         positions[1].alive = true; // Same authenticated session after respawn.
         assert_eq!(
             hub.route(
-                1,
-                11,
+                (1, 11),
                 &ChatRequest {
                     correlation: 4,
                     text: "respawned".into()
@@ -600,8 +596,7 @@ mod tests {
         assert!(near.try_recv().is_ok());
         assert_eq!(
             hub.route(
-                1,
-                999,
+                (1, 999),
                 &ChatRequest {
                     correlation: 5,
                     text: "spoof".into()
@@ -622,8 +617,7 @@ mod tests {
         positions[0].lease_epoch = 44;
         assert_eq!(
             hub.route(
-                1,
-                11,
+                (1, 11),
                 &ChatRequest {
                     correlation: 6,
                     text: "old".into()
@@ -638,8 +632,7 @@ mod tests {
         );
         assert_eq!(
             hub.route(
-                1,
-                44,
+                (1, 44),
                 &ChatRequest {
                     correlation: 6,
                     text: "new".into()
@@ -656,8 +649,7 @@ mod tests {
         positions[0].world_instance = 19; // Teleport to a different World.
         assert_eq!(
             hub.route(
-                1,
-                44,
+                (1, 44),
                 &ChatRequest {
                     correlation: 7,
                     text: "crossworld".into()
