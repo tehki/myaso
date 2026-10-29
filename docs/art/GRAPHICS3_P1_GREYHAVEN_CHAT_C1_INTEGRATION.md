@@ -47,3 +47,17 @@ The 3A original Silver is present in the current Chat base, but future Quaterniu
 7. Explicit Main0/owner release GO, supported rollback, staging and post-deploy functional acceptance; **not** authorized by this Draft.
 
 **Next engineering step:** Run the focused new source-integration tests, inspect exact-head protected CI, then separately port actual source-approved Red Lion art with stable World9 actor-depth and rollback tests. Coordinate Blacksmith `smith` visual identity/occlusion with World9 rather than inventing it.
+
+## Graphics 3B child — original Blender Red Lion source integration candidate (2026-10-29)
+
+This section describes the **separate child Draft branch** `graphics3/p1-redlion-source-20261029`. The parent P1 #1106 still intentionally draws World9 placeholders; do not confuse their source SHAs or acceptance.
+
+Exact original Red Lion donor: [Graphics3B #831](https://github.com/tehki/myaso/pull/831), immutable original Blender A2.32 source `da5664b015bb1f76b1c60482b5009a6fd5fb7487`; its 3 original day/dusk/roof WebPs and `src/browser/red-lion-live-art.mjs` copied by immutable same-repo Git blob IDs. Red Lion module validates SHA256 of **all three original image bodies** and exact decoded source dimensions before the World9 `red-lion` placeholder may be suppressed. Any failure returns the default World placeholder, never an unapproved building.
+
+Opt-in **`?world=1&greyhaven=1&redlion=1`**, optionally **`&dusk=1`**. Default P0 arena and plain `?world=1&greyhaven=1` remain unchanged. The 3B adapter stages World-replacement and facade offscreen with canonical camera before publishing pixels; paints genuine World-authored remote actors behind, then source facade/roof, then actors in front, and suppresses only actually covered enemy HUD/edge markers. Camera/actor XY are sampled from existing real server state, not invented. Red Lion visual depth Y=4075, entrance Y=4060 and portal Y=4075 are **distinct**, and no portal is made interactive. Original module is lazily imported only when the exact flags are provided; it carries no new network/World/Combat implementation. Original source RGB/day-dusk content retained byte-identical. See original 3B fixture contract; this new child has **not yet passed real native browser or performance qualification**.
+
+**Known open items:** UI10 Chat bubble visibility for occluded actors, signed collision legal movement, bright/dusk native Silver readability, exact-head source/quality, genuinely authenticated four players in exterior World, 3C street tree occlusion/lighting, decoded texture/cache frame cost, source artifact evidence and rollback. No claimed native first-party Greyhaven screenshot from this child yet.
+
+**Blacksmith remains a World9 placeholder** until Core8C/Physics/World9 authorize a `smith` named facade replacement; its approved original R4 Blender [3B #1073](https://github.com/tehki/myaso/pull/1073) portable WebPs may be reviewed separately, not inserted over a World9 solid without permission.
+
+**Gore Blood & Iron #1065 remains G0 planning.** P1 work is a Draft source branch; no merge or production deployment.
