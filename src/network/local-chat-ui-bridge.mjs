@@ -60,7 +60,9 @@ export async function openLocalChatUiBridge(gameConnection, {
     const message = Object.freeze({
       channel: "local",
       serverMessageId: localSessionTag + event.messageId.toString(),
-      sender: Object.freeze({ displayName: "Player #" + event.senderId }),
+      // ChatReceived senderId comes from the authenticated Rust World stream,
+      // never client-provided text or claimed display names.
+      sender: Object.freeze({ netId: event.senderId, displayName: "Player #" + event.senderId }),
       text: event.text,
     });
     for (const listener of listeners) {

@@ -81,9 +81,38 @@ try {
  const gotB=await poll("B near receive",()=>evaljs(b,"const x=[...document.querySelectorAll('.local-chat-item[data-channel=local]')].map(e=>({name:e.querySelector('.local-chat-sender')?.textContent,text:e.querySelector('.local-chat-text')?.textContent}));return {ok:x.some(m=>m.text===arguments[0]),messages:x};",[first]));
  console.log("B_RECEIVED",JSON.stringify(gotB));
  assert.equal(gotB.messages.find(m=>m.text===first)?.name,"Player #1");
- await delay(700);
+ // True browser DOM integration: speech must be above the actual authenticated
+ // Silver Knight, not stuck to viewport or inferred from a display name.
+ const getSpeech=(text)=>"const e=[...document.querySelectorAll('.chat-c1-overhead:not([hidden])')].find(x=>x.textContent===arguments[0]);if(!e)return {ok:false};const p=e.parentElement,c=document.querySelector('#arena'),r=c.getBoundingClientRect(),sr=document.querySelector('.arena-stage').getBoundingClientRect();return {ok:true,text:e.textContent,x:Number.parseFloat(e.style.left),y:Number.parseFloat(e.style.top),stageWidth:sr.width,stageHeight:sr.height,canvasWidth:r.width,canvasHeight:r.height,ariaHidden:p.getAttribute('aria-hidden'),pointerEvents:getComputedStyle(p).pointerEvents};";
+ const nearBubble=await poll("real authenticated Player #1 speech above Knight on B",()=>evaljs(b,getSpeech(first),[first]));
+ const ownBubble=await poll("own speech only after actual server ACK",()=>evaljs(a,getSpeech(first),[first]));
+ for(const bubble of [nearBubble,ownBubble]){
+  assert.equal(bubble.ariaHidden,"true","screen reader gets message only from chat log");
+  assert.equal(bubble.pointerEvents,"none","overhead never steals Combat input");
+  assert(Number.isFinite(bubble.x)&&bubble.x>=0&&bubble.x<=bubble.stageWidth);
+  assert(Number.isFinite(bubble.y)&&bubble.y>=0&&bubble.y<=bubble.stageHeight);
+ }
+ console.log("CHAT_C1_REAL_WORLD_KNIGHT_OVERHEAD_BUBBLES_PASS",JSON.stringify({near:nearBubble,own:ownBubble}));
+ // Real W3C movement toward -X, while B stands still, must move Player #1's
+ // already authenticated speech bubble toward -X in B's canvas. This catches
+ // fixed HUD labels that merely coincidentally sit above a spawn location.
+ await key(a,"\uE00C"); // Escape composer, return gameplay focus.
+ await wd("POST","/session/"+a+"/actions",{actions:[{
+  type:"key",id:"c1-speech-world-walk",
+  actions:[{type:"keyDown",value:"a"},{type:"pause",duration:250},{type:"keyUp",value:"a"}],
+ }]});
+ const movingBubble=await poll("Knight speech must move with actual Rust World actor", async()=>{
+  const next=await evaljs(b,getSpeech(first),[first]);
+  return {...next,ok:next.ok&&next.x<nearBubble.x-9};
+ },3000);
+ console.log("CHAT_C1_BUBBLE_FOLLOWS_PHYSICAL_WORLD_MOVEMENT_PASS",
+   JSON.stringify({beforeX:nearBubble.x,afterX:movingBubble.x,deltaX:movingBubble.x-nearBubble.x}));
+ await delay(250);
  const far=await evaljs(c,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].map(e=>e.textContent)");
  console.log("C_FAR",JSON.stringify(far));assert(!far.includes(first),"C outside authoritative radius");
+ // The preceding physical walking test correctly returned control to Combat.
+ // Re-open chat with a genuine Enter before testing its focus isolation.
+ await key(a,"\uE007");
  // Independent 4D's real first-red was native canvas LMB while chat owns
  // focus. Genuine W3C physical LMB/RMB/wheel on the authenticated Rust World.
  // This asserts native focus ownership; 4D must separately recheck actual
