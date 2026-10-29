@@ -106,6 +106,62 @@ fn sub_30hz_press_release_same_tick_reaches_real_34hp_hit_exactly_once() {
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
 }
 #[test]
+fn repeated_release_during_and_after_contact_never_restarts_retired_gesture() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    for (action, sequence) in [(GestureAction::Press, 1), (GestureAction::Release, 2)] {
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                action,
+                sequence,
+                1
+            ),
+            AckStatus::Accepted
+        );
+    }
+    let mut hits = Vec::new();
+    // Same authenticated packet before Active, at contact, during recovery
+    // and after Idle. None may reset windup or authorize another World hit.
+    for _ in 0..90 {
+        assert_eq!(
+            admit(
+                &mut p,
+                &mut w,
+                LEASE,
+                GestureSource::Lmb,
+                GestureAction::Release,
+                2,
+                1
+            ),
+            AckStatus::Duplicate
+        );
+        hits.extend(advance(&mut p, &mut w, 1));
+    }
+    assert_eq!(hits, vec![(34, 66)]);
+    assert_eq!(w.fighter(1).unwrap().action, Action::Idle);
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            3,
+            1
+        ),
+        AckStatus::Rejected,
+        "a new sequence cannot resurrect the retired gesture identity"
+    );
+    assert!(advance(&mut p, &mut w, 30).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+}
+
+#[test]
 fn server_320ms_ready_waits_for_matching_release_real_46hp_only() {
     let mut w = arena();
     let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
@@ -952,8 +1008,10 @@ fn late_upgrade_cannot_change_already_committed_light_or_authorize_heavy() {
             2,
             1
         ),
-        AckStatus::Rejected
+        AckStatus::Accepted
     );
+    // The late edge is transport-admitted but must NOT upgrade an
+    // original World Light that has already dealt its single 34 HP.
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
     assert!(advance(&mut p, &mut w, 55).is_empty());
     assert_eq!(w.fighter(2).unwrap().hp, 66.0);
@@ -1444,4 +1502,91 @@ fn same_world_tick_press_and_upgrade_preserve_real_intermediate_windup_without_a
     );
     assert!(advance(&mut p, &mut w, 55).is_empty());
     assert_eq!(w.fighter(2).unwrap().hp, 54.0);
+}
+
+#[test]
+fn late_held_lmb_upgrade_stays_light_and_keeps_valid_lease_for_next_gesture() {
+    let mut w = arena();
+    let mut p = SessionGestureWorldPath::from_admitted_world(&w, 1, LEASE, BOOT).unwrap();
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            1,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(advance(&mut p, &mut w, 9), vec![(34, 66)]);
+    // Delayed legitimate upgrade can never retroactively replace a landed light.
+    // It is nevertheless an already-authenticated held-pointer event, not a
+    // malformed packet that should fatally retire the player's QUIC lease.
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            2,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Upgrade,
+            2,
+            1
+        ),
+        AckStatus::Duplicate
+    );
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            3,
+            1
+        ),
+        AckStatus::Accepted
+    );
+    assert!(advance(&mut p, &mut w, 55).is_empty());
+    assert_eq!(w.fighter(2).unwrap().hp, 66.0);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Press,
+            4,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(w.fighter(1).unwrap().action, Action::AttackWindup);
+    assert_eq!(
+        admit(
+            &mut p,
+            &mut w,
+            LEASE,
+            GestureSource::Lmb,
+            GestureAction::Release,
+            5,
+            2
+        ),
+        AckStatus::Accepted
+    );
+    assert_eq!(advance(&mut p, &mut w, 55), vec![(34, 32)]);
 }

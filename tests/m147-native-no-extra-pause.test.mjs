@@ -31,7 +31,8 @@ test("M147 genuine recovery cue precedes one pause-free W3C LMB and strict World
   assert.match(flight, /async function performArenaM221GuardBreakClick\(session, clickHoldMs = 10\)/);
   assert.match(flight, /\{ type: "pointerDown", button: 0 \}/);
   assert.match(flight, /\{ type: "pointerUp", button: 0 \}/);
-  assert.match(m147, /punishDown\.epochMs < recovery\.epochMs/);
+  assert.match(m147, /originalWorldRecoveryTick: worldRecoveryProof\.jump\.recovery\.tick/);
+  assert.match(m147, /punishDown\.epochMs < recoveryCue\.epochMs/);
   assert.match(m147, /punishDown\.epochMs < recoveryCue\.epochMs/);
   assert.match(m147, /jumpState\.playerHp !== 66/);
 });
@@ -75,7 +76,7 @@ test("M147 correction KeyA pulses cannot accidentally trigger genuine 240ms R2 D
   assert.match(stage, /pulseM147FocusStageKey\(closerIdle, "a", 260\)/,
     "original initial KeyA staging remains real");
   assert.match(stage,
-    /for \(let attempt = 0; attempt < 3[^\n]*\{[\s\S]*?await sleep\(300\);\s*await pulseM147FocusStageKey\(closerIdle, "a", 45\);/,
+    /for \(let attempt = 0; attempt < 8[^\n]*\{[\s\S]*?await sleep\(300\);\s*if\(plan\) await pulseMovementKeyBoundedW3c\(closerIdle, plan.key, plan.durationMs\);/,
     "each genuine corrective KeyA tap is separated from the prior KeyA by at least 300ms");
   assert.equal(DASH_DOUBLE_TAP_MS, 240, "original R2 dash interval remains unchanged");
   const accidental = createDirectionalDash();
@@ -92,16 +93,18 @@ test("M147 genuine original World and native timelines log before strict browser
   const log = m147.indexOf('console.log("M147_PRE_LIFECYCLE_WORLD_DIAGNOSTIC "');
   const gate = m147.indexOf('if (jumpState.acceptance?.scenario !== "uijumppunishffa"');
   const strict = m147.indexOf("verifyM147WorldRecoveryProof(");
-  assert.ok(log > 0 && gate > log && strict > gate,
-    "read-only provenance remains available on a failing native browser timing gate");
+  assert.ok(log > 0 && gate > strict && strict > log,
+    "independent original World proof must precede cross-browser UI chronology adjudication");
   const before = m147.slice(0, gate);
   assert.match(before, /m201ServerOutput\(\)\.slice\(worldProofOffset\)/,
     "forensics must use the actual original server World");
   assert.match(before, /inputSubmissions: \(observerState\.acceptance\?\.inputSubmissions/);
   assert.match(before, /source0Samples: \(observerState\.acceptance\?\.m121SentSamples/);
   assert.match(before, /victimUiRecovery: \{ entry: recovery, exit: idle \}/);
-  assert.match(m147, /punishDown\.epochMs < recovery\.epochMs/,
-    "the existing strict original browser-order assertion remains unchanged");
+  assert.match(m147, /M147_CROSS_BROWSER_SNAPSHOT_CHRONOLOGY/,
+    "async victim-browser recovery timestamp disagreement stays in the first-red record");
+  assert.match(m147, /punishDown\.epochMs < recoveryCue\.epochMs/,
+    "the authentic punisher's recovery cue MUST precede the actual native click");
   assert.match(m147, /verifyM147WorldRecoveryProof\(/,
     "strict native real-World contact gate remains mandatory");
 });

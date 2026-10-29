@@ -37,6 +37,24 @@ jobs:
           - acceptance: held-lmb-firefox
             mode: held-lmb
             browsers: firefox,chrome,chrome,chrome
+          - acceptance: space-chord-chrome
+            mode: space-guard
+            browsers: chrome,chrome,chrome,chrome
+          - acceptance: space-chord-firefox
+            mode: space-guard
+            browsers: firefox,firefox,firefox,firefox
+          - acceptance: jump-action-chrome
+            mode: jump-review
+            browsers: chrome,chrome,chrome,chrome
+          - acceptance: jump-action-firefox
+            mode: jump-review
+            browsers: firefox,firefox,firefox,firefox
+          - acceptance: jump-two-hit-chrome
+            mode: jump-two-hit
+            browsers: chrome,chrome,chrome,chrome
+          - acceptance: jump-two-hit-firefox
+            mode: jump-two-hit
+            browsers: firefox,firefox,firefox,firefox
           - acceptance: four-combat-lifecycle
             mode: four-combat-lifecycle
             browsers: chrome,firefox,chrome,firefox

@@ -43,7 +43,7 @@ fn light_windup_starts_at_authenticated_press_and_activates_only_at_135_server_m
     );
     assert_eq!(
         send(&mut a, GestureAction::Upgrade, 2, 7, 450),
-        (Disposition::Rejected, Command::None)
+        (Disposition::Accepted, Command::None)
     );
 }
 #[test]
@@ -225,7 +225,7 @@ fn delayed_upgrade_after_light_hit_and_dropped_upgrade_edge_never_double_hit() {
     assert_eq!(a.advance(LEASE, 135), Some(Command::ActivateLight));
     assert_eq!(
         send(&mut a, GestureAction::Upgrade, 2, 7, 300),
-        (Disposition::Rejected, Command::None)
+        (Disposition::Accepted, Command::None)
     );
     assert_eq!(
         send(&mut a, GestureAction::Release, 3, 7, 500),
@@ -309,8 +309,8 @@ fn strict_135_and_320_millisecond_server_boundaries_never_authorize_early_heavy(
     send(&mut too_late, GestureAction::Press, 1, 8, 0);
     assert_eq!(
         send(&mut too_late, GestureAction::Upgrade, 2, 8, 135),
-        (Disposition::Rejected, Command::None),
-        "light is already active at 135 server ms"
+        (Disposition::Accepted, Command::None),
+        "late physical upgrade is admitted as NO-COMBAT; Light cannot become Heavy at 135ms"
     );
 }
 #[test]

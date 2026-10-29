@@ -23,9 +23,9 @@ export function readM41ScalarWorldCue(state, baselineEventCount, expectedActorId
 }
 
 export async function dispatchM41ObservedParry({
-  sendAttack, awaitWorldCue, sendWheel, now = () => Date.now(),
+  sendAttack, awaitWorldCue, sendWheel, waitForReaction = async () => {}, now = () => Date.now(),
 }) {
-  if (![sendAttack, awaitWorldCue, sendWheel, now].every(fn => typeof fn === "function")) {
+  if (![sendAttack, awaitWorldCue, sendWheel, waitForReaction, now].every(fn => typeof fn === "function")) {
     throw new TypeError("M41 requires native click, observed World cue, wheel and clock callbacks");
   }
   // Read-only host chronology. Neither these timestamps nor native ACKs
@@ -46,8 +46,9 @@ export async function dispatchM41ObservedParry({
   let cue, wheel = {ok:true}, observationError;
   try {
     cue = await awaitWorldCue();
-    if (!cue) throw new Error("M41 missing fresh actor-bound World cue; no native wheel allowed");
+    if (!cue || cue?.timedOut === true) throw new Error("M41 missing fresh actor-bound World cue; no native wheel allowed");
     chronology.cueResolvedEpochMs = now();
+    await waitForReaction(cue);
     wheel = await Promise.resolve().then(() => {
       chronology.wheelIssuedEpochMs = now();
       return sendWheel();
@@ -64,6 +65,34 @@ export async function dispatchM41ObservedParry({
   return {cue, nativeClickAck:true, nativeWheelAck:true, chronology};
 }
 
+// Failure-only, read-only provenance of the *same* live browser observer.
+// Never authorize a wheel from this summary: a captured superseded cue is
+// diagnostic history, NOT a currently valid attack-windup admission.
+export function summarizeM41CueTimeout(state, baselineEventCount, expectedActorId, elapsedMs) {
+  const events = Array.isArray(state?.events) ? state.events : [];
+  const transitions = Array.isArray(state?.eventTransitions) ? state.eventTransitions : [];
+  const start = Math.max(Number.isInteger(baselineEventCount) ? baselineEventCount : 0,
+    events.length - 4);
+  const recentEvents = events.slice(start).map((event, offset) => {
+    const index = start + offset;
+    return {
+      index,
+      text: typeof event === "string" ? event.slice(0, 100) : "",
+      t: Number.isFinite(transitions[index]?.t) ? transitions[index].t : null,
+    };
+  });
+  const actorId = Number(state?.online?.match(/player #(\d+)/)?.[1]);
+  return {
+    timedOut: true,
+    expectedActorId,
+    observedActorId: Number.isSafeInteger(actorId) && actorId > 0 ? actorId : null,
+    baselineEventCount,
+    eventCount: events.length,
+    observerElapsedMs: Number.isFinite(elapsedMs) ? Math.round(elapsedMs) : null,
+    recentEvents,
+  };
+}
+
 // Native QA only: observe the identical production World cue inside its OWN
 // real browser instead of serializing many W3C execute/sync HTTP responses.
 // The returned cue still has to pass waitForM41WorldWindup actor/index/text
@@ -71,14 +100,18 @@ export async function dispatchM41ObservedParry({
 // keyboard/mouse, action writer or World authority is introduced.
 export function m41NativeAsyncCueScript() {
   return "const observe = " + readM41ScalarWorldCue.toString() + ";"
+    + "const timeoutEvidence = " + summarizeM41CueTimeout.toString() + ";"
     + "const [baseline, actorId, allowHeavy, timeoutMs] = arguments;"
     + "const done = arguments[arguments.length - 1];"
     + "const started = performance.now();"
     + "let poll;"
     + "const check = () => {"
-    + "const cue = observe(window.__MYASO_M30_UI__, baseline, actorId, allowHeavy);"
+    + "const state = window.__MYASO_M30_UI__;"
+    + "const cue = observe(state, baseline, actorId, allowHeavy);"
     + "if (cue || performance.now() - started >= timeoutMs) {"
-    + "clearInterval(poll);done(cue ?? null);"
+    + "clearInterval(poll);"
+    + "if (!cue) window.__MYASO_M41_LAST_TIMEOUT__ = timeoutEvidence(state, baseline, actorId, performance.now() - started);"
+    + "done(cue ?? null);"
     + "}};"
     + "poll = setInterval(check, 4);check();";
 }

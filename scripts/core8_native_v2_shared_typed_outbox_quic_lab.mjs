@@ -35,7 +35,7 @@ async function wd(method,path,body) {
   if(!response.ok||result.value?.error) throw Error(method+" "+path+" "+JSON.stringify(result).slice(0,500));
   return result.value;
 }
-function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback) {
+function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,heldUpgradeLoss,callback) {
   (async()=>{
     const hash=new Uint8Array(pin.match(/../g).map(x=>parseInt(x,16)));
     const wt=new WebTransport(endpoint,{serverCertificateHashes:[{algorithm:"sha-256",value:hash}]});
@@ -75,6 +75,7 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
       try {
         if(name==="down") event=q.begin(source,clientTick);
         else if(name==="up") event=q.release(source,clientTick);
+        else if(name==="upgrade") event=q.upgrade(clientTick);
         else throw Error("unsupported test input");
         const [packet]=q.nextSendBatch(1);
         if(!packet||packet.sequence!==event.sequence)
@@ -124,14 +125,33 @@ function initBrowser(endpoint,pin,moduleUrl,dropFirstPress,dropFirstAck,callback
       }
     })().catch(e=>lab.errors.push(String(e)));
     const canvas=document.querySelector("canvas");
+    let heldPointer=null;
     canvas.addEventListener("pointerdown",e=>{
       if(e.button!==0)return;
-      lab.events.push({name:"lmbDown",id:e.pointerId,ms:performance.now()});
+      const downAt=performance.now();
+      lab.events.push({name:"lmbDown",id:e.pointerId,ms:downAt,trusted:e.isTrusted});
       lab.offer("down",0);
+      if(heldUpgradeLoss) {
+        // Test-only physical-hold classifier. 48ms is illustrative, NOT
+        // an approved product timer. The original World alone grants Heavy.
+        heldPointer=e.pointerId;
+        const trusted=e.isTrusted;
+        setTimeout(()=>{
+          if(heldPointer!==e.pointerId)return;
+          const heldMs=performance.now()-downAt;
+          if(heldMs>=135) {
+            lab.errors.push("native held UPGRADE missed strict original 135ms Light");
+            return;
+          }
+          lab.events.push({name:"heldUpgrade",id:e.pointerId,ms:performance.now(),heldMs,trusted});
+          lab.offer("upgrade",0);
+        },48);
+      }
     });
     canvas.addEventListener("pointerup",e=>{
       if(e.button!==0)return;
-      lab.events.push({name:"lmbUp",id:e.pointerId,ms:performance.now()});
+      if(heldUpgradeLoss)heldPointer=null;
+      lab.events.push({name:"lmbUp",id:e.pointerId,ms:performance.now(),trusted:e.isTrusted});
       lab.offer("up",0);
     });
     document.addEventListener("keydown",e=>{
@@ -190,8 +210,10 @@ try {
   const boot=await wd("POST",base+"/execute/async",{
     script:"("+initBrowser.toString()+").apply(null,arguments)",args:[info.url,info.pin,
       "http://127.0.0.1:"+httpPort+"/src/network/prealpha-lmb-gesture-outbox-proposal.mjs",
-      process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1",
-      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1"],
+      (process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS === "1" ||
+       process.env.CORE8A_LAB_LOST_PRESS_EARLY_UPGRADE === "1"),
+      process.env.CORE8A_LAB_DROP_FIRST_ACK === "1",
+      process.env.CORE8A_LAB_LOST_PRESS_EARLY_UPGRADE === "1"],
   });
   assert(boot.ok,JSON.stringify(boot));
   // Synchronize the READ-ONLY original Rust 60Hz World flight observer.
@@ -207,6 +229,8 @@ try {
   });
   assert(originalIdle.witness,"actual server 60Hz Idle baseline is required");
   const heldKeyE = process.env.CORE8A_LAB_STANDALONE_KEYE_HELD === "1";
+  const upgradeLossTest = process.env.CORE8A_LAB_LOST_PRESS_EARLY_UPGRADE === "1";
+  assert(!upgradeLossTest || !heldKeyE,"loss and KeyE tests must be isolated");
   if(heldKeyE) {
     assert(process.env.CORE8A_LAB_DROP_FIRST_LMB_PRESS !== "1" &&
       process.env.CORE8A_LAB_DROP_FIRST_ACK !== "1",
@@ -275,6 +299,128 @@ try {
       physicalHeldEms:denied.events[1].ms-denied.events[0].ms,
       source0Only:accepted.sent,acks:accepted.acks,world:accepted.world,
     }));
+  } else if(upgradeLossTest) {
+    // Genuine WebDriver DOWN stays physically held while seq1 is lost and
+    // seq2 UPGRADE reaches original Rust QUIC BEFORE its predecessor.
+    await wd("POST",base+"/actions",{actions:[{
+      type:"pointer",id:"auth-shared-mouse",parameters:{pointerType:"mouse"},
+      actions:[{type:"pointerMove",origin:"viewport",x:120,y:120,duration:0},
+               {type:"pointerDown",button:0}],
+    }]});
+    const before=await poll("physical held early UPGRADE with lost PRESS",async()=>{
+      const state=await wd("POST",base+"/execute/sync",{
+        script:"return {events:window.lab.events,sent:window.lab.sent,dropped:window.lab.dropped,acks:window.lab.acks,errors:window.lab.errors,snapshot:window.lab.snapshot};",
+        args:[],
+      });
+      return {...state,ok:state.events?.some(e=>e.name==="heldUpgrade") ||
+        state.errors?.length>0};
+    });
+    assert.deepEqual(before.errors,[],"late browser sampler must not forge UPGRADE");
+    assert.deepEqual(before.events.map(e=>e.name),["lmbDown","heldUpgrade"]);
+    assert(before.events.every(e=>e.trusted),"real native W3C mouse required");
+    assert(before.events[1].heldMs<135,"unchanged precontact cutoff");
+    assert.deepEqual(before.sent.map(e=>[e.sequence,e.action,e.attempt]),
+      [[1,1,1],[2,2,1]],"same authentic Core8A outbox and lease");
+    assert.deepEqual(before.dropped,[{sequence:1,source:0,gestureId:1,attempt:1}]);
+    assert.deepEqual(before.acks,[],"server must withhold out-of-order seq2 ACK");
+    assert.equal(before.snapshot.pending,2);
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(output),
+      "no original World Light without delivered PRESS");
+    for(const sequence of [1,2]) {
+      const retry=await wd("POST",base+"/execute/async",{
+        script:"window.lab.resendOne().then(arguments[0],e=>arguments[0]({error:String(e)}));",
+        args:[],
+      });
+      assert.deepEqual(retry,{sequence,gestureId:1,source:0,attempt:2},
+        "identical original Core8A edges, ordered after loss");
+      await poll("authenticated accepted same-lease edge "+sequence,async()=>{
+        const ack=await wd("POST",base+"/execute/sync",{
+          script:"return window.lab.acks.find(a=>a.sequence===arguments[0])||null;",
+          args:[sequence],
+        });
+        return {ok:ack?.status===1,ack};
+      });
+    }
+    // Both genuine original QUIC receipts may be admitted under ONE World
+    // tick/lock. Tick-sampled M201_AUTH_ACTION can compress 0→1→9 to 0→9.
+    // Verify BOTH exact actor/lease-bound admission receipts, rather than
+    // demanding an intermediate frame that never existed.
+    await poll("original under-lock PRESS and precontact UPGRADE receipts",async()=>({
+      // Source receipts are the actor/gesture authority. One World tick
+      // may publish compressed 0→9, whereas adjacent ticks publish
+      // distinct 0→1 and 1→9; BOTH are real and strictly constrained.
+      ok:/M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 gesture=1 sequence=1 eventAction=1 status=1 from=0 to=1/.test(output) &&
+         /M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 gesture=1 sequence=2 eventAction=2 status=1 from=1 to=9/.test(output) &&
+         (/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=9/.test(output) ||
+          (/M201_AUTH_ACTION tick=\d+ fighter=1 from=0 to=1/.test(output) &&
+           /M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=9/.test(output)))
+    }));
+    await pause(390);
+    const held=await wd("POST",base+"/execute/sync",{
+      script:"return {events:window.lab.events,errors:window.lab.errors,snapshot:window.lab.snapshot};",
+      args:[],
+    });
+    assert.deepEqual(held.events.map(e=>e.name),["lmbDown","heldUpgrade"]);
+    assert.deepEqual(held.errors,[]);
+    assert.equal(held.snapshot.pending,0);
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(output),
+      "original World may not release heavy before authentic physical UP");
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=2/.test(output),
+      "no parallel LightActive after held precontact UPGRADE");
+    await wd("POST",base+"/actions",{actions:[{
+      type:"pointer",id:"auth-shared-mouse",parameters:{pointerType:"mouse"},
+      actions:[{type:"pointerUp",button:0}],
+    }]});
+    const accepted=await poll("one genuine original World Heavy after W3C UP",async()=>{
+      const state=await wd("POST",base+"/execute/sync",{
+        script:"return {events:window.lab.events,sent:window.lab.sent,acks:window.lab.acks,errors:window.lab.errors,settlements:window.lab.settlements,snapshot:window.lab.snapshot};",
+        args:[],
+      });
+      return {...state,ok:state.acks?.length===3&&state.snapshot?.pending===0&&
+        /M201_AUTH_ACTION tick=\d+ fighter=1 from=9 to=10/.test(output)};
+    });
+    assert.deepEqual(accepted.errors,[]);
+    assert.deepEqual(accepted.events.map(e=>e.name),["lmbDown","heldUpgrade","lmbUp"]);
+    assert(accepted.events.every(e=>e.trusted));
+    assert.equal(accepted.events[0].id,accepted.events[2].id);
+    assert(accepted.events[2].ms-accepted.events[0].ms>=320);
+    assert.deepEqual(accepted.sent.map(e=>[e.sequence,e.gestureId,e.source,e.action,e.attempt]),
+      [[1,1,0,1,1],[2,1,0,2,1],[1,1,0,1,2],[2,1,0,2,2],[3,1,0,3,1]]);
+    assert.deepEqual(accepted.acks.map(a=>[a.sequence,a.gestureId,a.source,a.status]),
+      [[1,1,0,1],[2,1,0,1],[3,1,0,1]]);
+    assert(accepted.settlements.every(a=>a.transportSettled&&!a.combatCommitted));
+    assert.equal(accepted.snapshot.closed,false);
+    assert.deepEqual(accepted.snapshot.activeSources,[]);
+    for(const [from,to,sequence] of [[0,1,1],[1,9,2]]) {
+      const count=output.split("\n").filter(line=>
+        line.includes("M201_AUTH_GESTURE_ACTION") &&
+        line.includes(" fighter=1 source=0 gesture=1 sequence="+sequence+" ") &&
+        line.includes(" status=1 from="+from+" to="+to)).length;
+      assert.equal(count,1,"one real under-lock World admission receipt "+from+"→"+to);
+    }
+    const worldLines=output.split("\n").filter(line=>line.includes("M201_AUTH_ACTION") &&
+      line.includes(" fighter=1 "));
+    const count=(from,to)=>worldLines.filter(line=>
+      line.includes(" fighter=1 from="+from+" to="+to)).length;
+    // Exactly one of the true 60Hz observation shapes is admissible:
+    // same-tick compressed 0→9 OR adjacent-tick 0→1→9. Neither skips
+    // the required authenticated same-gesture receipts above.
+    const compressed=count(0,9)===1&&count(0,1)===0&&count(1,9)===0;
+    const adjacent=count(0,9)===0&&count(0,1)===1&&count(1,9)===1;
+    assert(compressed||adjacent,"original World observer must match one exact admission chronology");
+    assert.equal(output.split("\n").filter(line=>
+      line.includes("M201_AUTH_ACTION") &&
+      line.includes(" fighter=1 from=9 to=10")).length,1,
+      "genuine physical release commits one original World heavy");
+    assert(!/M201_AUTH_ACTION tick=\d+ fighter=1 from=1 to=2/.test(output));
+    assert(!/M201_AUTH_HIT tick=\d+ attacker=1/.test(output),
+      "one real actor has no target; cannot invent Heavy damage");
+    console.log("CORE8_NATIVE_ONE_SHARED_OUTBOX_LOST_PRESS_EARLY_UPGRADE_PASS",
+      JSON.stringify({genuineW3C:true,originalQUIC:true,originalWorld:true,
+        illustrativeHoldMs:accepted.events[1].heldMs,
+        physicalHoldMs:accepted.events[2].ms-accepted.events[0].ms,
+        dropped:before.dropped,sent:accepted.sent,acks:accepted.acks,
+        snapshot:accepted.snapshot}));
   } else {
   // One native W3C schedule: physical source0 LMB remains the ONLY Combat edge.
   // Trusted KeyE down/up DURING light windup must leave queue and World untouched.

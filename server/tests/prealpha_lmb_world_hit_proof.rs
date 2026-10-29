@@ -222,7 +222,12 @@ fn cancelled_heavy_ready_and_late_upgrade_cannot_hit_original_target_twice() {
         client_tick: 0,
     };
     let decision = late.reducer.process(LEASE, e, late.ms());
-    assert_eq!(decision.disposition, Disposition::Rejected);
+    assert_eq!(decision.disposition, Disposition::Accepted);
+    assert_eq!(
+        decision.command,
+        Command::None,
+        "late upgrade cannot authorize a heavy or second hit"
+    );
     late.ticks(60);
     assert_eq!(late.hits, vec![(34, 66)]);
 }
