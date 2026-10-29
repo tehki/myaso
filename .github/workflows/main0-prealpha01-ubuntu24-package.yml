@@ -1,0 +1,104 @@
+name: Main0 Pre-Alpha exact-source Ubuntu 24.04 package (NONRELEASE)
+
+on:
+  pull_request:
+    branches:
+      - review/main0-prealpha01-rc-7e2955c-20261029
+    paths:
+      - ".github/workflows/main0-prealpha01-ubuntu24-package.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-source-package:
+    # Package only the previously accepted, immutable game source. No deployment.
+    if: ${{ github.event.pull_request.head.ref == 'codex/main0-prealpha01-ubuntu24-package-20261029' && github.event.pull_request.base.sha == '7e2955c7227f142bcfb13e1f03c0bada3864719f' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SOURCE_SHA: 7e2955c7227f142bcfb13e1f03c0bada3864719f
+      SOURCE_TREE: 04fea76a91555341598648a16450dbeca10ccf90
+    steps:
+      - name: Checkout immutable game candidate (not the packaging PR)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact source and release target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          test "$(getconf GNU_LIBC_VERSION)" = "glibc 2.39"
+          test "$(uname -m)" = "x86_64"
+          rustc --version
+          cargo --version
+
+      - name: Revalidate launcher and build authoritative Rust release
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/r0-alpha-config.test.mjs
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server r0_player_cap_tests
+          cargo build --locked --release --manifest-path server/Cargo.toml --bin myaso-server
+
+      - name: Verify Ubuntu 24.04 ELF compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x server/target/release/myaso-server
+          ldd server/target/release/myaso-server | tee /tmp/myaso-ldd.txt
+          ! grep -q 'not found' /tmp/myaso-ldd.txt
+          python3 - <<'PY'
+          import re
+          import subprocess
+          binary = "server/target/release/myaso-server"
+          symbols = subprocess.check_output(["objdump", "-T", binary], text=True)
+          versions = [tuple(map(int, m)) for m in re.findall(r"GLIBC_(\d+)\.(\d+)", symbols)]
+          assert versions, "ELF does not expose the expected glibc symbol version information"
+          newest = max(versions)
+          print(f"GLIBC_MAX_REQUIRED={newest[0]}.{newest[1]}")
+          assert newest <= (2, 39), "newer glibc than target Ubuntu 24.04"
+          PY
+
+      - name: Produce immutable browser+server release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/bin out/public
+          install -m 0755 server/target/release/myaso-server out/bin/myaso-server
+          cp -a web out/public/web
+          cp -a src out/public/src
+          cp -a ops out/ops
+          printf '%s\n' "$SOURCE_SHA" > out/REVISION
+          (cd out && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          tar -C out -czf "myaso-prealpha01-${SOURCE_SHA}-ubuntu24-amd64.tar.gz" .
+          sha256sum "myaso-prealpha01-${SOURCE_SHA}-ubuntu24-amd64.tar.gz" > "myaso-prealpha01-${SOURCE_SHA}-ubuntu24-amd64.tar.gz.sha256"
+
+      - name: Verify entire extracted archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c "myaso-prealpha01-${SOURCE_SHA}-ubuntu24-amd64.tar.gz.sha256"
+          mkdir verified-package
+          tar -C verified-package -xzf "myaso-prealpha01-${SOURCE_SHA}-ubuntu24-amd64.tar.gz"
+          test "$(cat verified-package/REVISION)" = "$SOURCE_SHA"
+          (cd verified-package && sha256sum -c SHA256SUMS)
+          test -x verified-package/bin/myaso-server
+          test -f verified-package/public/web/online-game.mjs
+          test -f verified-package/public/src/network/chat-codec.mjs
+          ldd verified-package/bin/myaso-server | tee /tmp/myaso-extracted-ldd.txt
+          ! grep -q 'not found' /tmp/myaso-extracted-ldd.txt
+
+      - name: Upload review-only artifact (never deploy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: myaso-prealpha01-ubuntu24-review-${{ env.SOURCE_SHA }}
+          path: |
+            myaso-prealpha01-*.tar.gz
+            myaso-prealpha01-*.tar.gz.sha256
+          retention-days: 14
+          if-no-files-found: error
