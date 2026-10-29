@@ -2,6 +2,7 @@
 // The approved Core bridge opens opt-in reliable streams on the existing
 // authenticated WebTransport game session; it never owns combat datagrams.
 import { installLocalChat } from "./local-chat.mjs";
+import { createOverheadChatBubbles } from "./chat-c1-overheads.mjs";
 import { openLocalChatUiBridge } from "../network/local-chat-ui-bridge.mjs";
 
 export function isChatC1PreviewEligible(location) {
@@ -25,32 +26,49 @@ export function isChatC1Eligible(location) {
 
 export async function activateChatC1Preview({
   doc, location, gameClient, openBridge = openLocalChatUiBridge,
+  onBubblesReady = () => {},
 } = {}) {
   if (!isChatC1Eligible(location)) return null;
   // A URL flag alone cannot create a misleading, unconnected Chat UI.
   // Verify the real existing WebTransport chat stream before mounting controls.
   if (gameClient?.transport?.kind !== "webtransport") return null;
   let panel = null;
+  let overheads = null;
   try {
     const adapter = await openBridge(gameClient.transport, {
-      onDisconnect() { panel?.bindAdapter(null); },
+      onDisconnect() {
+        panel?.bindAdapter(null);
+        overheads?.clear();
+        onBubblesReady(null);
+      },
     });
     if (!adapter?.ready) {
       await adapter?.close?.();
       return null;
     }
-    panel = installLocalChat(doc, { online: true });
+    overheads = createOverheadChatBubbles({ doc });
+    panel = installLocalChat(doc, {
+      online: true,
+      onMessage: event => overheads.received(event),
+      onAccepted: text => overheads.acceptedOwn(gameClient.playerNetId, text),
+    });
     if (!panel || panel.root.isConnected === false) {
+      overheads.dispose();
       await adapter.close();
       return null;
     }
     panel.bindAdapter(adapter);
+    onBubblesReady(overheads);
     doc.defaultView?.addEventListener?.("pagehide", () => {
       panel.bindAdapter(null);
+      overheads.dispose();
+      onBubblesReady(null);
       void adapter.close();
     }, { once: true });
     return adapter;
   } catch {
+    overheads?.dispose();
+    onBubblesReady(null);
     panel?.bindAdapter(null);
     if (panel) panel.status.textContent = "Chat disconnected — gameplay remains connected.";
     return null;

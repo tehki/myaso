@@ -52,7 +52,11 @@ function element(doc, tag, className, label) {
   return node;
 }
 
-export function installLocalChat(doc, { online = false, adapter = null, idFactory = () => globalThis.crypto?.randomUUID?.() } = {}) {
+export function installLocalChat(doc, {
+  online = false, adapter = null,
+  idFactory = () => globalThis.crypto?.randomUUID?.(),
+  onMessage = () => {}, onAccepted = () => {},
+} = {}) {
   if (INSTANCES.has(doc)) {
     const existing = INSTANCES.get(doc);
     if (adapter) existing.bindAdapter(adapter);
@@ -165,6 +169,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (disposed || !store.push(event)) return false;
     const name = event.channel === "system" ? "System" : event.sender.displayName.slice(0, 64);
     messageRow(event.channel, name, event.text);
+    // This fires solely for a validated, deduplicated real server message.
+    try { onMessage(event); } catch { /* Presentation cannot interrupt Chat. */ }
     if (root.dataset.open !== "true") {
       unreadCount = Math.min(99, unreadCount + 1);
       unread.hidden = false;
@@ -215,6 +221,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       item.dataset.delivery = "accepted";
       stateLabel.textContent = "Accepted";
       status.textContent = "Server accepted message; recipient delivery not confirmed.";
+      // Never display the speaking Knight before the matching server ACK.
+      try { onAccepted(text); } catch { /* Presentation cannot alter ACK. */ }
       return true;
     } catch {
       item.dataset.delivery = "failed";

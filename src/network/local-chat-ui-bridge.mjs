@@ -60,7 +60,10 @@ export async function openLocalChatUiBridge(gameConnection, {
     const message = Object.freeze({
       channel: "local",
       serverMessageId: localSessionTag + event.messageId.toString(),
-      sender: Object.freeze({ displayName: "Player #" + event.senderId }),
+      sender: Object.freeze({
+        netId: event.senderId, // Original authenticated ChatReceived senderId.
+        displayName: "Player #" + event.senderId,
+      }),
       text: event.text,
     });
     for (const listener of listeners) {
