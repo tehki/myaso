@@ -35,7 +35,7 @@ test("C1B integration requires existing game connection, no second WebSocket or 
   const src = readFileSync(new URL("../src/browser/chat-c1-activation.mjs", import.meta.url), "utf8");
   const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
   assert.match(src, /gameClient\?\.transport\?\.kind !== "webtransport"/);
-  assert.match(src, /onDisconnect\(\) \{ panel.bindAdapter\(null\); \}/);
+  assert.ok(src.includes("onDisconnect() { panel?.bindAdapter(null); }"));
   assert.match(src, /adapter\.close\(\)/);
   assert.match(online, /void import\("\.\.\/src\/browser\/chat-c1-activation\.mjs"\)/);
   assert.match(online, /gameClient: networkClient/);

@@ -77,6 +77,8 @@ test("C1 bootstrap and real-client focus cleanup remain explicit", () => {
     assert.match(src, /canvas\.addEventListener\("blur", releaseInputs\)/);
     assert.match(src, /canvas\.addEventListener\("keydown",/);
   }
-  assert.ok(boot.indexOf("installLocalChat(document") < boot.indexOf('await import("./online-game.mjs")'));
-  assert.ok(boot.includes('online: params.has("server")'));
+  const online = readFileSync(new URL("../web/online-game.mjs", import.meta.url), "utf8");
+  assert.match(online, /void import\("\.\.\/src\/browser\/chat-c1-activation\.mjs"\)/);
+  assert.match(online, /activateChatC1Preview/);
+  assert.doesNotMatch(boot, /installLocalChat\(document/);
 });
