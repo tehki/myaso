@@ -38,6 +38,8 @@ test("real server result is required for UI accepted state; trusted sender ID dr
   assert.deepEqual(f.wire.calls, [{correlation: 1, channel: 1, text: "Привет 🌕"}]);
   f.wire.receive(42, 18n, "<img onerror=alert(1)>");
   assert.equal(seen[0].sender.displayName, "Player #42");
+  assert.equal(seen[0].sender.netId, 42,
+    "overhead target must originate in the authenticated binary senderId, never in a display name");
   assert.equal(seen[0].channel, "local");
   assert.equal(seen[0].text, "<img onerror=alert(1)>");
   assert.equal(seen[0].serverMessageId.endsWith("-18"), true);

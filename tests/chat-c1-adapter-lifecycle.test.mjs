@@ -143,3 +143,56 @@ test("C1 pending composer Escape returns to canvas and dispose invalidates ACK",
   await Promise.resolve();
   assert.equal(c.history.lastElementChild.dataset.delivery, "failed");
 });
+
+test("C1 overhead callbacks require authenticated inbound or matching server ACK, never an optimistic send", async () => {
+  const { doc } = fakeDocument();
+  const seen = [], accepted = [];
+  const c = installLocalChat(doc, {
+    online:true, idFactory:()=> "genuine-id",
+    onMessage: event => seen.push(event),
+    onAccepted: text => accepted.push(text),
+  });
+  let resolveAck;
+  c.bindAdapter({
+    ready:true,
+    subscribe(fn) {
+      this.inbound=fn;
+      return ()=>{};
+    },
+    send() {return new Promise(resolve=>{resolveAck=resolve;});},
+  });
+  assert.equal(c.receive({channel:"local",serverMessageId:"server-7",
+    sender:{netId:7,displayName:"Player #7"},text:"Anvil ready!"}),true);
+  assert.equal(seen.length,1);
+  assert.equal(seen[0].sender.netId,7);
+  assert.equal(c.receive({channel:"local",serverMessageId:"server-7",
+    sender:{netId:7,displayName:"Player #7"},text:"Duplicate"}),false);
+  assert.equal(seen.length,1,"no duplicated overhead for one authenticated message ID");
+  c.input.value="To the forge";
+  const sending=c.submit();
+  await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(accepted,[],"no overhead while sent message is awaiting the server");
+  resolveAck({ok:true,clientMessageId:"genuine-id"});
+  assert.equal(await sending,true);
+  assert.deepEqual(accepted,["To the forge"],"only real matching ACK causes speaker bubble");
+  c.dispose();
+});
+
+test("C1 late ACK after disconnect cannot create an orphan speaking bubble", async () => {
+  const { doc }=fakeDocument();
+  const accepted=[];
+  const c=installLocalChat(doc,{online:true,idFactory:()=> "once",
+    onAccepted:text=>accepted.push(text)});
+  let accept;
+  c.bindAdapter({ready:true,send:()=>new Promise(resolve=>{accept=resolve}),
+    subscribe:()=>()=>{}});
+  c.input.value="Hello";
+  const task=c.submit();
+  await Promise.resolve();await Promise.resolve();
+  c.bindAdapter(null);
+  assert.equal(await task,false);
+  accept({ok:true,clientMessageId:"once"});
+  await Promise.resolve();
+  assert.deepEqual(accepted,[]);
+  c.dispose();
+});
