@@ -264,6 +264,26 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (interrupted) status.textContent = "Connection changed — previous message not confirmed.";
   }
 
+  // Chat owns arena gestures for as long as its composer has focus.
+  // Intercept at Window CAPTURE before canvas pointerdown can focus itself,
+  // charge LMB, kick, or reach the window pointerUP fallback. No Combat
+  // packet/path changes; existing canvas blur retires held inputs on Enter.
+  function fenceChatPhysicalEvent(event) {
+    if (root.dataset.open !== "true" || doc.activeElement !== input
+      || (event.target !== canvas && !canvas.contains?.(event.target))) return;
+    if (event.cancelable !== false) event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  const fencedEvents = [
+    "pointerdown", "pointerup", "pointercancel", "lostpointercapture",
+    "mousedown", "mouseup", "click", "auxclick", "contextmenu", "wheel",
+  ];
+  const captureOptions = { capture: true, passive: false };
+  for (const type of fencedEvents) {
+    doc.defaultView?.addEventListener(type, fenceChatPhysicalEvent, captureOptions);
+    canvas.addEventListener(type, fenceChatPhysicalEvent, captureOptions);
+  }
+
   function onArenaKey(event) {
     if (event.key !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
     event.preventDefault();
@@ -271,7 +291,8 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     setExpanded(true, true);
   }
   function onComposerKey(event) {
-    if (event.key === "Escape") {
+    event.stopPropagation(); // W/E/Space must stay text, not game input.
+    if (event.key === "Escape" && !event.isComposing) {
       event.preventDefault();
       event.stopPropagation();
       input.value = "";
@@ -307,6 +328,10 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       observer?.disconnect();
       unsubscribe?.();
       canvas.removeEventListener("keydown", onArenaKey, true);
+      for (const type of fencedEvents) {
+        doc.defaultView?.removeEventListener(type, fenceChatPhysicalEvent, captureOptions);
+        canvas.removeEventListener(type, fenceChatPhysicalEvent, captureOptions);
+      }
       input.removeEventListener("keydown", onComposerKey);
       form.removeEventListener("submit", onSubmit);
       toggle.removeEventListener("click", onToggle);
