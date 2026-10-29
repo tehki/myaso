@@ -14,14 +14,15 @@
 - Client send: length-prefixed `[0x31, version=1, channel=local(1), correlation:u32LE, textBytes:u16LE, UTF8]`.
 - Server result: length-prefixed `[0x33, version=1, correlation:u32LE, status:u8, messageId:u64LE]`. An accepted result means **server acceptance**, NOT confirmed delivery/read.
 - Server receive: length-prefixed `[0x32, version=1, channel=1, messageId:u64LE, senderId:u32LE, tick:u32LE, textBytes:u16LE, UTF8]`.
-- Core 8C: all recipient identities, positions and same-World radius come from server World state; initial radius **160 world units**, operator range 32–512. No global chat, DMs, accounts, guilds, NPC or persistent transcripts.
+- Core 8C: all recipient identities, positions and same-World radius come from server World state; initial radius **160 world units**, operator range 32–160. No global chat, DMs, accounts, guilds, NPC or persistent transcripts.
 - Invalid UTF-8, empty/oversized text (**240 UTF-8 bytes maximum**), control/bidi injection, malformed framing or correlation replay are rejected. Per-session token bucket burst 4, refill every 600ms; ingress capped at 64 frames/s; eight-slot outbound queue; no user text in error logs. Slow chat cannot block Combat.
+- UI10: capture-phase pointer/mouse/wheel/aux/context guards prevent real arena Combat input while the chat composer is focused; independently discovered initial 4D failure retained as historical first-red. Current on-machine re-run of the exact same native QA script passed, but independent 4D must retest new SHA.
 - UI10: small lower-left panel, escaped text rendering, bounded 60 message history, server-assigned labels only, Enter composer/open/send, Escape cancel/return focus, gameplay input released on canvas blur. No optimistic “delivered” claims.
 - 4D: independent tests of the exact combined SHA: two/four real clients, near/far, spoofing, malformed, rejoin, focus, Combat unchanged, security, browser engines, and rollback/release evidence. Results must distinguish local browser proofs from independent two-physical-machine/WAN tests.
 
 ## Two separate production gates
 
-1. **Rust:** `MYASO_CHAT_C1_ENABLED=1` explicitly set by the production operator. Absent/0 is OFF, unexpected values fail closed. `MYASO_CHAT_RADIUS` is finite within 32–512.
+1. **Rust:** `MYASO_CHAT_C1_ENABLED=1` explicitly set by the production operator. Absent/0 is OFF, unexpected values fail closed. `MYASO_CHAT_RADIUS` is finite within 32–160.
 2. **Public browser:** first-party operator-served `/game-config.json` must contain `chatC1Enabled:true` AND match the existing pinned `serverUrl` and `certificateSha256` on the current URL. URL query `chatC1=1` **alone is not sufficient**. Default first-party config writer emits no chat flag. Nonproduction `chatC1Preview=1` is exclusively localhost HTTP and does not bypass the Rust flag.
 
 **V2 stream compatibility boundary:** the original experimental V2 gesture listener and chat ingress both consume optional incoming uni streams. Until 8A proves a shared multiplexer, server startup with BOTH V2 and Chat C1 enabled **fails closed** rather than allowing either stream to be misclassified. Public Pre-Alpha V2 remains OFF; this does not affect ordinary Combat.

@@ -264,6 +264,23 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     if (interrupted) status.textContent = "Connection changed — previous message not confirmed.";
   }
 
+  // P0 independent Combat4D real native first-red: when the chat input is
+  // focused a physical W3C canvas click must never steal composer focus or
+  // reach the Combat charge/roll/parry listeners (including window fallback).
+  // Install capture listeners before keyboard handler, and remove on dispose.
+  function suppressArenaInputWhileComposing(event) {
+    if (root.dataset.open !== "true" || doc.activeElement !== input) return;
+    if (event.cancelable !== false) event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  const suppressedArenaEvents = [
+    "pointerdown", "pointerup", "mousedown", "mouseup",
+    "wheel", "contextmenu", "auxclick",
+  ];
+  for (const type of suppressedArenaEvents) {
+    canvas.addEventListener(type, suppressArenaInputWhileComposing, true);
+  }
+
   function onArenaKey(event) {
     if (event.key !== "Enter" || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isReady()) return;
     event.preventDefault();
@@ -271,7 +288,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
     setExpanded(true, true);
   }
   function onComposerKey(event) {
-    if (event.key === "Escape") {
+    // Input elements own ALL typing; no key event may bubble to Combat.
+    event.stopPropagation();
+    if (event.key === "Escape" && !event.isComposing) {
       event.preventDefault();
       event.stopPropagation();
       input.value = "";
@@ -307,6 +326,9 @@ export function installLocalChat(doc, { online = false, adapter = null, idFactor
       observer?.disconnect();
       unsubscribe?.();
       canvas.removeEventListener("keydown", onArenaKey, true);
+      for (const type of suppressedArenaEvents) {
+        canvas.removeEventListener(type, suppressArenaInputWhileComposing, true);
+      }
       input.removeEventListener("keydown", onComposerKey);
       form.removeEventListener("submit", onSubmit);
       toggle.removeEventListener("click", onToggle);
