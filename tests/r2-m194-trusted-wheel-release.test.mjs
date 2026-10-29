@@ -87,7 +87,7 @@ test("M194 mode is confined to its genuine guard-break scenario and preserves st
   const runner = readFileSync(new URL("../scripts/pvp_browser_flight_runner.mjs", import.meta.url), "utf8");
   const section = runner.slice(runner.indexOf("async function runOnlineUiGuardBreakFlight("),
     runner.indexOf("async function waitForUiGuardBreakEvidence("));
-  assert.match(section, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
+  assert.match(section, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly \|\| m40ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.match(section, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
   assert.match(section, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(section, /M193 guard-break exchange/);
@@ -179,8 +179,8 @@ test("M194 and M151 use native release-anchored genuine wheel; M152 remains whee
   assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
   assert.match(runner, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak"/);
   assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
-  assert.match(runner, /postTrustedWheelMs: \(m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 25 : 0/);
-  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
+  assert.match(runner, /postTrustedWheelMs: \(m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly \|\| m40ReleaseAnchoredGuardOnly\) \? 25 : 0/);
+  assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly \|\| m40ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
   assert.equal(COMBAT.attack.guardDamage, 38);
