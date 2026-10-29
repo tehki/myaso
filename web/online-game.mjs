@@ -714,6 +714,14 @@ function recordAcceptanceState(state, ownId) {
   acceptance.playerNetId = ownId;
   acceptance.focusNetId = focusNetId;
   acceptance.serverTick = networkClient?.latestServerTick ?? 0;
+  if (acceptanceScenario === "uimultiknockdownffa") {
+    acceptance.knockdownSnapshots ??= [];
+    acceptance.knockdownSnapshots.push({
+      serverTick: acceptance.serverTick, epochMs: Date.now(), focusNetId,
+      actors: [...state.values()].map(({netId, action}) => ({netId, action})),
+    });
+    if (acceptance.knockdownSnapshots.length > 120) acceptance.knockdownSnapshots.shift();
+  }
   if (acceptanceScenario === "uimultirecoveryspatial") {
     acceptance.m233RecoveryHandoff ??= [];
     recordM233RecoveryHandoff(acceptance.m233RecoveryHandoff, {
