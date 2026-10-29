@@ -1,0 +1,58 @@
+name: Graphics 3 P1 authentic Greyhaven Red Lion four-browser review (NONRELEASE)
+
+on:
+  pull_request:
+    paths:
+      - "web/online-game.mjs"
+      - "src/browser/red-lion-live-art.mjs"
+      - "src/browser/authored-world-renderer.mjs"
+      - "src/browser/greyhaven-*.mjs"
+      - "src/world/authored-maps.mjs"
+      - "src/world/building-presentation.mjs"
+      - "assets/environment/greyhaven/a232-review/**"
+      - "tests/graphics3-p1-*.test.mjs"
+      - "tools/art/graphics3_greyhaven_redlion_four_native.mjs"
+      - ".github/workflows/graphics3-p1-greyhaven-four-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authentic-greyhaven-redlion-four-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      MYASO_GRAPHICS3_NATIVE_BROWSERS: chrome,firefox,chrome,firefox
+      MYASO_GRAPHICS3_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_KNIGHTS_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate exact checkout, original Blender source and opt-in World9 contract
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MYASO_GRAPHICS3_SOURCE_SHA"
+          node --check web/online-game.mjs
+          node --check tools/art/graphics3_greyhaven_redlion_four_native.mjs
+          node --test tests/graphics3-p1-greyhaven-preview-integration.test.mjs tests/graphics3-p1-redlion-source-optin.test.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Compile exact-source authoritative Rust WebTransport server
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Four real Chrome Firefox players, original Silver, source-authentic dusk Red Lion and connected Chat C1
+        run: timeout --signal=TERM --kill-after=5s 300s node tools/art/graphics3_greyhaven_redlion_four_native.mjs
+      - name: Preserve first-party native PNG evidence, frame intervals and exact source SHA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3-p1-greyhaven-redlion-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/graphics3-greyhaven-redlion-native/
+          if-no-files-found: warn
+          retention-days: 7
