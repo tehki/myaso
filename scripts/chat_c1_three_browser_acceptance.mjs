@@ -237,7 +237,7 @@ try {
  // Keep gameplay datagram ACK telemetry moving while the optional reliable
  // chat streams are connected. This is not full combat-under-chat acceptance.
  const ackSamples=async session=>evaljs(session,
-   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\d+)/);const e=document.querySelector('#event-text')?.textContent||'';const tick=e.match(/server tick ([0-9]+)/);return {ok:!!n&&!!tick,samples:n?Number(n[1]):0,serverTick:tick?Number(tick[1]):null,diagnostics:t,eventText:e};");
+   "const t=document.querySelector('#network-diagnostics')?.textContent||'';const n=t.match(/Samples (\\d+)/);const e=document.querySelector('#event-text')?.textContent||'';const tick=e.match(/server tick ([0-9]+)/);return {ok:!!n&&!!tick,samples:n?Number(n[1]):0,serverTick:tick?Number(tick[1]):null,diagnostics:t,eventText:e};");
  const before=await poll("gameplay ACK diagnostics before movement",()=>ackSamples(a));
  await evaljs(a,"document.querySelector('#arena').focus();");
  await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"movement",actions:[{type:"keyDown",value:"w"}]}]});
