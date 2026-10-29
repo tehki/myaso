@@ -11,7 +11,7 @@ on:
       - "src/network/local-chat-ui-bridge.mjs"
       - "tests/chat-codec.test.mjs"
       - "tests/local-chat-ui-bridge.test.mjs"
-      - "docs/CORE_CHAT_C1_LOCAL_PROTOCOL.md"
+      - "docs/PREALPHA_01_CHAT_C1_RELEASE.md"
       - ".github/workflows/chat-c1.yml"
   push:
     branches: [main]
@@ -46,10 +46,10 @@ jobs:
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
       - name: Real Rust WebTransport 3-client acceptance
         run: cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer -- --nocapture
-      - name: Server chat parser, routing and rate-limit tests
+      - name: Server chat parser, rate-limit and original QUIC input coexistence
         run: |
           cargo test --locked --manifest-path server/Cargo.toml --lib chat::
-          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server chat_ingress_budget_tests::
+          cargo test --locked --manifest-path server/Cargo.toml --test local_chat_multiplayer repeated_chat_submissions_do_not_starve_authoritative_game_input_ack -- --exact --nocapture
       - name: Browser transport and binary codec contract
         run: |
           node --check src/network/chat-codec.mjs
