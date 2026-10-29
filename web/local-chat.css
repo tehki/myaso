@@ -65,3 +65,10 @@
   .local-chat-heading, .local-chat-sender { color: CanvasText; }
   .local-chat :is(button, input):focus-visible { outline-color: Highlight; }
 }
+
+/* Keep the input and status available within short in-game viewports. */
+.local-chat[data-open="true"] { display:flex; flex-direction:column; overflow:hidden; }
+.local-chat[data-open="true"] .local-chat-toggle { flex:0 0 auto; }
+.local-chat[data-open="true"] .local-chat-body { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.local-chat-history { flex:1 1 auto; min-height:0; }
+.local-chat-form, .local-chat-status { flex:0 0 auto; }

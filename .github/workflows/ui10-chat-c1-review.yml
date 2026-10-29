@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "src/browser/chat-c1-activation.mjs"
+      - "scripts/ui10_chat_c1_visual_acceptance.mjs"
+      - "tests/fixtures/chat-c1-hud-visual.html"
       - "src/browser/local-chat.mjs"
       - "src/network/chat-codec.mjs"
       - "src/network/local-chat-ui-bridge.mjs"
@@ -25,3 +27,12 @@ jobs:
           node --check src/browser/local-chat.mjs
           node --check src/browser/chat-c1-activation.mjs
           node --test tests/chat-c1-combat-input-isolation.test.mjs tests/chat-c1-adapter-lifecycle.test.mjs tests/chat-c1-core-preview.test.mjs tests/chat-c1-foundation.test.mjs tests/local-chat-ui-bridge.test.mjs tests/chat-codec.test.mjs
+      - name: Native Chrome and Firefox layout, keyboard and mouse acceptance (UI-only)
+        run: node scripts/ui10_chat_c1_visual_acceptance.mjs
+      - name: Retain labeled UI-only 960x540 and narrow screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui10-chat-c1-layout-preview
+          path: artifacts/ui10-chat-c1/*.png
+          if-no-files-found: ignore
