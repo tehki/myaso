@@ -5278,8 +5278,7 @@ async function runOnlineUiMultiKnockdownFfaFlight(entries) {
     // handoff. Never set a focus label or modify either victim's state.
     if (!nativeRetreat && firstKnockdown && secondKnockdown
       && firstCurrentAction === COMBAT_ACTION.knockdown
-      && secondCurrentAction === COMBAT_ACTION.knockdown
-      && rollerActions.at(-1)?.action === COMBAT_ACTION.dodgeRecovery) {
+      && secondCurrentAction === COMBAT_ACTION.knockdown) {
       nativeRetreat = true;
       await pulseMovementKeyBoundedW3c(roller, rollRight ? "a" : "d", 250);
       continue;
