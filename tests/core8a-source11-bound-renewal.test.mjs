@@ -197,3 +197,63 @@ test("Source11 second incarnation keeps 3 distinct leases; old bidi and datagram
   assert.equal(client.transport.closed,false,"valid new incarnation survives old ACK replays");
   client.close("complete two generations");
 }));
+
+// The handshake timeout is a total startup bound, not only a grant-receipt
+// timer. An indefinitely backpressured QUIC OPEN or HELLO must not strand
+// the player's typed producer or keep its old generation active.
+async function boundedAttempt(promise) {
+  let guard;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_,reject)=>{guard=setTimeout(()=>reject(
+        new Error("Source11 handshake improperly exceeded total startup deadline")
+      ),400);}),
+    ]);
+  } finally { clearTimeout(guard); }
+}
+
+test("Source11 fresh bidi OPEN is bounded before any HELLO/GRANT, with no fabricated fresh lease",()=>fixture(async()=>{
+  const conn=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await conn.negotiateExperimentalGestureV2({reliableStream:true});
+  conn.onGestureRenewalRequired=()=>{};
+  let finishLateOpen,aborted=false,cancelled=false;
+  conn.transport.createBidirectionalStream=()=>new Promise(resolve=>{finishLateOpen=resolve;});
+  await assert.rejects(boundedAttempt(conn.negotiateRespawnTypedChannel({timeoutMs:100})),/bound.*timeout/i);
+  // WebTransport may finish opening AFTER cancellation of the caller.
+  // This late resource must be reset and must never acquire a new JS lease.
+  finishLateOpen({
+    writable:{getWriter:()=>({abort:()=>{aborted=true;return Promise.resolve();}})},
+    readable:{cancel:()=>{cancelled=true;return Promise.resolve();}},
+  });
+  await eventually(()=>aborted&&cancelled);
+  assert.equal(conn.typedGeneration,0);
+  assert.equal(conn.typedLeaseToken,conn);
+  assert.equal(conn.closed,false,"failed optional stream must not imply successful grant");
+  conn.close();
+}));
+
+test("Source11 blocked HELLO write is bounded and aborted, not treated as bound GRANT",()=>fixture(async()=>{
+  const conn=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await conn.negotiateExperimentalGestureV2({reliableStream:true});
+  conn.onGestureRenewalRequired=()=>{};
+  let aborted=false;
+  const original=conn.transport.createBidirectionalStream.bind(conn.transport);
+  conn.transport.createBidirectionalStream=async()=>{
+    const stream=await original();
+    return {
+      readable:stream.readable,
+      writable:{getWriter:()=>({
+        ready:Promise.resolve(),
+        write:()=>new Promise(()=>{}),
+        abort:()=>{aborted=true;return Promise.resolve();},
+        close:()=>Promise.resolve(),
+      })},
+    };
+  };
+  await assert.rejects(boundedAttempt(conn.negotiateRespawnTypedChannel({timeoutMs:100})),/bound.*timeout/i);
+  assert.equal(aborted,true,"cancel stalled HELLO writer of refused generation");
+  assert.equal(conn.typedGeneration,0);
+  assert.equal(conn.typedLeaseToken,conn);
+  conn.close();
+}));

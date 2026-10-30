@@ -123,34 +123,56 @@ class WebTransportGameConnection {
     }
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000)
       throw new RangeError("bounded Source11 grant deadline required");
-    const stream = await this.transport.createBidirectionalStream();
-    const writer = stream.writable.getWriter();
-    const reader = stream.readable.getReader();
-    let settle, fail, first = true;
-    const acknowledged = new Promise((resolve,reject)=>{settle=resolve;fail=reject;});
-    void acknowledged.catch(()=>{});
-    const token = Object.freeze({generation:this.typedGeneration+1});
-    // The grant and every subsequent ACK are from THIS SAME original
-    // server-granted bidirectional stream. Old DATAGRAM ACKs cannot enter.
-    void pumpLengthPrefixedReader(reader,packet=>{
-      const bytes=toUint8Array(packet);
-      if(first) {
-        first=false;
-        if (bytes.length===4 && bytes[0]===2 && bytes[1]===0x13
-            && bytes[2]===0 && bytes[3]===0) settle();
-        else fail(new Error("Source11 malformed or rejected bound grant"));
-        return;
-      }
-      if (this.closed || this.typedLeaseToken!==token) return;
-      this.onBoundGestureAck?.(bytes.slice(),token);
+    // A single startup deadline covers OPEN, HELLO write/backpressure and
+    // server GRANT, rather than starting only after HELLO has been written.
+    // WebTransport does not guarantee that createBidirectionalStream() can
+    // be aborted; any late-resolving stream is explicitly reset/closed.
+    let timer, expired=false, writer;
+    const deadline=new Promise((_,reject)=>{
+      timer=setTimeout(()=>{
+        expired=true;
+        reject(new Error("Source11 bound channel startup timeout"));
+      },timeoutMs);
     });
-    let timer;
+    const opening=Promise.resolve().then(()=>this.transport.createBidirectionalStream());
+    void opening.then(stream=>{
+      if(!expired && !this.closed) return;
+      try {
+        void Promise.resolve(stream.writable.getWriter().abort(
+          "stale Source11 channel opened after startup deadline"
+        )).catch(()=>{});
+      } catch {}
+      try { void Promise.resolve(stream.readable.cancel?.()).catch(()=>{}); } catch {}
+    }).catch(()=>{});
     try {
-      await writer.write(Uint8Array.from([2,0x10,77,89,65,83,79,49]));
-      await Promise.race([acknowledged,new Promise((_,reject)=>{
-        timer=setTimeout(()=>reject(new Error("Source11 bound grant timeout")),timeoutMs);
-      })]);
-      if(this.closed) throw new Error("Source11 original QUIC retired");
+      const stream=await Promise.race([opening,deadline]);
+      if(this.closed || expired) throw new Error("retired Source11 stream cannot acquire authority");
+      writer=stream.writable.getWriter();
+      const reader=stream.readable.getReader();
+      let settle, fail, first=true;
+      const acknowledged=new Promise((resolve,reject)=>{settle=resolve;fail=reject;});
+      void acknowledged.catch(()=>{});
+      const token=Object.freeze({generation:this.typedGeneration+1});
+      // Grant and all subsequent ACKs originate on this SAME original
+      // server-bound bidi; no old DATAGRAM ACK can settle a fresh generation.
+      void pumpLengthPrefixedReader(reader,packet=>{
+        const bytes=toUint8Array(packet);
+        if(first){
+          first=false;
+          if(bytes.length===4 && bytes[0]===2 && bytes[1]===0x13
+              && bytes[2]===0 && bytes[3]===0) settle();
+          else fail(new Error("Source11 malformed or rejected bound grant"));
+          return;
+        }
+        if(this.closed || this.typedLeaseToken!==token) return;
+        this.onBoundGestureAck?.(bytes.slice(),token);
+      });
+      await Promise.race([
+        writer.write(Uint8Array.from([2,0x10,77,89,65,83,79,49])),
+        deadline,
+      ]);
+      await Promise.race([acknowledged,deadline]);
+      if(this.closed || expired) throw new Error("Source11 original QUIC retired");
       const previous=this.typedBoundWriter;
       this.typedGeneration+=1;
       this.typedLeaseToken=token;
@@ -162,7 +184,11 @@ class WebTransportGameConnection {
       if(previous) { void previous.close().catch(()=>{}); }
       return token;
     } catch(error) {
-      try { await writer.abort?.(String(error)); } catch {}
+      // Never wait indefinitely for a stuck writer's abort. This optional
+      // stream may fail while the original game and Chat C1 remain alive.
+      if(writer){
+        try { void Promise.resolve(writer.abort?.(String(error))).catch(()=>{}); } catch {}
+      }
       throw error;
     } finally { clearTimeout(timer); }
   }
