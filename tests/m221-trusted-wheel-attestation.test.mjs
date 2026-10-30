@@ -25,7 +25,7 @@ test("M221 harness ties actual wheel.isTrusted event to one real Chrome and Fire
   assert.ok(s.includes("event.isTrusted === true"));
   assert.ok(s.includes("window.__MYASO_M221_WHEEL_TOKEN__"));
   assert.ok(s.includes("m221Registry.receive("));
-  assert.ok(s.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(s.includes("const receipt=await challenge.wait()"));
   assert.ok(s.includes("const challenge = m221Registry.issue()"));
   assert.ok(s.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(s.includes("M34 guard-break staging allowed an unblocked strike"));
