@@ -20,12 +20,13 @@ export function createDormantPrealphaLmbDomGate({
   isCanvasTarget, isChatFocused = () => false,
   isJumpAttackChord = () => false,
   enableJumpAttackReview = false,
+  onAcceptedPress = () => {},
 } = {}) {
   const shared = outbox instanceof ProposedSharedTypedGestureOutbox;
   if (!(outbox instanceof ProposedLmbGestureOutbox) && !shared) {
     throw new TypeError("a negotiated, lease-bound proposed v2 outbox is required");
   }
-  for (const fn of [getClientTick,acceptedPressNow,isCanvasTarget,isChatFocused,isJumpAttackChord]) {
+  for (const fn of [getClientTick,acceptedPressNow,isCanvasTarget,isChatFocused,isJumpAttackChord,onAcceptedPress]) {
     if (!isFn(fn)) throw new TypeError("explicit UI control predicates required");
   }
   let active = null, closed = false;
@@ -50,7 +51,7 @@ export function createDormantPrealphaLmbDomGate({
       return false;
     }
   }
-  function beginPhysicalLmb(pointerId, chorded, jump = false) {
+  function beginPhysicalLmb(pointerId, chorded, jump = false, trusted = false) {
     // Bind the dormant review's local hold clock to the accepted physical
     // pointer callback, NOT a later render/arm() task which may be delayed.
     // This is never a server timestamp or authority to upgrade a landed hit.
@@ -64,6 +65,9 @@ export function createDormantPrealphaLmbDomGate({
       : (shared ? outbox.begin(0,tick) : outbox.begin(tick)));
     if (!edge) return false;
     active = {pointerId,gestureId:edge.gestureId,upgraded:false,chorded,jump,pressMs};
+    // Optional presentation observer; it cannot reject or own a gameplay edge.
+    try { onAcceptedPress(Object.freeze({pointerId,gestureId:edge.gestureId,
+      sequence:edge.sequence,jump,trusted,pressMs})); } catch {}
     return true;
   }
   function pointerDown(event) {
@@ -72,7 +76,7 @@ export function createDormantPrealphaLmbDomGate({
       || isChatFocused() || !isCanvasTarget(event)) return false;
     const jump = isJumpAttackChord(event);
     if (jump && !enableJumpAttackReview) return false;
-    return beginPhysicalLmb(event.pointerId,false,jump);
+    return beginPhysicalLmb(event.pointerId,false,jump,event.isTrusted===true);
   }
   function chordedMouseDown(event) {
     // W3C pointerdown/up only occur at zero↔nonzero button transitions.
@@ -83,7 +87,7 @@ export function createDormantPrealphaLmbDomGate({
       || !isCanvasTarget(event)) return false;
     const jump = isJumpAttackChord(event);
     if (jump && !enableJumpAttackReview) return false;
-    return beginPhysicalLmb(CHORDED_MOUSE_POINTER_ID,true,jump);
+    return beginPhysicalLmb(CHORDED_MOUSE_POINTER_ID,true,jump,event.isTrusted===true);
   }
   function mouseUp(event) {
     if (closed || !active || !event || event.button !== 0

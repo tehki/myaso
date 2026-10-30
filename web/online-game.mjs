@@ -1,4 +1,5 @@
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
+import {createTypedJumpStaminaFeedback} from "../src/browser/typed-jump-stamina-feedback.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
 import { installRightButtonGesture } from "../src/browser/right-button-gesture.mjs";
 import { createDirectionalDash } from "../src/browser/dash-input.mjs";
@@ -119,6 +120,7 @@ let lastWorldStatusActorId = null;
 let combatFeedbackTimer = 0;
 let authoritativeStamina = null;
 let pendingStaminaDenial = null;
+const typedJumpStaminaFeedback = createTypedJumpStaminaFeedback();
 let matchOver = false;
 const killFeedEntries = [];
 const killFeedSequences = new Set();
@@ -396,6 +398,7 @@ function cancelActiveLeftPointer(pointerId) {
   return true;
 }
 canvas.addEventListener("pointercancel", (event) => {
+  if (typedLmbEnabled) typedJumpStaminaFeedback.cancel(event.pointerId);
   if (event.button === 1) middleBlockHeld = false;
   cancelActiveLeftPointer(event.pointerId);
 });
@@ -484,6 +487,7 @@ networkClient = await connectAuthoritativeClient({
     }
     const result = experimentalGestureLab.outbox.receiveAck(bytes, lease);
     experimentalGestureLab.noteAck(result);
+    typedJumpStaminaFeedback.acknowledge(result,lease);
     if (!result.transportSettled) {
       experimentalGestureLab.fail("World rejected or retired typed gesture edge");
     }
@@ -554,6 +558,20 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
+    const typedDenial=typedLmbEnabled?typedJumpStaminaFeedback.observe({own,
+      lease:networkClient.transport,alive:typedLmbEnabled&&Boolean(experimentalGestureLab)
+        &&!experimentalGestureLab.snapshot.failed&&!experimentalGestureLab.snapshot.closed,
+      focused:!document.hidden&&document.activeElement===canvas,
+      serverTick:networkClient.latestServerTick,processedClientTick:networkClient.processedClientTick,
+      now:performance.now()}):null;
+    if(typedDenial){
+      const presentation=staminaDenialPresentation(typedDenial.action,typedDenial.stamina);
+      if(presentation){
+        combatMessage=presentation.text;combatMessageUntil=performance.now()+presentation.durationMs;
+        setStatus(combatMessage);showCombatFeedback(presentation.feedback);
+        recordStaminaDenialStage("shown",{action:typedDenial.action,authoritativeStamina:typedDenial.stamina});
+      }
+    }
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
@@ -570,6 +588,12 @@ if (typedLmbEnabled) {
       isJumpAttackChord: () => jumpRequested || keys.has("Space")
         || local.action === COMBAT_ACTION.jump,
       enableJumpAttackReview: jumpCombatReviewRequested,
+      onAcceptedPress(press){
+        typedJumpStaminaFeedback.press({...press,actorId:networkClient.playerNetId,
+          lease:networkClient.transport,now:press.pressMs,stamina:authoritativeStamina,
+          spaceHeld:keys.has("Space")});
+        if(press.jump&&press.trusted&&pendingStaminaDenial?.action==="jump")pendingStaminaDenial=null;
+      },
     });
     if (privateHitLabRequested) {
       // Real input ACKs are produced by the 60Hz original sender, which starts
@@ -1004,6 +1028,7 @@ function updateMouse(event) {
 
 function releaseInputs() {
   keys.clear();
+  if(typeof typedJumpStaminaFeedback!=="undefined")typedJumpStaminaFeedback.reset();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.reset();
   dashGesture.clearTaps();
@@ -1075,6 +1100,10 @@ function sendImmediatePhysicalJumpEdge(trusted) {
   const outgoingTick = clientTick;
   markStaminaDenialSubmitted(outgoingTick, currentInput);
   networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if(typedLmbEnabled&&typeof typedJumpStaminaFeedback!=="undefined"){
+    typedJumpStaminaFeedback.originalJump({actorId:networkClient.playerNetId,lease:networkClient.transport,
+      clientTick:outgoingTick>>>0,action:local.action,stamina:authoritativeStamina,now:performance.now()});
+  }
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
   clientTick = (clientTick + 1) >>> 0;
   const debug = window.__MYASO_ACCEPTANCE_STATE__;

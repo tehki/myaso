@@ -112,6 +112,14 @@ jobs:
           - acceptance: jump-action-firefox
             mode: jump-review
             browsers: firefox,firefox,firefox,firefox
+          - acceptance: release-jump-stamina-chrome
+            mode: jump-stamina
+            browsers: chrome,chrome,chrome,chrome
+            instant: "1"
+          - acceptance: release-jump-stamina-firefox
+            mode: jump-stamina
+            browsers: firefox,firefox,firefox,firefox
+            instant: "1"
           - acceptance: jump-two-hit-chrome
             mode: jump-two-hit
             browsers: chrome,chrome,chrome,chrome
