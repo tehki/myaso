@@ -419,10 +419,11 @@ canvas.addEventListener("wheel", (event) => {
     ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
   if (event.deltaY < 0) {
-    canvas.focus();
     rollRequested = true;
-    audio.play("roll");
     queueStaminaDenial("roll");
+    sendImmediatePhysicalDodgeEdge(event.isTrusted === true);
+    canvas.focus();
+    audio.play("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
     // Submit the true Block edge before focus/layout or audio can stall it.
@@ -468,8 +469,8 @@ canvas.addEventListener("keydown", (event) => {
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
+window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("keyup", (event) => {
-  keys.delete(event.code);
   if (event.code === "Space") physicalJumpChord.release();
 });
 window.addEventListener("blur", releaseInputs);
@@ -1133,6 +1134,28 @@ function sendImmediatePhysicalJumpEdge(trusted) {
   }
   // This uses the original redundancy/prediction owner once. The next RAF
   // must not replay this genuine one-shot chord under a fresh client tick.
+  attackRequested = false;
+  runningAttackRequested = false;
+  committedLightMove = null;
+  heavyAttackRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
+}
+
+// A genuine wheel Dodge has the same original one-shot sender as Space
+// and Block. Cold audio/layout and the next RAF cannot postpone its ingress.
+function sendImmediatePhysicalDodgeEdge(trusted) {
+  if (!trusted || document.hidden || matchOver || !networkClient?.playerNetId) return;
+  sampleInput({ playStepAudio: false });
+  if (!currentInput.dodge) return;
+  const outgoingTick = clientTick;
+  markStaminaDenialSubmitted(outgoingTick, currentInput);
+  networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+  clientTick = (clientTick + 1) >>> 0;
   attackRequested = false;
   runningAttackRequested = false;
   committedLightMove = null;

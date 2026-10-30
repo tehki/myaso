@@ -1,3 +1,4 @@
+import {createPhysicalJumpChord} from "../src/browser/physical-jump-chord.mjs";
 // Execute the production DOM callback, charge classifier, prediction and30Hz
 // submission functions. These are unit input-plane tests, not native/World proof.
 import assert from "node:assert/strict";
@@ -23,7 +24,7 @@ function harness(phase){
   const listeners=new Map(),sent=[];
   const canvas={width:960,height:540,focus(){},getBoundingClientRect:()=>({left:0,top:0,width:960,height:540}),
     addEventListener(type,callback){listeners.set(type,callback);}};
-  const context={canvas,createLeftButtonCharge,captureLightAttackMovement,resolveLightAttackReleaseMovement,
+  const context={physicalJumpChord:createPhysicalJumpChord(),canvas,createLeftButtonCharge,captureLightAttackMovement,resolveLightAttackReleaseMovement,
     COMBAT,COMBAT_ACTION,NETWORK,performance:{now:()=>clock},Date:{now:()=>clock},
     audio:{play(){},isUnlocked:()=>true},keys:new Set(),local:{action:0,initialized:true,x:300,y:300,facing:0,hp:100,guard:100,stamina:100},
     typedLmbEnabled:false,matchOver:false,currentInput:{},predictionStep:phase,clientTick:57,
