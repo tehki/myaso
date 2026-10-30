@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -51,15 +51,15 @@ jobs:
             mode: four-combat-lifecycle
             browsers: chrome,firefox,chrome,firefox
     env:
-      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${ matrix.browsers }}
-      MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${ matrix.mode }}
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
+      MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
       MYASO_LIVE_GESTURE_CHAT_C1: "1"
-      MYASO_LIVE_GESTURE_SOURCE_SHA: ${ github.event.pull_request.head.sha || github.sha }}
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -76,7 +76,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core8a-source11-${ matrix.acceptance }}-${ github.run_attempt }}
+          name: core8a-source11-${{ matrix.acceptance }}-${{ github.run_attempt }}
           path: .artifacts/main0-knights-combat-gesture/
           if-no-files-found: ignore
           retention-days: 5
