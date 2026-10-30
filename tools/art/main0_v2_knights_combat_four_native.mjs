@@ -185,6 +185,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   // automatically by a keyboard action. Preserve genuine native key events.
   const focused=await evaluate(a.s,"const c=document.querySelector('#arena');if(!c)return false;c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
   assert.equal(focused,true,"real WASD staging requires original arena keyboard focus");
+  // Safe real respawns can choose another Y when old positions are occupied.
+  // Move the genuine actor to its actual target lane; never edit positions.
+  const laneProof=await proof(a),laneActor=own(laneProof,attackerId),laneTarget=own(laneProof,targetId);
+  if(laneActor&&laneTarget&&Math.abs(laneActor.y-laneTarget.y)>8)
+   await stageLaneY(attackerId,laneTarget.y);
   const attempts=[];
   for(let move=0;move<6;move++){
    const p=await proof(a),f=own(p,attackerId),t=own(p,targetId);
@@ -523,7 +528,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
      // RED it then stood between2 and3: original AoE correctly hit BOTH.
      // Physically clear that bystander, preserving every real damage rule.
      const killer=actors.find(a=>a.actor.id===1),killerProof=await proof(killer);
-     const killerY=own(killerProof,1).y,laneY=own(bound,2).y;
+     const killerY=own(killerProof,1).y,laneY=own(bound,3).y;
      staging.push(await stageLaneY(1,laneY+COMBAT.attack.reach+COMBAT.fighterRadius+30));
      staging.push(await stagePair(2,3));
      const freshRound=await round([[2,3]]),fresh=await proof(old);
