@@ -10,6 +10,7 @@ import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
 import {runNativeRecoveryBuffer} from "../../scripts/native-recovery-buffer.mjs";
+import {runNativeJumpStamina} from "../../scripts/native-jump-stamina.mjs";
 import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -18,7 +19,8 @@ const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
 const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
 const instantLmb=process.env.MYASO_LIVE_GESTURE_INSTANT_LMB==="1";
 assert.ok(!instantLmb||!["private-hit","space-guard"].includes(physicalMode),"select a release-profile Combat acceptance mode");
-assert.ok(["original","held-lmb","recovery-buffer","recovery-jump","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","recovery-buffer","recovery-jump","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit","jump-stamina"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(physicalMode!=="jump-stamina"||instantLmb,"jump-stamina qualifies the selected instant-LMB profile");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
 const output=resolve(process.env.MYASO_LIVE_GESTURE_NATIVE_OUT||join(root,".artifacts","main0-knights-combat-gesture"));
@@ -490,7 +492,7 @@ try{
  const actors=[];
  // This single-source0 negative test requires ONE actual browser/actor.
  // Preserve the full four-seat standard/held/lifecycle/private qualifications.
- const seatCount=["space-guard","jump-review"].includes(physicalMode)?1:physicalMode==="jump-two-hit"?2:4;
+ const seatCount=["space-guard","jump-review","jump-stamina"].includes(physicalMode)?1:physicalMode==="jump-two-hit"?2:4;
  for(let i=0;i<seatCount;i++){
   const s=await startW3C(engines[i],i);const flag="0";
   const u=new URL(host+"/web/index.html");u.searchParams.set("server",rustUrl);u.searchParams.set("cert",cert);u.searchParams.set("knights","1");u.searchParams.set("knightArt","relit");u.searchParams.set("arenaGrid","1");u.searchParams.set(instantLmb?"instantLmbPreview":"gestureLab","1");if(physicalMode==="private-hit")u.searchParams.set("hitDeliveryLab","1");if(!instantLmb&&["jump-review","jump-two-hit"].includes(physicalMode))u.searchParams.set("jumpCombatReview","1");
@@ -726,6 +728,13 @@ try{
  await writeFile(join(output,"combat4-two-native-jump-world-hit.json"),
   JSON.stringify(evidence,null,2)+"\n");
  console.log("COMBAT4_TWO_NATIVE_JUMP_WORLD_42HP_PASS",JSON.stringify(evidence));
+}else if(physicalMode==="jump-stamina"){
+ const result=await runNativeJumpStamina({actor:actors[0],evaluate,request,waitFor,readAuthoritativeWorld});
+ const evidence={mode:physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",...result};
+ await writeFile(join(output,"combat4-jump-stamina-original-world.json"),JSON.stringify(evidence,null,2)+"\n");
+ console.log("COMBAT4_JUMP_STAMINA_WORLD_PROOF",JSON.stringify(evidence));
+ assert.equal(result.confirmedDenial,true,"selected JumpAttack denial UI missing after genuine original Jump14 and no attack");
+ assert.equal(result.airborne.confirmedDenial,true,"one confirmed airborne12 denial cue required");
 }else if(physicalMode==="jump-review"){
  // Experimental extra opt-in: original first-party game, genuine native
  // key/pointer, same authenticated original QUIC stream and 60Hz Rust World.

@@ -28,6 +28,21 @@ function fixture(overrides={}){
 }
 const actions=outbox=>outbox.nextSendBatch(8).map(e=>decodeProposedGestureEvent(e.bytes));
 
+test("accepted physical press offers one read-only presentation observation without owning the edge",()=>{
+ const observed=[];
+ const f=fixture({acceptedPressNow:()=>40,onAcceptedPress:p=>observed.push(p)});
+ assert.equal(f.gate.pointerDown(event(7,{isTrusted:true})),true);
+ assert.equal(f.gate.pointerDown(event(7,{isTrusted:true})),false);
+ assert.equal(f.gate.pointerUp(event(7,{buttons:0})),true);
+ assert.deepEqual(observed,[{pointerId:7,gestureId:1,sequence:1,jump:false,trusted:true,pressMs:40}]);
+ assert.equal(Object.isFrozen(observed[0]),true);
+ assert.deepEqual(actions(f.outbox).map(e=>e.action),[GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+ const broken=fixture({onAcceptedPress:()=>{throw Error("presentation unavailable");}});
+ assert.equal(broken.gate.pointerDown(event()),true);
+ assert.equal(broken.gate.pointerUp(event(7,{buttons:0})),true);
+ assert.deepEqual(actions(broken.outbox).map(e=>e.action),[GESTURE_ACTION.PRESS,GESTURE_ACTION.RELEASE]);
+});
+
 test("quick native LMB down/up in one 30Hz sample yields distinct ordered edges, zero client hit",()=>{
  const f=fixture();
  assert.equal(f.gate.pointerDown(event()),true);

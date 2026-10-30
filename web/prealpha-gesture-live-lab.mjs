@@ -18,6 +18,7 @@ async function activateNegotiatedLmb({
   gameClient, canvas, windowObj, documentObj, getClientTick,
   isJumpAttackChord = () => false,
   enableJumpAttackReview = false,
+  onAcceptedPress,
   fetchConfig = globalThis.fetch,
 } = {}, instantProfile = false) {
   if (!gameClient || !canvas || !windowObj || !documentObj
@@ -139,6 +140,7 @@ async function activateNegotiatedLmb({
       // inventing a second v1 attack writer or a false World Light.
       isJumpAttackChord,
       enableJumpAttackReview:enableJumpAttackReview || instantProfile,
+      onAcceptedPress,
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
