@@ -57,7 +57,7 @@ export async function connectAuthoritativeClient({
 
   if (transport.kind === "webtransport") {
     transport.onBoundGestureAck = (bytes,token) => {
-      if (transport.closed || transport.typedLeaseToken !== token) return;
+      if (transport.closed || transport.typedLeaseRetiring || transport.typedRenewalPending || transport.typedLeaseToken !== token) return;
       try {
         decodeProposedGestureAck(bytes);
         onExperimentalGestureAck?.(bytes,token);
@@ -76,7 +76,7 @@ export async function connectAuthoritativeClient({
       if (bytes[0] === 2 && packetType === 0x12) {
         // Previous-generation DATAGRAM ACKs cannot reach the renewed bidi
         // outbox, even when their sequence/gesture IDs numerically coincide.
-        if (transport.typedGeneration > 0) return;
+        if (transport.typedGeneration > 0 || transport.typedLeaseRetiring || transport.typedRenewalPending) return;
         // Never let a stale QUIC actor or a public/v1 connection settle the
         // pending current-lease typed source0/source1 outbox.
         if (transport.kind !== "webtransport" ||

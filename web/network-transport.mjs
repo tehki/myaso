@@ -62,6 +62,7 @@ class WebTransportGameConnection {
     // JS token; the initial QUIC datagram generation uses the connection.
     this.typedLeaseToken = this;
     this.typedGeneration = 0;
+    this.typedLeaseRetiring = false;
     this.typedRenewalPending = false;
     // Bounded, diagnostic-only local proof; never used for authority or ACK.
     this.source11Events = [];
@@ -120,6 +121,7 @@ class WebTransportGameConnection {
     if (bytes.length !== 4 || bytes[0] !== 2 || bytes[1] !== 0x14
         || bytes[2] !== 0 || bytes[3] !== 0) return false;
     if (!this.closed && this.experimentalGestureState === "granted") {
+      this.typedLeaseRetiring = true;
       this.#traceSource11("root-renew-hint");
       // Notice is a hint only: the new bidi's real server grant is required.
       void Promise.resolve().then(() => this.onGestureRenewalRequired?.()).catch(() => {
@@ -142,6 +144,7 @@ class WebTransportGameConnection {
     // current World incarnation and could replace the valid JS lease token.
     // Unlike the UI-level renewal guard, this protects transport API callers.
     if (this.typedRenewalPending) throw new Error("Source11 renewal already in progress");
+    this.typedLeaseRetiring = true;
     this.typedRenewalPending = true;
     this.#traceSource11("renew-open-start");
     // A single startup deadline covers OPEN, HELLO write/backpressure and
@@ -186,7 +189,7 @@ class WebTransportGameConnection {
           else fail(new Error("Source11 malformed or rejected bound grant"));
           return;
         }
-        if(this.closed || this.typedLeaseToken!==token) return;
+        if(this.closed || this.typedLeaseRetiring || this.typedRenewalPending || this.typedLeaseToken!==token) return;
         this.onBoundGestureAck?.(bytes.slice(),token);
       });
       await Promise.race([
@@ -200,6 +203,7 @@ class WebTransportGameConnection {
       const previous=this.typedBoundWriter;
       this.typedGeneration+=1;
       this.typedLeaseToken=token;
+      this.typedLeaseRetiring=false;
       this.typedBoundWriter=writer;
       this.#traceSource11("renew-lease-active");
       // Old pending .ready/write promises must neither block nor close the
@@ -302,8 +306,8 @@ class WebTransportGameConnection {
   // overwritten by the movement sampler's latestRealtime slot. This is only
   // transport delivery, NOT an authoritative Combat hit or admission ACK.
   sendExperimentalGestureEdge(bytes, expectedLease = this) {
-    if (this.closed || this.experimentalGestureState !== "granted" ||
-        expectedLease !== this.typedLeaseToken) {
+    if (this.closed || this.typedLeaseRetiring || this.typedRenewalPending ||
+        this.experimentalGestureState !== "granted" || expectedLease !== this.typedLeaseToken) {
       throw new Error("gesture datagram requires current server grant");
     }
     const payload = toUint8Array(bytes);
@@ -329,12 +333,12 @@ class WebTransportGameConnection {
     const boundWriter = this.typedBoundWriter;
     this.pendingGestureEdges += 1;
     const send = this.gestureWriteQueue.then(async () => {
-      if (this.closed || this.experimentalGestureState !== "granted" ||
-          expectedLease !== this.typedLeaseToken)
+      if (this.closed || this.typedLeaseRetiring || this.typedRenewalPending ||
+          this.experimentalGestureState !== "granted" || expectedLease !== this.typedLeaseToken)
         throw new Error("retired generation cannot write a typed edge");
       const writer = boundWriter ?? this.datagramWriter;
       await writer.ready;
-      if (this.closed || expectedLease !== this.typedLeaseToken)
+      if (this.closed || this.typedLeaseRetiring || this.typedRenewalPending || expectedLease !== this.typedLeaseToken)
         throw new Error("generation changed while typed writer waited");
       await writer.write(boundWriter ? frameReliable(owned) : owned);
     });
@@ -346,7 +350,7 @@ class WebTransportGameConnection {
         // An old in-flight promise cannot retire a newer authenticated lease.
         if (expectedLease === this.typedLeaseToken) {
           this.pendingGestureEdges -= 1;
-          this.close("gesture delivery failed");
+          if (!this.typedLeaseRetiring && !this.typedRenewalPending) this.close("gesture delivery failed");
         }
       },
     );

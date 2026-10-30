@@ -117,9 +117,9 @@ async function activateNegotiatedLmb({
         // Physical releases authored while blocked stay in the SAME outbox.
         // Flush only previously unsent edges; the 170ms timer owns retries.
         if (!failed && !detached) drain(true);
-      }).catch(() => { if (writeLease === lease) fail("typed gesture QUIC delivery failed"); });
+      }).catch(() => { if (!renewing && writeLease === lease) fail("typed gesture QUIC delivery failed"); });
     } catch {
-      if (writeLease === lease) fail("typed gesture lease no longer current");
+      if (!renewing && writeLease === lease) fail("typed gesture lease no longer current");
     }
   }
 
