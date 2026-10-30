@@ -560,6 +560,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
      mode:physicalMode,originalActorId,originalSessionId,beforeFresh,afterFresh,
      beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,renewalCycles,completedRenewalCycles:renewalCycles.length,
      retiredGenerationSafetyRequiresSeparateNegativeProof:true,rejoinedAsActor5:false,
+     rounds,afterJoint,originalWorld:lines(), // include original four-actor135ms admission/contact evidence
      originalWorldAfterRespawn:lines().slice(startOffset)};
     await writeFile(join(output,"combat4-respawn-same-session-PASS.json"),JSON.stringify(result,null,2)+"\n");
     console.log("COMBAT4_RESPAWN_SAME_SESSION_NATIVE_PASS",JSON.stringify(result));
