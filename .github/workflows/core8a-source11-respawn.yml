@@ -36,6 +36,7 @@ jobs:
         run: |
           cargo fmt --manifest-path server/Cargo.toml -- --check
           cargo test --locked --manifest-path server/Cargo.toml
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server source11_gesture_path_lifetime_tests::retiring_root_connection_removes_only_its_player_gesture_generations -- --exact
           cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
   four-original-quic-world-respawn:
     runs-on: ubuntu-24.04

@@ -251,6 +251,20 @@ impl GameState {
         }
     }
 
+    // A retired QUIC connection must never leave a generation-specific
+    // typed path on the 60Hz World clock. Select by authoritative player
+    // binding, never by a client-selected lease or numeric action ID.
+    fn retire_gesture_paths_for_player(&mut self, player_id: u32) {
+        self.gesture_sessions.retain(|_, path| {
+            if path.binding().player_id == player_id {
+                path.retire();
+                false
+            } else {
+                true
+            }
+        });
+    }
+
     fn apply_flight_background_motion(&mut self) {
         let base_facing = self.world.tick as f32 * 0.075;
         for (index, net_id) in self.flight_background_ids.iter().copied().enumerate() {
@@ -625,6 +639,10 @@ async fn main() -> Result<()> {
                     gesture.retire();
                 }
                 if still_owned {
+                    // Source11 can own a fresh server epoch distinct from
+                    // the original root lease. Cleanup *all* remaining
+                    // generations before retiring the original World actor.
+                    state.retire_gesture_paths_for_player(player_id);
                     state.world.remove_player(player_id);
                     state.refresh_replication_frame();
                 }
@@ -1789,9 +1807,13 @@ async fn run_respawn_typed_channel(
             new_path.enable_jump_review();
         }
         // No raw old DATAGRAM can acquire the fresh path under any ordering.
-        if let Some(old_path) = state.gesture_sessions.get_mut(&prior_epoch) {
-            old_path.retire();
-        }
+        // Drop the old path rather than retaining a retired authority object
+        // in the per-tick World map for every successive incarnation.
+        let mut old_path = state
+            .gesture_sessions
+            .remove(&prior_epoch)
+            .ok_or_else(|| anyhow::anyhow!("old typed generation disappeared"))?;
+        old_path.retire();
         state.gesture_sessions.insert(fresh_lease, new_path);
         active.store(fresh_lease, Ordering::Release);
     }
@@ -3486,5 +3508,43 @@ mod chat_task_lifetime_tests {
             .expect("optional chat task must terminate after session guard drops")
             .expect_err("idle chat task cannot complete without cancellation");
         assert!(error.is_cancelled());
+    }
+}
+
+// Core8A Source11 authority-map lifetime: a new generation is server owned,
+// and retiring a root gameplay connection must leave NO ghost path for that
+// player. A separate live player's path must not be disturbed.
+#[cfg(test)]
+mod source11_gesture_path_lifetime_tests {
+    use super::*;
+
+    #[test]
+    fn retiring_root_connection_removes_only_its_player_gesture_generations() {
+        let mut state = GameState::new(0, 0);
+        state.boot_nonce = 17;
+        assert!(state.world.add_player(1));
+        assert!(state.world.add_player(2));
+        for epoch in [1, 3] {
+            let path = SessionGestureWorldPath::from_admitted_world(
+                &state.world,
+                1,
+                epoch,
+                state.boot_nonce,
+            )
+            .expect("admitted first player");
+            state.gesture_sessions.insert(epoch, path);
+        }
+        let other =
+            SessionGestureWorldPath::from_admitted_world(&state.world, 2, 7, state.boot_nonce)
+                .expect("admitted second player");
+        state.gesture_sessions.insert(7, other);
+        state.retire_gesture_paths_for_player(1);
+        assert!(!state.gesture_sessions.contains_key(&1));
+        assert!(!state.gesture_sessions.contains_key(&3));
+        assert_eq!(state.gesture_sessions.len(), 1);
+        assert_eq!(
+            state.gesture_sessions.get(&7).unwrap().binding().player_id,
+            2
+        );
     }
 }
