@@ -518,9 +518,12 @@ networkClient = await connectAuthoritativeClient({
       else if (Number.isFinite(own.stamina)) local.stamina = own.stamina;
     }
     observeCombatState(state);
+    confirmTypedJumpStaminaDenial(own);
   },
   onReliableSnapshot(_result, state) {
     observeCombatState(state);
+    const ownId=networkClient?.playerNetId;
+    confirmTypedJumpStaminaDenial(ownId?state.get(ownId):null);
   },
   onKillEvent(event) {
     recordKillEvent(event);
@@ -558,20 +561,7 @@ networkClient = await connectAuthoritativeClient({
       networkClient.diagnostics.noteReconciliation(ack, own, correction.distance);
     }
     confirmStaminaDenial(own);
-    const typedDenial=typedLmbEnabled?typedJumpStaminaFeedback.observe({own,
-      lease:networkClient.transport,alive:typedLmbEnabled&&Boolean(experimentalGestureLab)
-        &&!experimentalGestureLab.snapshot.failed&&!experimentalGestureLab.snapshot.closed,
-      focused:!document.hidden&&document.activeElement===canvas,
-      serverTick:networkClient.latestServerTick,processedClientTick:networkClient.processedClientTick,
-      now:performance.now()}):null;
-    if(typedDenial){
-      const presentation=staminaDenialPresentation(typedDenial.action,typedDenial.stamina);
-      if(presentation){
-        combatMessage=presentation.text;combatMessageUntil=performance.now()+presentation.durationMs;
-        setStatus(combatMessage);showCombatFeedback(presentation.feedback);
-        recordStaminaDenialStage("shown",{action:typedDenial.action,authoritativeStamina:typedDenial.stamina});
-      }
-    }
+    confirmTypedJumpStaminaDenial(own);
     networkStatus = `Online - player #${ownId} - server tick ${networkClient.latestServerTick}`;
   },
 });
@@ -894,6 +884,22 @@ function recordStaminaDenialStage(stage, details = {}) {
   if (!acceptance) return;
   const transitions = acceptance.staminaDenialTransitions ??= [];
   transitions.push({ stage, epochMs: Date.now(), ...details });
+}
+
+function confirmTypedJumpStaminaDenial(own) {
+  if(!own||!typedLmbEnabled)return;
+  const denial=typedJumpStaminaFeedback.observe({own,lease:networkClient.transport,
+    alive:Boolean(experimentalGestureLab)&&!experimentalGestureLab.snapshot.failed
+      &&!experimentalGestureLab.snapshot.closed,
+    focused:!document.hidden&&document.activeElement===canvas,
+    serverTick:networkClient.latestServerTick,processedClientTick:networkClient.processedClientTick,
+    now:performance.now()});
+  if(!denial)return;
+  const presentation=staminaDenialPresentation(denial.action,denial.stamina);
+  if(!presentation)return;
+  combatMessage=presentation.text;combatMessageUntil=performance.now()+presentation.durationMs;
+  setStatus(combatMessage);showCombatFeedback(presentation.feedback);
+  recordStaminaDenialStage("shown",{action:denial.action,authoritativeStamina:denial.stamina});
 }
 
 function queueStaminaDenial(action) {

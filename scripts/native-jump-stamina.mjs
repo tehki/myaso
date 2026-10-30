@@ -111,12 +111,11 @@ export async function runNativeJumpStamina({actor,evaluate,request,waitFor,readA
  assert.equal(own(afterAir)?.hp,100);assert.equal(own(afterAir)?.guard,100);
  const airFeedback=afterAir.feedback.slice(airFeedbackOffset);
  const airborneDenial=airFeedback.filter(e=>e.cue==="stamina-denied");
- assert.equal(airborneDenial.length,1,"one confirmed airborne denial cue");
- assert.ok(airborneDenial[0].status.includes("Low stamina — jump attack needs 12."));
  return {drain,startingStamina:own(ready).stamina,worldSpend:spend,
   confirmedDenial:after.feedback.filter(e=>e.cue==="stamina-denied").length===1
    &&after.feedback.some(e=>e.cue==="stamina-denied"&&e.status.includes("Low stamina — jump attack needs 26.")),
   after,originalWorldLog:journal,airborne:{worldSpend:airSpend,after:afterAir,
-   originalWorldLog:airLog,feedback:airborneDenial},
+   originalWorldLog:airLog,feedback:airborneDenial,confirmedDenial:airborneDenial.length===1
+    &&airborneDenial[0].status.includes("Low stamina — jump attack needs 12.")},
   limitation:"one native actor; no independent human or WAN qualification"};
 }

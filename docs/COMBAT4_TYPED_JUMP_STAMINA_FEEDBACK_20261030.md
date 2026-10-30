@@ -60,6 +60,18 @@ regression. Both final native chord26/airborne12 runs passed after that guard;
 all ten changed runtime/test/workflow Git blobs match on Windows/Linux.
 Final exact-SHA tests and CI results are maintained in the PR.
 
+The first2c7 CI Firefox airborne case missed its cue after passing the original
+World14/no-attack/receipt gates. This exposed a consumer gap: presentation was
+checked only from positional reconciliation's `onAck`. An executable regression
+of the actual unreliable/reliable World callbacks observed zero notifications.
+Both now notify the same bounded observer directly, while `onAck` can still
+complete original-input confirmation. All lease/gesture/tick/exhaustion guards
+and the exactly-one26/12 cue requirements remain. Native proof is written before
+the final cue assertions so another failure retains the complete actual state.
+First-red: https://github.com/tehki/myaso/actions/runs/41044231464/job/124024232717 .
+After this correction Linux Node1036/1036 and both engines' chord26/airborne12
+native cases passed; all four changed runtime/test blobs matched Windows/Linux.
+
 Two CI cases are added; all existing matrix cases and thresholds remain.
 Rust World/protocol are unchanged from the parent validated449/default and
 456/private tests. Parent #1119 ended49SUCCESS/1FAILURE/1packageSKIP: Firefox

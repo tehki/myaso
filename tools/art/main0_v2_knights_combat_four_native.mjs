@@ -734,6 +734,7 @@ try{
  await writeFile(join(output,"combat4-jump-stamina-original-world.json"),JSON.stringify(evidence,null,2)+"\n");
  console.log("COMBAT4_JUMP_STAMINA_WORLD_PROOF",JSON.stringify(evidence));
  assert.equal(result.confirmedDenial,true,"selected JumpAttack denial UI missing after genuine original Jump14 and no attack");
+ assert.equal(result.airborne.confirmedDenial,true,"one confirmed airborne12 denial cue required");
 }else if(physicalMode==="jump-review"){
  // Experimental extra opt-in: original first-party game, genuine native
  // key/pointer, same authenticated original QUIC stream and 60Hz Rust World.
