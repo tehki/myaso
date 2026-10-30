@@ -490,6 +490,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.equal(beforeFresh.failed,false,"original gesture connection must survive respawn");
    let resumedRound;
    try{
+    // Safe spawnX may put the original killer between actor2 and target3
+    // even on the FIRST incarnation. Clear the real AoE lane in every cycle.
+    const initialKiller=actors.find(a=>a.actor.id===1),initialKillerProof=await proof(initialKiller);
+    const initialKillerY=own(initialKillerProof,1).y;
+    staging.push(await stageLaneY(1,own(beforeFresh,3).y+COMBAT.attack.reach+COMBAT.fighterRadius+30));
     staging.push(await stagePair(2,3));
     resumedRound=await round([[2,3]]);
     const afterFresh=await proof(old);
@@ -502,6 +507,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===3&&e.damage===34);
     assert.equal(pressed.length,1,"one server-accepted fresh physical PRESS after respawn");
     assert.equal(hit.length,1,"one new original World 34HP HIT after respawn");
+    staging.push(await stageLaneY(1,initialKillerY));
     const renewalCycles=[{cycle:1,death,respawn,afterFresh,resumedRound}];
     let lastRespawn=respawn;
     for(let cycle=2;cycle<=3;cycle++){
