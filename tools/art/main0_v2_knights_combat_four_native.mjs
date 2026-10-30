@@ -170,6 +170,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
   });
  };
+ const nativeDispatches=[]; // bounded, read-only first-RED W3C command timing
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
   const replicas=await readAll();
@@ -226,6 +227,17 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
  function dispatchPreparedClick({a}){
   // Critical simultaneous phase: no browser reads, aim moves or down-ACK
   // barriers between dispatching these genuine native button sequences.
+  // Same-tick request timestamps are NOT game authority. If native overlap
+  // fails, they reveal Node dispatch vs real browser callback scheduling.
+  // The helper is also run standalone in a strict source contract test.
+  // That test has no lifecycle closure or original actor identity to log.
+  const dispatch=typeof nativeDispatches==="undefined" ? null
+   : {actorId:a.actor?.id??null,browser:a.s.engine??null,
+      requestedAtEpochMs:Date.now(),settledAtEpochMs:null,error:null};
+  if(dispatch){
+   nativeDispatches.push(dispatch);
+   if(nativeDispatches.length>24)nativeDispatches.shift();
+  }
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
     // The Firefox W3C 25ms pause can expand to a 142-150ms *real* physical
@@ -234,7 +246,8 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     // same native W3C request. Keep the strict measured <135ms Light gate.
     {type:"pointerDown",button:0},{type:"pointerUp",button:0},
    ]}]
-  });
+  }).then(result=>{if(dispatch)dispatch.settledAtEpochMs=Date.now();return result;},
+   error=>{if(dispatch){dispatch.settledAtEpochMs=Date.now();dispatch.error=String(error);}throw error;});
  }
  async function collectPreparedClick({a,targetId,before}){
   const edges=await evaluate(a.s,"return window.__MYASO_FOUR_PHYSICAL_LMB__?.map(e=>({...e}))??[];");
@@ -524,6 +537,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     .catch(e=>({error:String(e)}))
   })));
   const evidence={error:String(error),rounds,staging,physicalEvents,
+   nativeDispatches:nativeDispatches.map(d=>({...d})),
    replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
   await writeFile(join(output,"combat4-four-native-combat-lifecycle-failure.json"),JSON.stringify(evidence,null,2)+"\n");
   console.error("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_FAILURE",JSON.stringify(evidence));throw error;
@@ -926,15 +940,56 @@ try{
   const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
  },8000);
  const beforeNormal=(await proof()).acknowledged.length;
+ const beforeNormalWorld=readAuthoritativeWorld().length;
  await click();
- const afterNormal=await waitFor(async()=>{
-  const p=await proof(),later=p.acknowledged.slice(beforeNormal);
-  return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
- },9000);
+ let afterNormal;
+ try{
+  afterNormal=await waitFor(async()=>{
+   const p=await proof(),later=p.acknowledged.slice(beforeNormal);
+   return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
+  },9000);
+ }catch(error){
+  // Preserve the original strict 9s RED and W3C proof. Diagnostics run only
+  // AFTER failure; no retry, grace window, forged receipt, or World mutation.
+  const diagnosis={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   stage:"ordinary post-Space physical LMB PRESS/RELEASE",beforeNormal,
+   pageTarget:{x:page.x,y:page.y},originalError:String(error)};
+  try{diagnosis.transport=await proof()}catch(e){diagnosis.transportError=String(e)}
+  try{diagnosis.physical=await edges()}catch(e){diagnosis.physicalError=String(e)}
+  try{diagnosis.world=readAuthoritativeWorld().slice(beforeWorld).slice(-100)}
+  catch(e){diagnosis.worldError=String(e)}
+  try{
+   diagnosis.document=await evaluate(attacker,
+    "const c=document.querySelector('#arena'),r=c?.getBoundingClientRect();"+
+    "return {hasFocus:document.hasFocus(),activeId:document.activeElement?.id??null,"+
+    "scrollY:window.scrollY,arena:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,"+
+    "targetId:document.elementFromPoint("+page.x+","+page.y+")?.id??null}");
+  }catch(e){diagnosis.documentError=String(e)}
+  console.error("COMBAT4_SPACE_AFTER_NORMAL_FIRST_RED_DIAGNOSTIC",JSON.stringify(diagnosis));
+  throw error;
+ }
  const normal=afterNormal.acknowledged.slice(beforeNormal);
  assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
   "ordinary post-Space LMB still commits one valid pressed/released gesture");
  assert.equal(afterNormal.failed,false,"normal source0 must not disconnect");
+ // A server ACK alone does not prove original World gameplay. Bind BOTH
+ // physical normal-click edges to exact actor/gesture/sequence World-lock
+ // admission records. Never infer World mutation from replicated UI or ACK.
+ const normalPhysical=(await edges()).slice(witnessed.length);
+ assert.deepEqual(normalPhysical.slice(0,2).map(e=>e.type),
+  ["pointerdown","pointerup"],
+  "post-Space ordinary LMB must originate from genuine W3C down/up");
+ assert.ok(normalPhysical.slice(0,2).every(e=>e.trusted),
+  "post-Space physical LMB must be trusted by the real browser");
+ const normalWorld=readAuthoritativeWorld().slice(beforeNormalWorld);
+ for(const accepted of normal.filter(e=>e.source===0&&e.status===1)){
+  const action=new RegExp("M201_AUTH_GESTURE_ACTION tick=\\d+ fighter="+actorId
+   +" source=0 gesture="+accepted.gestureId+" sequence="+accepted.sequence
+   +" eventAction="+accepted.action+" status=1(?:\\s|$)");
+  assert.match(normalWorld,action,
+   "post-Space real World must admit exact source0 "+accepted.action
+   +" actor/gesture/sequence, not just a transport ACK");
+ }
  // Second genuine W3C order: LMB down BEFORE Space, then actual physical
  // keydown must send one same-lease CANCEL, never a synthetic RELEASE.
  // A slow driver may legitimately let early Light contact happen before
@@ -979,6 +1034,7 @@ try{
   genuineChromeOrFirefox:true,independentPhysicalHumanHosts:false,
   physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
   ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
+  normalWorld,normalPhysical,
   midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
   nativePhysicalAll:await edges(),
   before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
