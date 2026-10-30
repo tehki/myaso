@@ -265,6 +265,63 @@ impl GameState {
         });
     }
 
+    // Core 8C: one atomic original-World decision for renewal. Neither a
+    // client HELLO nor another player's typed seat can grant this authority.
+    // The caller holds the World mutex and publishes the new active epoch
+    // before releasing it; the root connection continues to own membership.
+    fn authorize_typed_respawn_renewal(
+        &mut self,
+        player_id: u32,
+        root_lease: u64,
+        prior_epoch: u64,
+        fresh_lease: u64,
+        jump_review: bool,
+    ) -> Result<()> {
+        if self.chat_leases.get(&player_id) != Some(&root_lease) {
+            bail!("original admitted gameplay lease has retired");
+        }
+        if fresh_lease == prior_epoch || self.gesture_sessions.contains_key(&fresh_lease) {
+            bail!("typed generation epoch must be distinct and unused");
+        }
+        let old_binding = self
+            .gesture_sessions
+            .get(&prior_epoch)
+            .ok_or_else(|| anyhow::anyhow!("typed predecessor missing"))?
+            .binding();
+        let current_actor = self
+            .world
+            .fighter(player_id)
+            .ok_or_else(|| anyhow::anyhow!("authenticated actor missing"))?;
+        if old_binding.player_id != player_id
+            || old_binding.lease_epoch != prior_epoch
+            || old_binding.boot_nonce != self.boot_nonce
+            || old_binding.world_instance != self.world.world_instance()
+            || current_actor.world_incarnation() == old_binding.incarnation
+            || current_actor.hp <= 0.0
+            || current_actor.action == myaso_server::simulation::Action::Dead
+        {
+            bail!("fresh authoritative World incarnation required for typed renewal");
+        }
+        let mut new_path = SessionGestureWorldPath::from_admitted_world(
+            &self.world,
+            player_id,
+            fresh_lease,
+            self.boot_nonce,
+        )
+        .ok_or_else(|| anyhow::anyhow!("new typed generation not admissible"))?;
+        if jump_review {
+            new_path.enable_jump_review();
+        }
+        // No old 16-byte DATAGRAM is given the successor's epoch or path.
+        let mut old_path = self
+            .gesture_sessions
+            .remove(&prior_epoch)
+            .ok_or_else(|| anyhow::anyhow!("old typed generation disappeared"))?;
+        old_path.retire();
+        self.gesture_sessions.insert(fresh_lease, new_path);
+        Ok(())
+    }
+
     fn apply_flight_background_motion(&mut self) {
         let base_facing = self.world.tick as f32 * 0.075;
         for (index, net_id) in self.flight_background_ids.iter().copied().enumerate() {
@@ -1775,46 +1832,14 @@ async fn run_respawn_typed_channel(
         .ok_or_else(|| anyhow::anyhow!("typed lease allocator exhausted"))?;
     {
         let mut state = game.state.lock().await;
-        if state.chat_leases.get(&player_id) != Some(&root_lease) {
-            bail!("original admitted gameplay lease has retired");
-        }
         let prior_epoch = active.load(Ordering::Acquire);
-        let prior = state
-            .gesture_sessions
-            .get(&prior_epoch)
-            .ok_or_else(|| anyhow::anyhow!("typed predecessor missing"))?;
-        let old_binding = prior.binding();
-        let current_actor = state
-            .world
-            .fighter(player_id)
-            .ok_or_else(|| anyhow::anyhow!("authenticated actor missing"))?;
-        if old_binding.player_id != player_id
-            || old_binding.world_instance != state.world.world_instance()
-            || current_actor.world_incarnation() == old_binding.incarnation
-            || current_actor.hp <= 0.0
-            || current_actor.action == myaso_server::simulation::Action::Dead
-        {
-            bail!("fresh authoritative World incarnation required for typed renewal");
-        }
-        let mut new_path = SessionGestureWorldPath::from_admitted_world(
-            &state.world,
+        state.authorize_typed_respawn_renewal(
             player_id,
+            root_lease,
+            prior_epoch,
             fresh_lease,
-            state.boot_nonce,
-        )
-        .ok_or_else(|| anyhow::anyhow!("new typed generation not admissible"))?;
-        if jump_review {
-            new_path.enable_jump_review();
-        }
-        // No raw old DATAGRAM can acquire the fresh path under any ordering.
-        // Drop the old path rather than retaining a retired authority object
-        // in the per-tick World map for every successive incarnation.
-        let mut old_path = state
-            .gesture_sessions
-            .remove(&prior_epoch)
-            .ok_or_else(|| anyhow::anyhow!("old typed generation disappeared"))?;
-        old_path.retire();
-        state.gesture_sessions.insert(fresh_lease, new_path);
+            jump_review,
+        )?;
         active.store(fresh_lease, Ordering::Release);
     }
     let mut buffer = Vec::with_capacity(18);
@@ -3546,5 +3571,246 @@ mod source11_gesture_path_lifetime_tests {
             state.gesture_sessions.get(&7).unwrap().binding().player_id,
             2
         );
+    }
+}
+
+// Core 8C independent review of the EXACT renewal decision used by the live
+// optional QUIC stream. Other Rust tests already prove authentic 3x34HP
+// death/timed respawn; these cases qualify actor/lease/World handover itself.
+#[cfg(test)]
+mod core8c_source11_world_authority_tests {
+    use super::*;
+    use myaso_server::prealpha_lmb_gesture_proposal::{
+        encode_event, AckStatus, GestureAction, GestureEvent,
+    };
+
+    #[test]
+    fn renewal_requires_new_world_life_and_preserves_other_current_player() {
+        let mut state = GameState::new(0, 0);
+        state.boot_nonce = 17;
+        assert!(state.world.add_player(1));
+        assert!(state.world.add_player(2));
+        state.chat_leases.insert(1, 101);
+        state.chat_leases.insert(2, 202);
+        let first =
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 11, state.boot_nonce)
+                .unwrap();
+        let mut old_packet_owner =
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 11, state.boot_nonce)
+                .unwrap();
+        let old_life = first.binding().incarnation;
+        state.gesture_sessions.insert(11, first);
+        state.gesture_sessions.insert(
+            22,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 2, 22, state.boot_nonce)
+                .unwrap(),
+        );
+
+        // No renewal on the same incarnation, forged root, or foreign path.
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_err());
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 999, 11, 33, false)
+            .is_err());
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 22, 33, false)
+            .is_err());
+        assert_eq!(state.gesture_sessions.len(), 2);
+
+        assert!(state.world.remove_player(1));
+        // A new incarnation of the SAME numeric actor, not another user.
+        assert!(state.world.add_player(1));
+        assert_ne!(
+            state.world.fighter(1).unwrap().world_incarnation(),
+            old_life
+        );
+        assert!(
+            state
+                .authorize_typed_respawn_renewal(1, 101, 11, 22, false)
+                .is_err(),
+            "foreign epoch must never be overwritten"
+        );
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 11, false)
+            .is_err());
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, true)
+            .is_ok());
+        assert!(!state.gesture_sessions.contains_key(&11));
+        assert_eq!(state.gesture_sessions.len(), 2);
+        let bound = state.gesture_sessions.get(&33).unwrap().binding();
+        assert_eq!(bound.player_id, 1);
+        assert_eq!(bound.lease_epoch, 33);
+        assert_eq!(
+            bound.incarnation,
+            state.world.fighter(1).unwrap().world_incarnation()
+        );
+        assert_eq!(
+            state.chat_leases.get(&1),
+            Some(&101),
+            "Chat C1 keeps the original root session lease"
+        );
+        assert_eq!(
+            state.gesture_sessions.get(&22).unwrap().binding().player_id,
+            2
+        );
+
+        let press = encode_event(GestureEvent {
+            action: GestureAction::Press,
+            sequence: 1,
+            gesture_id: 1,
+            client_tick: u32::MAX,
+        })
+        .unwrap();
+        let old_ack = old_packet_owner
+            .accept_under_world_lock(&mut state.world, 11, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(old_ack.status, AckStatus::Stale);
+        assert_eq!(
+            state.world.fighter(1).unwrap().action,
+            myaso_server::simulation::Action::Idle
+        );
+        let mut renewed = state.gesture_sessions.remove(&33).unwrap();
+        let fresh_ack = renewed
+            .accept_under_world_lock(&mut state.world, 33, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(fresh_ack.status, AckStatus::Accepted);
+        assert_eq!(
+            state.world.fighter(1).unwrap().action,
+            myaso_server::simulation::Action::AttackWindup
+        );
+        state.gesture_sessions.insert(33, renewed);
+        assert!(
+            state
+                .authorize_typed_respawn_renewal(1, 101, 33, 44, false)
+                .is_err(),
+            "a second HELLO cannot rotate an already-current life"
+        );
+        assert_eq!(state.gesture_sessions.get(&33).unwrap().binding(), bound);
+    }
+
+    #[test]
+    fn two_successive_world_lives_rotate_only_current_generation_and_reject_old_boot() {
+        let mut state = GameState::new(0, 0);
+        state.boot_nonce = 41;
+        assert!(state.world.add_player(1));
+        assert!(state.world.add_player(2));
+        state.chat_leases.insert(1, 101);
+        state.chat_leases.insert(2, 202);
+        state.gesture_sessions.insert(
+            11,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 11, state.boot_nonce)
+                .unwrap(),
+        );
+        state.gesture_sessions.insert(
+            22,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 2, 22, state.boot_nonce)
+                .unwrap(),
+        );
+
+        let first_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert!(state.world.remove_player(1));
+        assert!(state.world.add_player(1));
+        let second_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert_ne!(first_life, second_life);
+        // No path from a different boot may bind the new incarnation,
+        // even if its numeric player and root lease are unchanged.
+        state.boot_nonce = 42;
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_err());
+        assert!(state.gesture_sessions.contains_key(&11));
+        assert!(!state.gesture_sessions.contains_key(&33));
+        state.boot_nonce = 41;
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_ok());
+        assert!(!state.gesture_sessions.contains_key(&11));
+        assert_eq!(
+            state
+                .gesture_sessions
+                .get(&33)
+                .unwrap()
+                .binding()
+                .incarnation,
+            second_life
+        );
+        let mut second_life_old =
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 33, state.boot_nonce)
+                .unwrap();
+
+        // A second full life change occurs under the SAME authenticated
+        // root lease. Its old bound bidi cannot attack the third life.
+        assert!(state.world.remove_player(1));
+        assert!(state.world.add_player(1));
+        let third_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert_ne!(second_life, third_life);
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 33, 44, false)
+            .is_ok());
+        assert_eq!(state.gesture_sessions.len(), 2);
+        assert!(!state.gesture_sessions.contains_key(&33));
+        assert_eq!(
+            state
+                .gesture_sessions
+                .get(&44)
+                .unwrap()
+                .binding()
+                .incarnation,
+            third_life
+        );
+        assert_eq!(
+            state.gesture_sessions.get(&22).unwrap().binding().player_id,
+            2
+        );
+        assert_eq!(state.chat_leases.get(&1), Some(&101));
+        assert_eq!(state.chat_leases.get(&2), Some(&202));
+
+        let press = encode_event(GestureEvent {
+            action: GestureAction::Press,
+            sequence: 1,
+            gesture_id: 1,
+            client_tick: u32::MAX,
+        })
+        .unwrap();
+        let retired = second_life_old
+            .accept_under_world_lock(&mut state.world, 33, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(retired.status, AckStatus::Stale);
+        let mut third = state.gesture_sessions.remove(&44).unwrap();
+        let live = third
+            .accept_under_world_lock(&mut state.world, 44, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(live.status, AckStatus::Accepted);
+        state.gesture_sessions.insert(44, third);
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 44, 55, false)
+            .is_err());
+        assert_eq!(state.gesture_sessions.len(), 2);
+    }
+
+    #[test]
+    fn root_retirement_and_absent_actor_never_grant_typed_generation() {
+        let mut state = GameState::new(0, 0);
+        state.boot_nonce = 19;
+        assert!(state.world.add_player(1));
+        state.chat_leases.insert(1, 101);
+        state.gesture_sessions.insert(
+            11,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 11, state.boot_nonce)
+                .unwrap(),
+        );
+        assert!(state.world.remove_player(1));
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_err());
+        state.chat_leases.remove(&1);
+        assert!(state.world.add_player(1));
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_err());
+        assert!(state.gesture_sessions.contains_key(&11));
+        assert!(!state.gesture_sessions.contains_key(&33));
     }
 }
