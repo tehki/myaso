@@ -26,6 +26,7 @@ class BoundQuic {
     this.uniOpened=0;
     this.datagramWrites=[];
     this.boundWrites=[];
+    this.boundSources=[];
     this.ready=Promise.resolve();
     this.closed=new Promise(resolve=>this.resolveClosed=resolve);
     this.datagrams={
@@ -48,14 +49,15 @@ class BoundQuic {
       }});
       return {readable,writable};
     }
-    const readable=new ReadableStream({start:ctrl=>this.boundSource=ctrl});
+    let boundSource;
+    const readable=new ReadableStream({start:ctrl=>{boundSource=ctrl;this.boundSource=ctrl;this.boundSources.push(ctrl);}});
     const writable=new WritableStream({write:async bytes=>{
       const body=Uint8Array.from(bytes);this.boundWrites.push(body);
       if(body.length===8 && body.every((b,i)=>b===hello[i])) {
-        queueMicrotask(()=>this.boundSource.enqueue(frame([2,0x13,0,0])));
+        queueMicrotask(()=>boundSource.enqueue(frame([2,0x13,0,0])));
       } else if(body.length===18 && body[0]===16 && body[1]===0) {
         const ack=body.slice(2);ack[1]=0x12;ack[2]=1;
-        queueMicrotask(()=>this.boundSource.enqueue(frame(ack)));
+        queueMicrotask(()=>boundSource.enqueue(frame(ack)));
       }
     }});
     return {readable,writable};
@@ -64,7 +66,7 @@ class BoundQuic {
     if(this.closedByClient)return;
     this.closedByClient=true;
     this.resolveClosed();
-    for(const stream of [this.datagramSource,this.rootSource,this.boundSource]){
+    for(const stream of [this.datagramSource,this.rootSource,...this.boundSources]){
       try {stream?.close();} catch {}
     }
   }
@@ -147,4 +149,51 @@ test("Source11 original unsent generation cannot close the newly renewed lease",
   assert.equal(c.transport.boundWrites.length,2);
   assert.equal(c.transport.datagramWrites.length,0);
   c.close("test complete");
+}));
+
+test("Source11 second incarnation keeps 3 distinct leases; old bidi and datagram ACK cannot settle new matching IDs",()=>fixture(async()=>{
+  const acks=[];
+  const client=await connectAuthoritativeClient({
+    webTransportUrl:"https://127.0.0.1:4433/game",
+    onExperimentalGestureAck:(bytes,lease)=>acks.push({bytes,lease}),
+  });
+  await client.negotiateExperimentalGestureV2({reliableStream:true});
+  const quic=client.transport.transport;
+  const root=client.transport.typedLeaseToken;
+  const generations=[];
+  client.transport.onGestureRenewalRequired=async()=>{
+    generations.push(await client.transport.negotiateRespawnTypedChannel());
+  };
+  quic.rootSource.enqueue(frame([2,0x14,0,0]));
+  await eventually(()=>generations.length===1);
+  const first=generations[0];
+  await client.sendExperimentalGestureEdge(event(1,1),first);
+  await eventually(()=>acks.length===1);
+  assert.equal(acks[0].lease,first);
+  quic.rootSource.enqueue(frame([2,0x14,0,0]));
+  await eventually(()=>generations.length===2);
+  const second=generations[1];
+  assert.notEqual(second,first);
+  assert.notEqual(second,root);
+  assert.equal(client.transport.typedGeneration,2);
+  assert.equal(quic.bidiOpened,3,"one immutable root and one bound bidi per authoritative incarnation");
+  assert.equal(quic.uniOpened,0,"no Chat C1 uni stream interception");
+
+  // Collision: historical status=ACCEPTED seq1/gesture1 from the *prior*
+  // bound QUIC stream must not be delivered to the new pending outbox.
+  // DATAGRAM ACK is also permanently rooted in old generation.
+  const oldAck=event(1,1);oldAck[1]=0x12;oldAck[2]=1;
+  quic.boundSources[0].enqueue(frame(oldAck));
+  quic.datagramSource.enqueue(oldAck);
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(acks.length,1,"neither old bidi nor datagram ACK can settle generation2");
+  assert.throws(
+    ()=>client.sendExperimentalGestureEdge(event(1,1),first),
+    /grant|generation/,"old generation cannot write to new stream");
+  await client.sendExperimentalGestureEdge(event(1,1),second);
+  await eventually(()=>acks.length===2);
+  assert.equal(acks[1].lease,second,"new ACK must originate on new generation's own bidi");
+  assert.equal(quic.datagramWrites.length,0,"new Combat never falls back to legacy typed datagrams");
+  assert.equal(client.transport.closed,false,"valid new incarnation survives old ACK replays");
+  client.close("complete two generations");
 }));
