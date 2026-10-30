@@ -1,3 +1,4 @@
+import {createPhysicalJumpChord} from "../src/browser/physical-jump-chord.mjs";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import {createTypedJumpStaminaFeedback} from "../src/browser/typed-jump-stamina-feedback.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
@@ -272,6 +273,7 @@ let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 let middleBlockHeld = false;
+const physicalJumpChord = createPhysicalJumpChord();
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -279,6 +281,10 @@ const leftButtonCharge = createLeftButtonCharge({
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
+    // Fast physical Space may already have consumed jumpRequested. A fresh
+    // Light in that same bounded chord must still reach original World as
+    // Jump+Attack, once, including inside the original Recovery buffer.
+    if (physicalJumpChord.consume(Date.now(), keys.has("Space"))) jumpRequested = true;
     // Read-only M111 observation stays after the original movement latch.
     // Original R1 requires that no instrumentation intervene between the
     // onLight edge and this release-direction capture.
@@ -447,6 +453,7 @@ canvas.addEventListener("keydown", (event) => {
   }
   keys.add(event.code);
   if (event.code === "Space" && !event.repeat) {
+    physicalJumpChord.press(Date.now(), event.isTrusted);
     jumpRequested = true;
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
@@ -461,7 +468,10 @@ canvas.addEventListener("keydown", (event) => {
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
-window.addEventListener("keyup", (event) => keys.delete(event.code));
+window.addEventListener("keyup", (event) => {
+  keys.delete(event.code);
+  if (event.code === "Space") physicalJumpChord.release();
+});
 window.addEventListener("blur", releaseInputs);
 // Chat composer focus must release held game inputs, not trap a charge.
 canvas.addEventListener("blur", releaseInputs);
@@ -1033,6 +1043,7 @@ function updateMouse(event) {
 }
 
 function releaseInputs() {
+  physicalJumpChord.release();
   keys.clear();
   if(typeof typedJumpStaminaFeedback!=="undefined")typedJumpStaminaFeedback.reset();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
