@@ -926,6 +926,7 @@ try{
   const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
  },8000);
  const beforeNormal=(await proof()).acknowledged.length;
+ const beforeNormalWorld=readAuthoritativeWorld().length;
  await click();
  let afterNormal;
  try{
@@ -957,6 +958,24 @@ try{
  assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
   "ordinary post-Space LMB still commits one valid pressed/released gesture");
  assert.equal(afterNormal.failed,false,"normal source0 must not disconnect");
+ // A server ACK alone does not prove original World gameplay. Bind BOTH
+ // physical normal-click edges to exact actor/gesture/sequence World-lock
+ // admission records. Never infer World mutation from replicated UI or ACK.
+ const normalPhysical=(await edges()).slice(witnessed.length);
+ assert.deepEqual(normalPhysical.slice(0,2).map(e=>e.type),
+  ["pointerdown","pointerup"],
+  "post-Space ordinary LMB must originate from genuine W3C down/up");
+ assert.ok(normalPhysical.slice(0,2).every(e=>e.trusted),
+  "post-Space physical LMB must be trusted by the real browser");
+ const normalWorld=readAuthoritativeWorld().slice(beforeNormalWorld);
+ for(const accepted of normal.filter(e=>e.source===0&&e.status===1)){
+  const action=new RegExp("M201_AUTH_GESTURE_ACTION tick=\\d+ fighter="+actorId
+   +" source=0 gesture="+accepted.gestureId+" sequence="+accepted.sequence
+   +" eventAction="+accepted.action+" status=1(?:\\s|$)");
+  assert.match(normalWorld,action,
+   "post-Space real World must admit exact source0 "+accepted.action
+   +" actor/gesture/sequence, not just a transport ACK");
+ }
  // Second genuine W3C order: LMB down BEFORE Space, then actual physical
  // keydown must send one same-lease CANCEL, never a synthetic RELEASE.
  // A slow driver may legitimately let early Light contact happen before
@@ -1001,6 +1020,7 @@ try{
   genuineChromeOrFirefox:true,independentPhysicalHumanHosts:false,
   physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
   ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
+  normalWorld,normalPhysical,
   midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
   nativePhysicalAll:await edges(),
   before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
