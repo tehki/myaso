@@ -238,6 +238,10 @@ async function activateNegotiatedLmb({
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
+      // During an authorized Source11 renewal the previous outbox is
+      // intentionally retired before the new bound GRANT arrives. Its closed
+      // state is not a root-session failure; the bounded negotiation owns it.
+      if (renewing) return;
       if (outbox.snapshot.closed) { fail("typed gesture lease was retired"); return; }
       if (outbox.snapshot.pending > 0) drain();
     },170);
