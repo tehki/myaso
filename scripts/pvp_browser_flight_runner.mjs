@@ -4541,9 +4541,16 @@ async function runOnlineUiJumpAttackBufferFlight(entries) {
     throw new Error("M137 Chrome never observed its authoritative light recovery before Space + LMB");
   }
 
+  // M137 real first-red #41095935491: original Space+LMB entered around
+  // 161ms into the 255ms recovery, 4ms BEFORE the authoritative final
+  // 90ms jump-attack buffer. The World legitimately resolved a second Light
+  // rather than the expected JumpAttack. Aim the same genuine W3C chord
+  // 20ms INSIDE that unchanged final-90ms window (as M131 does for Jump).
+  // Native browser admission, 42HP and full original World action chain
+  // remain mandatory; no grace, input fabrication, or mechanic changes.
   const targetOffsetMs = Math.max(
     0,
-    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpAttackWindowMs - 20,
+    COMBAT.attack.recoveryMs - COMBAT.inputBuffer.jumpAttackWindowMs + 20,
   );
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
