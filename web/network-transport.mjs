@@ -62,6 +62,7 @@ class WebTransportGameConnection {
     // JS token; the initial QUIC datagram generation uses the connection.
     this.typedLeaseToken = this;
     this.typedGeneration = 0;
+    this.typedRenewalPending = false;
     this.typedBoundWriter = null;
     this.onBoundGestureAck = null;
     this.onGestureRenewalRequired = null;
@@ -123,6 +124,11 @@ class WebTransportGameConnection {
     }
     if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000)
       throw new RangeError("bounded Source11 grant deadline required");
+    // A second HELLO before the first is bound would race the server's single
+    // current World incarnation and could replace the valid JS lease token.
+    // Unlike the UI-level renewal guard, this protects transport API callers.
+    if (this.typedRenewalPending) throw new Error("Source11 renewal already in progress");
+    this.typedRenewalPending = true;
     // A single startup deadline covers OPEN, HELLO write/backpressure and
     // server GRANT, rather than starting only after HELLO has been written.
     // WebTransport does not guarantee that createBidirectionalStream() can
@@ -190,7 +196,10 @@ class WebTransportGameConnection {
         try { void Promise.resolve(writer.abort?.(String(error))).catch(()=>{}); } catch {}
       }
       throw error;
-    } finally { clearTimeout(timer); }
+    } finally {
+      clearTimeout(timer);
+      this.typedRenewalPending = false;
+    }
   }
 
   // Only a LOCAL loopback original-Rust flight may negotiate this experimental
