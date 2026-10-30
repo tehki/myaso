@@ -19,7 +19,7 @@ const physicalMode=process.env.MYASO_LIVE_GESTURE_PHYSICAL_MODE||"original";
 const chatC1=process.env.MYASO_LIVE_GESTURE_CHAT_C1==="1";
 const instantLmb=process.env.MYASO_LIVE_GESTURE_INSTANT_LMB==="1";
 assert.ok(!instantLmb||!["private-hit","space-guard"].includes(physicalMode),"select a release-profile Combat acceptance mode");
-assert.ok(["original","held-lmb","recovery-buffer","recovery-jump","four-combat-lifecycle","private-hit","space-guard","jump-review","jump-two-hit","jump-stamina"].includes(physicalMode),"unknown physical gesture acceptance mode");
+assert.ok(["original","held-lmb","recovery-buffer","recovery-jump","four-combat-lifecycle","four-combat-respawn-same-session","private-hit","space-guard","jump-review","jump-two-hit","jump-stamina"].includes(physicalMode),"unknown physical gesture acceptance mode");
 assert.ok(physicalMode!=="jump-stamina"||instantLmb,"jump-stamina qualifies the selected instant-LMB profile");
 assert.equal(engines.length,4,"four distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
@@ -420,6 +420,49 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   expectedHp.set(2,100);
   const afterRespawn=await waitReplicas();
   const old=actors.find(a=>a.actor.id===2);
+  if(physicalMode==="four-combat-respawn-same-session"){
+   // Source11 POSITIVE acceptance, NEVER the original lifecycle's actor#5
+   // reconnect escape hatch. Preserve original four real W3C sessions.
+   const originalSessionId=old.s.id, originalActorId=old.actor.id;
+   const beforeFresh=await proof(old),starting=lines(),startOffset=starting.length-(starting.at(-1)===""?1:0);
+   assert.equal(originalActorId,2,"same-seat respawn must retain player2");
+   assert.equal(beforeFresh.ownPlayerNetId,originalActorId,"same actor World identity before fresh click");
+   assert.equal(beforeFresh.closed,false,"a genuine respawn must not close the original game connection");
+   assert.equal(beforeFresh.failed,false,"original gesture connection must survive respawn");
+   let resumedRound;
+   try{
+    staging.push(await stagePair(2,1));
+    resumedRound=await round([[2,1]]);
+    const afterFresh=await proof(old);
+    assert.equal(old.s.id,originalSessionId,"native WebDriver session must never be replaced");
+    assert.equal(afterFresh.ownPlayerNetId,originalActorId,"respawn must fight as existing actor2, never rejoin actor5");
+    assert.equal(afterFresh.closed,false,"new generation must keep original QUIC connection open");
+    assert.equal(afterFresh.failed,false,"new genuine physical click must not retire a recoverable session");
+    const pressed=resumedRound.presses.filter(e=>e.fighter===originalActorId&&e.eventAction===1&&e.status===1);
+    const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===1&&e.damage===34);
+    assert.equal(pressed.length,1,"one server-accepted fresh physical PRESS after respawn");
+    assert.equal(hit.length,1,"one new original World 34HP HIT after respawn");
+    const result={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+     mode:physicalMode,originalActorId,originalSessionId,beforeFresh,afterFresh,
+     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,
+     retiredGenerationSafetyRequiresSeparateNegativeProof:true,rejoinedAsActor5:false,
+     originalWorldAfterRespawn:lines().slice(startOffset)};
+    await writeFile(join(output,"combat4-respawn-same-session-PASS.json"),JSON.stringify(result,null,2)+"\n");
+    console.log("COMBAT4_RESPAWN_SAME_SESSION_NATIVE_PASS",JSON.stringify(result));
+    return;
+   }catch(error){
+    const current=await proof(old).catch(e=>({error:String(e)}));
+    const firstRed={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+     mode:physicalMode,error:String(error),originalActorId,originalSessionId,
+     sameW3cSession:old.s.id===originalSessionId,beforeFresh,current,
+     newPhysicalClicks:await evaluate(old.s,
+      "return window.__MYASO_FOUR_PHYSICAL_LMB__?.map(e=>({...e}))??[];").catch(e=>({error:String(e)})),
+     originalWorldAfterRespawn:lines().slice(startOffset),respawn};
+    await writeFile(join(output,"combat4-respawn-same-session-FIRST-RED.json"),JSON.stringify(firstRed,null,2)+"\n");
+    console.error("COMBAT4_RESPAWN_SAME_SESSION_FIRST_RED",JSON.stringify(firstRed));
+    throw error;
+   }
+  }
   // The original native page still owns the pre-death negotiated lease.
   // A genuine post-respawn click must fail closed, never acquire authority
   // from the player's returned HP or silently grant a new actor incarnation.
@@ -579,8 +622,10 @@ try{
  // First-party unchanged /web/index.html game page, not a synthetic QA UI.
  // True WebDriver key/pointer actions run against a fresh admitted original
  // Rust QUIC actor. M201 prints are read-only World mutation events, not HUD.
- if(physicalMode==="four-combat-lifecycle"||physicalMode==="private-hit"){
+ if(physicalMode==="four-combat-lifecycle"||physicalMode==="four-combat-respawn-same-session"||physicalMode==="private-hit"){
   await runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativeWorld});
+  if(physicalMode==="four-combat-respawn-same-session"&&chatC1)
+   await nativeChatRound("After same-session death and renewed physical Combat");
  }else if(physicalMode==="recovery-buffer"||physicalMode==="recovery-jump"){
   await runNativeRecoveryBuffer({actors,evaluate,request,readAuthoritativeWorld,waitFor,sleep:sleeps,
    save:(name,evidence)=>writeFile(join(output,name),JSON.stringify(evidence,null,2)+"\n"),jumpChord:physicalMode==="recovery-jump"});
