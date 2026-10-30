@@ -431,6 +431,8 @@ canvas.addEventListener("keydown", (event) => {
   // E is reserved for future Use interaction. Combat never consumes it.
   if (event.code === "KeyE") return;
   const firstAudioGesture = !audio.isUnlocked();
+  const deferredJumpAudio = firstAudioGesture && event.code === "Space" && !event.repeat
+    && event.isTrusted === true && afterSource0Audio.noteJump?.();
   if (["KeyW", "KeyA", "KeyS", "KeyD", "Space"].includes(event.code)) event.preventDefault();
   if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code) && !keys.has(event.code)) {
     const direction = dashGesture.press(event.code, performance.now(), event.repeat);
@@ -443,13 +445,16 @@ canvas.addEventListener("keydown", (event) => {
   keys.add(event.code);
   if (event.code === "Space" && !event.repeat) {
     jumpRequested = true;
-    audio.play("jump");
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
+    sendImmediatePhysicalJumpEdge(event.isTrusted);
+    if (!deferredJumpAudio) audio.play("jump");
   }
   // Keyboard input also wins over the one-time audio unlock.
-  audio.unlock();
-  if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
+  if (!deferredJumpAudio) {
+    audio.unlock();
+    if (firstAudioGesture && !event.repeat && event.code === "Space") audio.play("jump");
+  }
 });
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
@@ -1060,6 +1065,39 @@ function sampleInput({ playStepAudio = true } = {}) {
 // Submit ONE fresh, original v1 sample immediately from the trusted DOM edge,
 // with the SAME monotonic client tick and the SAME authoritative QUIC writer.
 // No synthetic input, alternate combat engine, protocol or server clock.
+function sendImmediatePhysicalJumpEdge(trusted) {
+  if (!trusted || document.hidden || document.activeElement !== canvas
+    || matchOver || !networkClient?.playerNetId) return;
+  const gestureState = experimentalGestureLab?.snapshot;
+  if (typedLmbEnabled && (!gestureState || gestureState.failed || gestureState.closed)) return;
+  sampleInput({ playStepAudio: false });
+  if (!currentInput.jump) return;
+  const outgoingTick = clientTick;
+  markStaminaDenialSubmitted(outgoingTick, currentInput);
+  networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+  clientTick = (clientTick + 1) >>> 0;
+  const debug = window.__MYASO_ACCEPTANCE_STATE__;
+  if (debug) {
+    debug.inputSubmissions ??= [];
+    debug.inputSubmissions.push({clientTick:outgoingTick,epochMs:Date.now(),
+      attack:Boolean(currentInput.attack),heavyAttack:Boolean(currentInput.heavyAttack),
+      jump:true,block:Boolean(currentInput.block),source:"physical-space-original-v1"});
+    if(debug.inputSubmissions.length>32)debug.inputSubmissions.shift();
+  }
+  // This uses the original redundancy/prediction owner once. The next RAF
+  // must not replay this genuine one-shot chord under a fresh client tick.
+  attackRequested = false;
+  runningAttackRequested = false;
+  committedLightMove = null;
+  heavyAttackRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
+}
+
 function sendImmediatePhysicalBlockEdge(trusted) {
   if (!trusted || document.hidden || matchOver || !networkClient?.playerNetId) return;
   sampleInput({ playStepAudio: false });

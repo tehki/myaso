@@ -318,8 +318,15 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   await waitReplicas();
   await Promise.all(actors.map(a=>evaluate(a.s,String.raw`
    const edges=[];window.__MYASO_FOUR_PHYSICAL_LMB__=edges;
+   // Read-only distinction between driver delay and a stalled browser frame
+   // when a genuine intended-short click exceeds the unchanged135ms gate.
+   let frames=0,lastFrameAt=Date.now(),maxFrameGapMs=0;
+   const observeFrame=()=>{const now=Date.now();maxFrameGapMs=Math.max(maxFrameGapMs,now-lastFrameAt);
+    lastFrameAt=now;frames++;requestAnimationFrame(observeFrame);};
+   requestAnimationFrame(observeFrame);
    for(const type of ['pointerdown','pointerup'])window.addEventListener(type,e=>{
-    if(e.button===0){edges.push({type,trusted:e.isTrusted,pointerType:e.pointerType,pointerId:e.pointerId,epochMs:Date.now()});
+    if(e.button===0){edges.push({type,trusted:e.isTrusted,pointerType:e.pointerType,pointerId:e.pointerId,epochMs:Date.now(),
+     frames,lastFrameAt,maxFrameGapMs,frameAgeMs:Date.now()-lastFrameAt});
      if(edges.length>64)edges.shift();}
    },true);return true;`)));
   if(physicalMode==="private-hit"){

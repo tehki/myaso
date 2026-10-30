@@ -62,3 +62,21 @@ test("invalid input and audio objects fail closed", () => {
   assert.equal(h.helper.noteRelease(null), false);
   assert.equal(h.helper.afterOriginalSend({attack:true,heavyAttack:false}), false);
 });
+
+test("cold physical Jump cue waits for the original Jump submission, including typed-LMB coexistence",()=>{
+ const h=harness();
+ assert.equal(h.helper.noteJump(),true);
+ assert.equal(h.helper.afterOriginalSend({attack:true,jump:false}),false);
+ assert.deepEqual(h.events,[]);
+ assert.equal(h.helper.afterOriginalSend({attack:false,jump:true}),true);
+ assert.deepEqual(h.events,["schedule:50"]);
+ h.run();assert.deepEqual(h.events,["schedule:50","unlock","play:jump"]);
+ assert.equal(h.helper.afterOriginalSend({jump:true}),false);
+});
+
+test("focus loss cancels a pending or scheduled cold Jump cue",()=>{
+ const h=harness();h.helper.noteJump();h.helper.reset();
+ assert.equal(h.helper.afterOriginalSend({jump:true}),false);
+ h.helper.noteJump();h.helper.afterOriginalSend({jump:true});h.helper.reset();h.run();
+ assert.deepEqual(h.events,["schedule:50","cancel:17"]);
+});

@@ -1,6 +1,6 @@
 // First-use WebAudio startup can block Firefox's main thread for hundreds
-// of ms. Never initialize it within the physical release callback. Queue
-// it only after the ORIGINAL source0 writer receives the genuine release.
+// of ms. Never initialize it within a physical release/Jump callback. Queue
+// it only after the ORIGINAL source0 writer receives the genuine intent.
 // This is presentation-only: it must never emit/alter/replay combat input.
 export function createAfterSource0Audio({
   audio,
@@ -24,6 +24,7 @@ export function createAfterSource0Audio({
   }
   function matchesReleasedSource0(input) {
     if (!pending || !input) return false;
+    if (pending === "jump") return input.jump === true;
     if (pending === "light") return input.attack === true && input.heavyAttack === false;
     if (pending === "heavy") return input.heavyAttack === true && input.attack === false;
     // Space+LMB's immediate Light was already committed on pointerDOWN.
@@ -31,7 +32,7 @@ export function createAfterSource0Audio({
   }
   function afterOriginalSend(input) {
     if (scheduled !== null || !matchesReleasedSource0(input)) return false;
-    const cue = pending === "heavy" ? "heavy" : "light";
+    const cue = pending === "jump" ? "jump" : pending === "heavy" ? "heavy" : "light";
     pending = null;
     scheduled = schedule(() => {
       scheduled = null;
@@ -45,5 +46,10 @@ export function createAfterSource0Audio({
     if (scheduled !== null) cancel(scheduled);
     scheduled = null;
   }
-  return Object.freeze({ noteRelease, afterOriginalSend, reset });
+  function noteJump() {
+    if (audio.isUnlocked()) return false;
+    pending = "jump";
+    return true;
+  }
+  return Object.freeze({ noteRelease, noteJump, afterOriginalSend, reset });
 }
