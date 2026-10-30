@@ -91,9 +91,12 @@ test("fresh Space-first LMB preserves original combined JumpAttack intent after 
  const finish=source.indexOf('\n  },\n  onHeavy()',start);
  assert.ok(start>12&&finish>start);
  vm.runInContext('globalThis.actualLight=()=>{'+source.slice(start,finish)+'\n};',h.context);
- h.context.actualLight();h.context.sampleInput();
- assert.equal(h.context.currentInput.attack,true);
- assert.equal(h.context.currentInput.jump,true,"fresh LMB must join its just-submitted physical Space, not become buffered Light34");
+ h.context.actualLight();
+ assert.equal(h.packets.length,2,"fresh joint physical edge must be submitted before a prediction-only phase can consume Jump");
+ assert.equal(h.packets[1].attack,true);assert.equal(h.packets[1].jump,true);
+ h.context.sampleInput();
+ assert.equal(h.context.currentInput.attack,false,"next RAF cannot replay the immediate chord");
+ assert.equal(h.context.currentInput.jump,false);
 });
 
 test("physical chord cannot replay Space, survive release or attach a late unrelated Light",()=>{

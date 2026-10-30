@@ -119,16 +119,28 @@ try {
  // already authenticated speech bubble toward -X in B's canvas. This catches
  // fixed HUD labels that merely coincidentally sit above a spawn location.
  // A successful send already returned focus to Combat without needing Escape.
- await wd("POST","/session/"+a+"/actions",{actions:[{
-  type:"key",id:"c1-speech-world-walk",
-  actions:[{type:"keyDown",value:"a"},{type:"pause",duration:250},{type:"keyUp",value:"a"}],
- }]});
- const movingBubble=await poll("Knight speech must move with actual Rust World actor", async()=>{
-  const next=await evaljs(b,getSpeech(first),[first]);
-  return {...next,ok:next.ok&&next.x<nearBubble.x-9};
- },3000);
+ // Read actual replicated geometry when the selected source0 profile owns
+ // a proof hook. It is observation, never a movement/position injector.
+ const moverId=await evaljs(a,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()?.ownPlayerNetId??null;");
+ const readMoverWorld=()=>evaljs(b,"const p=window.__MYASO_LOCAL_GESTURE_PROOF__?.();const f=p?.replicatedFighters?.find(f=>f.netId===arguments[0]);return f?{actorId:f.netId,x:f.x,y:f.y,serverTick:p.serverTick}:null;",[moverId]);
+ const worldBefore=await readMoverWorld();
+ if(typedGestures||instantLmb)assert.ok(worldBefore&&worldBefore.actorId===moverId,"speech movement must observe the authenticated actor in real Rust replicas");
+ // One genuine held key, released on observed movement or the unchanged
+ //3s deadline. A fixed250ms pulse can end between delayed client frames.
+ await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"c1-speech-world-walk",actions:[{type:"keyDown",value:"a"}]}]});
+ let movingBubble,speechMoveError;
+ try {
+  movingBubble=await poll("Knight speech must move with actual Rust World actor",async()=>{
+   const next=await evaljs(b,getSpeech(first),[first]),world=await readMoverWorld();
+   const movedInWorld=!worldBefore||(world&&world.actorId===worldBefore.actorId&&world.serverTick>worldBefore.serverTick&&world.x<worldBefore.x);
+   return {...next,world,ok:next.ok&&next.x<nearBubble.x-9&&movedInWorld};
+  },3000);
+ }catch(error){speechMoveError=error;throw error;}finally{
+  try {await wd("POST","/session/"+a+"/actions",{actions:[{type:"key",id:"c1-speech-world-walk",actions:[{type:"keyUp",value:"a"}]}]});}
+  catch(error){if(!speechMoveError)throw error;console.error("C1_NATIVE_MOVEMENT_RELEASE_FAILED",String(error));}
+ }
  console.log("CHAT_C1_BUBBLE_FOLLOWS_PHYSICAL_WORLD_MOVEMENT_PASS",
-   JSON.stringify({beforeX:nearBubble.x,afterX:movingBubble.x,deltaX:movingBubble.x-nearBubble.x}));
+   JSON.stringify({beforeX:nearBubble.x,afterX:movingBubble.x,deltaX:movingBubble.x-nearBubble.x,worldBefore,worldAfter:movingBubble.world}));
  await delay(250);
  const far=await evaljs(c,"return [...document.querySelectorAll('.local-chat-item .local-chat-text')].map(e=>e.textContent)");
  console.log("C_FAR",JSON.stringify(far));assert(!far.includes(first),"C outside authoritative radius");

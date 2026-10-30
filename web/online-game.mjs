@@ -284,7 +284,8 @@ const leftButtonCharge = createLeftButtonCharge({
     // Fast physical Space may already have consumed jumpRequested. A fresh
     // Light in that same bounded chord must still reach original World as
     // Jump+Attack, once, including inside the original Recovery buffer.
-    if (physicalJumpChord.consume(Date.now(), keys.has("Space"))) jumpRequested = true;
+    const joinedPhysicalJumpChord = physicalJumpChord.consume(Date.now(), keys.has("Space"));
+    if (joinedPhysicalJumpChord) jumpRequested = true;
     // Read-only M111 observation stays after the original movement latch.
     // Original R1 requires that no instrumentation intervene between the
     // onLight edge and this release-direction capture.
@@ -300,6 +301,9 @@ const leftButtonCharge = createLeftButtonCharge({
       runningAttackRequested = true;
       queueStaminaDenial("running-attack");
     }
+    // A prediction-only phase clears jumpRequested before the next network
+    // phase. Submit this real joined edge now, once, before audio or RAF.
+    if (joinedPhysicalJumpChord) sendImmediatePhysicalJumpEdge(joinedPhysicalJumpChord,"physical-lmb-space-original-v1");
     audio.play("light");
   },
   onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
@@ -1108,7 +1112,7 @@ function sampleInput({ playStepAudio = true } = {}) {
 // Submit ONE fresh, original v1 sample immediately from the trusted DOM edge,
 // with the SAME monotonic client tick and the SAME authoritative QUIC writer.
 // No synthetic input, alternate combat engine, protocol or server clock.
-function sendImmediatePhysicalJumpEdge(trusted) {
+function sendImmediatePhysicalJumpEdge(trusted,source="physical-space-original-v1") {
   if (!trusted || document.hidden || document.activeElement !== canvas
     || matchOver || !networkClient?.playerNetId) return;
   const gestureState = experimentalGestureLab?.snapshot;
@@ -1129,7 +1133,7 @@ function sendImmediatePhysicalJumpEdge(trusted) {
     debug.inputSubmissions ??= [];
     debug.inputSubmissions.push({clientTick:outgoingTick,epochMs:Date.now(),
       attack:Boolean(currentInput.attack),heavyAttack:Boolean(currentInput.heavyAttack),
-      jump:true,block:Boolean(currentInput.block),source:"physical-space-original-v1"});
+      jump:true,block:Boolean(currentInput.block),source});
     if(debug.inputSubmissions.length>32)debug.inputSubmissions.shift();
   }
   // This uses the original redundancy/prediction owner once. The next RAF
