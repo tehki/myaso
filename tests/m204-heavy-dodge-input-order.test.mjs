@@ -19,7 +19,7 @@ test("M204 schedules one genuine wheel during the FIRST physical LMB heavy hold"
   assert.ok(!flight.includes("await sleep(90);"));
   assert.ok(!flight.includes("await sleep(120);"));
   const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
-  const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 15);");
+  const dodge = flight.indexOf("await performArenaTimedPointerDodge(defender, defenderElementId, 0, defenderWheelViewport);");
   const sUp = flight.indexOf('await setMovementKey(defender, "s", false);');
   const keyUp = flight.lastIndexOf('const delivered = await lmbOutcome;');
   assert.ok(keyDown >= 0 && commit > keyDown && sDown > commit

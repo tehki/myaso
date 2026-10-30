@@ -26,3 +26,12 @@ export async function awaitOriginalHeavyChargeTick({readOutput,afterOffset,fight
  }
  throw new Error("original Heavy charge tick was not observed within the bounded native window");
 }
+
+export function planOriginalDodgeViewport(arena) {
+ if(!arena||!["left","top","width","height","innerWidth","innerHeight"].every(k=>Number.isFinite(arena[k]))
+  ||arena.left<0||arena.top<0||arena.width<20||arena.height<20
+  ||arena.left+arena.width>arena.innerWidth||arena.top+arena.height>arena.innerHeight)
+  throw new RangeError("genuine fully visible arena bounds required before native Dodge");
+ return Object.freeze({x:Math.round(arena.left+arena.width/2),
+  y:Math.round(arena.top+arena.height/2+Math.min(180,arena.height/3))});
+}

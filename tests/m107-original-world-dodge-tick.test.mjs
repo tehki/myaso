@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {awaitOriginalHeavyChargeTick} from "../scripts/m107-original-world-dodge-tick.mjs";
+import {awaitOriginalHeavyChargeTick,planOriginalDodgeViewport} from "../scripts/m107-original-world-dodge-tick.mjs";
 
 const phase=(tick,id=2)=>`COMBAT4_NATIVE_WORLD_PHASE tick=${tick} fighter=${id} action=9 elapsedMs=320.0\n`;
 function fixture(output,extra={}) {
@@ -24,4 +24,11 @@ test("M107 bounded World proof rejects partial lines and unavailable output",asy
  await assert.rejects(()=>awaitOriginalHeavyChargeTick(fixture(phase(281).trimEnd())),/not observed/);
  await assert.rejects(()=>awaitOriginalHeavyChargeTick(fixture("",{afterOffset:1})),/unavailable/);
  await assert.rejects(()=>awaitOriginalHeavyChargeTick(fixture(phase(281),{offsetTicks:0})),TypeError);
+});
+
+test("M107 real viewport plan pre-aims down inside the canvas without input injection",()=>{
+ const arena={left:10,top:20,width:960,height:540,innerWidth:1280,innerHeight:720};
+ assert.deepEqual(planOriginalDodgeViewport(arena),{x:490,y:470});
+ assert.throws(()=>planOriginalDodgeViewport({...arena,left:-1}),RangeError);
+ assert.throws(()=>planOriginalDodgeViewport({...arena,height:1000}),RangeError);
 });

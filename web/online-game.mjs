@@ -1044,8 +1044,8 @@ function updateMouse(event) {
 }
 
 function releaseInputs() {
-  physicalJumpChord.release();
   keys.clear();
+  physicalJumpChord.release();
   if(typeof typedJumpStaminaFeedback!=="undefined")typedJumpStaminaFeedback.reset();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.reset();

@@ -42,8 +42,13 @@ export async function runNativeRecoveryBuffer({actors,evaluate,request,readAutho
   const m=/^M201_AUTH_HIT tick=(\d+) attacker=(\d+) target=(\d+) damage=(\d+) hp=(\d+)$/.exec(line);
   return m?[{tick:+m[1],attacker:+m[2],target:+m[3],damage:+m[4],hp:+m[5]}]:[];
  });
- const click=()=>request(s.base,"POST","/session/"+s.id+"/actions",{actions:[{type:"pointer",id:"buffer-native",
-  parameters:{pointerType:"mouse"},actions:[{type:"pointerDown",button:0},{type:"pointerUp",button:0}]}]});
+ // Genuine W3C Element Click owns one physical DOWN/UP transaction. Two
+ // separate Actions ticks can cross the unchanged85ms hold-intent timer
+ // in Firefox even though this acceptance requires a tap, not a hold.
+ const element=await request(s.base,"POST","/session/"+s.id+"/element",{using:"css selector",value:"#arena"});
+ const elementId=element.value?.["element-6066-11e4-a52e-4f735466cecf"];
+ assert.ok(elementId,"native tap requires the real arena element");
+ const click=()=>request(s.base,"POST","/session/"+s.id+"/element/"+encodeURIComponent(elementId)+"/click",{});
  await request(s.base,"POST","/session/"+s.id+"/actions",{actions:[{type:"pointer",id:"buffer-native",parameters:{pointerType:"mouse"},
   actions:[{type:"pointerMove",origin:"viewport",x:pointer.x,y:pointer.y,duration:0}]}]});
  try {
@@ -105,7 +110,7 @@ export async function runNativeRecoveryBuffer({actors,evaluate,request,readAutho
   await save(jumpChord?'combat4-native-recovery-jump.json':'combat4-native-recovery-buffer.json',evidence);
   console.log(jumpChord?'COMBAT4_NATIVE_RECOVERY_JUMP_PASS':'COMBAT4_NATIVE_RECOVERY_BUFFER_PASS',JSON.stringify({browser:s.engine,id,victim,hits:hits(),recovery,next,jumpStamina}));
  } catch(error) {
-  await save('combat4-native-recovery-buffer-FIRST-RED.json',{error:String(error),world:lines(),proof:await proof().catch(()=>null)});
+  await save('combat4-native-recovery-buffer-FIRST-RED.json',{error:String(error),world:lines(),proof:await proof().catch(()=>null),physical:await evaluate(s,"return window.__MYASO_RECOVERY_NATIVE_EDGES__?.()??null;").catch(()=>null)});
   throw error;
  }
 }
