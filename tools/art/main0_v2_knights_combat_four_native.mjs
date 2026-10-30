@@ -211,6 +211,20 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   }
   throw Error("real WASD could not establish stable authoritative pair geometry: "+JSON.stringify({attackerId,targetId,attempts}));
  }
+ async function stageLaneY(actorId,targetY){
+  const actor=actors.find(a=>a.actor.id===actorId),attempts=[];
+  for(let move=0;move<6;move++){
+   const p=await proof(actor),f=own(p,actorId);
+   assert.ok(f&&f.action===0,"only the actual recovered actor may move out of the swing lane");
+   const delta=targetY-f.y;
+   if(Math.abs(delta)<=4)return {actorId,targetY,proof:p,attempts};
+   const key=delta>0?"s":"w",durationMs=Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+   await pulse(actor,key,durationMs);await sleeps(310);
+   const after=await proof(actor);
+   attempts.push({key,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y});
+  }
+  throw Error("real WASD could not clear the original Light swing lane: "+JSON.stringify({actorId,targetY,attempts}));
+ }
  async function prepareClick(a,targetId){
   const p=await proof(a),f=own(p,a.actor.id),target=own(p,targetId);
   assert(f&&target&&f.action===0&&target.action===0,"all native click preparation requires actual recovered idle fighters");
@@ -505,6 +519,12 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
      },5000);
      assert.equal(old.s.id,originalSessionId,"every repeated incarnation keeps the original W3C session");
      assert.equal(bound.ownPlayerNetId,originalActorId,"repeated death cannot replace original actor2");
+     // Actor1 moved forward to earn the lethal hits. In the first3-cycle
+     // RED it then stood between2 and3: original AoE correctly hit BOTH.
+     // Physically clear that bystander, preserving every real damage rule.
+     const killer=actors.find(a=>a.actor.id===1),killerProof=await proof(killer);
+     const killerY=own(killerProof,1).y,laneY=own(bound,2).y;
+     staging.push(await stageLaneY(1,laneY+COMBAT.attack.reach+COMBAT.fighterRadius+30));
      staging.push(await stagePair(2,3));
      const freshRound=await round([[2,3]]),fresh=await proof(old);
      assert.equal(freshRound.presses.filter(e=>e.fighter===2&&e.eventAction===1&&e.status===1).length,1);
@@ -514,6 +534,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
      renewalCycles.push({cycle,death:cycleDeath,respawn:cycleRespawn,replicas,bound,freshRound,fresh,
       originalWorld:lines().slice(cycleStart)});
      lastRespawn=cycleRespawn;
+     staging.push(await stageLaneY(1,killerY));
      if(expectedHp.get(3)===0){
       // A second fresh34HP Light legitimately kills the damaged third actor.
       // Wait for ITS real World respawn before further combat; never reset HP.
@@ -526,7 +547,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     }
     const result={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
      mode:physicalMode,originalActorId,originalSessionId,beforeFresh,afterFresh,
-     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,renewalCycles,
+     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,renewalCycles,completedRenewalCycles:renewalCycles.length,
      retiredGenerationSafetyRequiresSeparateNegativeProof:true,rejoinedAsActor5:false,
      originalWorldAfterRespawn:lines().slice(startOffset)};
     await writeFile(join(output,"combat4-respawn-same-session-PASS.json"),JSON.stringify(result,null,2)+"\n");
@@ -1025,7 +1046,7 @@ try{
    pageTarget:{x:page.x,y:page.y},originalError:String(error)};
   try{diagnosis.transport=await proof()}catch(e){diagnosis.transportError=String(e)}
   try{diagnosis.physical=await edges()}catch(e){diagnosis.physicalError=String(e)}
-  try{diagnosis.world=readAuthoritativeWorld().slice(beforeWorld).slice(-100)}
+  try{diagnosis.world=readAuthoritativeWorld().slice(beforeWorld).split(/\r?\n/).slice(-100)}
   catch(e){diagnosis.worldError=String(e)}
   try{
    diagnosis.document=await evaluate(attacker,
