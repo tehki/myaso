@@ -170,6 +170,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
   });
  };
+ const nativeDispatches=[]; // bounded, read-only first-RED W3C command timing
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
   const replicas=await readAll();
@@ -226,6 +227,17 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
  function dispatchPreparedClick({a}){
   // Critical simultaneous phase: no browser reads, aim moves or down-ACK
   // barriers between dispatching these genuine native button sequences.
+  // Same-tick request timestamps are NOT game authority. If native overlap
+  // fails, they reveal Node dispatch vs real browser callback scheduling.
+  // The helper is also run standalone in a strict source contract test.
+  // That test has no lifecycle closure or original actor identity to log.
+  const dispatch=typeof nativeDispatches==="undefined" ? null
+   : {actorId:a.actor?.id??null,browser:a.s.engine??null,
+      requestedAtEpochMs:Date.now(),settledAtEpochMs:null,error:null};
+  if(dispatch){
+   nativeDispatches.push(dispatch);
+   if(nativeDispatches.length>24)nativeDispatches.shift();
+  }
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
     // The Firefox W3C 25ms pause can expand to a 142-150ms *real* physical
@@ -234,7 +246,8 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     // same native W3C request. Keep the strict measured <135ms Light gate.
     {type:"pointerDown",button:0},{type:"pointerUp",button:0},
    ]}]
-  });
+  }).then(result=>{if(dispatch)dispatch.settledAtEpochMs=Date.now();return result;},
+   error=>{if(dispatch){dispatch.settledAtEpochMs=Date.now();dispatch.error=String(error);}throw error;});
  }
  async function collectPreparedClick({a,targetId,before}){
   const edges=await evaluate(a.s,"return window.__MYASO_FOUR_PHYSICAL_LMB__?.map(e=>({...e}))??[];");
@@ -524,6 +537,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     .catch(e=>({error:String(e)}))
   })));
   const evidence={error:String(error),rounds,staging,physicalEvents,
+   nativeDispatches:nativeDispatches.map(d=>({...d})),
    replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
   await writeFile(join(output,"combat4-four-native-combat-lifecycle-failure.json"),JSON.stringify(evidence,null,2)+"\n");
   console.error("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_FAILURE",JSON.stringify(evidence));throw error;
