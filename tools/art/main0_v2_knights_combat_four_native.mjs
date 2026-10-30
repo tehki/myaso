@@ -927,10 +927,32 @@ try{
  },8000);
  const beforeNormal=(await proof()).acknowledged.length;
  await click();
- const afterNormal=await waitFor(async()=>{
-  const p=await proof(),later=p.acknowledged.slice(beforeNormal);
-  return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
- },9000);
+ let afterNormal;
+ try{
+  afterNormal=await waitFor(async()=>{
+   const p=await proof(),later=p.acknowledged.slice(beforeNormal);
+   return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
+  },9000);
+ }catch(error){
+  // Preserve the original strict 9s RED and W3C proof. Diagnostics run only
+  // AFTER failure; no retry, grace window, forged receipt, or World mutation.
+  const diagnosis={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   stage:"ordinary post-Space physical LMB PRESS/RELEASE",beforeNormal,
+   pageTarget:{x:page.x,y:page.y},originalError:String(error)};
+  try{diagnosis.transport=await proof()}catch(e){diagnosis.transportError=String(e)}
+  try{diagnosis.physical=await edges()}catch(e){diagnosis.physicalError=String(e)}
+  try{diagnosis.world=readAuthoritativeWorld().slice(beforeWorld).slice(-100)}
+  catch(e){diagnosis.worldError=String(e)}
+  try{
+   diagnosis.document=await evaluate(attacker,
+    "const c=document.querySelector('#arena'),r=c?.getBoundingClientRect();"+
+    "return {hasFocus:document.hasFocus(),activeId:document.activeElement?.id??null,"+
+    "scrollY:window.scrollY,arena:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,"+
+    "targetId:document.elementFromPoint("+page.x+","+page.y+")?.id??null}");
+  }catch(e){diagnosis.documentError=String(e)}
+  console.error("COMBAT4_SPACE_AFTER_NORMAL_FIRST_RED_DIAGNOSTIC",JSON.stringify(diagnosis));
+  throw error;
+ }
  const normal=afterNormal.acknowledged.slice(beforeNormal);
  assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
   "ordinary post-Space LMB still commits one valid pressed/released gesture");
