@@ -766,11 +766,15 @@ try{
    "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
   if(!p)return false;
   const a=p.acknowledged||[];
+  const worldJumpEntry=classifyOriginalWorldJumpAttackEntry(log,1,{
+   startingStamina:prior.replicatedFighters?.find(f=>f.netId===1)?.stamina,
+   observedStamina:p.replicatedFighters?.find(f=>f.netId===1)?.stamina,
+  });
   if(!a.some(e=>e.source===0&&e.action===5&&e.status===1)
      || !a.some(e=>e.source===0&&e.action===3&&e.status===1)
-     || !worldTransition(log,1,15,16)
+     || !worldJumpEntry
      || !worldTransition(log,1,16,17))return false;
-  return {log,p};
+  return {log,p,worldJumpEntry};
  },12000).catch(async error=>{
   const diag={error:String(error),world:readAuthoritativeWorld().slice(before),
     browser:await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null").catch(e=>String(e)),
@@ -785,8 +789,8 @@ try{
  const rows=result.p.acknowledged.filter(e=>e.source===0&&e.status===1);
  assert.deepEqual(rows.map(e=>e.action),[5,3],"exact one gesture, no separate Light/Heavy");
  assert.equal(rows[0].gestureId,rows[1].gestureId);
- assert.ok(worldTransition(result.log,1,0,15),
-  "original World must first grant and spend for real Jump");
+ assert.ok(result.worldJumpEntry,
+  "original World Jump entry requires separate ticks or authenticated compression with actual 14+12 stamina");
  assert.ok(/M201_AUTH_GESTURE_ACTION tick=\d+ fighter=1 source=0 gesture=\d+ sequence=\d+ eventAction=5 status=1/.test(result.log),
   "original authenticated World-lock receipt proves one typed JumpAttack action5");
  console.log("COMBAT4_JUMP_NATIVE_FULL_WORLD_TRACE",JSON.stringify({world:result.log,receipts:rows,native:live}));
@@ -796,7 +800,7 @@ try{
  assert.equal(result.p.closed,false,"no fatal source0 reject");
  const evidence={mode:physicalMode,sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
   originalGamePage:true,originalAuthenticatedQUIC:true,originalWorld:true,
-  native:live,typedReceipts:rows,originalWorldLog:result.log,
+  native:live,typedReceipts:rows,originalWorldLog:result.log,worldJumpEntry:result.worldJumpEntry,
   authoritativeReplica:result.p,independentHumanWAN:false,
   limitation:"single-actor true JumpAttack action, no opponent 42HP victim proof"};
  await writeFile(join(output,"combat4-jump-review-original-world.json"),

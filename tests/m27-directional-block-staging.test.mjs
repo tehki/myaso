@@ -11,10 +11,17 @@ test("M27 starts authentic Light from in-range Idle and rear Block only after re
   for(const action of [0,2,3,6,7,9,18,19]) {
     assert.equal(planM27DirectionalBackblock({isAttacker:false, ownAction:0, peerAction:action, distance:65}).blockReady, false);
   }
-  assert.equal(planM27DirectionalBackblock({isAttacker:false, ownAction:6, peerAction:1, distance:65}).blockReady,false);
+  assert.equal(planM27DirectionalBackblock({isAttacker:false, ownAction:6, peerAction:1, distance:65}).blockReady,true);
   assert.equal(planM27DirectionalBackblock({isAttacker:true, ownAction:1, peerAction:6, distance:65}).attackReady,false);
   assert.equal(planM27DirectionalBackblock({isAttacker:true, ownAction:0, peerAction:0, distance:75}).attackReady,false);
   assert.equal(planM27DirectionalBackblock({isAttacker:true, ownAction:0, peerAction:0, distance:NaN}).attackReady,false);
+});
+
+test("M27 keeps the same held rear Block through original Windup and Active", () => {
+  const samples = [[0,1], [6,1], [6,1], [6,2], [6,3]];
+  assert.deepEqual(samples.map(([ownAction, peerAction]) =>
+    planM27DirectionalBackblock({isAttacker:false, ownAction, peerAction, distance:36}).blockReady),
+    [true,true,true,true,false], "observing our own Block must not send a release before contact");
 });
 
 test("M27 preserves strict original-contact overlap, rear arc, HP and untouched guard checks", () => {
