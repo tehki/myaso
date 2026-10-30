@@ -46,6 +46,7 @@ async function activateNegotiatedLmb({
   const source11 = local && new URLSearchParams(windowObj.location.search).get("source11Renewal")==="1";
   let renewing = false;
   let failed = false, detached = false, retryTimer = null;
+  let firstLabFailureReason = null;
   const removeListeners = [];
   const upgradeTimers = new Set();
   // Bounded loopback-only attempted-write evidence, never an ACK or a hit.
@@ -71,6 +72,8 @@ async function activateNegotiatedLmb({
     gameClient.close(reason);
   }
   function fail(reason) {
+    if (firstLabFailureReason === null)
+      firstLabFailureReason = String(reason || "typed gesture World/ACK rejected").slice(0,180);
     failed = true;
     close(reason || "typed gesture World/ACK rejected");
   }
@@ -242,7 +245,13 @@ async function activateNegotiatedLmb({
     // witness; never a user identity, hit, source of authority, or public UI.
     const receipts = [];
     const proof = () => Object.freeze({
-      failed,closed:detached,transportState:lease.experimentalGestureState,
+      failed,closed:detached,transportState:gameClient.transport.experimentalGestureState,
+      // Loopback proof is read-only and never feeds game or server authority.
+      firstLabFailureReason,
+      firstTransportCloseReason:gameClient.transport.firstCloseReason ?? null,
+      source11Events:(gameClient.transport.source11Events ?? []).map(entry=>({...entry})),
+      typedGeneration:gameClient.transport.typedGeneration,
+      typedRenewalPending:gameClient.transport.typedRenewalPending,
       pending:outbox.snapshot.pending,
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
