@@ -3,6 +3,9 @@ name: Core8 authenticated gesture to World loopback lab (NONRELEASE)
 on:
   pull_request:
     paths:
+      - "web/network-transport.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/online-game.mjs"
       - "server/src/main.rs"
       - "server/src/simulation.rs"
       - "server/src/prealpha_authenticated_gesture.rs"
