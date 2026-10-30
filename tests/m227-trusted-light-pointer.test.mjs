@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { createM227TrustedLightRegistry } from "../scripts/m227-trusted-light-pointer.mjs";
+import { createM227TrustedLightRegistry, waitForM227TrustedLead } from "../scripts/m227-trusted-light-pointer.mjs";
 
 test("M227 accepts exactly one real trusted left-button down, no stale/forged receipts",async()=>{
   const registry=createM227TrustedLightRegistry();
@@ -24,6 +24,24 @@ test("M227 fails closed on missing receipt and enforces bounded timeout",async()
   const c=createM227TrustedLightRegistry({timeoutMs:5}).issue();
   await assert.rejects(c.wait(),/not observed/);
   c.close();
+});
+
+test("native lead uses actual trusted onset rather than adding HTTP delivery latency",async()=>{
+ const receipt={trusted:true,type:"pointerdown",button:0,epochMs:1000};
+ let clock=1040;const waits=[];
+ const lead=await waitForM227TrustedLead(receipt,80,{now:()=>clock,sleep:async ms=>{waits.push(ms);clock+=ms;}});
+ assert.deepEqual(waits,[40]);assert.equal(clock,1080);
+ assert.deepEqual(lead,{ageMs:40,remainingMs:40});
+ await waitForM227TrustedLead(receipt,80,{now:()=>1130,sleep:async()=>assert.fail("late onset cannot add another fixed wait")});
+ for(const bad of [{...receipt,trusted:false},{...receipt,epochMs:undefined},{...receipt,epochMs:2000},{...receipt,epochMs:1}]) {
+  await assert.rejects(waitForM227TrustedLead(bad,80,{now:()=>1040,sleep:async()=>{}}),/native|onset/);
+ }
+ const registry=createM227TrustedLightRegistry(),challenge=registry.issue();
+ const pending=challenge.wait();
+ assert.equal(registry.receive({...receipt,token:challenge.token,epochMs:NaN}),false);
+ assert.equal(registry.receive({...receipt,token:challenge.token}),true);
+ assert.deepEqual(await pending,receipt);
+ challenge.close();
 });
 
 test("M227 ties genuine M144 pointerdown receipt to the one W3C jump chord without weakening strict M144/M145",()=>{

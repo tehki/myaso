@@ -18,6 +18,7 @@ on:
       - "server/tests/combat4c_release_only_source_ownership.rs"
       - "server/tests/combat4_typed_recovery_buffer.rs"
       - "server/tests/combat4_recovery_jump_chord.rs"
+      - "server/tests/combat4_typed_running_strike.rs"
       - "scripts/native-recovery-buffer.mjs"
       - "server/tests/prealpha_four_real_quic_gesture_seats.rs"
       - "tests/core8a-p723-shared-typed-edge-outbox-review.test.mjs"
@@ -164,9 +165,23 @@ jobs:
   release-profile-three-native-threat:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - acceptance: three-native-threat
+            scenario: uisecondaryphase
+            attacker: chrome
+          - acceptance: running-chrome
+            scenario: uirunningattack
+            attacker: chrome
+          - acceptance: running-firefox
+            scenario: uirunningattack
+            attacker: firefox
     env:
       MYASO_PVP_INSTANT_LMB: "1"
-      MYASO_PVP_SCENARIO: uisecondaryphase
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+      MYASO_PVP_RUNNING_ATTACKER: ${{ matrix.attacker }}
       MYASO_PVP_WEBDRIVER_BASE_PORT: "29515"
     steps:
       - uses: actions/checkout@v4
@@ -177,16 +192,16 @@ jobs:
           node-version: "22"
       - name: Build original server before bounded native bootstrap
         run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
-      - name: Actual three-native release-profile Light threats
+      - name: Actual release-profile Combat (${{ matrix.acceptance }})
         run: |
           set -euo pipefail
-          mkdir -p .artifacts/instant-lmb-three-native
-          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee .artifacts/instant-lmb-three-native/world.log
+          mkdir -p .artifacts/instant-lmb-native
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee .artifacts/instant-lmb-native/world.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: instant-lmb-three-native-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .artifacts/instant-lmb-three-native/
+          name: instant-lmb-${{ matrix.acceptance }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/instant-lmb-native/
           retention-days: 5
 
   review-only-immutable-package:

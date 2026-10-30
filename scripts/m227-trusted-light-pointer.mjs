@@ -34,11 +34,29 @@ export function createM227TrustedLightRegistry({ timeoutMs = 600 } = {}) {
     if (typeof packet?.token !== "string" || packet.trusted !== true
       || (packet.type !== "pointerdown" && packet.type !== "pointerup")
       || packet.button !== 0) return false;
+    if (packet.epochMs !== undefined && (!Number.isSafeInteger(packet.epochMs) || packet.epochMs < 1)) return false;
     const entry = pending.get(packet.token);
     if (!entry || entry.type !== packet.type) return false;
     pending.delete(packet.token);
-    entry.resolve(Object.freeze({ trusted: true, type: packet.type, button: 0 }));
+    entry.resolve(Object.freeze({ trusted: true, type: packet.type, button: 0,
+      ...(packet.epochMs === undefined ? {} : { epochMs: packet.epochMs }) }));
     return true;
   }
   return Object.freeze({ issue, receive });
+}
+
+// Native fixture scheduling only. The final genuine input timestamps and
+// original World phase/HP assertions still decide acceptance independently.
+export async function waitForM227TrustedLead(receipt, leadMs, {sleep, now=Date.now}={}) {
+  if (receipt?.trusted !== true || !["pointerdown","pointerup"].includes(receipt.type)
+      || receipt.button !== 0 || !Number.isSafeInteger(receipt.epochMs) || receipt.epochMs < 1
+      || !Number.isFinite(leadMs) || leadMs < 0 || leadMs > 200
+      || typeof sleep !== "function" || typeof now !== "function") {
+    throw new TypeError("genuine timestamped native onset and bounded lead required");
+  }
+  const ageMs=now()-receipt.epochMs;
+  if (!Number.isFinite(ageMs) || ageMs < -5 || ageMs > 600) throw new Error("native onset clock is stale or in the future");
+  const remainingMs=Math.max(0,leadMs-Math.max(0,ageMs));
+  if(remainingMs>0)await sleep(remainingMs);
+  return {ageMs,remainingMs};
 }

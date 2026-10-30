@@ -28,7 +28,9 @@ test("current v1 sample has no authentic unique LMB gesture source, so cannot be
 
 test("dormant signed-lease source0 press begins REAL World LightWindup, upgrade is pre-contact only",()=>{
   assert.match(authority,/GestureAction::Press[\s\S]*?self\.phase = Phase::LightWindup;[\s\S]*?Command::BeginLightWindup/);
-  assert.match(authority,/GestureAction::Upgrade[\s\S]*?self\.phase == Phase::LightWindup[\s\S]*?elapsed < LIGHT_WINDUP_MS/);
+  assert.match(authority,/GestureAction::Upgrade[\s\S]*?self\.phase == Phase::LightWindup[\s\S]*?elapsed < self\.light_windup_ms/);
+  assert.match(authority,/const LIGHT_WINDUP_MS: u64 = 135/);
+  assert.match(read("server/src/prealpha_authenticated_gesture.rs"),/world\.owned_lmb_light_windup_ms[\s\S]*?proposed\.bind_original_light_windup\(duration\)/);
   assert.match(authority,/Phase::LightActive[\s\S]*?Command::None/);
   assert.match(spec,/before.*World adjudicates LightActive\/contact/);
 });

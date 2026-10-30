@@ -88,6 +88,7 @@ pub struct GestureAuthority {
     highest_gesture_id: u32,
     highest_sequence: u32,
     press_ms: u64,
+    light_windup_ms: u64,
     released: bool,
     accepted: VecDeque<TypedGestureEvent>,
 }
@@ -105,6 +106,7 @@ impl GestureAuthority {
             highest_gesture_id: 0,
             highest_sequence: 0,
             press_ms: 0,
+            light_windup_ms: LIGHT_WINDUP_MS,
             released: false,
             accepted: VecDeque::with_capacity(MAX_REPLAY_JOURNAL),
         }
@@ -112,6 +114,11 @@ impl GestureAuthority {
 
     pub fn phase(&self) -> Phase {
         self.phase
+    }
+
+    // Called only from the admitted original World action, never wire data.
+    pub(crate) fn bind_original_light_windup(&mut self, world_duration_ms: u64) {
+        self.light_windup_ms = world_duration_ms;
     }
 
     /// One global monotonic accepted sequence across both typed sources.
@@ -251,6 +258,7 @@ impl GestureAuthority {
                 self.highest_gesture_id = event.gesture_id;
                 self.press_ms = server_ms;
                 self.phase = Phase::LightWindup;
+                self.light_windup_ms = LIGHT_WINDUP_MS;
                 self.released = false;
                 Command::BeginLightWindup
             }
@@ -259,7 +267,7 @@ impl GestureAuthority {
                     && self.phase == Phase::LightWindup
                     && source == GestureSource::Lmb
                     && !self.released
-                    && elapsed < LIGHT_WINDUP_MS =>
+                    && elapsed < self.light_windup_ms =>
             {
                 self.phase = Phase::HeavyCharging;
                 Command::UpgradeHeldHeavy {
@@ -277,7 +285,8 @@ impl GestureAuthority {
                     && source == GestureSource::Lmb
                     && !self.released
                     && (self.phase == Phase::LightActive
-                        || (self.phase == Phase::LightWindup && elapsed >= LIGHT_WINDUP_MS)) =>
+                        || (self.phase == Phase::LightWindup
+                            && elapsed >= self.light_windup_ms)) =>
             {
                 Command::None
             }
@@ -300,7 +309,7 @@ impl GestureAuthority {
                         Command::ReleaseHeavy
                     }
                     Phase::HeavyCharging => {
-                        self.phase = if elapsed >= LIGHT_WINDUP_MS {
+                        self.phase = if elapsed >= self.light_windup_ms {
                             Phase::LightActive
                         } else {
                             Phase::LightWindup
@@ -312,7 +321,7 @@ impl GestureAuthority {
                     }
                     Phase::LightWindup => {
                         self.released = true;
-                        if elapsed >= LIGHT_WINDUP_MS {
+                        if elapsed >= self.light_windup_ms {
                             self.phase = Phase::LightActive;
                             Command::ActivateLight
                         } else {
@@ -339,7 +348,7 @@ impl GestureAuthority {
                         self.phase = Phase::Cancelled;
                         Command::CancelUnlandedLight
                     }
-                    Phase::LightWindup if elapsed < LIGHT_WINDUP_MS => {
+                    Phase::LightWindup if elapsed < self.light_windup_ms => {
                         self.phase = Phase::Cancelled;
                         Command::CancelUnlandedLight
                     }
@@ -374,7 +383,7 @@ impl GestureAuthority {
         self.last_server_ms = server_ms;
         let elapsed = server_ms.saturating_sub(self.press_ms);
         match self.phase {
-            Phase::LightWindup if elapsed >= LIGHT_WINDUP_MS => {
+            Phase::LightWindup if elapsed >= self.light_windup_ms => {
                 self.phase = Phase::LightActive;
                 Some(Command::ActivateLight)
             }

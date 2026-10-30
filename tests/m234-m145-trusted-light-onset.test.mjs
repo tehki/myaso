@@ -36,7 +36,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   assert.ok(start >= 0 && end > start);
   const flight = runner.slice(start, end);
   assert.ok(flight.includes("const jumpInputDelayMs = spatial ? 80 : 70;"));
-  assert.ok(flight.includes("sampleUiEvidenceWhileActive(entries, 1250, 8)"));
+  assert.ok(flight.includes("sampleUiEvidenceWhileActive([observer], 1250, 8)"));
   assert.ok(flight.includes("minLeadMs = spatial ? 70 : 60"));
   assert.ok(flight.includes("maxLeadMs = spatial ? 150 : 200"));
   assert.ok(flight.includes("nearestReturnIndex <= jumpPunishIndex"));
@@ -47,7 +47,7 @@ test("M234 anchors both M144 and M145 to a trusted receipt, preserving genuine g
   const armAt = flight.indexOf("window.__MYASO_M227_LIGHT_TOKEN__");
   const pressAt = flight.indexOf("performArenaAttackHold(lightAttacker, lightArena, 200, 45)");
   const waitAt = flight.indexOf("await lightChallenge.wait()");
-  const delayAt = flight.indexOf("await sleep(jumpInputDelayMs)");
+  const delayAt = flight.indexOf("await waitForM227TrustedLead(receipt, jumpInputDelayMs, {sleep})");
   const chordAt = flight.indexOf("performArenaPreAimedJumpAttackChord(jumpAttacker, 180)");
   assert.ok(challengeAt < armAt && armAt < pressAt);
   assert.ok(pressAt < waitAt && waitAt < delayAt && delayAt < chordAt);
