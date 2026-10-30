@@ -1,0 +1,83 @@
+name: Core 8A Source11 same-connection respawn Combat (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "web/network-transport.mjs"
+      - "web/authoritative-client.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "tools/art/main0_v2_knights_combat_four_native.mjs"
+      - "tests/core8a-source11-bound-renewal.test.mjs"
+      - "tests/combat4-respawn-same-session-native-contract.test.mjs"
+      - ".github/workflows/core8a-source11-respawn.yml"
+permissions:
+  contents: read
+jobs:
+  source11-original-bidi-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Strict source0 generation, ACK and legacy owner regressions
+        run: |
+          node --test tests/core8a-source11-bound-renewal.test.mjs
+          node --test tests/main0-v2-transport-owner.test.mjs
+          node --test tests/main0-live-gesture-page.test.mjs
+          node --test tests/combat4-respawn-same-session-native-contract.test.mjs
+          node --check web/authoritative-client.mjs
+          node --check web/network-transport.mjs
+          node --check web/prealpha-gesture-live-lab.mjs
+      - name: Original Rust authority, all targets and Clippy
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml -- --check
+          cargo test --locked --manifest-path server/Cargo.toml
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server source11_gesture_path_lifetime_tests::retiring_root_connection_removes_only_its_player_gesture_generations -- --exact
+          cargo clippy --locked --manifest-path server/Cargo.toml --all-targets -- -D warnings
+  four-original-quic-world-respawn:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - acceptance: fresh-incarnation-mixed
+            mode: four-combat-respawn-same-session
+            browsers: chrome,firefox,chrome,firefox
+          - acceptance: retired-generation-negative
+            mode: four-combat-lifecycle
+            browsers: chrome,firefox,chrome,firefox
+    env:
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
+      MYASO_LIVE_GESTURE_PHYSICAL_MODE: ${{ matrix.mode }}
+      MYASO_LIVE_GESTURE_CHAT_C1: "1"
+      MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Confirm genuine Chrome Firefox drivers and source contract
+        run: |
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+          node --test tests/combat4-respawn-same-session-native-contract.test.mjs
+      - name: Original 60 Hz Rust World with FOUR physical W3C clients and Chat C1
+        run: timeout --signal=TERM --kill-after=5s 360s node tools/art/main0_v2_knights_combat_four_native.mjs
+      - name: Preserve real first-red and native acceptance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8a-source11-${{ matrix.acceptance }}-${{ github.run_attempt }}
+          path: .artifacts/main0-knights-combat-gesture/
+          if-no-files-found: ignore
+          retention-days: 5

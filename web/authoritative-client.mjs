@@ -55,12 +55,28 @@ export async function connectAuthoritativeClient({
     },
   });
 
+  if (transport.kind === "webtransport") {
+    transport.onBoundGestureAck = (bytes,token) => {
+      if (transport.closed || transport.typedLeaseToken !== token) return;
+      try {
+        decodeProposedGestureAck(bytes);
+        onExperimentalGestureAck?.(bytes,token);
+      } catch(error) {
+        transport.close("invalid bound typed ACK");
+        onProtocolError?.(error);
+      }
+    };
+  }
+
   function handleRealtimePacket(packet) {
     try {
       const bytes = asUint8Array(packet);
       if (bytes.length < 2) return;
       const packetType = bytes[1];
       if (bytes[0] === 2 && packetType === 0x12) {
+        // Previous-generation DATAGRAM ACKs cannot reach the renewed bidi
+        // outbox, even when their sequence/gesture IDs numerically coincide.
+        if (transport.typedGeneration > 0) return;
         // Never let a stale QUIC actor or a public/v1 connection settle the
         // pending current-lease typed source0/source1 outbox.
         if (transport.kind !== "webtransport" ||
@@ -210,11 +226,11 @@ export async function connectAuthoritativeClient({
       }
       return transport.negotiateInstantLmb(options);
     },
-    sendExperimentalGestureEdge(bytes) {
+    sendExperimentalGestureEdge(bytes,lease) {
       if (transport.kind !== "webtransport") {
         throw new Error("original typed Combat requires native QUIC transport");
       }
-      return transport.sendExperimentalGestureEdge(bytes);
+      return transport.sendExperimentalGestureEdge(bytes,lease);
     },
     close(reason) { transport.close(reason); },
     get playerNetId() { return playerNetId; },

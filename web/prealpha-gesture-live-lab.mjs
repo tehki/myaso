@@ -41,8 +41,10 @@ async function activateNegotiatedLmb({
   // admission from a query flag or a client-selected actor/boot epoch.
   if (instantProfile) await gameClient.negotiateInstantLmb();
   else await gameClient.negotiateExperimentalGestureV2({reliableStream:true});
-  const lease = gameClient.transport;
-  const outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
+  let lease = gameClient.transport;
+  let outbox = new ProposedSharedTypedGestureOutbox({reviewVersion:2, trustedLease:lease});
+  const source11 = local && new URLSearchParams(windowObj.location.search).get("source11Renewal")==="1";
+  let renewing = false;
   let failed = false, detached = false, retryTimer = null;
   const removeListeners = [];
   const upgradeTimers = new Set();
@@ -54,6 +56,7 @@ async function activateNegotiatedLmb({
   function close(reason = "experimental gesture lease retired") {
     if (detached) return;
     detached = true;
+    gameClient.transport.onGestureRenewalRequired = null;
     if (retryTimer !== null) clearInterval(retryTimer);
     if (writeWatchdog !== null) clearTimeout(writeWatchdog);
     writeWatchdog = null;
@@ -74,7 +77,7 @@ async function activateNegotiatedLmb({
   function drain(onlyUnsent = false) {
     // The one original outbox keeps new edges while the canonical transport
     // waits for writer readiness. Never consume another retry batch in flight.
-    if (failed || detached || outbox.snapshot.closed || writeBatchPending) return;
+    if (failed || detached || renewing || outbox.snapshot.closed || writeBatchPending) return;
     let packets;
     try {
       // First-send priority and maxAttempts are enforced by the original
@@ -87,6 +90,7 @@ async function activateNegotiatedLmb({
     }
     if (packets.length === 0) return;
     writeBatchPending = true;
+    const writeLease = lease;
     // This is a bounded transport stall, not the gameplay 135/320ms clock
     // and not evidence of admission or a HIT. Retire the original lease on
     // timeout so an old writer continuation cannot escape after reconnect.
@@ -96,22 +100,23 @@ async function activateNegotiatedLmb({
         attemptedTransmissions.push(Object.freeze({
           source:packet.source, action:packet.action, sequence:packet.sequence,
           gestureId:packet.gestureId, attempt:packet.attempt,
-          currentLease:gameClient.transport === lease,
+          currentLease:(gameClient.transport.typedLeaseToken ?? gameClient.transport) === lease,
         }));
         if (attemptedTransmissions.length > 16) attemptedTransmissions.shift();
-        try { return Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes)); }
+        try { return Promise.resolve(gameClient.sendExperimentalGestureEdge(packet.bytes,writeLease)); }
         catch (error) { return Promise.reject(error); }
       });
       void Promise.all(writes).then(() => {
+        if (writeLease !== lease) return; // retired asynchronous generation
         if (writeWatchdog !== null) clearTimeout(writeWatchdog);
         writeWatchdog = null;
         writeBatchPending = false;
         // Physical releases authored while blocked stay in the SAME outbox.
         // Flush only previously unsent edges; the 170ms timer owns retries.
         if (!failed && !detached) drain(true);
-      }).catch(() => fail("typed gesture QUIC delivery failed"));
+      }).catch(() => { if (writeLease === lease) fail("typed gesture QUIC delivery failed"); });
     } catch {
-      fail("typed gesture lease no longer current");
+      if (writeLease === lease) fail("typed gesture lease no longer current");
     }
   }
 
@@ -131,7 +136,7 @@ async function activateNegotiatedLmb({
     removeListeners.push([target,type,handler]);
   }
   try {
-    gates = createDormantSharedUi10Sources({
+    const createCurrentGates = () => createDormantSharedUi10Sources({
       outbox, getClientTick,
       isCanvasTarget:e => e.target === canvas,
       isChatFocused:() => Boolean(documentObj.activeElement?.closest?.("[data-local-chat]")),
@@ -144,8 +149,42 @@ async function activateNegotiatedLmb({
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
+    gates = createCurrentGates();
     detachGates = attachDormantSharedUi10Sources(gates, {canvas, windowObj, documentObj});
     let lastUpgradeScheduledGestureId = null;
+    // The server announces authoritative NEW World incarnation over the
+    // original reliable root. This is a hint only; pending physical ownership
+    // is cancelled and the newly created BIDIRECTIONAL stream must GRANT.
+    // In Source11 preview this opts into renewal; original negative lifecycle
+    // fixtures remain a real retired-generation test.
+    if (source11) gameClient.transport.onGestureRenewalRequired = async () => {
+      if (failed || detached || renewing) return;
+      renewing = true;
+      try {
+        for (const timer of upgradeTimers) clearTimeout(timer);
+        upgradeTimers.clear();
+        if (writeWatchdog !== null) clearTimeout(writeWatchdog);
+        writeWatchdog = null;
+        detachGates?.(); // hard-retire original DOM owner and outbox
+        gates?.closeLease();
+        outbox.retire();
+        const freshLease = await gameClient.transport.negotiateRespawnTypedChannel();
+        if (failed || detached) throw new Error("gameplay retired during typed renewal");
+        lease = freshLease;
+        outbox = new ProposedSharedTypedGestureOutbox({
+          reviewVersion:2,trustedLease:lease,
+        });
+        lastFirstSendSequence = outbox.snapshot.nextSequence;
+        lastUpgradeScheduledGestureId = null;
+        writeBatchPending = false;
+        gates = createCurrentGates();
+        detachGates = attachDormantSharedUi10Sources(gates,{canvas,windowObj,documentObj});
+      } catch (error) {
+        fail("Source11 authenticated typed-generation renewal rejected: "+String(error));
+      } finally {
+        renewing = false;
+      }
+    };
     function scheduleSource0Upgrade() {
       if (!gates.lmb.snapshot.active) return;
       const {pointerId,gestureId,jump} = gates.lmb.snapshot;
@@ -222,7 +261,7 @@ async function activateNegotiatedLmb({
     if (local) Object.defineProperty(windowObj,"__MYASO_LOCAL_GESTURE_PROOF__",{
       configurable:true,value:proof,
     });
-    return Object.freeze({outbox,lease,close,fail,
+    return Object.freeze({get outbox(){return outbox;},get lease(){return lease;},close,fail,
       noteAck(receipt) {
         receipts.push(Object.freeze({
           sequence:receipt.sequence,gestureId:receipt.gestureId,
