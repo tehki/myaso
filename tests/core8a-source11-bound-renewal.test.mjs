@@ -257,3 +257,40 @@ test("Source11 blocked HELLO write is bounded and aborted, not treated as bound 
   assert.equal(conn.typedLeaseToken,conn);
   conn.close();
 }));
+
+test("Source11 concurrent renewal calls must not issue two same-incarnation bidi GRANTs or overwrite generation",()=>fixture(async()=>{
+  const conn=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await conn.negotiateExperimentalGestureV2({reliableStream:true});
+  conn.onGestureRenewalRequired=()=>{};
+  const first=conn.negotiateRespawnTypedChannel({timeoutMs:250});
+  const second=conn.negotiateRespawnTypedChannel({timeoutMs:250});
+  await assert.rejects(second,/renewal.*in progress/i,
+    "two concurrent HELLOs would race the original authoritative incarnation");
+  const firstLease=await first;
+  assert.notEqual(firstLease,conn);
+  assert.equal(conn.typedGeneration,1);
+  assert.equal(conn.transport.bidiOpened,2,"exactly one original root plus one bound bidi");
+  assert.equal(conn.transport.boundWrites.length,1,"exactly one source11 HELLO");
+  await conn.sendExperimentalGestureEdge(event(1,1),firstLease);
+  assert.equal(conn.closed,false);
+  conn.close("concurrent renew attempt completed");
+}));
+
+test("Source11 single-flight gate releases after failed OPEN so next valid bound HELLO may GRANT",()=>fixture(async()=>{
+  const conn=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await conn.negotiateExperimentalGestureV2({reliableStream:true});
+  conn.onGestureRenewalRequired=()=>{};
+  const open=conn.transport.createBidirectionalStream.bind(conn.transport);
+  conn.transport.createBidirectionalStream=()=>new Promise(()=>{});
+  await assert.rejects(
+    conn.negotiateRespawnTypedChannel({timeoutMs:100}),/bound.*timeout/i);
+  assert.equal(conn.typedRenewalPending,false);
+  conn.transport.createBidirectionalStream=open;
+  const valid=await conn.negotiateRespawnTypedChannel({timeoutMs:250});
+  assert.equal(conn.typedRenewalPending,false);
+  assert.equal(conn.typedGeneration,1);
+  assert.equal(conn.typedLeaseToken,valid);
+  assert.equal(conn.transport.bidiOpened,2);
+  assert.equal(conn.closed,false);
+  conn.close("retry granted");
+}));
