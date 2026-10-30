@@ -3691,6 +3691,106 @@ mod core8c_source11_world_authority_tests {
     }
 
     #[test]
+    fn two_successive_world_lives_rotate_only_current_generation_and_reject_old_boot() {
+        let mut state = GameState::new(0, 0);
+        state.boot_nonce = 41;
+        assert!(state.world.add_player(1));
+        assert!(state.world.add_player(2));
+        state.chat_leases.insert(1, 101);
+        state.chat_leases.insert(2, 202);
+        state.gesture_sessions.insert(
+            11,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 11, state.boot_nonce)
+                .unwrap(),
+        );
+        state.gesture_sessions.insert(
+            22,
+            SessionGestureWorldPath::from_admitted_world(&state.world, 2, 22, state.boot_nonce)
+                .unwrap(),
+        );
+
+        let first_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert!(state.world.remove_player(1));
+        assert!(state.world.add_player(1));
+        let second_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert_ne!(first_life, second_life);
+        // No path from a different boot may bind the new incarnation,
+        // even if its numeric player and root lease are unchanged.
+        state.boot_nonce = 42;
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_err());
+        assert!(state.gesture_sessions.contains_key(&11));
+        assert!(!state.gesture_sessions.contains_key(&33));
+        state.boot_nonce = 41;
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 11, 33, false)
+            .is_ok());
+        assert!(!state.gesture_sessions.contains_key(&11));
+        assert_eq!(
+            state
+                .gesture_sessions
+                .get(&33)
+                .unwrap()
+                .binding()
+                .incarnation,
+            second_life
+        );
+        let mut second_life_old =
+            SessionGestureWorldPath::from_admitted_world(&state.world, 1, 33, state.boot_nonce)
+                .unwrap();
+
+        // A second full life change occurs under the SAME authenticated
+        // root lease. Its old bound bidi cannot attack the third life.
+        assert!(state.world.remove_player(1));
+        assert!(state.world.add_player(1));
+        let third_life = state.world.fighter(1).unwrap().world_incarnation();
+        assert_ne!(second_life, third_life);
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 33, 44, false)
+            .is_ok());
+        assert_eq!(state.gesture_sessions.len(), 2);
+        assert!(!state.gesture_sessions.contains_key(&33));
+        assert_eq!(
+            state
+                .gesture_sessions
+                .get(&44)
+                .unwrap()
+                .binding()
+                .incarnation,
+            third_life
+        );
+        assert_eq!(
+            state.gesture_sessions.get(&22).unwrap().binding().player_id,
+            2
+        );
+        assert_eq!(state.chat_leases.get(&1), Some(&101));
+        assert_eq!(state.chat_leases.get(&2), Some(&202));
+
+        let press = encode_event(GestureEvent {
+            action: GestureAction::Press,
+            sequence: 1,
+            gesture_id: 1,
+            client_tick: u32::MAX,
+        })
+        .unwrap();
+        let retired = second_life_old
+            .accept_under_world_lock(&mut state.world, 33, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(retired.status, AckStatus::Stale);
+        let mut third = state.gesture_sessions.remove(&44).unwrap();
+        let live = third
+            .accept_under_world_lock(&mut state.world, 44, state.boot_nonce, &press)
+            .unwrap();
+        assert_eq!(live.status, AckStatus::Accepted);
+        state.gesture_sessions.insert(44, third);
+        assert!(state
+            .authorize_typed_respawn_renewal(1, 101, 44, 55, false)
+            .is_err());
+        assert_eq!(state.gesture_sessions.len(), 2);
+    }
+
+    #[test]
     fn root_retirement_and_absent_actor_never_grant_typed_generation() {
         let mut state = GameState::new(0, 0);
         state.boot_nonce = 19;
