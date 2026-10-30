@@ -58,6 +58,13 @@ class WebTransportGameConnection {
     // This is a transport safety ceiling, not a Combat retry policy.
     // The one-lease outbox may independently bound or retry genuine edges.
     this.pendingGestureEdges = 0;
+    // Source11: each successful server-bound bidi renewal gets a NEW opaque
+    // JS token; the initial QUIC datagram generation uses the connection.
+    this.typedLeaseToken = this;
+    this.typedGeneration = 0;
+    this.typedBoundWriter = null;
+    this.onBoundGestureAck = null;
+    this.onGestureRenewalRequired = null;
   }
 
   static async connect({ webTransportUrl, webTransportOptions, onRealtime, onReliable }) {
@@ -71,6 +78,7 @@ class WebTransportGameConnection {
     pumpReader(transport.datagrams.readable.getReader(), onRealtime);
     pumpLengthPrefixedReader(reliable.readable.getReader(), packet => {
       if (!connection.#handleGestureGrant(packet)
+          && !connection.#handleRespawnRenewalNotice(packet)
           && !connection.#privateHitLab?.receive(packet, connection)) onReliable?.(packet);
     });
     return connection;
@@ -91,6 +99,72 @@ class WebTransportGameConnection {
     this.experimentalGestureState = "granted";
     waiter.resolve(true);
     return true;
+  }
+
+  #handleRespawnRenewalNotice(packet) {
+    const bytes = toUint8Array(packet);
+    if (bytes.length !== 4 || bytes[0] !== 2 || bytes[1] !== 0x14
+        || bytes[2] !== 0 || bytes[3] !== 0) return false;
+    if (!this.closed && this.experimentalGestureState === "granted") {
+      // Notice is a hint only: the new bidi's real server grant is required.
+      void Promise.resolve().then(() => this.onGestureRenewalRequired?.()).catch(() => {
+        this.close("Source11 generation renewal failed");
+      });
+    }
+    return true;
+  }
+
+  // Only after a real server-side World respawn. This extra bidi is not
+  // another root reliable channel, and never calls acceptUni()/Chat C1.
+  async negotiateRespawnTypedChannel({timeoutMs=2000}={}) {
+    if (this.closed || this.kind !== "webtransport" ||
+        this.experimentalGestureState !== "granted" || !this.onGestureRenewalRequired) {
+      throw new Error("Source11 requires current original server-granted QUIC actor");
+    }
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 10000)
+      throw new RangeError("bounded Source11 grant deadline required");
+    const stream = await this.transport.createBidirectionalStream();
+    const writer = stream.writable.getWriter();
+    const reader = stream.readable.getReader();
+    let settle, fail, first = true;
+    const acknowledged = new Promise((resolve,reject)=>{settle=resolve;fail=reject;});
+    void acknowledged.catch(()=>{});
+    const token = Object.freeze({generation:this.typedGeneration+1});
+    // The grant and every subsequent ACK are from THIS SAME original
+    // server-granted bidirectional stream. Old DATAGRAM ACKs cannot enter.
+    void pumpLengthPrefixedReader(reader,packet=>{
+      const bytes=toUint8Array(packet);
+      if(first) {
+        first=false;
+        if (bytes.length===4 && bytes[0]===2 && bytes[1]===0x13
+            && bytes[2]===0 && bytes[3]===0) settle();
+        else fail(new Error("Source11 malformed or rejected bound grant"));
+        return;
+      }
+      if (this.closed || this.typedLeaseToken!==token) return;
+      this.onBoundGestureAck?.(bytes.slice(),token);
+    });
+    let timer;
+    try {
+      await writer.write(Uint8Array.from([2,0x10,77,89,65,83,79,49]));
+      await Promise.race([acknowledged,new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(new Error("Source11 bound grant timeout")),timeoutMs);
+      })]);
+      if(this.closed) throw new Error("Source11 original QUIC retired");
+      const previous=this.typedBoundWriter;
+      this.typedGeneration+=1;
+      this.typedLeaseToken=token;
+      this.typedBoundWriter=writer;
+      // Old pending .ready/write promises must neither block nor close the
+      // newly bound generation. Every old continuation checks its own token.
+      this.gestureWriteQueue=Promise.resolve();
+      this.pendingGestureEdges=0;
+      if(previous) { void previous.close().catch(()=>{}); }
+      return token;
+    } catch(error) {
+      try { await writer.abort?.(String(error)); } catch {}
+      throw error;
+    } finally { clearTimeout(timer); }
   }
 
   // Only a LOCAL loopback original-Rust flight may negotiate this experimental
@@ -172,8 +246,9 @@ class WebTransportGameConnection {
   // Each accepted gesture edge is preserved as an individual datagram, never
   // overwritten by the movement sampler's latestRealtime slot. This is only
   // transport delivery, NOT an authoritative Combat hit or admission ACK.
-  sendExperimentalGestureEdge(bytes) {
-    if (this.closed || this.experimentalGestureState !== "granted") {
+  sendExperimentalGestureEdge(bytes, expectedLease = this) {
+    if (this.closed || this.experimentalGestureState !== "granted" ||
+        expectedLease !== this.typedLeaseToken) {
       throw new Error("gesture datagram requires current server grant");
     }
     const payload = toUint8Array(bytes);
@@ -196,20 +271,28 @@ class WebTransportGameConnection {
       throw new RangeError("bounded experimental gesture queue overflow");
     }
     const owned = payload.slice();
+    const boundWriter = this.typedBoundWriter;
     this.pendingGestureEdges += 1;
     const send = this.gestureWriteQueue.then(async () => {
-      if (this.closed || this.experimentalGestureState !== "granted") {
-        throw new Error("old gesture edge cannot outlive its QUIC lease");
-      }
-      await this.datagramWriter.ready;
-      if (this.closed) throw new Error("gesture lease ended before send");
-      await this.datagramWriter.write(owned);
+      if (this.closed || this.experimentalGestureState !== "granted" ||
+          expectedLease !== this.typedLeaseToken)
+        throw new Error("retired generation cannot write a typed edge");
+      const writer = boundWriter ?? this.datagramWriter;
+      await writer.ready;
+      if (this.closed || expectedLease !== this.typedLeaseToken)
+        throw new Error("generation changed while typed writer waited");
+      await writer.write(boundWriter ? frameReliable(owned) : owned);
     });
     this.gestureWriteQueue = send.then(
-      () => { this.pendingGestureEdges -= 1; },
       () => {
-        this.pendingGestureEdges -= 1;
-        this.close("gesture delivery failed");
+        if (expectedLease === this.typedLeaseToken) this.pendingGestureEdges -= 1;
+      },
+      () => {
+        // An old in-flight promise cannot retire a newer authenticated lease.
+        if (expectedLease === this.typedLeaseToken) {
+          this.pendingGestureEdges -= 1;
+          this.close("gesture delivery failed");
+        }
       },
     );
     return send;
@@ -303,6 +386,12 @@ class WebTransportGameConnection {
     this.closed = true;
     this.#privateHitLab?.close(reason);
     this.experimentalGestureState = "closed";
+    this.onGestureRenewalRequired = null;
+    this.onBoundGestureAck = null;
+    this.typedLeaseToken = null;
+    this.pendingGestureEdges = 0;
+    this.gestureWriteQueue = Promise.resolve();
+    if(this.typedBoundWriter) { void this.typedBoundWriter.close().catch(()=>{}); }
     this.gestureGrantWaiter?.reject(new Error("experimental gesture transport closed"));
     this.gestureGrantWaiter = null;
     this.latestRealtime = null;

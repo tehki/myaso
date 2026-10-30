@@ -72,6 +72,11 @@ impl ChatIngressBudget {
 const GAME_PATH: &str = "/game";
 const V2_LAB_HELLO: [u8; 8] = [2, 0x10, b'M', b'Y', b'A', b'S', b'O', b'1'];
 const V2_LAB_GRANTED: [u8; 4] = [2, 0x13, 0, 0];
+// Source11 is negotiated ONLY after the original authenticated v2 grant.
+// This root reliable notification is a hint, never a player-selected lease.
+const V2_RESPAWN_RENEW_REQUIRED: [u8; 4] = [2, 0x14, 0, 0];
+const MAX_TYPED_RENEW_ATTEMPTS: usize = 8;
+const TYPED_FRAME_DEADLINE: Duration = Duration::from_secs(2);
 const CLOSE_DATAGRAM_UNAVAILABLE: u32 = 0x11;
 const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(50);
 const SNAPSHOT_EVERY_SERVER_TICKS: u32 = 3;
@@ -971,6 +976,17 @@ impl Drop for ChatTaskAbortGuard {
     }
 }
 
+// All extra typed streams must terminate with their ORIGINAL admitted QUIC
+// session. The root reliable and optional Chat C1 readers have separate owners.
+struct TypedTaskAbortGuard(Vec<tokio::task::AbortHandle>);
+impl Drop for TypedTaskAbortGuard {
+    fn drop(&mut self) {
+        for handle in self.0.drain(..) {
+            handle.abort();
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct ExperimentalGestureSettings {
     v2_lab: bool,
@@ -996,6 +1012,10 @@ async fn handle_connection(
     println!("session {stable_id} assigned player {player_id} from {remote}");
 
     let mut v2_enabled = false;
+    let current_typed_epoch = Arc::new(AtomicU64::new(lease_epoch));
+    let mut typed_tasks = TypedTaskAbortGuard(Vec::new());
+    let mut renewal_attempts = 0_usize;
+    let mut notified_incarnation = 0_u64;
     let mut legacy_combat_seen = false;
     let mut ingress = StandardInputIngress::default();
     let mut snapshots = SnapshotSession::default();
@@ -1236,6 +1256,25 @@ async fn handle_connection(
                     tokio::time::sleep_until(deadline).await;
                 } else { std::future::pending().await }
             } => { bail!("private HIT reliable writer exceeded 1500ms; no delivery claimed"); }
+            // Source11 owns only ADDITIONAL admitted game bidi streams. The
+            // original reliable bidi and Chat C1 optional uni remain untouched.
+            new_typed = connection.accept_bi(), if v2_enabled && renewal_attempts < MAX_TYPED_RENEW_ATTEMPTS => {
+                let (send, recv) = new_typed.context("accept optional typed renewal bidi")?;
+                renewal_attempts += 1;
+                let game = Arc::clone(&game);
+                let active = Arc::clone(&current_typed_epoch);
+                let task = tokio::spawn(async move {
+                    if let Err(error) = run_respawn_typed_channel(
+                        send, recv, TypedRenewContext {
+                            game, player_id, root_lease: lease_epoch, active,
+                            jump_review, flight_action_proof,
+                        }
+                    ).await {
+                        eprintln!("optional respawn typed stream rejected: {error:#}");
+                    }
+                });
+                typed_tasks.0.push(task.abort_handle());
+            }
             // Separate negotiated client uni stream, on the admitted QUIC
             // connection. No datagram or query parameter can enable v2.
             negotiation = connection.accept_uni(), if v2_lab && !v2_enabled && !game.chat_enabled => {
@@ -1266,6 +1305,9 @@ async fn handle_connection(
                 let datagram = datagram?;
                 if is_v2_event(datagram.as_ref()) {
                     if !v2_enabled { continue; }
+                    // Old 16-byte DATAGRAMs NEVER lookup or acquire the fresh
+                    // incarnation path, including delayed/duplicated packets.
+                    if current_typed_epoch.load(Ordering::Acquire) != lease_epoch { continue; }
                     // No await inside real World admission/Combat application.
                     let mut admission_proof = None;
                     let ack = {
@@ -1505,6 +1547,38 @@ async fn handle_connection(
                     )
                 };
                 let server_tick = frame.server_tick();
+                // Original root reliable is only a notification plane. The
+                // current World incarnation is read under the same mutex used
+                // for typed admission. A dropped signal is retried (bounded
+                // by once per 50ms snapshot), never treated as a grant.
+                if v2_enabled {
+                    let incarnation = {
+                        let state = game.state.lock().await;
+                        let active = current_typed_epoch.load(Ordering::Acquire);
+                        state.gesture_sessions.get(&active).and_then(|path| {
+                            state.world.fighter(player_id).and_then(|fighter| {
+                                let binding = path.binding();
+                                (state.chat_leases.get(&player_id) == Some(&lease_epoch)
+                                    && fighter.hp > 0.0
+                                    && fighter.action != myaso_server::simulation::Action::Dead
+                                    && binding.incarnation != fighter.world_incarnation()
+                                    && binding.world_instance == state.world.world_instance())
+                                    .then_some(fighter.world_incarnation())
+                            })
+                        })
+                    };
+                    if let Some(incarnation) = incarnation {
+                        if notified_incarnation != incarnation {
+                            match try_enqueue_reliable(&reliable_tx, || {
+                                ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
+                            }) {
+                                Ok(true) => notified_incarnation = incarnation,
+                                Ok(false) => {},
+                                Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
+                            }
+                        }
+                    }
+                }
                 let safe_input_ack = take_safe_input_ack(&mut pending_input_acks, server_tick);
                 let snapshot = realtime_ready.then(|| {
                     snapshots.build_from_frame(
@@ -1642,6 +1716,186 @@ async fn handle_connection(
             }
         }
     }
+}
+
+struct TypedRenewContext {
+    game: Arc<SharedGame>,
+    player_id: u32,
+    root_lease: u64,
+    active: Arc<AtomicU64>,
+    jump_review: bool,
+    flight_action_proof: bool,
+}
+
+// Source11: independent, length-framed 16-byte source0 events AND same-stream
+// 16-byte ACKs. An 8-byte legacy HELLO grants nothing by itself: only the
+// server-owned live incarnation, original ROOT lease and boot nonce may bind
+// the next channel. All error paths retire this optional stream, not gameplay.
+async fn run_respawn_typed_channel(
+    mut send: SendStream,
+    mut recv: RecvStream,
+    context: TypedRenewContext,
+) -> Result<()> {
+    let TypedRenewContext {
+        game,
+        player_id,
+        root_lease,
+        active,
+        jump_review,
+        flight_action_proof,
+    } = context;
+    let mut hello = [0_u8; 8];
+    tokio::time::timeout(TYPED_FRAME_DEADLINE, recv.read_exact(&mut hello))
+        .await
+        .context("respawn typed HELLO deadline")?
+        .context("respawn typed HELLO read")?;
+    if hello != V2_LAB_HELLO {
+        bail!("invalid respawn typed HELLO");
+    }
+    let fresh_lease = game
+        .allocate_lease_epoch()
+        .ok_or_else(|| anyhow::anyhow!("typed lease allocator exhausted"))?;
+    {
+        let mut state = game.state.lock().await;
+        if state.chat_leases.get(&player_id) != Some(&root_lease) {
+            bail!("original admitted gameplay lease has retired");
+        }
+        let prior_epoch = active.load(Ordering::Acquire);
+        let prior = state
+            .gesture_sessions
+            .get(&prior_epoch)
+            .ok_or_else(|| anyhow::anyhow!("typed predecessor missing"))?;
+        let old_binding = prior.binding();
+        let current_actor = state
+            .world
+            .fighter(player_id)
+            .ok_or_else(|| anyhow::anyhow!("authenticated actor missing"))?;
+        if old_binding.player_id != player_id
+            || old_binding.world_instance != state.world.world_instance()
+            || current_actor.world_incarnation() == old_binding.incarnation
+            || current_actor.hp <= 0.0
+            || current_actor.action == myaso_server::simulation::Action::Dead
+        {
+            bail!("fresh authoritative World incarnation required for typed renewal");
+        }
+        let mut new_path = SessionGestureWorldPath::from_admitted_world(
+            &state.world,
+            player_id,
+            fresh_lease,
+            state.boot_nonce,
+        )
+        .ok_or_else(|| anyhow::anyhow!("new typed generation not admissible"))?;
+        if jump_review {
+            new_path.enable_jump_review();
+        }
+        // No raw old DATAGRAM can acquire the fresh path under any ordering.
+        if let Some(old_path) = state.gesture_sessions.get_mut(&prior_epoch) {
+            old_path.retire();
+        }
+        state.gesture_sessions.insert(fresh_lease, new_path);
+        active.store(fresh_lease, Ordering::Release);
+    }
+    let mut buffer = Vec::with_capacity(18);
+    tokio::time::timeout(
+        TYPED_FRAME_DEADLINE,
+        send_reliable_frame(&mut send, &mut buffer, &V2_LAB_GRANTED),
+    )
+    .await
+    .context("bound typed GRANT writer deadline")?
+    .context("send bound typed GRANT")?;
+    let mut next_expected = 1_u32;
+    loop {
+        // Idle first-byte waits for a real physical gesture. A partial frame
+        // must complete promptly or this stream closes; Combat stays alive.
+        let mut len = [0_u8; 2];
+        recv.read_exact(&mut len[..1])
+            .await
+            .context("read typed frame first byte")?;
+        tokio::time::timeout(TYPED_FRAME_DEADLINE, recv.read_exact(&mut len[1..]))
+            .await
+            .context("partial typed header timed out")?
+            .context("read typed frame second byte")?;
+        if u16::from_le_bytes(len) != 16 {
+            bail!("invalid bound typed frame size");
+        }
+        let mut event_bytes = [0_u8; 16];
+        tokio::time::timeout(TYPED_FRAME_DEADLINE, recv.read_exact(&mut event_bytes))
+            .await
+            .context("partial typed body timed out")?
+            .context("read bound typed event")?;
+        let typed = decode_typed_event(&event_bytes)
+            .map_err(|_| anyhow::anyhow!("invalid bound typed source0 event"))?;
+        if typed.event.sequence > next_expected {
+            // Same conservative consecutive edge fence as original datagram
+            // path; reliable stream already preserves sender write ordering.
+            bail!("typed sequence gap on bound generation");
+        }
+        let mut proof = None;
+        let receipt = {
+            let mut state = game.state.lock().await;
+            if active.load(Ordering::Acquire) != fresh_lease
+                || state.chat_leases.get(&player_id) != Some(&root_lease)
+            {
+                break;
+            }
+            let before = if flight_action_proof {
+                state.world.fighter(player_id).map(|f| f.action.wire_code())
+            } else {
+                None
+            };
+            let nonce = state.boot_nonce;
+            let reply = state
+                .gesture_sessions
+                .remove(&fresh_lease)
+                .and_then(|mut path| {
+                    let ack = path.accept_under_world_lock(
+                        &mut state.world,
+                        fresh_lease,
+                        nonce,
+                        &event_bytes,
+                    );
+                    state.gesture_sessions.insert(fresh_lease, path);
+                    ack
+                });
+            if let (Some(from), Some(ack)) = (before, reply) {
+                if let Some(to) = state.world.fighter(player_id).map(|f| f.action.wire_code()) {
+                    proof = Some(m201_gesture_action_proof_line(
+                        state.world.tick,
+                        player_id,
+                        typed,
+                        ack,
+                        from,
+                        to,
+                    ));
+                }
+            }
+            reply
+        };
+        if let Some(line) = proof {
+            println!("{line}");
+        }
+        if let Some(ack) = receipt {
+            if active.load(Ordering::Acquire) != fresh_lease {
+                break;
+            }
+            let bytes =
+                encode_ack(ack).map_err(|e| anyhow::anyhow!("bound typed ACK encoding: {e:?}"))?;
+            tokio::time::timeout(
+                TYPED_FRAME_DEADLINE,
+                send_reliable_frame(&mut send, &mut buffer, &bytes),
+            )
+            .await
+            .context("bound typed ACK deadline")?
+            .context("send bound typed ACK")?;
+            if ack.status == myaso_server::prealpha_lmb_gesture_proposal::AckStatus::Stale {
+                break;
+            }
+            if ack.status == myaso_server::prealpha_lmb_gesture_proposal::AckStatus::Accepted {
+                next_expected = typed.event.sequence.saturating_add(1);
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn grant_gesture_session(
