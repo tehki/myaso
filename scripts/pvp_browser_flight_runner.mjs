@@ -1,3 +1,4 @@
+import {awaitOriginalWorldShortBlock} from "./m151-original-world-block.mjs";
 import {awaitOriginalHeavyChargeTick,planOriginalDodgeViewport} from "./m107-original-world-dodge-tick.mjs";
 import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
 import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
@@ -10288,11 +10289,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
       // M320: capture ONLY this genuine exchange's authoritative action/event
-      // transitions. The loopback-only server trace is evidence, not a clock
-      // used to schedule attacks or to waive M194's HP/guard/parry assertions.
+      // transitions. M194 keeps these as read-only proof; M151 additionally
+      // waits for actual Block admission before physical release. No World
+      // stepping or waiver of HP/guard/parry assertions is permitted.
       const m320ServerOutputStart = m201ServerOutput().length;
       const challenge = m221Registry.issue();
-      let m212Exchange;
+      let m212Exchange,m151WorldBlock=null;
       try {
         // Arm the real Firefox observer BEFORE the one genuine W3C wheel.
         // Chrome responds after browser delivery, not the delayed HTTP ACK.
@@ -10312,17 +10314,23 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
           trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          // M194 first RED #41092544888: physical Chrome UP lagged 91ms after
-          // dispatch and actual World HIT arrived ONE tick after the 240ms
-          // Block expired. Leave M151's original 25ms pacing intact; M194
-          // releases promptly after real Firefox wheel, still requiring
-          // original W3C/World 125..240ms and exact guard/HP proof.
-          postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0,
+          // M151 first RED: Block1329 expired1344; Light HIT1345.
+          // The extra25ms host pause exhausted the original240ms defense.
+          // Require actual World Block before release, preserving >125ms
+          // full original Light windup without another artificial pause.
+          postTrustedWheelMs: 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 0) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
-          awaitTrustedWheel: () => challenge.wait(),
+          awaitTrustedWheel: async () => {
+            const receipt=await challenge.wait();
+            if(m151ReleaseAnchoredGuardOnly) m151WorldBlock=await awaitOriginalWorldShortBlock({
+              readOutput:m201ServerOutput,afterOffset:m320ServerOutputStart,
+              fighterId:defenderReady.playerNetId,sleep,
+            });
+            return receipt;
+          },
           sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
@@ -10375,6 +10383,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         attempt: attempt + 1,
         harnessW3c: m212Exchange,
         trustedWheelBeforeRelease,
+        originalWorldBlock:m151WorldBlock,
         wheelEventEpochMs: m212FirefoxWheel?.epochMs ?? null,
         chromeReleaseEpochMs: m212ChromeUp?.epochMs ?? null,
         firefox: {

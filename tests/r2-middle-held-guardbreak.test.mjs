@@ -35,7 +35,7 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   const guardBreak = source.slice(start, end);
   assert.match(guardBreak, /dispatchR2ReleaseLedShortBlock\(\{/);
   assert.match(guardBreak, /sendAttackDown: \(\) => setArenaAttackButton\(attacker, true\)/);
-  assert.match(guardBreak, /awaitTrustedWheel: \(\) => challenge\.wait\(\)/);
+  assert.match(guardBreak, /const receipt=await challenge\.wait\(\)/);
   assert.match(guardBreak, /if \(!trustedWheelBeforeRelease\)/);
   assert.match(guardBreak, /sendAttackUp: \(\) => setArenaAttackButton\(attacker, false\)/);
   assert.match(guardBreak, /defenderState\?\.playerHp !== 100/);
@@ -44,7 +44,7 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   const heldRelease = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
   assert.match(heldRelease, /wheelHeadStartMs: 0/);
   assert.match(heldRelease, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(guardBreak.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
-    "only M151 keeps the optional 25ms pause; M194 releases upon actual trusted wheel receipt");
+  assert.ok(guardBreak.includes("postTrustedWheelMs: 0"),
+    "native release has no extra post-wheel pause; M151 additionally requires real World Block");
   assert.match(heldRelease, /receiptGraceMs = 100/);
 });
