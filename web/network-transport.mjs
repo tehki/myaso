@@ -63,6 +63,9 @@ class WebTransportGameConnection {
     this.typedLeaseToken = this;
     this.typedGeneration = 0;
     this.typedRenewalPending = false;
+    // Bounded, diagnostic-only local proof; never used for authority or ACK.
+    this.source11Events = [];
+    this.firstCloseReason = null;
     this.typedBoundWriter = null;
     this.onBoundGestureAck = null;
     this.onGestureRenewalRequired = null;
@@ -102,11 +105,22 @@ class WebTransportGameConnection {
     return true;
   }
 
+  #traceSource11(stage,detail="") {
+    // No user identity, keys, packet bodies or credentials are recorded.
+    this.source11Events.push(Object.freeze({
+      stage,detail:String(detail).slice(0,160),
+      generation:this.typedGeneration,pending:this.typedRenewalPending,
+      atEpochMs:Date.now(),
+    }));
+    if (this.source11Events.length > 16) this.source11Events.shift();
+  }
+
   #handleRespawnRenewalNotice(packet) {
     const bytes = toUint8Array(packet);
     if (bytes.length !== 4 || bytes[0] !== 2 || bytes[1] !== 0x14
         || bytes[2] !== 0 || bytes[3] !== 0) return false;
     if (!this.closed && this.experimentalGestureState === "granted") {
+      this.#traceSource11("root-renew-hint");
       // Notice is a hint only: the new bidi's real server grant is required.
       void Promise.resolve().then(() => this.onGestureRenewalRequired?.()).catch(() => {
         this.close("Source11 generation renewal failed");
@@ -129,6 +143,7 @@ class WebTransportGameConnection {
     // Unlike the UI-level renewal guard, this protects transport API callers.
     if (this.typedRenewalPending) throw new Error("Source11 renewal already in progress");
     this.typedRenewalPending = true;
+    this.#traceSource11("renew-open-start");
     // A single startup deadline covers OPEN, HELLO write/backpressure and
     // server GRANT, rather than starting only after HELLO has been written.
     // WebTransport does not guarantee that createBidirectionalStream() can
@@ -152,6 +167,7 @@ class WebTransportGameConnection {
     }).catch(()=>{});
     try {
       const stream=await Promise.race([opening,deadline]);
+      this.#traceSource11("renew-open-complete");
       if(this.closed || expired) throw new Error("retired Source11 stream cannot acquire authority");
       writer=stream.writable.getWriter();
       const reader=stream.readable.getReader();
@@ -177,12 +193,15 @@ class WebTransportGameConnection {
         writer.write(Uint8Array.from([2,0x10,77,89,65,83,79,49])),
         deadline,
       ]);
+      this.#traceSource11("renew-hello-written");
       await Promise.race([acknowledged,deadline]);
+      this.#traceSource11("renew-bound-grant-received");
       if(this.closed || expired) throw new Error("Source11 original QUIC retired");
       const previous=this.typedBoundWriter;
       this.typedGeneration+=1;
       this.typedLeaseToken=token;
       this.typedBoundWriter=writer;
+      this.#traceSource11("renew-lease-active");
       // Old pending .ready/write promises must neither block nor close the
       // newly bound generation. Every old continuation checks its own token.
       this.gestureWriteQueue=Promise.resolve();
@@ -190,6 +209,7 @@ class WebTransportGameConnection {
       if(previous) { void previous.close().catch(()=>{}); }
       return token;
     } catch(error) {
+      this.#traceSource11("renew-failed",error?.message ?? String(error));
       // Never wait indefinitely for a stuck writer's abort. This optional
       // stream may fail while the original game and Chat C1 remain alive.
       if(writer){
@@ -418,6 +438,8 @@ class WebTransportGameConnection {
 
   close(reason = "client close") {
     if (this.closed) return;
+    this.firstCloseReason = String(reason).slice(0,180);
+    this.#traceSource11("root-transport-close",this.firstCloseReason);
     this.closed = true;
     this.#privateHitLab?.close(reason);
     this.experimentalGestureState = "closed";
