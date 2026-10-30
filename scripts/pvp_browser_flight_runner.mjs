@@ -1,3 +1,4 @@
+import {awaitOriginalHeavyChargeTick} from "./m107-original-world-dodge-tick.mjs";
 import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
 import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
 import { verifyM173WorldJumpSpend } from "./m173-world-stamina-proof.mjs";
@@ -1563,22 +1564,25 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
       }
       const windupObservedEpochMs = Date.now();
       committedObserved = true;
-      // Shift the native choreography by the extra physical charging hold,
-      // not the server's125ms iframe or320ms READY rule. Keep the original
-      //170ms perpendicular movement lead by waiting before KeyS begins.
-      const releaseHoldShiftMs = M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs;
-      const wheelTargetEpochMs = windupObservedEpochMs + 170 + releaseHoldShiftMs;
-      await sleep(releaseHoldShiftMs);
+      // The original failure hit Idle at tick288; Dodge began at289.
+      // Host observation of tick261 arrived late, so adding another300ms
+      // scheduled the native wheel after contact. Anchor both physical
+      // controls to current World ticks, retaining the original125ms iframe.
+      const awaitChargeTick=offsetTicks=>awaitOriginalHeavyChargeTick({
+        readOutput:m201ServerOutput,afterOffset:serverLogOffset,
+        fighterId:beforeAttacker.playerNetId,startTick:windup.serverTick,offsetTicks,sleep,
+      });
+      await awaitChargeTick(10);
       await setMovementKey(defender, "s", true);
       try {
-        const remainingMs = wheelTargetEpochMs - Date.now();
-        if (remainingMs > 0) await sleep(remainingMs);
+        const dispatchPhase=await awaitChargeTick(20);
         const wheelIssuedEpochMs = Date.now();
         await performArenaTimedPointerDodge(defender, defenderElementId, 15);
         console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
           fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
           windupObservedAfterMs: windup.observedAfterMs,
-          plannedAfterWindupMs: 170 + releaseHoldShiftMs,
+          dispatchWorldTick:dispatchPhase.serverTick,
+          dispatchWorldOffsetTicks:dispatchPhase.offsetTicks,
           wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
         }));
       } finally {

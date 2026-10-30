@@ -49,12 +49,14 @@ const PRIORITY = Object.freeze({
 export function createCombatReadabilityTracker() {
   const previous = new Map();
   let pendingDodge = null;
+  const damagingAttacks = new Set();
   return {
     observe(state, ownId) {
       if (!(state instanceof Map) || !ownId) return null;
       const current = new Map();
       for (const entity of state.values()) current.set(entity.netId, snapshot(entity));
 
+      for (const id of damagingAttacks) if (!current.has(id)) damagingAttacks.delete(id);
       const own = current.get(ownId);
       const beforeOwn = previous.get(ownId);
       const peers = [...current.values()].filter((entity) => entity.netId !== ownId);
@@ -78,8 +80,26 @@ export function createCombatReadabilityTracker() {
           }
         }
       }
+      // A late roll cannot turn an already damaging attack into a dodge.
+      // Remember the whole observed attack cycle, before Dodge begins; its
+      // pending baseline alone may already contain the earlier 46HP loss.
+      if (own && peer) {
+        for (const [attacker, defender, beforeAttacker, beforeDefender] of [
+          [own, peer, beforeOwn, beforePeer], [peer, own, beforePeer, beforeOwn],
+        ]) {
+          const attacking = isAttackWindup(attacker.action) || isAttackActive(attacker.action)
+            || isAttackRecovery(attacker.action);
+          const freshWindup = isAttackWindup(attacker.action)
+            && !isAttackWindup(beforeAttacker?.action) && !isAttackActive(beforeAttacker?.action);
+          if (!attacking || freshWindup) damagingAttacks.delete(attacker.netId);
+          if (attacking && beforeDefender
+            && (defender.hp < beforeDefender.hp || defender.guard < beforeDefender.guard)) {
+            damagingAttacks.add(attacker.netId);
+          }
+        }
+      }
       pendingDodge = own && peer
-        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer)
+        ? collectDodgeEvents(candidates, own, peer, ownId, pendingDodge, beforeOwn, beforePeer, damagingAttacks)
         : null;
 
       previous.clear();
@@ -87,7 +107,7 @@ export function createCombatReadabilityTracker() {
       candidates.sort((a, b) => b.priority - a.priority);
       return candidates[0] ?? null;
     },
-    reset() { previous.clear(); pendingDodge = null; },
+    reset() { previous.clear(); pendingDodge = null; damagingAttacks.clear(); },
   };
 }
 
@@ -786,7 +806,7 @@ function collectParryEvents(events, beforeOwn, own, beforePeer, peer) {
   }
 }
 
-function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null, beforePeer = null) {
+function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null, beforePeer = null, damagingAttacks = new Set()) {
   if (pending) {
     const attacker = pending.attackerId === own.netId ? own : pending.attackerId === peer.netId ? peer : null;
     const defender = pending.defenderId === own.netId ? own : pending.defenderId === peer.netId ? peer : null;
@@ -794,7 +814,7 @@ function collectDodgeEvents(events, own, peer, ownId, pending, beforeOwn = null,
     if (!attacker || !vitalsStable) {
       pending = null;
     } else if (isAttackRecovery(attacker.action)) {
-      if (pending.activeSeen) {
+      if (pending.activeSeen && !damagingAttacks.has(attacker.netId)) {
         const ownDefended = defender.netId === ownId;
         push(
           events,

@@ -1090,3 +1090,24 @@ test("M59 R2 genuine held LMB heavy-charge windup preserves active-before-windup
   assert.ok(runner.includes('!secondaryPhases.has("WINDUP") || !secondaryPhases.has("STRIKE")'),
     "native M59 must still observe both fully-committed normal WINDUP and STRIKE");
 });
+
+test("M107 late Dodge cannot claim avoidance after Heavy46 already landed in that attack cycle",()=>{
+ for(const ownId of [1,2]) {
+  const tracker=createCombatReadabilityTracker();
+  tracker.observe(state(fighter(1,100,100,COMBAT_ACTION.idle,80),
+   fighter(2,100,100,COMBAT_ACTION.heavyAttackWindup,0,0,0)),ownId);
+  const hit=tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.idle,80),
+   fighter(2,100,100,COMBAT_ACTION.heavyAttackActive,0,0,0)),ownId);
+  assert.equal(hit.feedback,ownId===1?"damage-taken":"hit-confirm","actual Heavy46 feedback is preserved");
+  tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.dodge,80),
+   fighter(2,100,100,COMBAT_ACTION.heavyAttackActive,0,0,0)),ownId);
+  const after=tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.dodgeRecovery,88),
+   fighter(2,100,100,COMBAT_ACTION.heavyAttackRecovery,0,0,0)),ownId);
+  assert.notEqual(after?.kind,"dodge","one already damaging Heavy cannot later become an evaded strike");
+  tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.idle,80),fighter(2,100,100,COMBAT_ACTION.idle,0,0,0)),ownId);
+  tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.idle,80),fighter(2,100,100,COMBAT_ACTION.heavyAttackWindup,0,0,0)),ownId);
+  tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.dodge,80),fighter(2,100,100,COMBAT_ACTION.heavyAttackActive,0,0,0)),ownId);
+  const fresh=tracker.observe(state(fighter(1,54,100,COMBAT_ACTION.dodgeRecovery,88),fighter(2,100,100,COMBAT_ACTION.heavyAttackRecovery,0,0,0)),ownId);
+  assert.equal(fresh?.feedback,ownId===1?"dodge-success":"dodge-evaded","a new genuinely evaded attack still earns its cue at54HP");
+ }
+});

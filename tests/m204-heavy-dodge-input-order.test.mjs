@@ -13,9 +13,9 @@ test("M204 schedules one genuine wheel during the FIRST physical LMB heavy hold"
   const keyDown = flight.indexOf('performM110NativeHeldLmb(attacker, attackerElementId, attackOffset).then(');
   const commit = flight.indexOf("windup = await awaitM223HeavyWindup({");
   assert.ok(flight.includes("serverLogOffset = m201ServerOutput().length"));
-  assert.ok(flight.includes("windupObservedEpochMs + 170 + releaseHoldShiftMs"));
-  assert.ok(flight.includes("M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs"));
-  assert.ok(flight.includes("wheelTargetEpochMs - Date.now()"));
+  assert.ok(flight.includes("await awaitChargeTick(10)"));
+  assert.ok(flight.includes("const dispatchPhase=await awaitChargeTick(20)"));
+  assert.ok(!flight.includes("wheelTargetEpochMs - Date.now()"));
   assert.ok(!flight.includes("await sleep(90);"));
   assert.ok(!flight.includes("await sleep(120);"));
   const sDown = flight.indexOf('await setMovementKey(defender, "s", true);');
