@@ -1,0 +1,75 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import vm from "node:vm";
+import {readFileSync} from "node:fs";
+
+// Execute the actual game keyboard callback and optional actual fast-path
+// function. No synthetic DOM event is dispatched and no World hit is inferred.
+const source=readFileSync(new URL("../web/online-game.mjs",import.meta.url),"utf8").replace(/\r\n/g,"\n");
+const marker='canvas.addEventListener("keydown", (event) => {';
+const begin=source.indexOf(marker)+marker.length;
+const end=source.indexOf('\n});\n// Key release',begin);
+assert.ok(begin>=marker.length&&end>begin);
+const helperStart=source.indexOf('function sendImmediatePhysicalJumpEdge(');
+const helperEnd=helperStart<0?-1:source.indexOf('\n}\n',helperStart)+2;
+
+function harness({trusted=true,hidden=false,focused=true,playerId=1,typed=false,cold=false,armed=true}={}) {
+ const canvas={},events=[],packets=[];
+ const context={canvas,document:{hidden,activeElement:focused?canvas:{}},matchOver:false,
+  networkClient:{playerNetId:playerId,sendInput:p=>{events.push('send');packets.push({...p});}},
+  clientTick:40,currentInput:{},keys:new Set(),leftButtonDown:true,
+  typedLmbEnabled:typed,experimentalGestureLab:armed?{snapshot:{failed:false,closed:false}}:null,
+  attackRequested:false,runningAttackRequested:false,heavyAttackRequested:false,
+  rollRequested:false,kickRequested:false,jumpRequested:false,dashRequested:false,
+  dashMove:null,committedLightMove:null,
+  local:{action:0,stamina:100},COMBAT_ACTION:{idle:0},COMBAT:{dash:{staminaCost:20}},
+  audio:{isUnlocked:()=>!cold,play:()=>events.push('play'),unlock:()=>events.push('unlock')},
+  afterSource0Audio:{noteJump:()=>cold,afterOriginalSend:()=>events.push('after-send')},
+  queueStaminaDenial:()=>{},markStaminaDenialSubmitted:()=>events.push('mark'),
+  dashGesture:{press:()=>null},window:{},acceptanceScenario:'',
+ };
+ context.leftButtonCharge={commitLight:()=>{context.attackRequested=true;}};
+ context.sampleInput=()=>{Object.assign(context.currentInput,{jump:context.jumpRequested,
+  attack:!typed&&context.attackRequested,heavyAttack:false});};
+ vm.createContext(context);
+ const helper=helperStart<0?'':source.slice(helperStart,helperEnd);
+ vm.runInContext(helper+'\nglobalThis.actualKeydown=(event)=>{'+source.slice(begin,end)+'\n};',context);
+ const down=(repeat=false)=>context.actualKeydown({code:'Space',repeat,isTrusted:trusted,preventDefault(){}});
+ return {context,events,packets,down};
+}
+
+test("trusted Space+LMB reaches original input before RAF or cold audio startup",()=>{
+ const h=harness({cold:true});h.down();
+ assert.equal(h.packets.length,1,"physical chord cannot wait233ms for the next RAF sender");
+ assert.deepEqual(h.packets[0],{tick:40,jump:true,attack:true,heavyAttack:false});
+ assert.equal(h.context.clientTick,41);
+ assert.equal(h.context.jumpRequested,false);
+ assert.equal(h.context.attackRequested,false);
+ assert.equal(h.events.includes('unlock'),false,"cold audio must be scheduled after original submission");
+ h.down(true);assert.equal(h.packets.length,1,"Space auto-repeat cannot replay the one-shot chord");
+});
+
+test("selected typed LMB keeps its exclusive attack owner while physical Space uses original input",()=>{
+ const h=harness({typed:true});h.down();
+ assert.equal(h.packets.length,1);
+ assert.equal(h.packets[0].jump,true);assert.equal(h.packets[0].attack,false);
+});
+
+test("hidden, unfocused, unadmitted and untrusted callbacks cannot submit an immediate jump",()=>{
+ for(const opts of [{trusted:false},{hidden:true},{focused:false},{playerId:0}]) {
+  const h=harness(opts);h.down();assert.equal(h.packets.length,0);
+ }
+});
+
+test("physical submission shares the original uint32 tick owner across wrap",()=>{
+ const h=harness();h.context.clientTick=0xffffffff;h.down();
+ assert.equal(h.packets[0].tick,0xffffffff);assert.equal(h.context.clientTick,0);
+ h.context.keys.delete('Space');h.down();
+ assert.equal(h.packets[1].tick,0);assert.equal(h.context.clientTick,1);
+});
+
+test("typed negotiation or retired controls cannot leak original gameplay before grant",()=>{
+ const pending=harness({typed:true,armed:false});pending.down();assert.equal(pending.packets.length,0);
+ const retired=harness({typed:true});retired.context.experimentalGestureLab.snapshot.closed=true;
+ retired.down();assert.equal(retired.packets.length,0);
+});
