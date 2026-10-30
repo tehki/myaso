@@ -179,7 +179,7 @@ test("M194 and M151 use native release-anchored genuine wheel; M152 remains whee
   assert.match(runner, /const m151ReleaseAnchoredGuardOnly = scenario === "uiguardbreakpunishffa"/);
   assert.match(runner, /const m194ReleaseAnchoredGuardOnly = scenario === "uiguardbreak"/);
   assert.match(runner, /preWheelHeadStartMs: wheelFirstGuardOnly \? 15 : 0/);
-  assert.match(runner, /postTrustedWheelMs: \(m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 25 : 0/);
+  assert.match(runner, /postTrustedWheelMs: m151ReleaseAnchoredGuardOnly \? 25 : 0/);
   assert.match(runner, /trustedWheelWaitMs: \(wheelFirstGuardOnly \|\| m151ReleaseAnchoredGuardOnly \|\| m194ReleaseAnchoredGuardOnly\) \? 190 : 0/);
   assert.equal(COMBAT.block.parryWindowMs, 125);
   assert.equal(COMBAT.block.shortBlockMs, 240);
