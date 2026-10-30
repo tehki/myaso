@@ -12,7 +12,7 @@ test("Source11 native mode must keep same physical actor and QUIC session after 
   const positive = source.slice(start, end);
   assert.match(positive, /originalSessionId=old\.s\.id/);
   assert.match(positive, /originalActorId=old\.actor\.id/);
-  assert.match(positive, /resumedRound=await round\(\[\[2,1\]\]\)/);
+  assert.match(positive, /resumedRound=await round\(\[\[2,3\]\]\)/);
   assert.match(positive, /afterFresh\.ownPlayerNetId,originalActorId/);
   assert.match(positive, /afterFresh\.closed,false/);
   assert.match(positive, /afterFresh\.failed,false/);

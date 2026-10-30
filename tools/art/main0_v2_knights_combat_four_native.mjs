@@ -431,15 +431,15 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.equal(beforeFresh.failed,false,"original gesture connection must survive respawn");
    let resumedRound;
    try{
-    staging.push(await stagePair(2,1));
-    resumedRound=await round([[2,1]]);
+    staging.push(await stagePair(2,3));
+    resumedRound=await round([[2,3]]);
     const afterFresh=await proof(old);
     assert.equal(old.s.id,originalSessionId,"native WebDriver session must never be replaced");
     assert.equal(afterFresh.ownPlayerNetId,originalActorId,"respawn must fight as existing actor2, never rejoin actor5");
     assert.equal(afterFresh.closed,false,"new generation must keep original QUIC connection open");
     assert.equal(afterFresh.failed,false,"new genuine physical click must not retire a recoverable session");
     const pressed=resumedRound.presses.filter(e=>e.fighter===originalActorId&&e.eventAction===1&&e.status===1);
-    const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===1&&e.damage===34);
+    const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===3&&e.damage===34);
     assert.equal(pressed.length,1,"one server-accepted fresh physical PRESS after respawn");
     assert.equal(hit.length,1,"one new original World 34HP HIT after respawn");
     const result={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
