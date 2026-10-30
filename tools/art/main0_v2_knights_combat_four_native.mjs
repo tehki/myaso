@@ -478,13 +478,55 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     assert.equal(afterFresh.ownPlayerNetId,originalActorId,"respawn must fight as existing actor2, never rejoin actor5");
     assert.equal(afterFresh.closed,false,"new generation must keep original QUIC connection open");
     assert.equal(afterFresh.failed,false,"new genuine physical click must not retire a recoverable session");
+    assert.equal(afterFresh.typedGeneration,1,"the first genuine respawn uses its first bound generation");
     const pressed=resumedRound.presses.filter(e=>e.fighter===originalActorId&&e.eventAction===1&&e.status===1);
     const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===3&&e.damage===34);
     assert.equal(pressed.length,1,"one server-accepted fresh physical PRESS after respawn");
     assert.equal(hit.length,1,"one new original World 34HP HIT after respawn");
+    const renewalCycles=[{cycle:1,death,respawn,afterFresh,resumedRound}];
+    let lastRespawn=respawn;
+    for(let cycle=2;cycle<=3;cycle++){
+     const cycleStart=lines().length-1;
+     // Three real original34HP Lights kill the same respawned100HP actor.
+     // No HP edits, new client, actor5 or substituted browser are possible.
+     for(let lethal=0;lethal<3;lethal++){
+      staging.push(await stagePair(1,2));
+      rounds.push(await round([[1,2]]));
+      if(expectedHp.get(2)===0)break;
+      await waitReplicas();
+     }
+     const cycleDeath=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.to===8&&e.index>lastRespawn.index),5000);
+     const cycleRespawn=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.from===8&&e.to===0&&e.index>cycleDeath.index),6000);
+     expectedHp.set(2,100);
+     const replicas=await waitReplicas();
+     const bound=await waitFor(async()=>{
+      const p=await proof(old);
+      return p?.typedGeneration===cycle&&!p.typedRenewalPending&&!p.closed&&!p.failed?p:false;
+     },5000);
+     assert.equal(old.s.id,originalSessionId,"every repeated incarnation keeps the original W3C session");
+     assert.equal(bound.ownPlayerNetId,originalActorId,"repeated death cannot replace original actor2");
+     staging.push(await stagePair(2,3));
+     const freshRound=await round([[2,3]]),fresh=await proof(old);
+     assert.equal(freshRound.presses.filter(e=>e.fighter===2&&e.eventAction===1&&e.status===1).length,1);
+     assert.equal(freshRound.hits.filter(e=>e.attacker===2&&e.target===3&&e.damage===34).length,1);
+     assert.equal(fresh.typedGeneration,cycle);
+     assert.equal(fresh.closed,false);assert.equal(fresh.failed,false);
+     renewalCycles.push({cycle,death:cycleDeath,respawn:cycleRespawn,replicas,bound,freshRound,fresh,
+      originalWorld:lines().slice(cycleStart)});
+     lastRespawn=cycleRespawn;
+     if(expectedHp.get(3)===0){
+      // A second fresh34HP Light legitimately kills the damaged third actor.
+      // Wait for ITS real World respawn before further combat; never reset HP.
+      const secondaryDeath=await waitFor(()=>actionRows().find(e=>e.fighter===3&&e.to===8&&e.index>=cycleStart),5000);
+      const secondaryRespawn=await waitFor(()=>actionRows().find(e=>e.fighter===3&&e.from===8&&e.to===0&&e.index>secondaryDeath.index),6000);
+      expectedHp.set(3,100);
+      await waitReplicas();
+      renewalCycles.at(-1).secondaryRespawn=secondaryRespawn;
+     }
+    }
     const result={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
      mode:physicalMode,originalActorId,originalSessionId,beforeFresh,afterFresh,
-     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,
+     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,renewalCycles,
      retiredGenerationSafetyRequiresSeparateNegativeProof:true,rejoinedAsActor5:false,
      originalWorldAfterRespawn:lines().slice(startOffset)};
     await writeFile(join(output,"combat4-respawn-same-session-PASS.json"),JSON.stringify(result,null,2)+"\n");
