@@ -10289,7 +10289,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
           trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0,
+          // M194 first RED #41092544888: physical Chrome UP lagged 91ms after
+          // dispatch and actual World HIT arrived ONE tick after the 240ms
+          // Block expired. Leave M151's original 25ms pacing intact; M194
+          // releases promptly after real Firefox wheel, still requiring
+          // original W3C/World 125..240ms and exact guard/HP proof.
+          postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 0) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),

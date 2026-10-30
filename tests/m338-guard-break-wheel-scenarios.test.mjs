@@ -44,8 +44,8 @@ test("M338 connects before guard-break W3C input and preserves genuine wheel pro
   assert.ok(flight.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.match(r2, /receiptGraceMs = 100/);
   assert.match(r2, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(flight.includes("postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0"),
-    "only authentic M151/M194 release-anchored staging opts into the bounded release window");
+  assert.ok(flight.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
+    "only M151 keeps the optional 25ms pause; M194 releases upon actual trusted wheel receipt");
   assert.ok(flight.includes("b.playerGuard < expectedGuards[index]") || flight.includes("defenderResult.playerGuard !== 0"));
   assert.ok(!observer.includes("dispatchEvent("));
 });

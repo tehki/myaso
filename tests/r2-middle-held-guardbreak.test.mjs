@@ -44,7 +44,7 @@ test("R2 adds hold-block acceptance WITHOUT disabling original strict M194 wheel
   const heldRelease = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
   assert.match(heldRelease, /wheelHeadStartMs: 0/);
   assert.match(heldRelease, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(guardBreak.includes("postTrustedWheelMs: (m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 25 : 0"),
-    "only authentic M151/M194 release-anchored staging opts into the bounded release window");
+  assert.ok(guardBreak.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
+    "only M151 keeps the optional 25ms pause; M194 releases upon actual trusted wheel receipt");
   assert.match(heldRelease, /receiptGraceMs = 100/);
 });
