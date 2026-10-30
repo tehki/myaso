@@ -294,3 +294,26 @@ test("Source11 single-flight gate releases after failed OPEN so next valid bound
   assert.equal(conn.closed,false);
   conn.close("retry granted");
 }));
+
+test("Source11 local first-fatal trace records hint, bounded channel stages and exact root close reason",()=>fixture(async()=>{
+  const c=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await c.negotiateExperimentalGestureV2({reliableStream:true});
+  c.onGestureRenewalRequired=()=>{};
+  c.transport.rootSource.enqueue(frame([2,0x14,0,0]));
+  await eventually(()=>c.source11Events.some(x=>x.stage==="root-renew-hint"));
+  await c.negotiateRespawnTypedChannel();
+  const stages=c.source11Events.map(x=>x.stage);
+  for(const expected of ["root-renew-hint","renew-open-start","renew-open-complete",
+    "renew-hello-written","renew-bound-grant-received","renew-lease-active"])
+    assert.ok(stages.includes(expected),expected);
+  assert.equal(c.firstCloseReason,null);
+  const generation=c.typedGeneration;
+  c.close("fixture exact original root closure reason");
+  c.close("second close must not replace first evidence");
+  assert.equal(c.firstCloseReason,"fixture exact original root closure reason");
+  assert.equal(c.typedGeneration,generation,"trace never changes generation");
+  assert.equal(c.source11Events.at(-1).stage,"root-transport-close");
+  assert.ok(c.source11Events.length<=16,"fatal trace remains bounded");
+  assert.ok(c.source11Events.every(x=>typeof x.stage==="string" &&
+    !Object.hasOwn(x,"playerId") && !Object.hasOwn(x,"packet")));
+}));

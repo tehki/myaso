@@ -418,7 +418,34 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   const death=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.to===8),5000);
   const respawn=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.from===8&&e.to===0&&e.index>death.index),6000);
   expectedHp.set(2,100);
-  const afterRespawn=await waitReplicas();
+  let afterRespawn;
+  try {
+   afterRespawn=await waitReplicas();
+  } catch(error) {
+   if(physicalMode==="four-combat-respawn-same-session"){
+    // First-fatal snapshot must precede the usual post-respawn positive
+    // capture; that positive block cannot run when waitReplicas rejects.
+    // This is observation ONLY: no retries, reconnect, W3C input or timeout
+    // changes. Per-seat browser errors remain explicit rather than hidden.
+    const actualSeats=await Promise.all(actors.map(async a=>{
+     try {
+      return {actorId:a.actor.id,browser:a.s.engine,
+       proof:await proof(a),w3cSessionId:a.s.id};
+     } catch(fatal) {
+      return {actorId:a.actor.id,browser:a.s.engine,
+       w3cSessionId:a.s.id,readError:String(fatal)};
+     }
+    }));
+    const firstRed={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+     mode:physicalMode,stage:"afterRespawn original four-session wait",
+     error:String(error),respawn,actualSeats,
+     originalWorldAtFailure:lines().slice(-200)};
+    await writeFile(join(output,"combat4-respawn-preclick-FIRST-RED.json"),
+     JSON.stringify(firstRed,null,2)+"\n");
+    console.error("COMBAT4_RESPAWN_PRECLICK_FIRST_RED",JSON.stringify(firstRed));
+   }
+   throw error;
+  }
   const old=actors.find(a=>a.actor.id===2);
   if(physicalMode==="four-combat-respawn-same-session"){
    // Source11 POSITIVE acceptance, NEVER the original lifecycle's actor#5
