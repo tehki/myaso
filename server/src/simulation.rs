@@ -264,6 +264,7 @@ pub struct Fighter {
     gesture_review_owns_light: bool,
     // Original admitted LMB light direction; one scalar in the existing World.
     gesture_review_light_lateral: f32,
+    gesture_review_light_running: bool,
     // Dormant reviewed v2 gesture ownership; no network/runtime callers.
     // Original v1 input release handling is unchanged when this is false.
     gesture_review_owns_held_charge: bool,
@@ -331,6 +332,7 @@ impl Fighter {
             charging_heavy: false,
             gesture_review_owns_light: false,
             gesture_review_light_lateral: 0.0,
+            gesture_review_light_running: false,
             gesture_review_owns_held_charge: false,
             block_input_was_down: false,
             dodge_input_was_down: false,
@@ -534,10 +536,12 @@ impl Fighter {
             Action::AttackWindup
                 | Action::AttackLeftWindup
                 | Action::AttackRightWindup
+                | Action::RunningAttackWindup
                 | Action::HeavyAttackWindup
         ) {
             self.gesture_review_owns_light = false;
             self.gesture_review_light_lateral = 0.0;
+            self.gesture_review_light_running = false;
         }
         if action != Action::HeavyAttackWindup {
             self.charging_heavy = false;
@@ -892,7 +896,22 @@ impl World {
         f.begin_light_attack(intent.lateral);
         f.gesture_review_owns_light = true;
         f.gesture_review_light_lateral = intent.lateral;
+        f.gesture_review_light_running = false;
         true
+    }
+
+    // Only the actual original World action supplies its windup deadline.
+    pub(crate) fn owned_lmb_light_windup_ms(&self, net_id: u32) -> Option<u64> {
+        let f = self.fighter(net_id)?;
+        (f.gesture_review_owns_light
+            && matches!(
+                f.action,
+                Action::AttackWindup
+                    | Action::AttackLeftWindup
+                    | Action::AttackRightWindup
+                    | Action::RunningAttackWindup
+            ))
+        .then_some(f.action_duration_ms.round() as u64)
     }
 
     /// Server-bound gesture bridge. Callers must own the live World lock and
@@ -937,17 +956,37 @@ impl World {
             {
                 let lateral = fighter.facing.sin() * fighter.latest_input.move_x
                     - fighter.facing.cos() * fighter.latest_input.move_y;
-                fighter.begin_light_attack(lateral);
+                let running = fighter.latest_input.run
+                    && fighter
+                        .latest_input
+                        .move_x
+                        .hypot(fighter.latest_input.move_y)
+                        >= 0.5;
+                if running {
+                    // The original run+attack attempt owns this edge even
+                    // when exhausted; never fall through to a free Light.
+                    if !spend_stamina(now_ms, fighter, RUNNING_ATTACK_STAMINA_COST) {
+                        return true; // admitted no-combat; adapter retains terminal/replay fences
+                    }
+                    fighter.attack_hit_targets.clear();
+                    fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+                } else {
+                    fighter.begin_light_attack(lateral);
+                }
                 fighter.gesture_review_owns_light = true;
                 fighter.gesture_review_light_lateral = lateral;
+                fighter.gesture_review_light_running = running;
                 true
             }
             Command::UpgradeHeldHeavy { server_elapsed_ms }
                 if matches!(
                     fighter.action,
-                    Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                    Action::AttackWindup
+                        | Action::AttackLeftWindup
+                        | Action::AttackRightWindup
+                        | Action::RunningAttackWindup
                 ) && fighter.gesture_review_owns_light
-                    && fighter.action_elapsed_ms + EPSILON < ATTACK_WINDUP_MS
+                    && fighter.action_elapsed_ms + EPSILON < fighter.action_duration_ms
                     && (fighter.action_elapsed_ms - server_elapsed_ms as f32).abs()
                         <= SERVER_DT_MS + 2.0 =>
             {
@@ -974,7 +1013,12 @@ impl World {
                 // Resume the originally admitted light variant; newer neutral
                 // locomotion never reclassifies an already-owned LMB action.
                 let lateral = fighter.gesture_review_light_lateral;
-                fighter.begin_light_attack(lateral);
+                if fighter.gesture_review_light_running {
+                    fighter.attack_hit_targets.clear();
+                    fighter.set_action(Action::RunningAttackWindup, RUNNING_ATTACK_WINDUP_MS);
+                } else {
+                    fighter.begin_light_attack(lateral);
+                }
                 // An undercharged RELEASE can never reset original light
                 // time, add a second damage window, or secretly become heavy.
                 fighter.action_elapsed_ms = elapsed;
@@ -994,7 +1038,10 @@ impl World {
                 if fighter.gesture_review_owns_light
                     && (matches!(
                         fighter.action,
-                        Action::AttackWindup | Action::AttackLeftWindup | Action::AttackRightWindup
+                        Action::AttackWindup
+                            | Action::AttackLeftWindup
+                            | Action::AttackRightWindup
+                            | Action::RunningAttackWindup
                     ) || (fighter.action == Action::HeavyAttackWindup
                         && fighter.charging_heavy))
                     && fighter.attack_hit_targets.is_empty() =>
@@ -1011,6 +1058,8 @@ impl World {
                     | Action::AttackRecovery
                     | Action::AttackLeftRecovery
                     | Action::AttackRightRecovery
+                    | Action::RunningAttackActive
+                    | Action::RunningAttackRecovery
             ),
             Command::HeavyReady => {
                 fighter.action == Action::HeavyAttackWindup

@@ -305,6 +305,31 @@ impl SessionGestureWorldPath {
                             decision.command,
                         )
                     {
+                        if decision.command == Command::BeginLightWindup
+                            && committed_queue.is_none()
+                        {
+                            if let Some(duration) =
+                                world.owned_lmb_light_windup_ms(self.binding.player_id)
+                            {
+                                proposed.bind_original_light_windup(duration);
+                            } else if world
+                                .fighter(self.binding.player_id)
+                                .is_some_and(|f| f.action == Action::Idle)
+                                && !proposed.abandon_queued_light(
+                                    lease_epoch,
+                                    event.gesture_id,
+                                    world.now_ms.round() as u64,
+                                )
+                            {
+                                self.retire();
+                                return Some(GestureAck {
+                                    status: AckStatus::Stale,
+                                    sequence: event.sequence,
+                                    gesture_id: event.gesture_id,
+                                    server_tick: tick,
+                                });
+                            }
+                        }
                         // A physically real but World-busy second source is
                         // ACKed as transport-admitted no-combat. It must NOT
                         // replace the last actual World attack ID: that ID

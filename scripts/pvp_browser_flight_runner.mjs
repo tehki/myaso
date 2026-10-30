@@ -46,7 +46,7 @@ import { dispatchR2ReleaseLedShortBlock } from "./r2-release-led-short-block.mjs
 import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation.mjs";
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
-import { createM227TrustedLightRegistry } from "./m227-trusted-light-pointer.mjs";
+import { createM227TrustedLightRegistry, waitForM227TrustedLead } from "./m227-trusted-light-pointer.mjs";
 import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
@@ -607,7 +607,7 @@ async function startGameServer() {
         // M173 exact original World same-tick Jump stamina-spend evidence.
         // The existing server flag is fail-closed on nonloopback listeners.
         || scenario === "uijumpattack"
-        || scenario === "uidirectionallight"
+        || scenario === "uidirectionallight" || scenario === "uirunningattack"
         // Original loopback-only 60Hz real World M111 ACTION/BREAK/HIT trace.
         || scenario === "uiheavyguardbreakpunish" || scenario === "uiheavyguardbreak"
         || scenario === "uiguardbreak" || scenario === "uiguardbreaktell"
@@ -7239,10 +7239,12 @@ async function runOnlineUiKickBufferFlight(entries) {
 }
 
 async function runOnlineUiRunningAttackFlight(entries) {
+  const attackerName = process.env.MYASO_PVP_RUNNING_ATTACKER || "chrome";
+  if (!["chrome", "firefox"].includes(attackerName)) throw new Error("M119 requires a genuine Chrome or Firefox attacker");
   const staged = await prepareHeavyCounterplayFlight(
     entries,
     "M119 running strike",
-    { attackerName: "chrome", defenderName: "firefox", movementMs: 0 },
+    { attackerName, defenderName: attackerName === "chrome" ? "firefox" : "chrome", movementMs: 0 },
   );
   const { attacker, defender, attackerElementId, movementCode } = staged;
   const movementKey = movementCode === "KeyD" ? "d" : "a";
@@ -7368,7 +7370,15 @@ async function runOnlineUiRunningAttackFlight(entries) {
     || text.startsWith("Running strike recovery"))) {
     throw new Error(`M119 attacker never rendered running-strike commitment: ${JSON.stringify(attackerResult.events)}`);
   }
-  return evidence;
+  const worldProof = m201ServerOutput();
+  const worldHits = worldProof.split(/\r?\n/).filter(line => /^M201_AUTH_HIT /.test(line));
+  const expectedHit = new RegExp(`^M201_AUTH_HIT tick=\\d+ attacker=${attackerResult.playerNetId} target=${defenderResult.playerNetId} damage=30 hp=70$`);
+  if (worldHits.length !== 1 || !expectedHit.test(worldHits[0])
+    || !new RegExp(`M201_AUTH_ACTION tick=\\d+ fighter=${attackerResult.playerNetId} from=21 to=22`).test(worldProof)
+    || !new RegExp(`M201_AUTH_ACTION tick=\\d+ fighter=${attackerResult.playerNetId} from=22 to=23`).test(worldProof)) {
+    throw new Error(`M119 requires one original World30HP running hit and full running phases: ${JSON.stringify({worldHits})}`);
+  }
+  return evidence.map(entry => ({...entry, runningWorldHit: worldHits[0]}));
 }
 
 async function runOnlineUiFeintFlight(entries) {
@@ -12205,13 +12215,17 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
     await Promise.all([
       performArenaAttackHold(lightAttacker, lightArena, 200, 45),
       (async () => {
+        let receipt;
         if (lightChallenge) {
-          const receipt = await lightChallenge.wait();
+          receipt = await lightChallenge.wait();
           console.log((spatial ? "M234_TRUSTED_SPATIAL_LIGHT_ONSET " : "M227_TRUSTED_LIGHT_RELEASE ") + JSON.stringify({
             milestone, scenario: expectedScenario, ...receipt,
           }));
         }
-        await sleep(jumpInputDelayMs);
+        // HTTP delivery time is already part of the measured native lead.
+        // Wait only its remainder from the actual trusted DOM onset.
+        const lead = await waitForM227TrustedLead(receipt, jumpInputDelayMs, {sleep});
+        console.log("M144_M145_NATIVE_ONSET_LEAD " + JSON.stringify({milestone,...lead}));
         // M336/M144: real Space+LMB reached the Chrome DOM together but
         // loaded exact-head quality #40184398389 still showed ZERO original
         // World actions for #1 while #3 completed its light recovery.
@@ -12230,7 +12244,12 @@ async function runOnlineUiMultiRecoveryFfaFocusFlight(entries, spatial = false) 
       // genuine 70..150ms input-lead, server tick, exact three-stage focus,
       // 100HP and independent remote pixel proof gates unchanged; observe
       // the real recovery until it can return to ordinary nearest focus.
-      sampleUiEvidenceWhileActive(entries, 1250, 8),
+      // Poll the actual focus observer continuously. Competing execute/sync
+      // calls on the two input drivers can queue ahead of the native chord
+      // and exhaust the unchanged60..200ms/70..150ms timing windows.
+      // Actor own-action logs are recorded in-page; all actors are read and
+      // checked below, together with the full original server phase proof.
+      sampleUiEvidenceWhileActive([observer], 1250, 8),
     ]);
   } finally {
     lightChallenge?.close();
@@ -13732,7 +13751,7 @@ async function installUiObserver(session) {
             fetch('/__myaso_m227_trusted_light', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ token, trusted: true, type, button: event.button }),
+              body: JSON.stringify({ token, trusted: true, type, button: event.button, epochMs: entry.epochMs }),
               keepalive: true,
             }).catch(() => {});
           }

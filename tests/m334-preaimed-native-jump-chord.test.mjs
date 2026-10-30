@@ -16,7 +16,7 @@ test("M334 genuine pointer pre-aim precedes authenticated light event and native
   const token = flight.indexOf("m227Registry.issue({ type: spatial");
   const attack = flight.indexOf("performArenaAttackHold(lightAttacker, lightArena, 200, 45)");
   const receipt = flight.indexOf("await lightChallenge.wait()");
-  const delayed = flight.indexOf("await sleep(jumpInputDelayMs)");
+  const delayed = flight.indexOf("await waitForM227TrustedLead(receipt, jumpInputDelayMs, {sleep})");
   const chordCall = flight.indexOf("await performArenaPreAimedJumpAttackChord(jumpAttacker, 180)");
   assert.ok(aim >= 0 && aim < token && token < attack && attack < chordCall);
   assert.ok(receipt < delayed && delayed < chordCall);
