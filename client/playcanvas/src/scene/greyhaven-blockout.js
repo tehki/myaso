@@ -40,7 +40,7 @@ function toScenePoint(x, y, centerX, centerY) {
   };
 }
 
-function polyline(app, name, points, width, height, y, centerX, centerY, surface) {
+function polyline(app, pc, name, points, width, height, y, centerX, centerY, surface) {
   const created = [];
   for (let index = 0; index < points.length - 1; index += 1) {
     const a = toScenePoint(points[index][0], points[index][1], centerX, centerY);
@@ -142,13 +142,13 @@ export function buildGreyhavenBlockout(app, pc) {
   }
 
   for (const road of map.roads ?? []) {
-    polyline(app, `World9 road: ${road.id}`, road.points,
+    polyline(app, pc, `World9 road: ${road.id}`, road.points,
       road.width * WORLD9_RENDER_SCALE, 0.055, -0.005,
       centerX, centerY, road.id.includes('farm') ? cache.earth : cache.stone);
   }
 
   if (map.river?.points) {
-    polyline(app, 'Authored river — visual water only', map.river.points,
+    polyline(app, pc, 'Authored river — visual water only', map.river.points,
       map.river.width * WORLD9_RENDER_SCALE, 0.045, -0.025,
       centerX, centerY, cache.water);
   }
