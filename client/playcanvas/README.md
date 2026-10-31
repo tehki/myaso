@@ -19,7 +19,7 @@ npm run smoke:browser
 npm run dev
 ```
 
-The dev server binds to `127.0.0.1:4174` only. The production preview binds to `127.0.0.1:4175` only.
+The dev server binds to `127.0.0.1:4174` only. The production preview binds to `127.0.0.1:4175` only. The browser smoke supports `CHROME_BIN` overrides and saves a diagnostic screenshot under `.artifacts/`.
 
 ## What this first slice proves
 
@@ -43,5 +43,7 @@ The dev server binds to `127.0.0.1:4174` only. The production preview binds to `
 3. Reuse the exact current Rust wire contract through the existing browser client modules.
 4. Qualify two independent clients on a non-production test server, including Combat, respawn, Chat C1, reconnect and tab suspension.
 5. Compare WebGPU and WebGL 2 on actual supported browsers/devices; record load size, p50/p95 frame time and memory where available.
+
+Current initial bundle baseline: 2.50 MB minified / 646 KB gzip for the engine entry, with the Rust adapter split into a separate 41.8 KB / 13 KB gzip chunk. This is a measured prototype baseline, not an optimized release target.
 
 See [Main0 PlayCanvas spike #1151](https://github.com/tehki/myaso/issues/1151).

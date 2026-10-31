@@ -44,6 +44,13 @@ jobs:
       - name: Run headless Chrome WebGL/WebGPU fallback smoke
         run: npm run smoke:browser
         working-directory: client/playcanvas
+      - name: Upload diagnostic browser screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playcanvas-browser-smoke-${{ github.sha }}
+          path: client/playcanvas/.artifacts/playcanvas-browser-smoke.png
+          if-no-files-found: ignore
       - name: Confirm source-only isolation
         run: |
           test -z "$(git diff --name-only HEAD -- server web)"

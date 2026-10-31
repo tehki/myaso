@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const port = 4174;
 const url = `http://127.0.0.1:${port}/`;
@@ -24,12 +25,20 @@ async function waitForServer() {
 
 try {
   await waitForServer();
-  const chromeBin = process.env.CHROME_BIN || 'google-chrome';
+  const windowsChromeCandidates = process.platform === 'win32' ? [
+    process.env.PROGRAMFILES && join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env['PROGRAMFILES(X86)'] && join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')
+  ].filter(Boolean) : [];
+  const chromeBin = process.env.CHROME_BIN || windowsChromeCandidates.find(existsSync) || (process.platform === 'win32' ? 'chrome.exe' : 'google-chrome');
+  const screenshotPath = resolve('.artifacts/playcanvas-browser-smoke.png');
+  mkdirSync(dirname(screenshotPath), { recursive: true });
   browser = spawn(chromeBin, [
     '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-background-networking', '--use-gl=angle',
     '--use-angle=swiftshader', '--enable-webgl', '--enable-unsafe-swiftshader',
-    '--virtual-time-budget=8000', '--dump-dom', url
+    '--window-size=1280,720', '--virtual-time-budget=8000',
+    `--screenshot=${screenshotPath}`, '--dump-dom', url
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   let stdout = '';
