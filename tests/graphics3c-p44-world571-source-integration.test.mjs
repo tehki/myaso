@@ -69,7 +69,7 @@ test("P44 screenshot probe retains immutable historical source pins; only the sc
  assert.match(script,/P44_BROWSER_ENGINE/);
  assert.match(script,/ef78df8b065a03399c0047e785587e707852bc07/);
  assert.match(script,/9139ce3b4290bd7b1a5efe4b90b3edcc8d15db59/);
- assert.match(script,/getImageData\\(0,0,width,height\\)/);
+ assert.ok(script.includes("getImageData(0,0,width,height)"));
  assert.doesNotMatch(readFileSync(new URL("web/online-game.mjs",root),"utf8"),/probe_p44_world571_3c_render_parity/);
  const changed=[];
  for(const [route,pin] of Object.entries(evidence.sourceHashes)){
