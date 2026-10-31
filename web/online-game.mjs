@@ -1,3 +1,4 @@
+import {createPhysicalJumpChord} from "../src/browser/physical-jump-chord.mjs";
 import { createFrameBudget } from "../src/browser/frame-budget.mjs";
 import {createTypedJumpStaminaFeedback} from "../src/browser/typed-jump-stamina-feedback.mjs";
 import { recordM233RecoveryHandoff } from "../src/browser/m233-recovery-handoff-trace.mjs";
@@ -272,6 +273,7 @@ let kickRequested = false;
 let jumpRequested = false;
 let shortBlockUntil = 0;
 let middleBlockHeld = false;
+const physicalJumpChord = createPhysicalJumpChord();
 const leftButtonCharge = createLeftButtonCharge({
   onLight() {
     attackRequested = true;
@@ -279,6 +281,11 @@ const leftButtonCharge = createLeftButtonCharge({
     committedLightMove = resolveLightAttackReleaseMovement(
       captureLightAttackMovement(keys), leftButtonPressMovement);
     leftButtonPressMovement = null;
+    // Fast physical Space may already have consumed jumpRequested. A fresh
+    // Light in that same bounded chord must still reach original World as
+    // Jump+Attack, once, including inside the original Recovery buffer.
+    const joinedPhysicalJumpChord = physicalJumpChord.consume(Date.now(), keys.has("Space"));
+    if (joinedPhysicalJumpChord) jumpRequested = true;
     // Read-only M111 observation stays after the original movement latch.
     // Original R1 requires that no instrumentation intervene between the
     // onLight edge and this release-direction capture.
@@ -294,6 +301,9 @@ const leftButtonCharge = createLeftButtonCharge({
       runningAttackRequested = true;
       queueStaminaDenial("running-attack");
     }
+    // A prediction-only phase clears jumpRequested before the next network
+    // phase. Submit this real joined edge now, once, before audio or RAF.
+    if (joinedPhysicalJumpChord) sendImmediatePhysicalJumpEdge(joinedPhysicalJumpChord,"physical-lmb-space-original-v1");
     audio.play("light");
   },
   onHeavy() { heavyAttackRequested = true; leftButtonPressMovement = null; audio.play("heavy"); },
@@ -413,10 +423,11 @@ canvas.addEventListener("wheel", (event) => {
     ? m41PhysicalChronology?.wheelStart(event) : null;
   event.preventDefault();
   if (event.deltaY < 0) {
-    canvas.focus();
     rollRequested = true;
-    audio.play("roll");
     queueStaminaDenial("roll");
+    sendImmediatePhysicalDodgeEdge(event.isTrusted === true);
+    canvas.focus();
+    audio.play("roll");
   } else if (event.deltaY > 0) {
     shortBlockUntil = Math.max(shortBlockUntil, performance.now() + COMBAT.block.shortBlockMs);
     // Submit the true Block edge before focus/layout or audio can stall it.
@@ -447,6 +458,7 @@ canvas.addEventListener("keydown", (event) => {
   }
   keys.add(event.code);
   if (event.code === "Space" && !event.repeat) {
+    physicalJumpChord.press(Date.now(), event.isTrusted);
     jumpRequested = true;
     queueStaminaDenial("jump");
     if (leftButtonDown) leftButtonCharge.commitLight();
@@ -462,6 +474,9 @@ canvas.addEventListener("keydown", (event) => {
 // Key release can occur after focus moves to an in-page control.
 // Canvas keydown remains focus scoped; window observes real bubbling keyup.
 window.addEventListener("keyup", (event) => keys.delete(event.code));
+window.addEventListener("keyup", (event) => {
+  if (event.code === "Space") physicalJumpChord.release();
+});
 window.addEventListener("blur", releaseInputs);
 // Chat composer focus must release held game inputs, not trap a charge.
 canvas.addEventListener("blur", releaseInputs);
@@ -1034,6 +1049,7 @@ function updateMouse(event) {
 
 function releaseInputs() {
   keys.clear();
+  physicalJumpChord.release();
   if(typeof typedJumpStaminaFeedback!=="undefined")typedJumpStaminaFeedback.reset();
   if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.reset();
   if (typeof m41PhysicalChronology !== "undefined") m41PhysicalChronology?.reset();
@@ -1096,7 +1112,7 @@ function sampleInput({ playStepAudio = true } = {}) {
 // Submit ONE fresh, original v1 sample immediately from the trusted DOM edge,
 // with the SAME monotonic client tick and the SAME authoritative QUIC writer.
 // No synthetic input, alternate combat engine, protocol or server clock.
-function sendImmediatePhysicalJumpEdge(trusted) {
+function sendImmediatePhysicalJumpEdge(trusted,source="physical-space-original-v1") {
   if (!trusted || document.hidden || document.activeElement !== canvas
     || matchOver || !networkClient?.playerNetId) return;
   const gestureState = experimentalGestureLab?.snapshot;
@@ -1117,11 +1133,33 @@ function sendImmediatePhysicalJumpEdge(trusted) {
     debug.inputSubmissions ??= [];
     debug.inputSubmissions.push({clientTick:outgoingTick,epochMs:Date.now(),
       attack:Boolean(currentInput.attack),heavyAttack:Boolean(currentInput.heavyAttack),
-      jump:true,block:Boolean(currentInput.block),source:"physical-space-original-v1"});
+      jump:true,block:Boolean(currentInput.block),source});
     if(debug.inputSubmissions.length>32)debug.inputSubmissions.shift();
   }
   // This uses the original redundancy/prediction owner once. The next RAF
   // must not replay this genuine one-shot chord under a fresh client tick.
+  attackRequested = false;
+  runningAttackRequested = false;
+  committedLightMove = null;
+  heavyAttackRequested = false;
+  rollRequested = false;
+  kickRequested = false;
+  jumpRequested = false;
+  dashRequested = false;
+  dashMove = null;
+}
+
+// A genuine wheel Dodge has the same original one-shot sender as Space
+// and Block. Cold audio/layout and the next RAF cannot postpone its ingress.
+function sendImmediatePhysicalDodgeEdge(trusted) {
+  if (!trusted || document.hidden || matchOver || !networkClient?.playerNetId) return;
+  sampleInput({ playStepAudio: false });
+  if (!currentInput.dodge) return;
+  const outgoingTick = clientTick;
+  markStaminaDenialSubmitted(outgoingTick, currentInput);
+  networkClient.sendInput({ tick: outgoingTick, ...currentInput });
+  if (typeof afterSource0Audio !== "undefined") afterSource0Audio?.afterOriginalSend(currentInput);
+  clientTick = (clientTick + 1) >>> 0;
   attackRequested = false;
   runningAttackRequested = false;
   committedLightMove = null;

@@ -3,12 +3,16 @@ name: Core 8A dormant Pre-Alpha v2 LMB outbox review
 on:
   pull_request:
     paths:
+      - "web/network-transport.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/online-game.mjs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
       - "src/network/prealpha-lmb-gesture-proposal.mjs"
       - "tests/core8a-prealpha-lmb-gesture-outbox-proposal.test.mjs"
       - "tests/prealpha-lmb-gesture-proposal.test.mjs"
       - "docs/CORE8A_PREALPHA_GESTURE_OUTBOX_REVIEW.md"
       - ".github/workflows/core8a-prealpha-v2-gesture-outbox-proposal.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read

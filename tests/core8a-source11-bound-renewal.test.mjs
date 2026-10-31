@@ -294,3 +294,71 @@ test("Source11 single-flight gate releases after failed OPEN so next valid bound
   assert.equal(conn.closed,false);
   conn.close("retry granted");
 }));
+
+test("Source11 local first-fatal trace records hint, bounded channel stages and exact root close reason",()=>fixture(async()=>{
+  const c=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+  await c.negotiateExperimentalGestureV2({reliableStream:true});
+  c.onGestureRenewalRequired=()=>{};
+  c.transport.rootSource.enqueue(frame([2,0x14,0,0]));
+  await eventually(()=>c.source11Events.some(x=>x.stage==="root-renew-hint"));
+  await c.negotiateRespawnTypedChannel();
+  const stages=c.source11Events.map(x=>x.stage);
+  for(const expected of ["root-renew-hint","renew-open-start","renew-open-complete",
+    "renew-hello-written","renew-bound-grant-received","renew-lease-active"])
+    assert.ok(stages.includes(expected),expected);
+  assert.equal(c.firstCloseReason,null);
+  const generation=c.typedGeneration;
+  c.close("fixture exact original root closure reason");
+  c.close("second close must not replace first evidence");
+  assert.equal(c.firstCloseReason,"fixture exact original root closure reason");
+  assert.equal(c.typedGeneration,generation,"trace never changes generation");
+  assert.equal(c.source11Events.at(-1).stage,"root-transport-close");
+  assert.ok(c.source11Events.length<=16,"fatal trace remains bounded");
+  assert.ok(c.source11Events.every(x=>typeof x.stage==="string" &&
+    !Object.hasOwn(x,"playerId") && !Object.hasOwn(x,"packet")));
+}));
+
+for(const generation of [0,1]) test(`Source11 old generation ${generation} ACK is retired while next OPEN/GRANT is pending`,()=>fixture(async()=>{
+ let receipts=0;
+ const client=await connectAuthoritativeClient({webTransportUrl:"https://127.0.0.1:4433/game",
+  onExperimentalGestureAck:()=>{receipts++;throw new Error("old outbox deliberately retired");}});
+ await client.negotiateExperimentalGestureV2({reliableStream:true});
+ const root=client.transport,quic=root.transport;root.onGestureRenewalRequired=()=>{};
+ if(generation)await root.negotiateRespawnTypedChannel();
+ const open=quic.createBidirectionalStream.bind(quic);let releaseOpen;
+ quic.createBidirectionalStream=()=>new Promise(resolve=>{releaseOpen=()=>resolve(open());});
+ const pending=root.negotiateRespawnTypedChannel();pending.catch(()=>{});
+ try {
+  await eventually(()=>typeof releaseOpen==="function");
+  const ack=event();ack[1]=0x12;ack[2]=1;
+  if(generation)quic.boundSources[0].enqueue(frame(ack));
+  else quic.datagramSource.enqueue(ack);
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(root.closed,false,"retired ACK cannot terminate the original root during bound OPEN");
+  assert.equal(receipts,0,"retirement starts before token replacement, not only after GRANT");
+  releaseOpen();await pending;
+ } finally {releaseOpen?.();await pending.catch(()=>{});client.close("test complete");}
+}));
+
+test("Source11 blocked old writer cannot send during OPEN; genuine new writer failure still closes",()=>fixture(async()=>{
+ const c=await connectGameTransport({webTransportUrl:"https://127.0.0.1:4433/game"});
+ await c.negotiateExperimentalGestureV2({reliableStream:true});
+ c.onGestureRenewalRequired=()=>{};let unblock,releaseOpen;
+ c.datagramWriter.ready=new Promise(resolve=>{unblock=resolve;});
+ const oldSend=c.sendExperimentalGestureEdge(event(),c.typedLeaseToken);oldSend.catch(()=>{});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const quic=c.transport,open=quic.createBidirectionalStream.bind(quic);
+ quic.createBidirectionalStream=()=>new Promise(resolve=>{releaseOpen=()=>resolve(open());});
+ const renewal=c.negotiateRespawnTypedChannel();renewal.catch(()=>{});
+ try {
+  await eventually(()=>typeof releaseOpen==="function");unblock();
+  await assert.rejects(oldSend,/generation changed/);
+  assert.equal(quic.datagramWrites.length,0,"old queued input is retired before server GRANT");
+  assert.equal(c.closed,false,"expected old write retirement is not a root fault");
+  releaseOpen();const lease=await renewal;
+  c.typedBoundWriter.write=async()=>{throw new Error("genuine current writer failed");};
+  await assert.rejects(c.sendExperimentalGestureEdge(event(),lease),/genuine current/);
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(c.closed,true,"current authenticated writer failure must remain fail-closed");
+ } finally {unblock?.();releaseOpen?.();await renewal.catch(()=>{});c.close("test complete");}
+}));

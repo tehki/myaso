@@ -1,3 +1,5 @@
+import {awaitOriginalWorldShortBlock} from "./m151-original-world-block.mjs";
+import {awaitOriginalHeavyChargeTick,planOriginalDodgeViewport} from "./m107-original-world-dodge-tick.mjs";
 import { hasM147PunishFeedback, isM147RenderedRecoveryCue } from "./m147-recovery-feedback-convergence.mjs";
 import { verifyM147WorldRecoveryProof } from "./m147-world-recovery-proof.mjs";
 import { verifyM173WorldJumpSpend } from "./m173-world-stamina-proof.mjs";
@@ -1534,6 +1536,18 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
   const { attacker, defender, attackerElementId, defenderElementId, movementCode } = staged;
   const attackOffset = movementCode === "KeyD" ? 200 : -200;
 
+  // Resolve and physically aim before the heavy begins. The first REDs
+  // dispatched at World+20 but the compound pointer timeline delivered
+  // Dodge only at+32/+34. Keep all pointer/layout work outside that window.
+  const defenderWheelViewport=planOriginalDodgeViewport(await execute(defender.base,defender.sessionId,`
+    const b=document.querySelector('#arena').getBoundingClientRect();
+    return {left:b.left,top:b.top,width:b.width,height:b.height,innerWidth,innerHeight};
+  `));
+  await webdriver(defender.base,"POST",`/session/${defender.sessionId}/actions`,{
+    actions:[{type:"pointer",id:`mouse-${defender.name}`,parameters:{pointerType:"mouse"},
+      actions:[{type:"pointerMove",origin:"viewport",duration:0,...defenderWheelViewport}]}],
+  });
+
   let committedObserved = false;
   let lastCommitEvidence = null;
   for (let attempt = 1; attempt <= 3 && !committedObserved; attempt += 1) {
@@ -1563,22 +1577,25 @@ async function runOnlineUiHeavyDodgeFlight(entries) {
       }
       const windupObservedEpochMs = Date.now();
       committedObserved = true;
-      // Shift the native choreography by the extra physical charging hold,
-      // not the server's125ms iframe or320ms READY rule. Keep the original
-      //170ms perpendicular movement lead by waiting before KeyS begins.
-      const releaseHoldShiftMs = M110_LMB_HEAVY_HOLD_MS - COMBAT.heavyAttack.windupMs;
-      const wheelTargetEpochMs = windupObservedEpochMs + 170 + releaseHoldShiftMs;
-      await sleep(releaseHoldShiftMs);
+      // The original failure hit Idle at tick288; Dodge began at289.
+      // Host observation of tick261 arrived late, so adding another300ms
+      // scheduled the native wheel after contact. Anchor both physical
+      // controls to current World ticks, retaining the original125ms iframe.
+      const awaitChargeTick=offsetTicks=>awaitOriginalHeavyChargeTick({
+        readOutput:m201ServerOutput,afterOffset:serverLogOffset,
+        fighterId:beforeAttacker.playerNetId,startTick:windup.serverTick,offsetTicks,sleep,
+      });
+      await awaitChargeTick(10);
       await setMovementKey(defender, "s", true);
       try {
-        const remainingMs = wheelTargetEpochMs - Date.now();
-        if (remainingMs > 0) await sleep(remainingMs);
+        const dispatchPhase=await awaitChargeTick(20);
         const wheelIssuedEpochMs = Date.now();
-        await performArenaTimedPointerDodge(defender, defenderElementId, 15);
+        await performArenaTimedPointerDodge(defender, defenderElementId, 0, defenderWheelViewport);
         console.log("M204_SERVER_WINDUP_NATIVE_DODGE " + JSON.stringify({
           fighterId: beforeAttacker.playerNetId, serverWindupTick: windup.serverTick,
           windupObservedAfterMs: windup.observedAfterMs,
-          plannedAfterWindupMs: 170 + releaseHoldShiftMs,
+          dispatchWorldTick:dispatchPhase.serverTick,
+          dispatchWorldOffsetTicks:dispatchPhase.offsetTicks,
           wheelIssuedAfterObservedMs: wheelIssuedEpochMs - windupObservedEpochMs,
         }));
       } finally {
@@ -9285,7 +9302,10 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
   const performHeavyIntoObservedShortBlock = async () => {
     lastHeavyControl = await dispatchNativeHeldHeavyGuard({
       readOutput:m201ServerOutput,attackerId:staged.attackerId,
-      defenderId:staged.defenderId,guard:"block",wheelCount:2,sleep,
+      // M111 first-red: awaiting a redundant second wheel aged the real
+      // Block to216.7ms, then native UP arrived after its240ms expiry.
+      // One genuine wheel plus the actual133.3ms World proof is sufficient.
+      defenderId:staged.defenderId,guard:"block",wheelCount:1,sleep,
       sendDown:()=>setArenaAttackButton(attacker,true),
       sendWheel:()=>scrollArenaWheel(defender,defenderElementId,120),
       sendUp:()=>setArenaAttackButton(attacker,false),
@@ -10272,11 +10292,12 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
       // 100HP/-38guard/no-parry proof rejects early, late or missing action.
       // Never fabricate inputs, repeat failed exchanges or alter mechanics.
       // M320: capture ONLY this genuine exchange's authoritative action/event
-      // transitions. The loopback-only server trace is evidence, not a clock
-      // used to schedule attacks or to waive M194's HP/guard/parry assertions.
+      // transitions. M194 keeps these as read-only proof; M151 additionally
+      // waits for actual Block admission before physical release. No World
+      // stepping or waiver of HP/guard/parry assertions is permitted.
       const m320ServerOutputStart = m201ServerOutput().length;
       const challenge = m221Registry.issue();
-      let m212Exchange;
+      let m212Exchange,m151WorldBlock=null;
       try {
         // Arm the real Firefox observer BEFORE the one genuine W3C wheel.
         // Chrome responds after browser delivery, not the delayed HTTP ACK.
@@ -10296,17 +10317,23 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         m212Exchange = await dispatchR2ReleaseLedShortBlock({
           trustedWheelWaitMs: (wheelFirstGuardOnly || m151ReleaseAnchoredGuardOnly || m194ReleaseAnchoredGuardOnly) ? 190 : 0,
           preWheelHeadStartMs: wheelFirstGuardOnly ? 15 : 0,
-          // M194 first RED #41092544888: physical Chrome UP lagged 91ms after
-          // dispatch and actual World HIT arrived ONE tick after the 240ms
-          // Block expired. Leave M151's original 25ms pacing intact; M194
-          // releases promptly after real Firefox wheel, still requiring
-          // original W3C/World 125..240ms and exact guard/HP proof.
-          postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0,
+          // M151 first RED: Block1329 expired1344; Light HIT1345.
+          // The extra25ms host pause exhausted the original240ms defense.
+          // Require actual World Block before release, preserving >125ms
+          // full original Light windup without another artificial pause.
+          postTrustedWheelMs: 0,
           sendAttackClick: wheelFirstGuardOnly
             ? () => performArenaM221GuardBreakClick(attacker, 0) : undefined,
           sendAttackDown: () => setArenaAttackButton(attacker, true),
           sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0),
-          awaitTrustedWheel: () => challenge.wait(),
+          awaitTrustedWheel: async () => {
+            const receipt=await challenge.wait();
+            if(m151ReleaseAnchoredGuardOnly) m151WorldBlock=await awaitOriginalWorldShortBlock({
+              readOutput:m201ServerOutput,afterOffset:m320ServerOutputStart,
+              fighterId:defenderReady.playerNetId,sleep,
+            });
+            return receipt;
+          },
           sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
@@ -10359,6 +10386,7 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
         attempt: attempt + 1,
         harnessW3c: m212Exchange,
         trustedWheelBeforeRelease,
+        originalWorldBlock:m151WorldBlock,
         wheelEventEpochMs: m212FirefoxWheel?.epochMs ?? null,
         chromeReleaseEpochMs: m212ChromeUp?.epochMs ?? null,
         firefox: {
@@ -13039,7 +13067,14 @@ async function pressArenaPerpendicularDodgeAfterPause(session, delayMs, knownEle
   });
 }
 
-async function performArenaTimedPointerDodge(session, elementId, delayMs = 120) {
+async function performArenaTimedPointerDodge(session, elementId, delayMs = 120, preaimedViewport = null) {
+  if (preaimedViewport) {
+    // One real browser wheel; the same native pointer was aimed beforehand.
+    return webdriver(session.base,"POST",`/session/${session.sessionId}/actions`,{
+      actions:[{type:"wheel",id:`wheel-${session.name}`,actions:[{type:"scroll",
+        origin:"viewport",...preaimedViewport,deltaX:0,deltaY:-120,duration:0}]}],
+    });
+  }
   const origin = { "element-6066-11e4-a52e-4f735466cecf": elementId };
   const boundedDelayMs = Math.max(0, Math.min(220, Math.trunc(delayMs)));
   // Keep pointer targeting and wheel-forward in one W3C timeline with exactly
@@ -13654,7 +13689,7 @@ async function installUiObserver(session) {
           "ws://" + location.host + "/__myaso_m325_trusted_wheel");
       }
     }
-    const epochEvidence = ['uiguardbreak', 'uiguardbreaktell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
+    const epochEvidence = ['uiheavydodge', 'uiguardbreak', 'uiguardbreaktell', 'uiheavyguardbreakpunish', 'uidodge', 'uirollbuffer', 'uijumpbuffer', 'uijumpattack', 'uijumpattackinputloss', 'uijumpattackpunish', 'uijumpattacktelegraph', 'uijumpffaprimary', 'uijumpffasecondary', 'uijumprecoveryffa', 'uijumppunishffa', 'uimultirecoveryffa', 'uimultirecoveryspatial', 'uimultirecoverypunish', 'uiparrypunishwindow', 'uiparrypunishffa', 'uiparrypunishffahit', 'uiguardbreakpunishffa', 'uiguardbreakpunishffahit', 'uikickknockdownffa', 'uikickknockdownffahit', 'uikickknockdownbounded', 'uirollknockdownbounded', 'uistaminaauth', 'uistaminaexhaustion', 'uistaminafeedback', 'uistaminaconfirmed', 'uifeint', 'uirollknockdownffahit', 'uimultiknockdownffa', 'uimultiknockdownffahit', 'uirollknockdownffa', 'uijumpattackblock', 'uijumpattackparry', 'uijumpattackdodge', 'uijumpattackbuffer', 'uikickbuffer'].includes(new URLSearchParams(location.search).get('scenario'));
     const record = () => {
       const text = target.textContent?.trim() ?? '';
       if (/^Online - player #\\d+ - server tick \\d+$/.test(text)) state.online = text;

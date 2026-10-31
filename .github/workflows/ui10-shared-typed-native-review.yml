@@ -3,6 +3,9 @@ name: UI10 shared typed LMB and KeyE genuine browsers (DORMANT REVIEW)
 on:
   pull_request:
     paths:
+      - "web/network-transport.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/online-game.mjs"
       - "src/browser/prealpha-lmb-dom-gesture-review.mjs"
       - "src/browser/prealpha-keye-source-review.mjs"
       - "src/browser/prealpha-shared-ui10-sources-review.mjs"

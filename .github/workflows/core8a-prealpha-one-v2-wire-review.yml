@@ -3,6 +3,9 @@ name: Core 8A P0 review one v2 event ACK and KeyE wire choice
 on:
   pull_request:
     paths:
+      - "web/network-transport.mjs"
+      - "web/prealpha-gesture-live-lab.mjs"
+      - "web/online-game.mjs"
       - "tests/fixtures/core8a-one-v2-gesture-wire-review.mjs"
       - "tests/fixtures/core8a-p723-selected-family-v2.golden"
       - "tests/core8a-one-v2-gesture-wire-review.test.mjs"
@@ -17,6 +20,7 @@ on:
       - ".github/workflows/core8a-prealpha-one-v2-wire-review.yml"
       - "server/src/prealpha_lmb_gesture_proposal.rs"
       - "src/network/prealpha-lmb-gesture-outbox-proposal.mjs"
+  workflow_dispatch:
 
 permissions:
   contents: read

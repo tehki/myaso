@@ -419,9 +419,9 @@ test("M325 runner uses a bounded real-wheel head start and preserves strict fail
   // Scope to the genuine dispatch call, not an arbitrary character count:
   // original first-red notes can grow without hiding unchanged W3C gates.
   const options = flight.slice(scheduling, flight.indexOf("\n      } finally {", scheduling));
-  assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(options.includes("const receipt=await challenge.wait()"));
   assert.ok(options.includes("sendAttackDown: () => setArenaAttackButton(attacker, true)"));
-  assert.ok(options.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(options.includes("const receipt=await challenge.wait()"));
   assert.ok(options.includes("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)"));
   assert.ok(options.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
   assert.ok(flight.includes('defenderState?.playerHp !== 100'));
@@ -623,5 +623,5 @@ test("R2 native acceptance validates trusted wheel epoch preceding Chrome UP and
   assert.ok(section.includes("defenderResult.playerGuard !== 0"));
   assert.ok(section.includes("defenderResult.playerHp !== 100"));
   assert.ok(section.includes("sendAttackUp: () => setArenaAttackButton(attacker, false)"));
-  assert.ok(section.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(section.includes("const receipt=await challenge.wait()"));
 });

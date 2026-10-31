@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import vm from "node:vm";
+import {createPhysicalJumpChord} from "../src/browser/physical-jump-chord.mjs";
 import {readFileSync} from "node:fs";
 
 // Execute the actual game keyboard callback and optional actual fast-path
@@ -15,7 +16,8 @@ const helperEnd=helperStart<0?-1:source.indexOf('\n}\n',helperStart)+2;
 
 function harness({trusted=true,hidden=false,focused=true,playerId=1,typed=false,cold=false,armed=true}={}) {
  const canvas={},events=[],packets=[];
- const context={canvas,document:{hidden,activeElement:focused?canvas:{}},matchOver:false,
+ const physicalJumpChord=createPhysicalJumpChord();
+ const context={canvas,physicalJumpChord,document:{hidden,activeElement:focused?canvas:{}},matchOver:false,
   networkClient:{playerNetId:playerId,sendInput:p=>{events.push('send');packets.push({...p});}},
   clientTick:40,currentInput:{},keys:new Set(),leftButtonDown:true,
   typedLmbEnabled:typed,experimentalGestureLab:armed?{snapshot:{failed:false,closed:false}}:null,
@@ -72,4 +74,38 @@ test("typed negotiation or retired controls cannot leak original gameplay before
  const pending=harness({typed:true,armed:false});pending.down();assert.equal(pending.packets.length,0);
  const retired=harness({typed:true});retired.context.experimentalGestureLab.snapshot.closed=true;
  retired.down();assert.equal(retired.packets.length,0);
+});
+
+// Execute the real Light callback after the original fast Space submission.
+// These are two fresh physical edges; the first packet must not erase their chord.
+test("fresh Space-first LMB preserves original combined JumpAttack intent after fast Jump",()=>{
+ const h=harness();h.context.leftButtonDown=false;h.down();
+ assert.equal(h.packets.length,1);
+ assert.equal(h.packets[0].jump,true);
+ assert.equal(h.packets[0].attack,false);
+ Object.assign(h.context,{m111InputProbe:null,pendingStaminaDenial:null,
+  leftButtonPressMovement:null,captureLightAttackMovement:()=>({moveX:0,moveY:0}),
+  resolveLightAttackReleaseMovement:()=>({moveX:0,moveY:0}),
+  rightButtonGesture:{isRunning:()=>false}});
+ const start=source.indexOf('  onLight() {')+'  onLight() {'.length;
+ const finish=source.indexOf('\n  },\n  onHeavy()',start);
+ assert.ok(start>12&&finish>start);
+ vm.runInContext('globalThis.actualLight=()=>{'+source.slice(start,finish)+'\n};',h.context);
+ h.context.actualLight();
+ assert.equal(h.packets.length,2,"fresh joint physical edge must be submitted before a prediction-only phase can consume Jump");
+ assert.equal(h.packets[1].attack,true);assert.equal(h.packets[1].jump,true);
+ h.context.sampleInput();
+ assert.equal(h.context.currentInput.attack,false,"next RAF cannot replay the immediate chord");
+ assert.equal(h.context.currentInput.jump,false);
+});
+
+test("physical chord cannot replay Space, survive release or attach a late unrelated Light",()=>{
+ const chord=createPhysicalJumpChord();
+ chord.press(100,true);assert.equal(chord.consume(101,true),true);
+ assert.equal(chord.consume(102,true),false);
+ chord.press(100,true);assert.equal(chord.consume(161,true),false);
+ chord.press(100,true);chord.release();assert.equal(chord.consume(101,true),false);
+ chord.press(100,true);assert.equal(chord.consume(101,false),false);
+ chord.press(100,false);assert.equal(chord.consume(101,true),false);
+ chord.press(100,true);assert.equal(chord.consume(99,true),false);
 });

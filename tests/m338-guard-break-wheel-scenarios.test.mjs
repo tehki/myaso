@@ -39,13 +39,13 @@ test("M338 connects before guard-break W3C input and preserves genuine wheel pro
   const flight = source.slice(begin, finish);
   assert.ok(flight.includes("await Promise.all(entries.map(installUiObserver))"));
   assert.ok(flight.includes("M325 trusted Firefox wheel socket did not open"));
-  assert.ok(flight.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(flight.includes("const receipt=await challenge.wait()"));
   const r2 = readFileSync(new URL("../scripts/r2-release-led-short-block.mjs", import.meta.url), "utf8");
   assert.ok(flight.includes("dispatchR2ReleaseLedShortBlock({"));
   assert.match(r2, /receiptGraceMs = 100/);
   assert.match(r2, /postTrustedWheelMs = 0/, "all established W3C scenarios retain zero extra post-wheel wait by default");
-  assert.ok(flight.includes("postTrustedWheelMs: m151ReleaseAnchoredGuardOnly ? 25 : 0"),
-    "only M151 keeps the optional 25ms pause; M194 releases upon actual trusted wheel receipt");
+  assert.ok(flight.includes("postTrustedWheelMs: 0"),
+    "native release has no extra post-wheel pause; M151 additionally requires real World Block");
   assert.ok(flight.includes("b.playerGuard < expectedGuards[index]") || flight.includes("defenderResult.playerGuard !== 0"));
   assert.ok(!observer.includes("dispatchEvent("));
 });

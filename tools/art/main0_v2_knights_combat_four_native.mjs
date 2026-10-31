@@ -170,6 +170,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
   });
  };
+ const nativeDispatches=[]; // bounded, read-only first-RED W3C command timing
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
   const replicas=await readAll();
@@ -184,6 +185,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   // automatically by a keyboard action. Preserve genuine native key events.
   const focused=await evaluate(a.s,"const c=document.querySelector('#arena');if(!c)return false;c.scrollIntoView({block:'center'});c.focus();return document.activeElement===c;");
   assert.equal(focused,true,"real WASD staging requires original arena keyboard focus");
+  // Safe real respawns can choose another Y when old positions are occupied.
+  // Move the genuine actor to its actual target lane; never edit positions.
+  const laneProof=await proof(a),laneActor=own(laneProof,attackerId),laneTarget=own(laneProof,targetId);
+  if(laneActor&&laneTarget&&Math.abs(laneActor.y-laneTarget.y)>8)
+   await stageLaneY(attackerId,laneTarget.y);
   const attempts=[];
   for(let move=0;move<6;move++){
    const p=await proof(a),f=own(p,attackerId),t=own(p,targetId);
@@ -210,6 +216,20 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   }
   throw Error("real WASD could not establish stable authoritative pair geometry: "+JSON.stringify({attackerId,targetId,attempts}));
  }
+ async function stageLaneY(actorId,targetY){
+  const actor=actors.find(a=>a.actor.id===actorId),attempts=[];
+  for(let move=0;move<6;move++){
+   const p=await proof(actor),f=own(p,actorId);
+   assert.ok(f&&f.action===0,"only the actual recovered actor may move out of the swing lane");
+   const delta=targetY-f.y;
+   if(Math.abs(delta)<=4)return {actorId,targetY,proof:p,attempts};
+   const key=delta>0?"s":"w",durationMs=Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+   await pulse(actor,key,durationMs);await sleeps(310);
+   const after=await proof(actor);
+   attempts.push({key,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y});
+  }
+  throw Error("real WASD could not clear the original Light swing lane: "+JSON.stringify({actorId,targetY,attempts}));
+ }
  async function prepareClick(a,targetId){
   const p=await proof(a),f=own(p,a.actor.id),target=own(p,targetId);
   assert(f&&target&&f.action===0&&target.action===0,"all native click preparation requires actual recovered idle fighters");
@@ -226,6 +246,17 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
  function dispatchPreparedClick({a}){
   // Critical simultaneous phase: no browser reads, aim moves or down-ACK
   // barriers between dispatching these genuine native button sequences.
+  // Same-tick request timestamps are NOT game authority. If native overlap
+  // fails, they reveal Node dispatch vs real browser callback scheduling.
+  // The helper is also run standalone in a strict source contract test.
+  // That test has no lifecycle closure or original actor identity to log.
+  const dispatch=typeof nativeDispatches==="undefined" ? null
+   : {actorId:a.actor?.id??null,browser:a.s.engine??null,
+      requestedAtEpochMs:Date.now(),settledAtEpochMs:null,error:null};
+  if(dispatch){
+   nativeDispatches.push(dispatch);
+   if(nativeDispatches.length>24)nativeDispatches.shift();
+  }
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"pointer",id:"four-real-lmb",parameters:{pointerType:"mouse"},actions:[
     // The Firefox W3C 25ms pause can expand to a 142-150ms *real* physical
@@ -234,7 +265,8 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     // same native W3C request. Keep the strict measured <135ms Light gate.
     {type:"pointerDown",button:0},{type:"pointerUp",button:0},
    ]}]
-  });
+  }).then(result=>{if(dispatch)dispatch.settledAtEpochMs=Date.now();return result;},
+   error=>{if(dispatch){dispatch.settledAtEpochMs=Date.now();dispatch.error=String(error);}throw error;});
  }
  async function collectPreparedClick({a,targetId,before}){
   const edges=await evaluate(a.s,"return window.__MYASO_FOUR_PHYSICAL_LMB__?.map(e=>({...e}))??[];");
@@ -418,7 +450,34 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   const death=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.to===8),5000);
   const respawn=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.from===8&&e.to===0&&e.index>death.index),6000);
   expectedHp.set(2,100);
-  const afterRespawn=await waitReplicas();
+  let afterRespawn;
+  try {
+   afterRespawn=await waitReplicas();
+  } catch(error) {
+   if(physicalMode==="four-combat-respawn-same-session"){
+    // First-fatal snapshot must precede the usual post-respawn positive
+    // capture; that positive block cannot run when waitReplicas rejects.
+    // This is observation ONLY: no retries, reconnect, W3C input or timeout
+    // changes. Per-seat browser errors remain explicit rather than hidden.
+    const actualSeats=await Promise.all(actors.map(async a=>{
+     try {
+      return {actorId:a.actor.id,browser:a.s.engine,
+       proof:await proof(a),w3cSessionId:a.s.id};
+     } catch(fatal) {
+      return {actorId:a.actor.id,browser:a.s.engine,
+       w3cSessionId:a.s.id,readError:String(fatal)};
+     }
+    }));
+    const firstRed={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+     mode:physicalMode,stage:"afterRespawn original four-session wait",
+     error:String(error),respawn,actualSeats,
+     originalWorldAtFailure:lines().slice(-200)};
+    await writeFile(join(output,"combat4-respawn-preclick-FIRST-RED.json"),
+     JSON.stringify(firstRed,null,2)+"\n");
+    console.error("COMBAT4_RESPAWN_PRECLICK_FIRST_RED",JSON.stringify(firstRed));
+   }
+   throw error;
+  }
   const old=actors.find(a=>a.actor.id===2);
   if(physicalMode==="four-combat-respawn-same-session"){
    // Source11 POSITIVE acceptance, NEVER the original lifecycle's actor#5
@@ -431,6 +490,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.equal(beforeFresh.failed,false,"original gesture connection must survive respawn");
    let resumedRound;
    try{
+    // Safe spawnX may put the original killer between actor2 and target3
+    // even on the FIRST incarnation. Clear the real AoE lane in every cycle.
+    const initialKiller=actors.find(a=>a.actor.id===1),initialKillerProof=await proof(initialKiller);
+    const initialKillerY=own(initialKillerProof,1).y;
+    staging.push(await stageLaneY(1,own(beforeFresh,3).y+COMBAT.attack.reach+COMBAT.fighterRadius+30));
     staging.push(await stagePair(2,3));
     resumedRound=await round([[2,3]]);
     const afterFresh=await proof(old);
@@ -438,14 +502,65 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     assert.equal(afterFresh.ownPlayerNetId,originalActorId,"respawn must fight as existing actor2, never rejoin actor5");
     assert.equal(afterFresh.closed,false,"new generation must keep original QUIC connection open");
     assert.equal(afterFresh.failed,false,"new genuine physical click must not retire a recoverable session");
+    assert.equal(afterFresh.typedGeneration,1,"the first genuine respawn uses its first bound generation");
     const pressed=resumedRound.presses.filter(e=>e.fighter===originalActorId&&e.eventAction===1&&e.status===1);
     const hit=resumedRound.hits.filter(e=>e.attacker===originalActorId&&e.target===3&&e.damage===34);
     assert.equal(pressed.length,1,"one server-accepted fresh physical PRESS after respawn");
     assert.equal(hit.length,1,"one new original World 34HP HIT after respawn");
+    staging.push(await stageLaneY(1,initialKillerY));
+    const renewalCycles=[{cycle:1,death,respawn,afterFresh,resumedRound}];
+    let lastRespawn=respawn;
+    for(let cycle=2;cycle<=3;cycle++){
+     const cycleStart=lines().length-1;
+     // Three real original34HP Lights kill the same respawned100HP actor.
+     // No HP edits, new client, actor5 or substituted browser are possible.
+     for(let lethal=0;lethal<3;lethal++){
+      staging.push(await stagePair(1,2));
+      rounds.push(await round([[1,2]]));
+      if(expectedHp.get(2)===0)break;
+      await waitReplicas();
+     }
+     const cycleDeath=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.to===8&&e.index>lastRespawn.index),5000);
+     const cycleRespawn=await waitFor(()=>actionRows().find(e=>e.fighter===2&&e.from===8&&e.to===0&&e.index>cycleDeath.index),6000);
+     expectedHp.set(2,100);
+     const replicas=await waitReplicas();
+     const bound=await waitFor(async()=>{
+      const p=await proof(old);
+      return p?.typedGeneration===cycle&&!p.typedRenewalPending&&!p.closed&&!p.failed?p:false;
+     },5000);
+     assert.equal(old.s.id,originalSessionId,"every repeated incarnation keeps the original W3C session");
+     assert.equal(bound.ownPlayerNetId,originalActorId,"repeated death cannot replace original actor2");
+     // Actor1 moved forward to earn the lethal hits. In the first3-cycle
+     // RED it then stood between2 and3: original AoE correctly hit BOTH.
+     // Physically clear that bystander, preserving every real damage rule.
+     const killer=actors.find(a=>a.actor.id===1),killerProof=await proof(killer);
+     const killerY=own(killerProof,1).y,laneY=own(bound,3).y;
+     staging.push(await stageLaneY(1,laneY+COMBAT.attack.reach+COMBAT.fighterRadius+30));
+     staging.push(await stagePair(2,3));
+     const freshRound=await round([[2,3]]),fresh=await proof(old);
+     assert.equal(freshRound.presses.filter(e=>e.fighter===2&&e.eventAction===1&&e.status===1).length,1);
+     assert.equal(freshRound.hits.filter(e=>e.attacker===2&&e.target===3&&e.damage===34).length,1);
+     assert.equal(fresh.typedGeneration,cycle);
+     assert.equal(fresh.closed,false);assert.equal(fresh.failed,false);
+     renewalCycles.push({cycle,death:cycleDeath,respawn:cycleRespawn,replicas,bound,freshRound,fresh,
+      originalWorld:lines().slice(cycleStart)});
+     lastRespawn=cycleRespawn;
+     staging.push(await stageLaneY(1,killerY));
+     if(expectedHp.get(3)===0){
+      // A second fresh34HP Light legitimately kills the damaged third actor.
+      // Wait for ITS real World respawn before further combat; never reset HP.
+      const secondaryDeath=await waitFor(()=>actionRows().find(e=>e.fighter===3&&e.to===8&&e.index>=cycleStart),5000);
+      const secondaryRespawn=await waitFor(()=>actionRows().find(e=>e.fighter===3&&e.from===8&&e.to===0&&e.index>secondaryDeath.index),6000);
+      expectedHp.set(3,100);
+      await waitReplicas();
+      renewalCycles.at(-1).secondaryRespawn=secondaryRespawn;
+     }
+    }
     const result={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
      mode:physicalMode,originalActorId,originalSessionId,beforeFresh,afterFresh,
-     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,
+     beforeRespawn:death,respawn,staging,afterRespawn,resumedRound,renewalCycles,completedRenewalCycles:renewalCycles.length,
      retiredGenerationSafetyRequiresSeparateNegativeProof:true,rejoinedAsActor5:false,
+     rounds,afterJoint,originalWorld:lines(), // include original four-actor135ms admission/contact evidence
      originalWorldAfterRespawn:lines().slice(startOffset)};
     await writeFile(join(output,"combat4-respawn-same-session-PASS.json"),JSON.stringify(result,null,2)+"\n");
     console.log("COMBAT4_RESPAWN_SAME_SESSION_NATIVE_PASS",JSON.stringify(result));
@@ -524,6 +639,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
     .catch(e=>({error:String(e)}))
   })));
   const evidence={error:String(error),rounds,staging,physicalEvents,
+   nativeDispatches:nativeDispatches.map(d=>({...d})),
    replicas:await readAll().catch(e=>({error:String(e)})),originalWorld:lines()};
   await writeFile(join(output,"combat4-four-native-combat-lifecycle-failure.json"),JSON.stringify(evidence,null,2)+"\n");
   console.error("COMBAT4_FOUR_NATIVE_COMBAT_LIFECYCLE_FAILURE",JSON.stringify(evidence));throw error;
@@ -926,15 +1042,56 @@ try{
   const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
  },8000);
  const beforeNormal=(await proof()).acknowledged.length;
+ const beforeNormalWorld=readAuthoritativeWorld().length;
  await click();
- const afterNormal=await waitFor(async()=>{
-  const p=await proof(),later=p.acknowledged.slice(beforeNormal);
-  return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
- },9000);
+ let afterNormal;
+ try{
+  afterNormal=await waitFor(async()=>{
+   const p=await proof(),later=p.acknowledged.slice(beforeNormal);
+   return [1,3].every(action=>later.some(e=>e.source===0&&e.action===action&&e.status===1))?p:false;
+  },9000);
+ }catch(error){
+  // Preserve the original strict 9s RED and W3C proof. Diagnostics run only
+  // AFTER failure; no retry, grace window, forged receipt, or World mutation.
+  const diagnosis={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   stage:"ordinary post-Space physical LMB PRESS/RELEASE",beforeNormal,
+   pageTarget:{x:page.x,y:page.y},originalError:String(error)};
+  try{diagnosis.transport=await proof()}catch(e){diagnosis.transportError=String(e)}
+  try{diagnosis.physical=await edges()}catch(e){diagnosis.physicalError=String(e)}
+  try{diagnosis.world=readAuthoritativeWorld().slice(beforeWorld).split(/\r?\n/).slice(-100)}
+  catch(e){diagnosis.worldError=String(e)}
+  try{
+   diagnosis.document=await evaluate(attacker,
+    "const c=document.querySelector('#arena'),r=c?.getBoundingClientRect();"+
+    "return {hasFocus:document.hasFocus(),activeId:document.activeElement?.id??null,"+
+    "scrollY:window.scrollY,arena:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,"+
+    "targetId:document.elementFromPoint("+page.x+","+page.y+")?.id??null}");
+  }catch(e){diagnosis.documentError=String(e)}
+  console.error("COMBAT4_SPACE_AFTER_NORMAL_FIRST_RED_DIAGNOSTIC",JSON.stringify(diagnosis));
+  throw error;
+ }
  const normal=afterNormal.acknowledged.slice(beforeNormal);
  assert.deepEqual(normal.filter(e=>e.source===0&&e.status===1).map(e=>e.action),[1,3],
   "ordinary post-Space LMB still commits one valid pressed/released gesture");
  assert.equal(afterNormal.failed,false,"normal source0 must not disconnect");
+ // A server ACK alone does not prove original World gameplay. Bind BOTH
+ // physical normal-click edges to exact actor/gesture/sequence World-lock
+ // admission records. Never infer World mutation from replicated UI or ACK.
+ const normalPhysical=(await edges()).slice(witnessed.length);
+ assert.deepEqual(normalPhysical.slice(0,2).map(e=>e.type),
+  ["pointerdown","pointerup"],
+  "post-Space ordinary LMB must originate from genuine W3C down/up");
+ assert.ok(normalPhysical.slice(0,2).every(e=>e.trusted),
+  "post-Space physical LMB must be trusted by the real browser");
+ const normalWorld=readAuthoritativeWorld().slice(beforeNormalWorld);
+ for(const accepted of normal.filter(e=>e.source===0&&e.status===1)){
+  const action=new RegExp("M201_AUTH_GESTURE_ACTION tick=\\d+ fighter="+actorId
+   +" source=0 gesture="+accepted.gestureId+" sequence="+accepted.sequence
+   +" eventAction="+accepted.action+" status=1(?:\\s|$)");
+  assert.match(normalWorld,action,
+   "post-Space real World must admit exact source0 "+accepted.action
+   +" actor/gesture/sequence, not just a transport ACK");
+ }
  // Second genuine W3C order: LMB down BEFORE Space, then actual physical
  // keydown must send one same-lease CANCEL, never a synthetic RELEASE.
  // A slow driver may legitimately let early Light contact happen before
@@ -979,6 +1136,7 @@ try{
   genuineChromeOrFirefox:true,independentPhysicalHumanHosts:false,
   physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
   ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
+  normalWorld,normalPhysical,
   midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
   nativePhysicalAll:await edges(),
   before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,

@@ -1,3 +1,4 @@
+import {verifyNativeRecoveryTapIntents} from "./native-recovery-tap-proof.mjs";
 // Genuine W3C input and original server stdout only. Never step/edit World.
 import assert from "node:assert/strict";
 import {COMBAT} from "../src/combat/model.mjs";
@@ -89,23 +90,23 @@ export async function runNativeRecoveryBuffer({actors,evaluate,request,readAutho
   assert.deepEqual(hits().map(h=>[h.attacker,h.target,h.damage,h.hp]),[[id,victim,34,66],[id,victim,jumpChord?42:34,jumpChord?24:32]],"exactly two original hits; no Heavy, duplicate or collateral");
   assert.equal(actions().filter(e=>e.to===2).length,jumpChord?1:2);
   if(jumpChord)assert.equal(actions().filter(e=>e.to===17).length,1);
-  assert.equal(accepted.filter(e=>e.event===2).length,0,"a tap cannot acquire a Heavy upgrade");
   const physical=await evaluate(s,"return window.__MYASO_RECOVERY_NATIVE_EDGES__();");
   assert.deepEqual(physical.map(e=>e.type),jumpChord?['pointerdown','pointerup','keydown','pointerdown','pointerup','keyup']:['pointerdown','pointerup','pointerdown','pointerup']);
   assert.ok(physical.every(e=>e.trusted));
   assert.ok(physical.filter(e=>e.type.startsWith('pointer')).every(e=>e.pointerId===physical[0].pointerId));
+  const tapProof=verifyNativeRecoveryTapIntents({physical,admissions:accepted,actions:actions()});
   const replicas=await waitFor(async()=>{
    const rows=await Promise.all(actors.map(async a=>({id:a.actor.id,browser:a.s.engine,...await evaluate(a.s,
     "return {hp:Number(document.querySelector('#player-hp-value')?.textContent),roster:document.querySelectorAll('#scoreboard-list li').length,proof:window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null};")})));
    return rows.every(r=>r.hp===(r.id===victim?(jumpChord?24:32):100)&&r.roster===4&&!r.proof?.failed&&!r.proof?.closed)?rows:false;
   },8000);
   const evidence={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||'local',attackerBrowser:s.engine,
-   id,victim,stage,phase,jumpChord,jumpStamina,physical,admissions:accepted,actions:actions(),hits:hits(),replicas,
+   id,victim,stage,phase,jumpChord,jumpStamina,physical,tapProof,admissions:accepted,actions:actions(),hits:hits(),replicas,
    originalWorld:true,originalGame:true,independentHumanHosts:false};
   await save(jumpChord?'combat4-native-recovery-jump.json':'combat4-native-recovery-buffer.json',evidence);
   console.log(jumpChord?'COMBAT4_NATIVE_RECOVERY_JUMP_PASS':'COMBAT4_NATIVE_RECOVERY_BUFFER_PASS',JSON.stringify({browser:s.engine,id,victim,hits:hits(),recovery,next,jumpStamina}));
  } catch(error) {
-  await save('combat4-native-recovery-buffer-FIRST-RED.json',{error:String(error),world:lines(),proof:await proof().catch(()=>null)});
+  await save('combat4-native-recovery-buffer-FIRST-RED.json',{error:String(error),world:lines(),proof:await proof().catch(()=>null),physical:await evaluate(s,"return window.__MYASO_RECOVERY_NATIVE_EDGES__?.()??null;").catch(()=>null)});
   throw error;
  }
 }

@@ -1,3 +1,4 @@
+import {createPhysicalJumpChord} from "../src/browser/physical-jump-chord.mjs";
 // Unit execution of the original standard DOM handlers, not native-browser,
 // network admission, World parry, or two-host qualification evidence.
 import assert from "node:assert/strict";
@@ -19,7 +20,7 @@ function harness(){
   const canvas=surface(),window=surface(),document=Object.assign(surface(),{hidden:false});
   let clock=100,focusCalls=0,preventCalls=0,cancelCalls=0;
   canvas.focus=()=>{focusCalls++;};
-  const context={canvas,window,document,COMBAT,COMBAT_ACTION,performance:{now:()=>clock},
+  const context={physicalJumpChord:createPhysicalJumpChord(),canvas,window,document,COMBAT,COMBAT_ACTION,performance:{now:()=>clock},
     audio:{play(){}},networkClient:null,m41PhysicalChronology:null,queueStaminaDenial(){},keys:new Set(),local:{action:COMBAT_ACTION.idle,stamina:100},
     currentInput:{},typedLmbEnabled:false,matchOver:false,dashGesture:{clearTaps(){}},
     leftButtonCharge:{cancel(){},isCharging:()=>false},rightButtonGesture:{cancel(){},isRunning:()=>false},
@@ -40,6 +41,7 @@ function harness(){
   for(const binding of bindings)assert.ok(source.includes(binding));
   runInNewContext([originalFunction("releaseInputs"),originalFunction("sampleInput"),
     originalFunction("sendImmediatePhysicalBlockEdge"),originalFunction("handleVisibilityChange"),
+    source.includes("function sendImmediatePhysicalDodgeEdge(")?originalFunction("sendImmediatePhysicalDodgeEdge"):"",
     source.slice(wheelStart,wheelEnd),...bindings].join("\n"),context);
   return {context,canvas,window,document,clock:value=>{clock=value;},
     wheel:(deltaY,isTrusted=false)=>canvas.listeners.get("wheel").callback({deltaY,isTrusted,preventDefault(){preventCalls++;}}),
@@ -102,4 +104,16 @@ test("trusted wheel sends original Block before slow canvas focus, with one sour
   assert.equal(h.context.clientTick,42);
   assert.equal(h.context.shortBlockUntil,340, "unchanged 240ms Block window");
   assert.equal(COMBAT.block.parryWindowMs,125, "unchanged Parry window");
+});
+
+test("genuine wheel Dodge reaches original sender before cold audio/layout and cannot replay on next RAF",()=>{
+ const h=harness(),sent=[];
+ h.context.networkClient={playerNetId:2,sendInput:input=>sent.push({...input})};
+ h.context.clientTick=40;h.context.markStaminaDenialSubmitted=()=>{};
+ h.context.audio.play=()=>assert.equal(sent.length,1,"genuine Dodge cannot wait behind cold audio or RAF");
+ h.canvas.focus=()=>assert.equal(sent.length,1,"genuine Dodge cannot wait behind focus/layout");
+ h.wheel(-120,true);
+ assert.equal(sent[0].dodge,true);assert.equal(sent[0].tick,40);
+ assert.equal(h.context.clientTick,41);
+ assert.equal(h.sample().dodge,false,"only the fresh physical edge may author Dodge");
 });

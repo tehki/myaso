@@ -350,3 +350,57 @@ test("loopback geometry proof copies only actual replicas and never infers actor
   assert.equal(f.wire.length,0,"reading geometry never submits input");
  }finally{lab.close("test");}
 });
+
+test("Source11 pending bound GRANT survives original 170ms outbox retry tick on the same root QUIC",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
+ const f=createFixture();
+ f.win.location={hostname:"localhost",search:"?source11Renewal=1"};
+ let resolveBoundGrant;
+ const delayedGrant=new Promise(resolve=>{resolveBoundGrant=resolve;});
+ f.gameClient.transport.negotiateRespawnTypedChannel=()=>delayedGrant;
+ const lab=await activateLoopbackGestureLab(f.options);
+ try {
+  const renewal=f.gameClient.transport.onGestureRenewalRequired();
+  assert.equal(lab.outbox.snapshot.closed,true,"old generation is deliberately retired before GRANT");
+  t.mock.timers.tick(170);
+  await settleMicrotasks();
+  assert.equal(f.closed,false,"pending server-authorized renewal must not kill original root QUIC");
+  assert.equal(lab.snapshot.failed,false,"retired old outbox is expected during renewal");
+  const newLease=Object.freeze({generation:1});
+  resolveBoundGrant(newLease);
+  await renewal;
+  assert.equal(lab.lease,newLease,"fresh authorized token replaces original generation");
+  assert.equal(lab.outbox.snapshot.closed,false,"new current outbox is active");
+  t.mock.timers.tick(340);
+  await settleMicrotasks();
+  assert.equal(f.closed,false,"future retry ticks must preserve successful renewal");
+ } finally {
+  resolveBoundGrant?.(Object.freeze({generation:999}));
+  lab.close("test complete");
+ }
+});
+
+test("Source11 genuinely rejected bound GRANT still fails closed without replaying old typed edges",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
+ const f=createFixture();
+ f.win.location={hostname:"localhost",search:"?source11Renewal=1"};
+ let rejectBoundGrant;
+ const awaitingGrant=new Promise((_,reject)=>{rejectBoundGrant=reject;});
+ f.gameClient.transport.negotiateRespawnTypedChannel=()=>awaitingGrant;
+ const lab=await activateLoopbackGestureLab(f.options);
+ try {
+  const pending=f.gameClient.transport.onGestureRenewalRequired();
+  t.mock.timers.tick(170);
+  await settleMicrotasks();
+  assert.equal(f.closed,false,"old retired generation cannot preempt pending real GRANT");
+  rejectBoundGrant(new Error("server rejected current incarnation"));
+  await pending;
+  assert.equal(f.closed,true,"an actual failed bound negotiation still closes typed gameplay");
+  assert.equal(lab.snapshot.failed,true);
+  assert.equal(lab.snapshot.closed,true);
+  assert.deepEqual(f.wire,[],"retired datagram input cannot be replayed");
+ } finally {
+  rejectBoundGrant?.(new Error("fixture cleanup"));
+  lab.close("test complete");
+ }
+});

@@ -54,7 +54,7 @@ test("M198 guard-break browser acceptance uses genuine one-click W3C plan", () =
   const wheel = guardBreak.indexOf("sendWheel: () => scrollArenaWheel(defender, defenderElementId, 120, 0)");
   const click = guardBreak.indexOf("sendAttackUp: () => setArenaAttackButton(attacker, false)");
   assert.ok(wheel >= 0 && click > wheel);
-  assert.ok(guardBreak.includes("awaitTrustedWheel: () => challenge.wait()"));
+  assert.ok(guardBreak.includes("const receipt=await challenge.wait()"));
   const clickFn = source.slice(
     source.indexOf("async function setArenaAttackButton("),
     source.indexOf("async function performArenaAttackBurst("),

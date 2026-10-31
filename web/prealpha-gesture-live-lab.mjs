@@ -46,6 +46,7 @@ async function activateNegotiatedLmb({
   const source11 = local && new URLSearchParams(windowObj.location.search).get("source11Renewal")==="1";
   let renewing = false;
   let failed = false, detached = false, retryTimer = null;
+  let firstLabFailureReason = null;
   const removeListeners = [];
   const upgradeTimers = new Set();
   // Bounded loopback-only attempted-write evidence, never an ACK or a hit.
@@ -71,6 +72,8 @@ async function activateNegotiatedLmb({
     gameClient.close(reason);
   }
   function fail(reason) {
+    if (firstLabFailureReason === null)
+      firstLabFailureReason = String(reason || "typed gesture World/ACK rejected").slice(0,180);
     failed = true;
     close(reason || "typed gesture World/ACK rejected");
   }
@@ -114,9 +117,9 @@ async function activateNegotiatedLmb({
         // Physical releases authored while blocked stay in the SAME outbox.
         // Flush only previously unsent edges; the 170ms timer owns retries.
         if (!failed && !detached) drain(true);
-      }).catch(() => { if (writeLease === lease) fail("typed gesture QUIC delivery failed"); });
+      }).catch(() => { if (!renewing && writeLease === lease) fail("typed gesture QUIC delivery failed"); });
     } catch {
-      if (writeLease === lease) fail("typed gesture lease no longer current");
+      if (!renewing && writeLease === lease) fail("typed gesture lease no longer current");
     }
   }
 
@@ -235,6 +238,10 @@ async function activateNegotiatedLmb({
     add(windowObj,"pagehide",() => close("pagehide retires experimental actor lease"));
     // Bound retries; no dropped terminal and no private cross-lease replay.
     retryTimer = setInterval(() => {
+      // During an authorized Source11 renewal the previous outbox is
+      // intentionally retired before the new bound GRANT arrives. Its closed
+      // state is not a root-session failure; the bounded negotiation owns it.
+      if (renewing) return;
       if (outbox.snapshot.closed) { fail("typed gesture lease was retired"); return; }
       if (outbox.snapshot.pending > 0) drain();
     },170);
@@ -242,7 +249,13 @@ async function activateNegotiatedLmb({
     // witness; never a user identity, hit, source of authority, or public UI.
     const receipts = [];
     const proof = () => Object.freeze({
-      failed,closed:detached,transportState:lease.experimentalGestureState,
+      failed,closed:detached,transportState:gameClient.transport.experimentalGestureState,
+      // Loopback proof is read-only and never feeds game or server authority.
+      firstLabFailureReason,
+      firstTransportCloseReason:gameClient.transport.firstCloseReason ?? null,
+      source11Events:(gameClient.transport.source11Events ?? []).map(entry=>({...entry})),
+      typedGeneration:gameClient.transport.typedGeneration,
+      typedRenewalPending:gameClient.transport.typedRenewalPending,
       pending:outbox.snapshot.pending,
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
