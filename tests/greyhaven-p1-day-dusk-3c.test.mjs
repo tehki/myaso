@@ -141,10 +141,12 @@ test("P1 roadside shrubs are deterministic, bounded and never obstruct existing 
   assert.deepEqual(createGreyhavenTerrainPlan(map,{x:0,y:0,width:512,height:512}).shrubs,[]);
 });
 
-test("P1 roadside shrubs match globally across neighboring cached tiles",()=>{
-  const a=createGreyhavenTerrainPlan(map,{x:3584,y:3584,width:512,height:512}).shrubs;
-  const b=createGreyhavenTerrainPlan(map,{x:4096,y:3584,width:512,height:512}).shrubs;
-  const left=a.filter(p=>Math.abs(p.x-4096)<=13);
-  const right=b.filter(p=>Math.abs(p.x-4096)<=13);
-  assert.deepEqual(left,right,"tile edges sample the same coordinates and shade values");
+test("P1 roadside shrubs agree across a genuine populated tile seam",()=>{
+  const upper=createGreyhavenTerrainPlan(map,{x:3584,y:3584,width:512,height:512}).shrubs;
+  const lower=createGreyhavenTerrainPlan(map,{x:3584,y:4096,width:512,height:512}).shrubs;
+  const upperEdge=upper.filter(p=>Math.abs(p.y-4096)<=13);
+  const lowerEdge=lower.filter(p=>Math.abs(p.y-4096)<=13);
+  assert.ok(upperEdge.length>0,"test must exercise a real World9 plant crossing the tile seam");
+  assert.deepEqual(upperEdge,lowerEdge,
+    "overlapping world-grid leaves retain identical coordinates, size and shade");
 });
