@@ -7,8 +7,10 @@ import {
   ADULT_HUMAN_BODY_PRESENTATIONS,
   ADULT_HUMAN_DIRECTIONS,
   ADULT_HUMAN_RIG_V1_BONES,
+  ADULT_HUMAN_ANATOMICAL_BASE_V1,
   ADULT_HUMAN_CLIP_COVERAGE,
   resolveAdultHumanClip,
+  resolveAdultHumanAnatomicalBase,
 } from "../src/browser/adult-human-animation-contract.mjs";
 import {
   isValidAnimationTimeline,
@@ -29,6 +31,13 @@ function glbJointNames(buffer) {
   const skin = (doc.skins || []).find(candidate => candidate.joints?.length === 22);
   assert.ok(skin, "original GLB must contain the shared 22-joint skin");
   return skin.joints.map(index => doc.nodes[index]?.name);
+}
+
+function glbAnimationNames(buffer) {
+  assert.equal(buffer.subarray(0, 4).toString("ascii"), "glTF");
+  const length = buffer.readUInt32LE(12);
+  const doc = JSON.parse(buffer.subarray(20, 20 + length).toString("utf8"));
+  return (doc.animations || []).map(action => action.name);
 }
 
 function assertAtlas(path, manifestPath, expectedFrames) {
@@ -65,12 +74,32 @@ test("A3 defines one reusable 22-bone human rig and eight-way convention", () =>
   }
 });
 
+test("R3 anatomical base reuses the shared rig and retains real locomotion actions", () => {
+  assert.equal(ADULT_HUMAN_ANATOMICAL_BASE_V1.rigId, ADULT_HUMAN_RIG_ID);
+  assert.equal(ADULT_HUMAN_ANATOMICAL_BASE_V1.sourceLicense, "CC0-1.0");
+  assert.equal(ADULT_HUMAN_ANATOMICAL_BASE_V1.locomotionAtlasesAvailable, false);
+  for (const body of ADULT_HUMAN_BODY_PRESENTATIONS) {
+    const base = resolveAdultHumanAnatomicalBase(body);
+    assert.ok(base);
+    assert.equal(base.sourceGlbPath,
+      "assets/characters/adult-anatomy-r3/" + body + "-anatomical-shoulderroll-r3.glb");
+    const names = glbAnimationNames(bytes(base.sourceGlbPath));
+    for (const action of ["idle", "walk", "run", "roll_r3_shoulder_ground"]) {
+      assert.ok(names.includes(action), body + " missing anatomical source action " + action);
+    }
+    const r4Names = glbAnimationNames(bytes(
+      "assets/characters/adult-mocap-r4/" + body + "-mocap-roll-r4.glb"));
+    assert.ok(r4Names.includes("roll_r4_real_mocap_candidate"));
+  }
+});
+
 test("A0/A1 source atlases resolve without a renderer fallback for both human bodies", () => {
   for (const body of ADULT_HUMAN_BODY_PRESENTATIONS) {
     for (const clip of ["idle", "walk", "run"]) {
       const resolved = resolveAdultHumanClip(body, clip);
       assert.ok(resolved, body + " " + clip);
-      assert.equal(resolved.status, "source-preview-only");
+      assert.equal(resolved.status, "procedural-study-preview-only");
+      assert.equal(resolved.modelSource, "A0/A1 procedural body study");
       assert.equal(resolved.sourceActionName, clip);
       assert.equal(resolved.productionActive, false);
       const manifest = assertAtlas(resolved.atlasPath, resolved.manifestPath, 4);
