@@ -221,8 +221,11 @@ def run():
     scene=bpy.context.scene
     scene.render.engine="CYCLES"
     scene.cycles.device="CPU";scene.cycles.samples=manifest["render"]["samples"]
-    if hasattr(scene.cycles,"use_denoising"):scene.cycles.use_denoising=True
-    if hasattr(bpy.context.view_layer.cycles,"use_denoising"):bpy.context.view_layer.cycles.use_denoising=True
+    # Ubuntu's distro Blender 4.0 can be compiled without OpenImageDenoise.
+    # Detect real build capability rather than requesting an absent denoiser.
+    denoiser_available=bool(getattr(bpy.app.build_options,"openimagedenoise",False))
+    if hasattr(scene.cycles,"use_denoising"):scene.cycles.use_denoising=denoiser_available
+    if hasattr(bpy.context.view_layer.cycles,"use_denoising"):bpy.context.view_layer.cycles.use_denoising=denoiser_available
     scene.render.resolution_x=manifest["render"]["width"]
     scene.render.resolution_y=manifest["render"]["height"]
     scene.render.resolution_percentage=100
