@@ -71,6 +71,7 @@ test("A0/A1 source atlases resolve without a renderer fallback for both human bo
       const resolved = resolveAdultHumanClip(body, clip);
       assert.ok(resolved, body + " " + clip);
       assert.equal(resolved.status, "source-preview-only");
+      assert.equal(resolved.sourceActionName, clip);
       assert.equal(resolved.productionActive, false);
       const manifest = assertAtlas(resolved.atlasPath, resolved.manifestPath, 4);
       assert.equal(manifest.bodyPresentation, body);
@@ -89,6 +90,7 @@ test("A2 and R4 rolls are explicit visual-hold variants with original source tim
       const resolved = resolveAdultHumanClip(body, "roll", variant);
       assert.ok(resolved);
       assert.equal(resolved.status, "source-visual-hold");
+      assert.equal(resolved.sourceActionName, variant === "a2" ? "roll" : "roll_r4_real_mocap_candidate");
       assert.equal(resolved.productionActive, false);
       assert.deepEqual(resolved.sourceFrameTimesMs, expectedTimes);
       assertAtlas(resolved.atlasPath, resolved.manifestPath, 8);
