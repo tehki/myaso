@@ -55,19 +55,21 @@ function html(){
  window.greyhavenP1Source={render(mode,camera){
   if(!["day","dusk"].includes(mode)||![camera?.x,camera?.y].every(Number.isFinite))
    throw Error("explicit nonrelease Greyhaven visual mode and authored camera required");
-  const world=createAuthoredWorldRenderer({greyhavenTimeOfDay:mode,cacheCap:24,buildLimit:8});
-  const draws=[];
+  // Match the real renderer's default incremental tile-build budget.
+  const world=createAuthoredWorldRenderer({greyhavenTimeOfDay:mode,cacheCap:24,buildLimit:3});
+  const draws=[],createdPerDraw=[];
   for(let i=0;i<8;i++){
    const before=performance.now();
    ctx.clearRect(0,0,960,540);
    ctx.save();ctx.translate(480,270);ctx.scale(ARENA_VIEW_ZOOM,ARENA_VIEW_ZOOM);ctx.translate(-480,-270);
    world.draw(ctx,MAP_IDS.overworld,camera,960,540,1);ctx.restore();
    draws.push(performance.now()-before);
+   createdPerDraw.push(world.stats.created);
   }
   return {canvas:canvas.toDataURL("image/png"),mode,camera,
    cacheTiles:world.stats.cached,tileSize:512,zoom:ARENA_VIEW_ZOOM,
    sourceWorldMap:MAP_IDS.overworld,sourceReplacements:world.replacedBuildingIds,
-   totalDraws:draws.length,drawSamplesMs:draws,visualOnly:true,
+   buildLimit:3,createdPerDraw,totalDraws:draws.length,drawSamplesMs:draws,visualOnly:true,
    actualRust:false,actualHumans:0,gpuPresentMeasured:false};
  }};window.greyhavenP1Ready=true;
  </script>`;
@@ -117,12 +119,18 @@ try{
     assert.ok(v.cacheTiles>=1&&v.cacheTiles<=24);
     assert.deepEqual(v.sourceReplacements,[]);
     assert.equal(v.totalDraws,8);
+    assert.equal(v.buildLimit,3,"native reviewer must match the game's incremental tile-build budget");
+    assert.deepEqual(v.createdPerDraw.slice(0,2),[3,3],"six visible tiles must build in two bounded batches");
+    assert.ok(v.createdPerDraw.slice(2).every(x=>x===0),"warm draws must not create additional tiles");
     assert.ok(v.drawSamplesMs.every(x=>Number.isFinite(x)&&x>=0));
+    const warm=v.drawSamplesMs.slice(2);
+    assert.equal(warm.length,6);
     const bytes=image(v.canvas),name=engine+"-"+spot.id+"-"+mode+".png";
     await writeFile(join(out,name),bytes);
     record.variants.push({mode,filename:name,bytes:bytes.length,sha256:digest(bytes),
-     cacheTiles:v.cacheTiles,drawP50Ms:percentile(v.drawSamplesMs,.5),
-     drawP95Ms:percentile(v.drawSamplesMs,.95)});
+     cacheTiles:v.cacheTiles,buildLimit:v.buildLimit,createdPerDraw:v.createdPerDraw,
+     coldBatch1Ms:v.drawSamplesMs[0],coldBatch2Ms:v.drawSamplesMs[1],
+     warmDrawP50Ms:percentile(warm,.5),warmDrawP95Ms:percentile(warm,.95)});
    }
    assert.notEqual(record.variants[0].sha256,record.variants[1].sha256,
      "actual original World renderer must produce different day and dusk images");
