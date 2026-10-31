@@ -137,6 +137,63 @@ test("genuine hold upgrade is an intent before server-controlled READY, terminal
  }finally{lab.close("test");}
 });
 
+test("Heavy hold-intent starts from accepted physical PRESS before slow UI observer",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
+ const f=createFixture(),observed=[];
+ f.options.onAcceptedPress=proof=>{
+  observed.push(proof);
+  // Simulate slow synchronous presentation AFTER actual captured PRESS.
+  // The 85ms hold clock must not restart after this 70ms work.
+  t.mock.timers.tick(70);
+ };
+ const lab=await activateLoopbackGestureLab(f.options);
+ try{
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:86,button:0,buttons:1}));
+  await settleMicrotasks();
+  assert.equal(observed.length,1,"one accepted physical gesture");
+  assert.equal(observed[0].pointerId,86);
+  assert.deepEqual(f.wire.map(e=>e.action),[1],"initial source0 PRESS still admitted");
+  t.mock.timers.tick(14);await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1],"no UPGRADE before physical 85ms");
+  t.mock.timers.tick(1);await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,2],
+   "exact 85ms from accepted physical PRESS, not 155ms after UI observer");
+  assert.equal(f.wire[1].gestureId,f.wire[0].gestureId);
+  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:86,button:0,buttons:0}));
+  await settleMicrotasks();
+  assert.deepEqual(f.wire.map(e=>e.action),[1,2,3],"only physical UP releases charge");
+ }finally{lab.close("test");}
+});
+
+test("early physical cancel and Space+LMB never schedule a Heavy UPGRADE",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","setInterval"]});
+ const f=createFixture(),accepted=[];
+ let jumpChord=false;
+ f.options.isJumpAttackChord=()=>jumpChord;
+ f.options.enableJumpAttackReview=true;
+ f.options.onAcceptedPress=physical=>accepted.push(physical);
+ const lab=await activateLoopbackGestureLab(f.options);
+ try{
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:87,button:0,buttons:1}));
+  t.mock.timers.tick(50);
+  f.win.dispatchEvent(event("keydown",{code:"Space",repeat:false}));
+  await settleMicrotasks();
+  t.mock.timers.tick(85);await settleMicrotasks();
+  assert.ok(!f.wire.some(e=>e.action===2),"cancelled original Light cannot upgrade");
+  assert.ok(f.wire.some(e=>e.action===4),"Space after LMB cancels true active source");
+  jumpChord=true;
+  f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:88,button:0,buttons:1}));
+  await settleMicrotasks();
+  assert.equal(accepted.at(-1).jump,true,"Space-first LMB retains JumpAttack intent");
+  t.mock.timers.tick(150);await settleMicrotasks();
+  assert.equal(f.wire.filter(e=>e.action===2).length,0,
+   "JumpAttack never inherits ordinary Heavy hold-intent timer");
+  f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:88,button:0,buttons:0}));
+  await settleMicrotasks();
+  assert.equal(lab.snapshot.failed,false,"real original lease stays alive");
+ }finally{lab.close("test");}
+});
+
 test("Key E is reserved for Use, while original LMB stays the only Combat gesture source",async t=>{
  t.mock.timers.enable({apis:["setTimeout","setInterval"]});
  const f=createFixture(),lab=await activateLoopbackGestureLab(f.options);

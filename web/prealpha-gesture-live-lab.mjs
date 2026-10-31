@@ -148,7 +148,12 @@ async function activateNegotiatedLmb({
       // inventing a second v1 attack writer or a false World Light.
       isJumpAttackChord,
       enableJumpAttackReview:enableJumpAttackReview || instantProfile,
-      onAcceptedPress,
+      // Arm the 85ms hold-intent timer at the accepted physical PRESS,
+      // before optional UI presentation or any later bubbling listener.
+      onAcceptedPress:physical => {
+        scheduleSource0Upgrade(physical);
+        if (typeof onAcceptedPress === "function") onAcceptedPress(physical);
+      },
       hasGameplayFocus:() => documentObj.activeElement === canvas,
       isTextEditing:() => Boolean(documentObj.activeElement?.matches?.("input,textarea,[contenteditable]")),
     });
@@ -188,33 +193,31 @@ async function activateNegotiatedLmb({
         renewing = false;
       }
     };
-    function scheduleSource0Upgrade() {
-      if (!gates.lmb.snapshot.active) return;
-      const {pointerId,gestureId,jump} = gates.lmb.snapshot;
-      if (jump) return; // no Heavy upgrade follows an admitted Space chord
-      // PointerEvents (normal LMB) and RMB-held MouseEvents share ONE source0
-      // gesture and exactly ONE upgrade timer. Server alone arbitrates 135ms
-      // light and 320ms charge; this timer is merely a hold-intent edge.
+    function scheduleSource0Upgrade({pointerId,gestureId,jump}) {
+      if (jump) return; // Space+LMB never becomes a Heavy intent
+      // Only accepted physical PRESS (not later presentation/bubble) starts
+      // the one 85ms hold-intent timer. This is never World charge authority:
+      // the Rust server still owns the 135ms Light and 320ms Heavy rules.
       if (lastUpgradeScheduledGestureId === gestureId) return;
       lastUpgradeScheduledGestureId = gestureId;
+      const owningGate = gates.lmb, owningOutbox = outbox;
       const timer = setTimeout(() => {
         upgradeTimers.delete(timer);
-        if (detached || failed || !gates.lmb.snapshot.active
-            || gates.lmb.snapshot.pointerId !== pointerId
-            || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drainNewEdges();
+        if (detached || failed || renewing || gates.lmb !== owningGate
+            || outbox !== owningOutbox || !owningGate.snapshot.active
+            || owningGate.snapshot.pointerId !== pointerId
+            || owningGate.snapshot.gestureId !== gestureId) return;
+        if (owningGate.approvedHoldUpgrade(pointerId)) drainNewEdges();
       },85);
       upgradeTimers.add(timer);
     }
     add(canvas,"pointerdown",event => {
       if (event.button !== 0) return;
       drainNewEdges(); // original capture already admitted the real physical edge
-      scheduleSource0Upgrade();
     });
     add(canvas,"mousedown",event => {
       if (event.button !== 0 || (event.buttons & 2) === 0) return;
-      drainNewEdges(); // no pointerdown occurs for LMB while RMB is already held
-      scheduleSource0Upgrade();
+      drainNewEdges(); // RMB-held LMB has no second pointerdown event
     });
     add(windowObj,"pointerup",drainNewEdges);
     add(windowObj,"mouseup",drainNewEdges);
