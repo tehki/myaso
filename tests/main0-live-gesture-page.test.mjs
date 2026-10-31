@@ -130,6 +130,18 @@ test("genuine hold upgrade is an intent before server-controlled READY, terminal
   f.canvas.dispatchEvent(event("pointerdown",{pointerType:"mouse",pointerId:8,button:0,buttons:1}));
   t.mock.timers.tick(125);await settleMicrotasks();
   assert.ok(f.wire.some(e=>e.source===0&&e.action===2),"held pointer queues upgrade request");
+  // Read-only first-fatal witness: distinguishes late JS hold scheduling from
+  // transport/World admission without changing producer or Combat timing.
+  const chronology=f.win.__MYASO_LOCAL_GESTURE_PROOF__().gestureChronology;
+  assert.deepEqual(chronology.filter(e=>e.stage.startsWith("hold-")).map(e=>e.stage),
+    ["hold-scheduled","hold-fired","hold-approved"]);
+  const sends=chronology.filter(e=>e.stage==="wire-attempt"&&e.attempt===1);
+  assert.ok(sends.some(e=>e.source===0&&e.action===1&&e.gestureId===1),
+    "real PRESS has bounded local wire-attempt timestamp");
+  assert.ok(sends.some(e=>e.source===0&&e.action===2&&e.gestureId===1),
+    "same-gesture UPGRADE has its own local wire-attempt timestamp");
+  assert.ok(sends.every(e=>Number.isFinite(e.epochMs)),
+    "chronology timestamps are numeric local evidence, never server authority");
   assert.ok(!f.wire.some(e=>e.action===3),"no phantom RELEASE at 85ms/125ms");
   f.win.dispatchEvent(event("pointerup",{pointerType:"mouse",pointerId:8,button:0,buttons:0}));
   await settleMicrotasks();
