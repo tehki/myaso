@@ -30,3 +30,14 @@ Before shipping as an interactive tavern, Graphics 3 / World9 / Core8C / Physics
 - Budgeted decoding, correct frame size and performance, full mandatory protected quality CI.
 
 Until then, **P1 ART REPLACEMENT PROPOSED / GAME INTEGRATION HOLD / PRODUCTION HOLD**. Old runtime art is still active where the earlier Red Lion opt-in is used. No merge or deployment permission is assumed.
+
+## Owner-requested Blender correction pass — 31 October 2026
+
+The two latest owner-approved generated references are **visual direction only**. They are not game assets and are not represented as Blender renders. The corrected scene imports 33 genuine pinned Quaternius CC0 modules (15,148 original vertices), adds nine editable artist-authored ground-ivy leaves, and includes no A2.32 meshes. The following corrections are implemented in the real editable Quaternius source:
+
+1. **Raised THE RED LION sign:** board center is now Z=3.55 m (bottom Z=3.29 m), with both forged supports, 3D text and rivets raised together. The Blender build measures the actual sign-board lower bound against both genuine front-window mesh upper bounds and requires at least 0.25 m clearance.
+2. **Relocated crate:** moved to (5.35, -4.30, 0.00) m, fully outside the original roof's positive-X edge. Blender measures a minimum 0.40 m X clearance from the roof mesh; no crate/house AABB overlap is accepted.
+3. **Grounded foliage:** the old upright CC0 `Prop_Vine2` wall-vine is removed from the visible scene and replaced with nine separate editable Blender ground-ivy leaf meshes with raised center veins, placed at (5.55, -5.85, 0.08) m. Blender measures its world-space bounds against both roof and crate and requires a ground-plane Z range of 0.00–0.20 m.
+4. **Dusk chimney smoke:** six separate bubble meshes have been replaced with one continuous closed, irregular plume mesh (1.8 m rise) and a procedural Cycles volume material. Its origin is computed from the actual imported `Prop_Chimney` world-space bounds. The plume is hidden in daylight and enabled in dusk. The smoke is source-art only; no runtime VFX permission is implied.
+
+The exact native Blender 4.5.14 Windows scene is rebuilt and saved as `red-lion-quaternius-original.blend`; genuine 960×720 day/dusk Cycles RGBA frames and hash provenance accompany it. The build fails closed if the sign/window, crate/roof, foliage/roof, foliage/crate or ground-plane clearances are not met. This remains a Draft/source-art change only; World9 placement, portal, collision and game runtime remain untouched.

@@ -20,8 +20,22 @@ def run(source,out):
         or report["actualCreatorVertices"]<15000
         or report["genuineGlazingSlots"]<5
         or report["actualGables"]!=2
+        or report.get("actualArtistGroundFoliageLeaves")!=9
         or report["gameRuntimeNotChanged"] is not True):
         raise ValueError("Not an authentic complete original Quaternius Red Lion replacement")
+    measured=report.get("measuredCorrections",{})
+    smoke=report.get("sourceChimney",{})
+    if (measured.get("signClearanceAboveWindows",0)<.25
+        or measured.get("crateRoofClearance",0)<.4
+        or measured.get("foliageRoofClearance",0)<.4
+        or measured.get("foliageCrateGap",0)<.15
+        or measured.get("foliageBounds",{}).get("z",[999,999])[0]<0
+        or measured.get("foliageBounds",{}).get("z",[999,999])[1]>.2
+        or smoke.get("continuousClosedVolumeMesh") is not True
+        or smoke.get("actualCyclesVolumeMaterial") is not True
+        or smoke.get("dayVisible") is not False
+        or smoke.get("duskVisible") is not True):
+        raise ValueError("Owner-requested sign, crate, ground foliage or dusk chimney smoke correction failed measured geometry checks")
     out.mkdir(parents=True,exist_ok=True)
     captures={}
     for mood in ("day","dusk"):
@@ -58,8 +72,10 @@ def run(source,out):
               "pinnedQuaterniusCC0Commit":report["creatorPinnedCommit"],
               "sourceBlendSha256":report["originalEditableBlendSha256"],
               "creatorModelInstances":report["actualCreatorInstances"],
+              "artistGroundFoliageLeaves":report["actualArtistGroundFoliageLeaves"],
               "oldRedLionA232MeshesUsed":False,
               "genuineSourceGlazing":True,"genuineOriginalRoofAndGables":True,
+              "measuredCorrections":measured,"duskChimneySmoke":smoke,
               "images":captures,"sourceArtOnly":True,"world9VisualPlacementTested":False,
               "world9GameplayAuthorityUnchanged":True,"runtimeOldAssetNotYetReplaced":True,
               "noMergeOrDeployment":True}

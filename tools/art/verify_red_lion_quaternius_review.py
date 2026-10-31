@@ -26,7 +26,18 @@ def verify(path):
         raise ValueError("Red Lion Quaternius replacement must retain source/world boundaries")
     parts=manifest["parts"]
     models=[x["model"] for x in parts]
-    if (len(parts)!=34 or
+    crate=next(x for x in parts if x["model"]=="Prop_Crate")
+    art=manifest.get("artCorrections",{})
+    foliage=art.get("foliage",{})
+    if (crate["at"]!=[5.35,-4.3,0] or
+        any(x["model"]=="Prop_Vine2" for x in parts) or
+        foliage.get("location")!=[5.55,-5.85,0.08] or
+        foliage.get("leafCount")!=9 or
+        art.get("sign",{}).get("board")!=[0,-4.55,3.55] or
+        art.get("chimneySmoke",{}).get("dayVisible") is not False or
+        art.get("chimneySmoke",{}).get("duskVisible") is not True):
+        raise ValueError("Owner-requested geometry correction manifest drift")
+    if (len(parts)!=33 or
         len(models)<30 or
         models.count("Roof_Front_Brick6")!=2 or
         models.count("Roof_RoundTiles_6x8")!=1 or
@@ -41,6 +52,7 @@ def verify(path):
         or source["ownerRequestedRetirementOfA232"] is not True
         or source["oldRedLionA232MeshesUsed"] is not False
         or source["creatorModelInstances"]!=len(parts)
+        or source.get("artistGroundFoliageLeaves")!=9
         or source["genuineSourceGlazing"] is not True
         or source["genuineOriginalRoofAndGables"] is not True
         or source["sourceArtOnly"] is not True
@@ -48,6 +60,19 @@ def verify(path):
         or source["world9GameplayAuthorityUnchanged"] is not True
         or source["runtimeOldAssetNotYetReplaced"] is not True):
         raise ValueError("Unverified source-model identity or exaggerated gameplay claim")
+    measured=source.get("measuredCorrections",{})
+    smoke=source.get("duskChimneySmoke",{})
+    if (measured.get("signClearanceAboveWindows",0)<.25
+        or measured.get("crateRoofClearance",0)<.4
+        or measured.get("foliageRoofClearance",0)<.4
+        or measured.get("foliageCrateGap",0)<.15
+        or measured.get("foliageBounds",{}).get("z",[999,999])[0]<0
+        or measured.get("foliageBounds",{}).get("z",[999,999])[1]>.2
+        or smoke.get("continuousClosedVolumeMesh") is not True
+        or smoke.get("actualCyclesVolumeMaterial") is not True
+        or smoke.get("dayVisible") is not False
+        or smoke.get("duskVisible") is not True):
+        raise ValueError("Blender did not prove raised sign, non-overlapping crate, grounded foliage and dusk-only smoke")
     images=source["images"]
     if sorted(images)!=["day","dusk"]:
         raise ValueError("Missing one source mood")

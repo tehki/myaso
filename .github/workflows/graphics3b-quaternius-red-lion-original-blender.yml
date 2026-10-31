@@ -6,6 +6,7 @@ on:
       - "tools/art/render_red_lion_quaternius_replacement.py"
       - "tools/art/bake_red_lion_quaternius_review.py"
       - "tools/art/verify_red_lion_quaternius_review.py"
+      - "tools/art/verify_red_lion_quaternius_blend.py"
       - "assets/environment/greyhaven/red-lion-quaternius/**"
       - "docs/art/GRAPHICS3B_RED_LION_QUATERNIUS_FULL_REPLACEMENT.md"
       - ".github/workflows/graphics3b-quaternius-red-lion-original-blender.yml"
@@ -34,7 +35,7 @@ jobs:
             echo "Original Red Lion replacement art must not touch gameplay source" >&2
             exit 1
           fi
-          python3 -m py_compile tools/art/render_red_lion_quaternius_replacement.py tools/art/bake_red_lion_quaternius_review.py tools/art/verify_red_lion_quaternius_review.py
+          python3 -m py_compile tools/art/render_red_lion_quaternius_replacement.py tools/art/bake_red_lion_quaternius_review.py tools/art/verify_red_lion_quaternius_review.py tools/art/verify_red_lion_quaternius_blend.py
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -44,10 +45,10 @@ jobs:
           assert m['oldRedLionArtSuperseded'] and not m['originalA232ModelIncluded']
           assert m['artReviewOnly'] and not m['gameRuntimeReplaced']
           assert m['worldReadOnly']['authoredBuildingId']=='red-lion'
-          assert len(m['parts'])==34
+          assert len(m['parts'])==33
           for item in m['parts']:
             assert (Path('third_party/quaternius/medieval-village-megakit-standard/glTF')/(item['model']+'.gltf')).is_file()
-          print('GRAPHICS3B_RED_LION_QUATERNIUS_34_ORIGINAL_CC0_MODULE_SOURCE_PASS')
+          print('GRAPHICS3B_RED_LION_QUATERNIUS_33_ORIGINAL_CC0_MODULE_SOURCE_PASS')
           PY
       - name: Install authentic Blender and preview verification dependencies
         run: |
@@ -72,11 +73,16 @@ jobs:
           for f in red-lion-quaternius-day.png red-lion-quaternius-dusk.png red-lion-quaternius-original.blend red-lion-quaternius-provenance.json; do
             test -s ".artifacts/graphics3b-red-lion-quaternius/$f"
           done
+          timeout --signal=TERM --kill-after=10s 1200s blender --background --threads 2 \
+            --python tools/art/verify_red_lion_quaternius_blend.py -- \
+            --blend .artifacts/graphics3b-red-lion-quaternius/red-lion-quaternius-original.blend \
+            --manifest assets/environment/greyhaven/red-lion-quaternius/manifest.json
           python3 - <<'PY'
           import json
           from pathlib import Path
           r=json.loads(Path('.artifacts/graphics3b-red-lion-quaternius/red-lion-quaternius-provenance.json').read_text())
-          assert r['actualCreatorInstances']==34
+          assert r['actualCreatorInstances']==33
+          assert r['actualArtistGroundFoliageLeaves']==9
           assert r['actualCreatorVertices']>=15000
           assert r['genuineGlazingSlots']>=5
           assert r['originalA232MeshCount']==0
