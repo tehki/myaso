@@ -18,6 +18,7 @@ pub mod kill_event;
 pub mod prealpha_lmb_gesture_authority;
 pub mod prealpha_lmb_gesture_proposal;
 pub mod reliable;
+pub mod alpha_greyhaven_geometry;
 pub mod simulation;
 pub mod snapshot;
 pub mod zone;
