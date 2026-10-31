@@ -228,6 +228,12 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    const after=await proof(actor);
    attempts.push({key,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y});
   }
+  // The last genuine W3C movement may reach the original World lane on the
+  // sixth (final) pulse. Apply the SAME strict <=4 World-position gate after
+  // it; never reject a valid final physical movement without observing it.
+  const finalProof=await proof(actor),finalActor=own(finalProof,actorId);
+  if(finalActor?.action===0&&Math.abs(targetY-finalActor.y)<=4)
+   return {actorId,targetY,proof:finalProof,attempts};
   throw Error("real WASD could not clear the original Light swing lane: "+JSON.stringify({actorId,targetY,attempts}));
  }
  async function prepareClick(a,targetId){
