@@ -1089,3 +1089,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "loot_persistence_process_tests.rs"]
+mod process_tests;
