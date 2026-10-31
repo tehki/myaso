@@ -76,16 +76,21 @@ test("P1 default OFF preserves legacy world renderer and isolates cached day/dus
   assert.throws(()=>createAuthoredWorldRenderer({greyhavenTimeOfDay:null}),RangeError);
 });
 
-test("P1 dusk wash is clipped to authored city tile; city edges never bleed",()=>{
+test("P1 dusk ambience is continuous across outdoor tiles and respects world bounds",()=>{
   const calls=[];const ctx={set fillStyle(v){this.tint=v;},fillRect(...a){calls.push({a,tint:this.tint});}};
   assert.equal(paintGreyhavenDuskWash(ctx,map,cityTile),1);
-  assert.deepEqual(calls[0],{a:[4096,3584,512,512],tint:"rgba(23,26,35,.20)"});
-  assert.equal(paintGreyhavenDuskWash(ctx,map,{x:3500,y:3400,width:100,height:100}),1);
-  assert.deepEqual(calls.at(-1).a,[3520,3460,80,40]);
-  assert.equal(paintGreyhavenDuskWash(ctx,map,{x:6900,y:6400,width:512,height:512}),0);
+  assert.deepEqual(calls[0],{a:[4096,3584,512,512],tint:"rgba(23,26,35,.14)"});
+  // A distant outdoor tile receives the same wash: there is no rectangular
+  // edge around Greyhaven's authored city footprint.
+  assert.equal(paintGreyhavenDuskWash(ctx,map,{x:6900,y:6400,width:512,height:512}),1);
+  assert.deepEqual(calls[1],{a:[6900,6400,512,512],tint:"rgba(23,26,35,.14)"});
+  // Tiles extending beyond World9's map edge are clipped to the authored map.
+  assert.equal(paintGreyhavenDuskWash(ctx,map,{x:-128,y:-128,width:512,height:512}),1);
+  assert.deepEqual(calls[2],{a:[0,0,384,384],tint:"rgba(23,26,35,.14)"});
   assert.equal(paintGreyhavenDuskWash(ctx,AUTHORED_MAPS[MAP_IDS.tavern],cityTile),0);
   assert.equal(paintGreyhavenDuskWash(ctx,map,{...cityTile,width:2048}),0);
-  assert.equal(calls.length,2);
+  assert.equal(paintGreyhavenDuskWash(ctx,map,{...cityTile,x:Infinity}),0);
+  assert.equal(calls.length,3);
 });
 
 test("P1 daylight fixture remains physical but emits no glow; dusk fixture bounded",()=>{
