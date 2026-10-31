@@ -1,4 +1,3 @@
-//! Test-only Unix multi-process negative witness for the legacy MYASOL03
 //! checkpoint writer. This deliberately proves the missing cross-process
 //! revision fence; it does not introduce or activate a second writer.
 use super::*;
@@ -44,13 +43,7 @@ fn two_process_atomic_checkpoint_writes_accept_stale_sibling_snapshots_and_lose_
     }
     let item_id = initial.grant(3, ItemKind::IronSword, 1).unwrap();
     let entity_id = initial
-        .drop_backpack(
-            3,
-            world.fighter(3).unwrap(),
-            ZoneId::Moonvale,
-            item_id,
-            0,
-        )
+        .drop_backpack(3, world.fighter(3).unwrap(), ZoneId::Moonvale, item_id, 0)
         .unwrap();
     for actor in 1..=3 {
         initial
@@ -64,13 +57,7 @@ fn two_process_atomic_checkpoint_writes_accept_stale_sibling_snapshots_and_lose_
         .resume_inventory(&identity, SessionLease::new(1, 1).unwrap())
         .unwrap();
     let claimed_a = writer_a
-        .take_ground(
-            1,
-            world.fighter(1).unwrap(),
-            ZoneId::Moonvale,
-            entity_id,
-            1,
-        )
+        .take_ground(1, world.fighter(1).unwrap(), ZoneId::Moonvale, entity_id, 1)
         .unwrap();
     assert_eq!(claimed_a.id, item_id);
     writer_a.equip(1, item_id, EquipmentSlot::MainHand).unwrap();
@@ -85,13 +72,7 @@ fn two_process_atomic_checkpoint_writes_accept_stale_sibling_snapshots_and_lose_
         .resume_inventory(&identity, SessionLease::new(2, 1).unwrap())
         .unwrap();
     let claimed_b = writer_b
-        .take_ground(
-            2,
-            world.fighter(2).unwrap(),
-            ZoneId::Moonvale,
-            entity_id,
-            1,
-        )
+        .take_ground(2, world.fighter(2).unwrap(), ZoneId::Moonvale, entity_id, 1)
         .unwrap();
     assert_eq!(claimed_b.id, item_id);
     writer_b.equip(2, item_id, EquipmentSlot::MainHand).unwrap();
@@ -148,8 +129,14 @@ fn two_process_atomic_checkpoint_writes_accept_stale_sibling_snapshots_and_lose_
     fs::write(&gate, b"GO").unwrap();
     let status_a = child_a.wait().unwrap();
     let status_b = child_b.wait().unwrap();
-    assert!(status_a.success(), "first independent writer failed: {status_a}");
-    assert!(status_b.success(), "second independent writer failed: {status_b}");
+    assert!(
+        status_a.success(),
+        "first independent writer failed: {status_a}"
+    );
+    assert!(
+        status_b.success(),
+        "second independent writer failed: {status_b}"
+    );
 
     // Both independent processes reported success, but only one complete
     // branch can remain. There is no conflict error or merged ownership.
@@ -169,7 +156,10 @@ fn two_process_atomic_checkpoint_writes_accept_stale_sibling_snapshots_and_lose_
         .unwrap()
         .equipped(EquipmentSlot::MainHand)
         .map(|stack| stack.id);
-    assert_ne!(a_owner, b_owner, "one physical sword cannot have two owners");
+    assert_ne!(
+        a_owner, b_owner,
+        "one physical sword cannot have two owners"
+    );
     assert!(
         (a_owner == Some(item_id) && b_owner.is_none())
             || (b_owner == Some(item_id) && a_owner.is_none())
