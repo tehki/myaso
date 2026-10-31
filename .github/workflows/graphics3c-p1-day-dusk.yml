@@ -1,0 +1,77 @@
+name: Graphics 3C P1 opt-in Greyhaven day dusk source checks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/graphics3c-p1-day-dusk.yml"
+      - "src/browser/authored-world-renderer.mjs"
+      - "src/browser/greyhaven-atmosphere.mjs"
+      - "src/browser/greyhaven-terrain-materials.mjs"
+      - "src/world/authored-maps.mjs"
+      - "src/browser/arena-viewport.mjs"
+      - "tests/greyhaven-*.test.mjs"
+      - "tests/graphics3c-*.test.mjs"
+      - "tools/art/graphics3c_p1_day_dusk_native.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  greyhaven-p1-optin:
+    name: Source World9 projection, default OFF, cached street day/dusk
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact P1 draft source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Preserve exact HEAD and syntax
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --check
+          node --check src/browser/greyhaven-atmosphere.mjs
+          node --check src/browser/authored-world-renderer.mjs
+          node --check tests/greyhaven-p1-day-dusk-3c.test.mjs
+      - name: Run real source-owned World9 and Graphics3C terrain checks
+        run: |
+          node --test \
+            tests/greyhaven-p1-day-dusk-3c.test.mjs \
+            tests/greyhaven-atmosphere-3c.test.mjs \
+            tests/greyhaven-environment-3c.test.mjs \
+            tests/greyhaven-environment-3c-culling.test.mjs \
+            tests/graphics3c-first-playable-alpha-contract.test.mjs \
+            tests/graphics3c-p44-world571-source-integration.test.mjs
+  greyhaven-p1-native-source:
+    name: Real Chrome Firefox source Canvas at Red Lion and Blacksmith day dusk
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact P1 source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify browser provenance and source script
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          node --check tools/art/graphics3c_p1_day_dusk_native.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Capture 8 original Greyhaven Canvas PNGs with exact source hashes
+        run: |
+          timeout --signal=TERM --kill-after=5s 480s node tools/art/graphics3c_p1_day_dusk_native.mjs
+      - name: Archive genuine Chrome Firefox source-renderer captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3c-p1-greyhaven-day-dusk-real-browser-source
+          path: artifacts/graphics3c-p1-greyhaven-native/**
+          if-no-files-found: ignore
+          retention-days: 7
