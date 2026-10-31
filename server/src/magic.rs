@@ -65,6 +65,8 @@ pub enum MagicError {
     MissingInventory,
     InsufficientMana,
     InvalidEffectIntent,
+    InvalidCastReceipt,
+    DuplicateCastReceipt,
     UnknownEffectIntent,
     EffectAlreadyResolved,
 }
@@ -98,6 +100,39 @@ pub struct EmberEffectIntent {
     pub origin_x_bits: u32,
     pub origin_y_bits: u32,
     pub facing_bits: u32,
+}
+
+/// Magic-local typed evidence that the Ember resource debit and exact
+/// pending intent were staged together. This is NOT a Core 8B canonical
+/// transaction receipt, authenticated signature, World effect receipt or
+/// proof of applied damage. The dormant MYWLD003 caller must still serialize
+/// the complete Loot+Magic transaction under one writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EmberCastCostReceipt {
+    pub(crate) character: CharacterId,
+    pub(crate) sequence: u64,
+    pub(crate) lease: SessionLease,
+    pub(crate) zone: ZoneId,
+    pub(crate) mana_spent: u16,
+    pub(crate) sulfur_ash_spent: u16,
+    origin_x_bits: u32,
+    origin_y_bits: u32,
+    facing_bits: u32,
+}
+
+impl EmberCastCostReceipt {
+    pub(crate) fn valid_for(self, intent: &EmberEffectIntent) -> bool {
+        let expected = spell_plan(Spell::Ember);
+        self.sequence != 0
+            && self.character == intent.character
+            && self.sequence == intent.sequence
+            && self.zone == intent.zone
+            && self.origin_x_bits == intent.origin_x_bits
+            && self.origin_y_bits == intent.origin_y_bits
+            && self.facing_bits == intent.facing_bits
+            && self.mana_spent == expected.mana_cost
+            && self.sulfur_ash_spent == expected.reagent_amount
+    }
 }
 
 impl EmberEffectIntent {
@@ -138,6 +173,7 @@ struct CharacterMagic {
 pub struct MagicAuthority {
     characters: BTreeMap<CharacterId, CharacterMagic>,
     claimed_receipts: BTreeSet<NonZeroU64>,
+    cast_cost_receipts: BTreeMap<(CharacterId, u64), EmberCastCostReceipt>,
     pending_ember: BTreeMap<(CharacterId, u64), EmberEffectIntent>,
 }
 
@@ -340,6 +376,66 @@ impl MagicAuthority {
         Ok(())
     }
 
+    /// Record Magic-local cast-cost provenance only after the staged Loot
+    /// debit, mana debit and exact intent have all succeeded. This marker is
+    /// persisted beside the intent; it does not replace Core's canonical
+    /// transaction receipt or establish distributed writer/epoch authority.
+    pub(crate) fn record_ember_cost_receipt(
+        &mut self,
+        identity: &SessionIdentityRegistry,
+        lease: SessionLease,
+        character: CharacterId,
+        sequence: u64,
+        zone: ZoneId,
+        plan: SpellPlan,
+    ) -> Result<(), MagicError> {
+        if identity.resolve_session(lease) != Some(character) {
+            return Err(MagicError::UnverifiedSession);
+        }
+        if plan != spell_plan(Spell::Ember) {
+            return Err(MagicError::InvalidCastReceipt);
+        }
+        let key = (character, sequence);
+        let intent = self
+            .pending_ember
+            .get(&key)
+            .copied()
+            .ok_or(MagicError::UnknownEffectIntent)?;
+        if intent.status != EmberEffectStatus::Pending || intent.zone != zone {
+            return Err(MagicError::InvalidCastReceipt);
+        }
+        if self.cast_cost_receipts.contains_key(&key) {
+            return Err(MagicError::DuplicateCastReceipt);
+        }
+        if self.cast_cost_receipts.len() >= MAX_PENDING_EMBER_INTENTS {
+            return Err(MagicError::LimitReached);
+        }
+        let receipt = EmberCastCostReceipt {
+            character,
+            sequence,
+            lease,
+            zone,
+            mana_spent: plan.mana_cost,
+            sulfur_ash_spent: plan.reagent_amount,
+            origin_x_bits: intent.origin_x_bits,
+            origin_y_bits: intent.origin_y_bits,
+            facing_bits: intent.facing_bits,
+        };
+        if !receipt.valid_for(&intent) {
+            return Err(MagicError::InvalidCastReceipt);
+        }
+        self.cast_cost_receipts.insert(key, receipt);
+        Ok(())
+    }
+
+    pub(crate) fn ember_cost_receipt(
+        &self,
+        character: CharacterId,
+        sequence: u64,
+    ) -> Option<&EmberCastCostReceipt> {
+        self.cast_cost_receipts.get(&(character, sequence))
+    }
+
     /// A read-only server-resolved spell preview. This never spends mana,
     /// consumes reagents or produces damage. No cast packet is enabled.
     pub fn preview_cast(
@@ -402,7 +498,8 @@ const fn spell_plan(spell: Spell) -> SpellPlan {
     }
 }
 
-const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG003";
+const PROGRESSION_MAGIC_V3: &[u8; 8] = b"MYMAG003";
+const PROGRESSION_MAGIC: &[u8; 8] = b"MYMAG004";
 const ALL_RUNES: [Rune; 6] = [
     Rune::Fire,
     Rune::Water,
@@ -479,6 +576,7 @@ impl MagicAuthority {
     pub(crate) fn encode_progression(&self) -> Result<Vec<u8>, MagicSnapshotError> {
         if self.characters.len() > MAX_MAGIC_CHARACTERS
             || self.claimed_receipts.len() > MAX_LESSON_RECEIPTS
+            || self.cast_cost_receipts.len() > MAX_PENDING_EMBER_INTENTS
         {
             return Err(MagicSnapshotError::TooLarge);
         }
@@ -513,6 +611,29 @@ impl MagicAuthority {
         for receipt in &self.claimed_receipts {
             bytes.extend_from_slice(&receipt.get().to_le_bytes());
         }
+        bytes.extend_from_slice(&(self.cast_cost_receipts.len() as u32).to_le_bytes());
+        for (key, receipt) in &self.cast_cost_receipts {
+            let intent = self
+                .pending_ember
+                .get(key)
+                .ok_or(MagicSnapshotError::InvalidState)?;
+            if *key != (receipt.character, receipt.sequence) || !receipt.valid_for(intent) {
+                return Err(MagicSnapshotError::InvalidState);
+            }
+            bytes.extend_from_slice(&receipt.character.get().to_le_bytes());
+            bytes.extend_from_slice(&receipt.sequence.to_le_bytes());
+            bytes.extend_from_slice(&receipt.lease.server_session().to_le_bytes());
+            bytes.extend_from_slice(&receipt.lease.epoch().to_le_bytes());
+            bytes.push(match receipt.zone {
+                ZoneId::Moonvale => 0,
+                ZoneId::RedLionInn => 1,
+            });
+            bytes.extend_from_slice(&receipt.mana_spent.to_le_bytes());
+            bytes.extend_from_slice(&receipt.sulfur_ash_spent.to_le_bytes());
+            bytes.extend_from_slice(&receipt.origin_x_bits.to_le_bytes());
+            bytes.extend_from_slice(&receipt.origin_y_bits.to_le_bytes());
+            bytes.extend_from_slice(&receipt.facing_bits.to_le_bytes());
+        }
         if self.pending_ember.len() > MAX_PENDING_EMBER_INTENTS {
             return Err(MagicSnapshotError::TooLarge);
         }
@@ -546,9 +667,14 @@ impl MagicAuthority {
     /// Fail-closed recovery: no partial rune knowledge is ever returned.
     pub(crate) fn decode_progression(bytes: &[u8]) -> Result<Self, MagicSnapshotError> {
         let mut reader = MagicReader::new(bytes);
-        if reader.take(PROGRESSION_MAGIC.len())? != PROGRESSION_MAGIC {
+        let header = reader.take(PROGRESSION_MAGIC.len())?;
+        let has_cast_receipts = if header == PROGRESSION_MAGIC {
+            true
+        } else if header == PROGRESSION_MAGIC_V3 {
+            false
+        } else {
             return Err(MagicSnapshotError::Corrupt);
-        }
+        };
         let character_count = reader.u32()? as usize;
         if character_count > MAX_MAGIC_CHARACTERS {
             return Err(MagicSnapshotError::TooLarge);
@@ -597,6 +723,47 @@ impl MagicAuthority {
                 return Err(MagicSnapshotError::Corrupt);
             }
         }
+        let mut cast_cost_receipts = BTreeMap::new();
+        if has_cast_receipts {
+            let cast_receipt_count = reader.u32()? as usize;
+            if cast_receipt_count > MAX_PENDING_EMBER_INTENTS {
+                return Err(MagicSnapshotError::TooLarge);
+            }
+            for _ in 0..cast_receipt_count {
+                let character =
+                    CharacterId::new(reader.u64()?).ok_or(MagicSnapshotError::Corrupt)?;
+                let sequence = reader.u64()?;
+                let server_session = reader.u32()?;
+                let lease_epoch = reader.u64()?;
+                let lease = SessionLease::new(server_session, lease_epoch)
+                    .ok_or(MagicSnapshotError::Corrupt)?;
+                let zone = match reader.u8()? {
+                    0 => ZoneId::Moonvale,
+                    1 => ZoneId::RedLionInn,
+                    _ => return Err(MagicSnapshotError::Corrupt),
+                };
+                let receipt = EmberCastCostReceipt {
+                    character,
+                    sequence,
+                    lease,
+                    zone,
+                    mana_spent: reader.u16()?,
+                    sulfur_ash_spent: reader.u16()?,
+                    origin_x_bits: reader.u32()?,
+                    origin_y_bits: reader.u32()?,
+                    facing_bits: reader.u32()?,
+                };
+                if receipt.sequence == 0
+                    || receipt.mana_spent != spell_plan(Spell::Ember).mana_cost
+                    || receipt.sulfur_ash_spent != spell_plan(Spell::Ember).reagent_amount
+                    || cast_cost_receipts
+                        .insert((character, sequence), receipt)
+                        .is_some()
+                {
+                    return Err(MagicSnapshotError::Corrupt);
+                }
+            }
+        }
         let intent_count = reader.u32()? as usize;
         if intent_count > MAX_PENDING_EMBER_INTENTS {
             return Err(MagicSnapshotError::TooLarge);
@@ -637,6 +804,7 @@ impl MagicAuthority {
         let result = Self {
             characters,
             claimed_receipts,
+            cast_cost_receipts,
             pending_ember,
         };
         result
@@ -1137,7 +1305,7 @@ mod tests {
             commit_verified_ground_sword_equip_checked, GroundSwordAuthority, PickupCommitError,
             PickupWorldTick, VerifiedLootOperation,
         };
-        use crate::magic_checkpoint::{load_joint, save_joint, JointCheckpointError};
+        use crate::magic_checkpoint::{load_joint, JointCheckpointError};
         use crate::zone::ZoneAuthority;
         use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -1220,17 +1388,51 @@ mod tests {
         );
         assert_eq!(magic.encode_progression().unwrap(), progression);
 
-        // Simulate a previously authenticated/committed spell operation
-        // watermark in a test-only fixture, then actually persist BOTH
-        // Loot and Magic before the later unrelated sword transaction.
-        loot.record_operation(character(1), 7).unwrap();
-        save_joint(&path, &loot, &identity, &magic).unwrap();
+        // Replace the deliberately uncosted fixture with a real Ember cost
+        // transaction: actual Spellbook, SulfurAsh and mana are committed
+        // together with a typed Magic-local cast-cost receipt.
+        magic = MagicAuthority::new();
+        magic
+            .grant_lesson(award(13, character(1), Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(14, character(1), Lesson::Spell(Spell::Ember)))
+            .unwrap();
+        let spellbook = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
+        loot.equip(1, spellbook, EquipmentSlot::OffHand).unwrap();
+        loot.grant(1, ItemKind::SulfurAsh, 2).unwrap();
+        let fighter = world.fighter(1).unwrap().clone();
+        let cost = crate::magic_cast::commit_ember_cost(
+            &path,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            VerifiedLootOperation {
+                lease: lease(1, 1),
+                sequence: 7,
+            },
+            &fighter,
+        )
+        .unwrap();
+        assert_eq!((cost.mana_spent, cost.sulfur_ash_spent), (15, 1));
+        assert_eq!(magic.mana(character(1)), 85);
+        let pending = *magic.ember_intent(character(1), 7).unwrap();
+        let progression = magic.encode_progression().unwrap();
+        let prior_cost = magic.ember_cost_receipt(character(1), 7).unwrap();
+        assert_eq!(prior_cost.lease, lease(1, 1));
+        assert_eq!(prior_cost.mana_spent, 15);
+        assert_eq!(prior_cost.sulfur_ash_spent, 1);
         let (prior_loot, prior_magic) = load_joint(&path).unwrap();
         assert_eq!(
             prior_loot.committed_operation_sequence(character(1)),
             Some(7)
         );
         assert_eq!(prior_magic.ember_intent(character(1), 7), Some(&pending));
+        assert_eq!(
+            prior_magic.ember_cost_receipt(character(1), 7),
+            Some(prior_cost)
+        );
         assert_eq!(prior_magic.encode_progression().unwrap(), progression);
 
         // Later successful physical sword drop is sequence 8. The intent

@@ -96,6 +96,9 @@ pub fn commit_ember_cost(
             fighter.facing,
         )
         .map_err(CastError::Magic)?;
+    staged_magic
+        .record_ember_cost_receipt(identity, op.lease, character, op.sequence, zone, plan)
+        .map_err(CastError::Magic)?;
     let bytes = bundle(&staged_loot, identity, &staged_magic).map_err(CastError::Checkpoint)?;
     atomic_write(path, &bytes).map_err(CastError::Io)?;
     *loot = staged_loot;
