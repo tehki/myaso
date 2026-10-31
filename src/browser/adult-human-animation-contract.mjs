@@ -23,12 +23,45 @@ export const ADULT_HUMAN_RIG_V1_BONES = Object.freeze([
   "RightUpLeg", "RightLeg", "RightFoot", "RightToeBase",
 ]);
 
+// The later R3 anatomical body reuses this same rig and already carries
+// idle/walk/run actions, but has not yet received its own accepted locomotion
+// atlases. Do not draw A0/A1 procedural-study atlases on this different mesh.
+export const ADULT_HUMAN_ANATOMICAL_BASE_V1 = Object.freeze({
+  source: "R3 MakeHuman anatomical source",
+  sourceLicense: "CC0-1.0",
+  rigId: ADULT_HUMAN_RIG_ID,
+  rigBoneCount: 22,
+  sourceBlendPathTemplate:
+    "assets/characters/adult-anatomy-r3/{body}-anatomical-shoulderroll-r3.blend",
+  sourceGlbPathTemplate:
+    "assets/characters/adult-anatomy-r3/{body}-anatomical-shoulderroll-r3.glb",
+  sourceActions: Object.freeze([
+    "idle", "walk", "run", "roll_r3_shoulder_ground",
+  ]),
+  locomotionAtlasesAvailable: false,
+  status: "editable-source-only-no-approved-locomotion-atlases",
+  productionActive: false,
+});
+
+export function resolveAdultHumanAnatomicalBase(bodyPresentation) {
+  if (!ADULT_HUMAN_BODY_PRESENTATIONS.includes(bodyPresentation)) return null;
+  return Object.freeze({
+    ...ADULT_HUMAN_ANATOMICAL_BASE_V1,
+    bodyPresentation,
+    sourceBlendPath: ADULT_HUMAN_ANATOMICAL_BASE_V1.sourceBlendPathTemplate
+      .replaceAll("{body}", bodyPresentation),
+    sourceGlbPath: ADULT_HUMAN_ANATOMICAL_BASE_V1.sourceGlbPathTemplate
+      .replaceAll("{body}", bodyPresentation),
+  });
+}
+
 const rollFrames = Object.freeze([1, 3, 5, 7, 9, 11, 15, 22]);
 const rollTimes = Object.freeze(rollFrames.map(frame => (frame - 1) * 1000 / 60));
 
 const previewClip = (source, clip, frameCount, sourceFrames) => Object.freeze({
-  status: "source-preview-only",
+  status: "procedural-study-preview-only",
   source,
+  modelSource: "A0/A1 procedural body study",
   clip,
   sourceActionName: clip,
   atlasPathTemplate: "web/assets/adults/{body}_" + clip + ".webp",
@@ -40,6 +73,7 @@ const previewClip = (source, clip, frameCount, sourceFrames) => Object.freeze({
   sourceFrames: Object.freeze([...sourceFrames]),
   timingQualified: false,
   groundContactQualified: false,
+  anatomicalAtlasAvailable: false,
   productionActive: false,
 });
 
