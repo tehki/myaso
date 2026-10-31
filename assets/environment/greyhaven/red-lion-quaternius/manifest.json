@@ -1,0 +1,404 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-red-lion-quaternius-full-asset-replacement",
+  "title": "The Red Lion — Blood & Iron",
+  "sourceLicense": "CC0-1.0",
+  "sourceMirror": "J-Ponzo/gltf-medieval-village-megakit",
+  "sourceCommit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "oldRedLionArtSuperseded": true,
+  "originalA232ModelIncluded": false,
+  "originalWorld9PlacementUnchanged": true,
+  "artReviewOnly": true,
+  "gameRuntimeReplaced": false,
+  "worldReadOnly": {
+    "mapId": "moonvale-overworld",
+    "authoredBuildingId": "red-lion",
+    "unchangedServerCollision": true,
+    "unchangedEntranceAuthority": true
+  },
+  "camera": {
+    "position": [
+      11,
+      -17,
+      12
+    ],
+    "target": [
+      0,
+      0,
+      3.5
+    ],
+    "orthoScale": 16.8,
+    "kind": "ORTHO"
+  },
+  "parts": [
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        -2,
+        -4,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_UnevenBrick_Door_Round",
+      "at": [
+        0,
+        -4,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        2,
+        -4,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        -2,
+        4,
+        0
+      ],
+      "yawDeg": 180,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        0,
+        4,
+        0
+      ],
+      "yawDeg": 180,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        2,
+        4,
+        0
+      ],
+      "yawDeg": 180,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        -3,
+        -3,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        -3,
+        -1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        -3,
+        1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        -3,
+        3,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        3,
+        -3,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        3,
+        -1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_Window_Wide_Round",
+      "at": [
+        3,
+        1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "Wall_Plaster_WoodGrid",
+      "at": [
+        3,
+        3,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "DoorFrame_Round_WoodDark",
+      "at": [
+        0,
+        -4.09,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Door_1_Round",
+      "at": [
+        -0.513745,
+        -4.13,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        -2,
+        -4.12,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        -2,
+        -4.14,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        2,
+        -4.12,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        2,
+        -4.14,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        -3.12,
+        -1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        -3.18,
+        -1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        -3.12,
+        1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        -3.18,
+        1,
+        0
+      ],
+      "yawDeg": -90,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        3.12,
+        -1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        3.18,
+        -1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "Window_Wide_Round1",
+      "at": [
+        3.12,
+        1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "WindowShutters_Wide_Round_Open",
+      "at": [
+        3.18,
+        1,
+        0
+      ],
+      "yawDeg": 90,
+      "role": "walls"
+    },
+    {
+      "model": "Roof_RoundTiles_6x8",
+      "at": [
+        0,
+        0,
+        3.42
+      ],
+      "yawDeg": 0,
+      "role": "roof"
+    },
+    {
+      "model": "Roof_Front_Brick6",
+      "at": [
+        0,
+        -4.05,
+        3.1
+      ],
+      "yawDeg": 0,
+      "role": "roof"
+    },
+    {
+      "model": "Roof_Front_Brick6",
+      "at": [
+        0,
+        4.05,
+        3.1
+      ],
+      "yawDeg": 180,
+      "role": "roof"
+    },
+    {
+      "model": "Prop_Chimney",
+      "at": [
+        -2,
+        1.3,
+        4.1
+      ],
+      "yawDeg": 0,
+      "role": "roof"
+    },
+    {
+      "model": "Prop_Crate",
+      "at": [
+        3.6,
+        -3.55,
+        0
+      ],
+      "yawDeg": -15,
+      "role": "foreground"
+    },
+    {
+      "model": "Prop_Vine2",
+      "at": [
+        2.9,
+        -3.98,
+        0
+      ],
+      "yawDeg": 0,
+      "role": "walls"
+    }
+  ],
+  "sourceArchitecture": {
+    "outerFootprintMeters": [
+      6,
+      8
+    ],
+    "creatorModularWalls": true,
+    "genuineRoof": "Roof_RoundTiles_6x8",
+    "genuineGable": "Roof_Front_Brick6",
+    "realGenuineDoor": "Door_1_Round",
+    "genuineWindows": "Window_Wide_Round1",
+    "genuineShutters": "WindowShutters_Wide_Round_Open"
+  },
+  "render": {
+    "width": 960,
+    "height": 720,
+    "samples": 20,
+    "engine": "CYCLES",
+    "day": "red-lion-quaternius-day.png",
+    "dusk": "red-lion-quaternius-dusk.png",
+    "editableSource": "red-lion-quaternius-original.blend",
+    "provenance": "red-lion-quaternius-provenance.json"
+  },
+  "scope": {
+    "noChangesToBlacksmith": true,
+    "noChangesToCombat": true,
+    "noChangesToOriginalWorld9Authority": true,
+    "noProductionDeployment": true,
+    "noLiveGameRelease": true
+  }
+}

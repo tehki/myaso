@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-quaternius-red-lion-complete-visual-replacement-review",
+  "ownerRequestedRetirementOfA232": true,
+  "pinnedQuaterniusCC0Commit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "sourceBlendSha256": "80a19d4c23ecf074c1cf183f158a149b7f6247c5049908de3fb282ee07338323",
+  "creatorModelInstances": 34,
+  "oldRedLionA232MeshesUsed": false,
+  "genuineSourceGlazing": true,
+  "genuineOriginalRoofAndGables": true,
+  "images": {
+    "day": {
+      "webp": "red-lion-quaternius-day-review.webp",
+      "webpSha256": "e17aa73498a4c56493fc2c239491428ea1b7252b7cf3e7bd072d00816f87d487",
+      "bytes": 66946,
+      "sourcePngSha256": "d383c843cb948c72245a3e89963feecb6ed3bc7fc31f7c7e13d95aeed1dcfd99",
+      "alphaBounds": [
+        140,
+        19,
+        820,
+        720
+      ],
+      "alphaPixelExact": true,
+      "width": 960,
+      "height": 720,
+      "originalBlenderDayDusk": true
+    },
+    "dusk": {
+      "webp": "red-lion-quaternius-dusk-review.webp",
+      "webpSha256": "2f538cd9135e4bab014c88471b6e7466b216182dad01d75107995a02dc59619f",
+      "bytes": 50950,
+      "sourcePngSha256": "293296b2327847a3fb7a0c39abc9330fbad6b0e556f5bcb2248c61a6c2380e98",
+      "alphaBounds": [
+        140,
+        0,
+        820,
+        720
+      ],
+      "alphaPixelExact": true,
+      "width": 960,
+      "height": 720,
+      "originalBlenderDayDusk": true
+    }
+  },
+  "sourceArtOnly": true,
+  "world9VisualPlacementTested": false,
+  "world9GameplayAuthorityUnchanged": true,
+  "runtimeOldAssetNotYetReplaced": true,
+  "noMergeOrDeployment": true
+}
