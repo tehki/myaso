@@ -9,10 +9,10 @@
 - **A0 #433:** original editable adult masculine/feminine Blender sources, 22-bone rig, eight-direction idle.
 - **A1 #448:** the same rig and original sources with separate walk/run actions and eight-direction atlases.
 - **A2 #457:** separate 350ms forward-roll source action and eight-direction atlases.
-- **R3/R4 #487:** CC0 MakeHuman anatomical source meshes and CMU 128_10 motion-capture roll retarget candidate, still under visual HOLD.
+- **R3/R4 #487:** CC0 MakeHuman anatomical source meshes on the same 22-bone rig. The R3/R4 GLBs retain real `idle`, `walk`, and `run` source actions, plus separate R3/R4 roll candidates. The anatomical locomotion actions do **not yet** have their own approved atlases or ground-contact review; the R4 roll remains visual HOLD.
 - **R1 #472 / R4 #487 review:** genuine standalone Chrome/Firefox review evidence, not live Greyhaven or gameplay acceptance.
 
-The shared source rig is **adult-human-22-v1**, with 22 named bones and the canonical eight directions: south, southwest, west, northwest, north, northeast, east, southeast. All original source bodies and GLBs are checked against this contract by A3 tests.
+The shared source rig is **adult-human-22-v1**, with 22 named bones and the canonical eight directions: south, southwest, west, northwest, north, northeast, east, southeast. A3 tests verify the original A0/A1/A2/R3/R4 GLB joint names against this contract. A0/A1 atlases remain procedural-study previews; do not mistake them for final anatomical body art. The later R3 MakeHuman CC0 body is the preferred anatomical base for the reusable library, but its existing locomotion actions still need new renders and grounding review.
 
 ## A3 engineering change
 
