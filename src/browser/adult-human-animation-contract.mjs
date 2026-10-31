@@ -30,6 +30,7 @@ const previewClip = (source, clip, frameCount, sourceFrames) => Object.freeze({
   status: "source-preview-only",
   source,
   clip,
+  sourceActionName: clip,
   atlasPathTemplate: "web/assets/adults/{body}_" + clip + ".webp",
   manifestPathTemplate: "web/assets/adults/{body}_" + clip + ".json",
   directionCount: 8,
@@ -42,10 +43,11 @@ const previewClip = (source, clip, frameCount, sourceFrames) => Object.freeze({
   productionActive: false,
 });
 
-const rollVariant = (source, atlasPathTemplate, manifestPathTemplate) => Object.freeze({
+const rollVariant = (source, sourceActionName, atlasPathTemplate, manifestPathTemplate) => Object.freeze({
   status: "source-visual-hold",
   source,
   clip: "roll",
+  sourceActionName,
   atlasPathTemplate,
   manifestPathTemplate,
   directionCount: 8,
@@ -71,9 +73,9 @@ export const ADULT_HUMAN_CLIP_COVERAGE = Object.freeze({
   roll: Object.freeze({
     status: "source-visual-hold",
     variants: Object.freeze({
-      a2: rollVariant("A2", "web/assets/adults/{body}_roll.webp",
+      a2: rollVariant("A2", "roll", "web/assets/adults/{body}_roll.webp",
         "web/assets/adults/{body}_roll.json"),
-      r4: rollVariant("R4", "web/assets/adults-review-r4/{body}_roll.webp",
+      r4: rollVariant("R4", "roll_r4_real_mocap_candidate", "web/assets/adults-review-r4/{body}_roll.webp",
         "web/assets/adults-review-r4/{body}_roll.json"),
     }),
   }),
