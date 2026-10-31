@@ -463,6 +463,16 @@ fn should_enqueue_reliable_catchup(
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
 }
 
+// Core 8C: the same explicit operator-owned World9 Alpha gate selects both
+// authored spawn admission and Physics6's original-World static collision
+// guard. No client parameter can activate this profile.
+fn configure_greyhaven_alpha_runtime(world: &mut World, enabled: bool) -> Result<()> {
+    if enabled && !world.enable_greyhaven_static_collisions() {
+        bail!("Greyhaven Alpha could not enable approved static collision geometry");
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let bind: SocketAddr = env::var("MYASO_BIND")
@@ -588,6 +598,10 @@ async fn main() -> Result<()> {
     #[cfg(not(feature = "experimental-hit-delivery-lab"))]
     let _ = hit_lab_enabled;
     let game = SharedGame::new(flight, boot_nonce, chat_radius, chat_enabled);
+    {
+        let mut state = game.state.lock().await;
+        configure_greyhaven_alpha_runtime(&mut state.world, greyhaven_alpha)?;
+    }
     #[cfg(feature = "experimental-hit-delivery-lab")]
     if hit_lab_enabled {
         let mut state = game.state.lock().await;
@@ -2288,6 +2302,34 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn greyhaven_static_collision_guard_uses_the_explicit_world9_server_gate() {
+        let mut default_world = World::new(8192.0, 8192.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut default_world, false).is_ok());
+        let mut guarded_world = World::new(8192.0, 8192.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut guarded_world, true).is_ok());
+
+        for world in [&mut default_world, &mut guarded_world] {
+            assert!(world.add_player_at(1, 3740.0, 4088.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_y: -1.0,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..3 {
+                world.step_by(100.0);
+            }
+        }
+        assert!(default_world.fighter(1).unwrap().y < 4030.0);
+        assert!(guarded_world.fighter(1).unwrap().y >= 4030.0);
+
+        let mut wrong_sized_arena = World::new(800.0, 600.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut wrong_sized_arena, false).is_ok());
+        assert!(configure_greyhaven_alpha_runtime(&mut wrong_sized_arena, true).is_err());
+    }
 
     #[tokio::test]
     async fn c1_optional_stream_registration_can_retry_after_contention_and_respawn() {
