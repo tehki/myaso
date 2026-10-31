@@ -9302,7 +9302,10 @@ async function runOnlineUiHeavyGuardBreakFlight(entries, { returnTiming = false,
   const performHeavyIntoObservedShortBlock = async () => {
     lastHeavyControl = await dispatchNativeHeldHeavyGuard({
       readOutput:m201ServerOutput,attackerId:staged.attackerId,
-      defenderId:staged.defenderId,guard:"block",wheelCount:2,sleep,
+      // M111 first-red: awaiting a redundant second wheel aged the real
+      // Block to216.7ms, then native UP arrived after its240ms expiry.
+      // One genuine wheel plus the actual133.3ms World proof is sufficient.
+      defenderId:staged.defenderId,guard:"block",wheelCount:1,sleep,
       sendDown:()=>setArenaAttackButton(attacker,true),
       sendWheel:()=>scrollArenaWheel(defender,defenderElementId,120),
       sendUp:()=>setArenaAttackButton(attacker,false),
