@@ -1,0 +1,58 @@
+name: World9 Phase A Greyhaven original Rust two-browser review (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "server/src/greyhaven_alpha.rs"
+      - "server/src/main.rs"
+      - "web/online-game.mjs"
+      - "src/world/**"
+      - "src/browser/authored-world-renderer.mjs"
+      - "src/browser/greyhaven-*.mjs"
+      - "tests/world9-alpha-foundation.test.mjs"
+      - "tests/graphics3-p1-greyhaven-preview-integration.test.mjs"
+      - "tools/world9/greyhaven_alpha_two_native.mjs"
+      - ".github/workflows/world9-alpha-phasea-two-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world9-greyhaven-real-two-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      MYASO_WORLD9_NATIVE_BROWSERS: chrome,firefox
+      MYASO_WORLD9_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      MYASO_KNIGHTS_CARGO_OFFLINE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify exact source, immutable World9 geometry and original P0 separation
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MYASO_WORLD9_SOURCE_SHA"
+          node --check web/online-game.mjs
+          node --check tools/world9/greyhaven_alpha_two_native.mjs
+          node --test tests/world9-alpha-foundation.test.mjs tests/graphics3-p1-greyhaven-preview-integration.test.mjs
+          cargo fmt --all --manifest-path server/Cargo.toml --check
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Build original Rust QUIC World with isolated Greyhaven preview
+        run: cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Two genuine Chrome Firefox QUIC seats in shared Greyhaven from original Rust
+        run: timeout --signal=TERM --kill-after=5s 300s node tools/world9/greyhaven_alpha_two_native.mjs
+      - name: Preserve original real browser screenshot SHA and first-RED logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world9-alpha-phasea-two-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/world9-greyhaven-alpha-two-native/
+          if-no-files-found: warn
+          retention-days: 7
