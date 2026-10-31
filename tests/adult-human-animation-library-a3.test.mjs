@@ -55,7 +55,7 @@ test("A3 defines one reusable 22-bone human rig and eight-way convention", () =>
     const report = json("assets/characters/adult-body/" + body + "-source-report.json");
     assert.deepEqual(new Set(report.rigBoneNames), new Set(ADULT_HUMAN_RIG_V1_BONES));
     for (const path of [
-      "assets/characters/" + body + ".glb",
+      "assets/characters/adult-body/" + body + ".glb",
       "assets/characters/adult-body-a1/" + body + "-locomotion-a1.glb",
       "assets/characters/adult-body-a2/" + body + "-roll-a2.glb",
       "assets/characters/adult-mocap-r4/" + body + "-mocap-roll-r4.glb",
