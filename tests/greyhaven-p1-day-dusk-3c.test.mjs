@@ -17,7 +17,7 @@ function fakeCanvas(recs){
     moveTo(){},lineTo(){},stroke(){},fill(){},
     strokeRect(){},fillText(){},drawImage(){},
     fillRect(x,y,w,h){
-      if(this.fillStyle==="rgba(23,26,35,.20)")recs.washes.push({x,y,w,h});
+      if(this.fillStyle==="rgba(23,26,35,.14)")recs.washes.push({x,y,w,h});
     },
     createRadialGradient(x,y,innerX,xx,yy,radius){
       recs.pools.push({x,y,radius});
@@ -63,7 +63,7 @@ test("P1 default OFF preserves legacy world renderer and isolates cached day/dus
   assert.deepEqual(legacy.initial,explicit.initial);
   assert.equal(legacy.recs.washes.length,0);
   assert.equal(day.recs.washes.length,0);
-  assert.ok(dusk.recs.washes.length>0,"dusk must visibly tint authored Greyhaven street");
+  assert.ok(dusk.recs.washes.length>0,"dusk must visibly tint the outdoor world");
   assert.ok(dusk.recs.pools.length>0,"dusk must light original building street anchors");
   assert.equal(day.recs.pools.length,0,"sunlit street cannot show dusk glow");
   for(const x of [legacy,day,dusk]){
