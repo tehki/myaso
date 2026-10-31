@@ -81,17 +81,25 @@ impl From<TeacherError> for JointCheckpointError {
     }
 }
 
-/// Ensure each pending Ember intent is backed by a committed operation in
-/// the same loot state. A forged or partially persisted intent must never
-/// become eligible for future Combat resolution after recovery.
+/// A pending Ember intent requires BOTH its exact Magic cast-cost receipt
+/// and the matching committed operation watermark. A generic Loot operation
+/// (for example, a sword drop) can never authorize an unrelated spell intent.
+/// This remains a dormant local checkpoint rule, not Core's canonical receipt.
 fn verify_intent_watermarks(
     loot: &LootAuthority,
     magic: &MagicAuthority,
 ) -> Result<(), JointCheckpointError> {
     for intent in magic.all_ember_intents() {
-        if loot
-            .committed_operation_sequence(intent.character)
-            .is_none_or(|committed| committed < intent.sequence)
+        if intent.status != EmberEffectStatus::Pending {
+            continue;
+        }
+        let receipt = magic
+            .ember_cost_receipt(intent.character, intent.sequence)
+            .ok_or(JointCheckpointError::Corrupt)?;
+        if !receipt.valid_for(intent)
+            || loot
+                .committed_operation_sequence(intent.character)
+                .is_none_or(|committed| committed < intent.sequence)
         {
             return Err(JointCheckpointError::Corrupt);
         }
@@ -553,11 +561,16 @@ mod tests {
     }
 
     #[test]
-    fn interrupt_checkpoint_keeps_cost_and_prevents_reactivation_after_restart() {
+    fn unrelated_sword_drop_watermark_cannot_authorize_uncosted_ember_intent() {
+        use crate::loot_transaction::{
+            commit_verified_equipped_sword_drop_checked, GroundSwordAuthority, PickupCommitError,
+            PickupWorldTick, VerifiedLootOperation,
+        };
+        use crate::simulation::World;
+
         let (mut loot, mut magic, identity, hero) = fixtures();
-        let mut zones = ZoneAuthority::new();
-        zones.register(1).unwrap();
-        loot.record_operation(hero, 50).unwrap();
+        let sword = loot.grant(1, ItemKind::IronSword, 1).unwrap();
+        loot.equip(1, sword, EquipmentSlot::MainHand).unwrap();
         magic
             .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
             .unwrap();
@@ -565,9 +578,145 @@ mod tests {
             .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         magic
-            .stage_ember_intent(hero, 50, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .stage_ember_intent(hero, 7, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert_eq!(magic.mana(hero), 100);
+        assert_eq!(
+            magic.preview_cast(
+                SessionLease::new(1, 1).unwrap(),
+                &identity,
+                &loot,
+                Spell::Ember
+            ),
+            Err(MagicError::MissingSpellbook)
+        );
+
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let mut world = World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let path = checkpoint_path();
+        let mut geometry_called = false;
+        let result = commit_verified_equipped_sword_drop_checked(
+            GroundSwordAuthority {
+                path: &path,
+                loot: &mut loot,
+                magic: &magic,
+                identity: &identity,
+                tick: PickupWorldTick {
+                    world: &world,
+                    completed_tick: world.tick,
+                    zones: &zones,
+                },
+                operation: VerifiedLootOperation {
+                    lease: SessionLease::new(1, 1).unwrap(),
+                    sequence: 7,
+                },
+            },
+            |fighter, zone| {
+                geometry_called = true;
+                assert_eq!(fighter.net_id, 1);
+                assert_eq!(zone, ZoneId::Moonvale);
+                Ok(())
+            },
+        );
+        assert!(geometry_called);
+        assert!(matches!(
+            result,
+            Err(PickupCommitError::JointCheckpoint(
+                JointCheckpointError::Corrupt
+            ))
+        ));
+        assert_eq!(
+            loot.inventory(1)
+                .unwrap()
+                .equipped(EquipmentSlot::MainHand)
+                .unwrap()
+                .id,
+            sword
+        );
+        assert!(loot.ground().is_empty());
+        assert_eq!(loot.committed_operation_sequence(hero), None);
+        assert!(!path.exists());
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn legacy_v3_pending_intent_without_cast_receipt_is_not_authorized() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        loot.record_operation(hero, 9).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
+            .unwrap();
+
+        let no_intent_v4 = magic.encode_progression().unwrap();
+        let no_intent_v3 = legacy_v3_without_cast_receipt_section(&no_intent_v4);
+        assert!(MagicAuthority::decode_progression(&no_intent_v3).is_ok());
+
+        magic
+            .stage_ember_intent(hero, 9, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        let pending_v4 = magic.encode_progression().unwrap();
+        let pending_v3 = legacy_v3_without_cast_receipt_section(&pending_v4);
+        let restored = MagicAuthority::decode_progression(&pending_v3).unwrap();
+        assert!(matches!(
+            verify_intent_watermarks(&loot, &restored),
+            Err(JointCheckpointError::Corrupt)
+        ));
+        let _ = identity;
+    }
+
+    fn legacy_v3_without_cast_receipt_section(v4: &[u8]) -> Vec<u8> {
+        let character_count =
+            u32::from_le_bytes(v4[8..12].try_into().expect("fixed count")) as usize;
+        let mut offset = 12 + character_count * 12;
+        let lesson_count =
+            u32::from_le_bytes(v4[offset..offset + 4].try_into().expect("fixed count")) as usize;
+        offset += 4 + lesson_count * 8;
+        let cast_count =
+            u32::from_le_bytes(v4[offset..offset + 4].try_into().expect("fixed count"));
+        assert_eq!(cast_count, 0);
+        let mut legacy = v4.to_vec();
+        legacy.drain(offset..offset + 4);
+        legacy[..8].copy_from_slice(b"MYMAG003");
+        legacy
+    }
+
+    #[test]
+    fn interrupt_checkpoint_keeps_cost_and_prevents_reactivation_after_restart() {
+        let (mut loot, mut magic, identity, hero) = fixtures();
+        let mut zones = ZoneAuthority::new();
+        zones.register(1).unwrap();
+        let spellbook = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
+        loot.equip(1, spellbook, EquipmentSlot::OffHand).unwrap();
+        loot.grant(1, ItemKind::SulfurAsh, 1).unwrap();
+        magic
+            .grant_lesson(award(1, hero, Lesson::Rune(Rune::Fire)))
+            .unwrap();
+        magic
+            .grant_lesson(award(2, hero, Lesson::Spell(Spell::Ember)))
             .unwrap();
         let path = checkpoint_path();
+        let mut world = crate::simulation::World::new(800.0, 600.0);
+        assert!(world.add_player_at(1, 200.0, 200.0, 0.0));
+        let fighter = world.fighter(1).unwrap().clone();
+        crate::magic_cast::commit_ember_cost(
+            &path,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            crate::loot_transaction::VerifiedLootOperation {
+                lease: SessionLease::new(1, 1).unwrap(),
+                sequence: 50,
+            },
+            &fighter,
+        )
+        .unwrap();
+        assert_eq!(magic.mana(hero), 85);
         save_joint(&path, &loot, &identity, &magic).unwrap();
         resolve_ember_without_damage(
             &path,

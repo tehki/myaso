@@ -120,10 +120,10 @@ pub fn record_ember_combat_interruption(
 mod tests {
     use super::*;
     use crate::character_identity::CharacterId;
+    use crate::loot::{EquipmentSlot, ItemKind};
     use crate::magic::{Lesson, LessonAward, LessonSource, Rune, Spell};
     use crate::magic_checkpoint::{load_joint, save_joint};
     use crate::simulation::World;
-    use crate::zone::ZoneId;
     use std::fs;
     use std::num::NonZeroU64;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -155,7 +155,9 @@ mod tests {
         identity.bind_verified(lease, hero).unwrap();
         zones.register(1).unwrap();
         loot.register(1).unwrap();
-        loot.record_operation(hero, 30).unwrap();
+        let spellbook = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
+        loot.equip(1, spellbook, EquipmentSlot::OffHand).unwrap();
+        loot.grant(1, ItemKind::SulfurAsh, 1).unwrap();
         for (receipt, lesson) in [
             (1, Lesson::Rune(Rune::Fire)),
             (2, Lesson::Spell(Spell::Ember)),
@@ -169,12 +171,25 @@ mod tests {
                 })
                 .unwrap();
         }
-        magic
-            .stage_ember_intent(hero, 30, ZoneId::Moonvale, 200.0, 200.0, 0.0)
-            .unwrap();
         let mut world = World::new(800.0, 600.0);
         world.add_player_at(1, 200.0, 200.0, 0.0);
         let fighter = world.fighter(1).unwrap().clone();
+        let staged_checkpoint = path();
+        crate::magic_cast::commit_ember_cost(
+            &staged_checkpoint,
+            &mut loot,
+            &mut magic,
+            &identity,
+            &zones,
+            crate::loot_transaction::VerifiedLootOperation {
+                lease,
+                sequence: 30,
+            },
+            &fighter,
+        )
+        .unwrap();
+        assert_eq!(magic.mana(hero), 85);
+        let _ = fs::remove_file(staged_checkpoint);
         (loot, magic, identity, zones, hero, fighter)
     }
 
@@ -227,7 +242,7 @@ mod tests {
     #[test]
     fn authoritative_death_cancels_but_never_refunds_resources() {
         let (loot, mut magic, identity, zones, hero, mut fighter) = fixture();
-        magic.spend_mana(hero, 15).unwrap();
+        assert_eq!(magic.mana(hero), 85);
         let checkpoint = path();
         fighter.action = Action::Dead;
         assert!(matches!(

@@ -93,10 +93,15 @@ pub fn preview_ember_target(
     if intent.status != EmberEffectStatus::Pending {
         return Err(EmberPreviewError::NotPending);
     }
-    if ctx
-        .loot
-        .committed_operation_sequence(character)
-        .is_none_or(|sequence| sequence < ctx.sequence)
+    let cost_receipt = ctx
+        .magic
+        .ember_cost_receipt(character, ctx.sequence)
+        .ok_or(EmberPreviewError::UncommittedIntent)?;
+    if !cost_receipt.valid_for(intent)
+        || ctx
+            .loot
+            .committed_operation_sequence(character)
+            .is_none_or(|sequence| sequence < ctx.sequence)
     {
         return Err(EmberPreviewError::UncommittedIntent);
     }
@@ -180,6 +185,7 @@ pub fn revalidate_ember_target(
 mod tests {
     use super::*;
     use crate::character_identity::CharacterId;
+    use crate::loot::{EquipmentSlot, ItemKind};
     use crate::magic::{Lesson, LessonAward, LessonSource, Rune, Spell};
     use std::num::NonZeroU64;
 
@@ -219,7 +225,9 @@ mod tests {
             for id in [1, 2, 3] {
                 loot.register(id).unwrap();
             }
-            loot.record_operation(character, 10).unwrap();
+            let spellbook = loot.grant(1, ItemKind::Spellbook, 1).unwrap();
+            loot.equip(1, spellbook, EquipmentSlot::OffHand).unwrap();
+            loot.grant(1, ItemKind::SulfurAsh, 2).unwrap();
             let mut magic = MagicAuthority::new();
             for (receipt, lesson) in [
                 (1, Lesson::Rune(Rune::Fire)),
@@ -234,8 +242,19 @@ mod tests {
                     })
                     .unwrap();
             }
+            let lease = lease(1, 1);
+            let plan = magic
+                .preview_cast(lease, &identity, &loot, Spell::Ember)
+                .unwrap();
+            loot.record_operation(character, 10).unwrap();
+            loot.consume_reagent(1, plan.reagent, plan.reagent_amount)
+                .unwrap();
+            magic.spend_mana(character, plan.mana_cost).unwrap();
             magic
                 .stage_ember_intent(character, 10, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+                .unwrap();
+            magic
+                .record_ember_cost_receipt(&identity, lease, character, 10, ZoneId::Moonvale, plan)
                 .unwrap();
             Self {
                 world,
@@ -315,6 +334,23 @@ mod tests {
         assert_eq!(
             fixture.preview(lease(1, 1), 10),
             Err(EmberPreviewError::NotPending)
+        );
+    }
+
+    #[test]
+    fn unrelated_operation_watermark_cannot_preview_uncosted_ember_intent() {
+        let mut fixture = Fixture::new();
+        fixture
+            .loot
+            .record_operation(fixture.character, 11)
+            .unwrap();
+        fixture
+            .magic
+            .stage_ember_intent(fixture.character, 11, ZoneId::Moonvale, 200.0, 200.0, 0.0)
+            .unwrap();
+        assert_eq!(
+            fixture.preview(lease(1, 1), 11),
+            Err(EmberPreviewError::UncommittedIntent)
         );
     }
 
