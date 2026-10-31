@@ -36,13 +36,16 @@ The geometry is explicitly a *partial known-static set*, not the entire world ob
 
 The individual Core8C spawn-fence SHA `07268ce` has genuine GitHub-hosted Chrome + Firefox original-Rust/WebTransport two-seat acceptance (run #41231002675). Both clients observed the same server-issued actors and positions; the exact run uploaded original screenshots and JSON evidence.
 
-The combined candidate also requires its own exact-head CI/native run with Physics6 collision activation enabled. Local isolated integration checks must include:
+The combined candidate's original exact head passed GitHub-hosted Chrome + Firefox two-seat original-Rust/WebTransport movement (run #41232405767). The native harness is being extended so both browsers also observe a real actor walk to the Red Lion south frontage and are unable to cross its server-authoritative static south wall; that updated exact head must pass its own native run.
+
+Local isolated integration checks:
 - `cargo fmt --manifest-path server/Cargo.toml -- --check`;
 - locked Rust `cargo test --all-targets`;
 - strict all-target Clippy with the experimental HIT delivery feature and `-D warnings`;
 - full Node regression suite;
 - exact 23-solid manifest/generated-Rust digest parity;
-- the explicit-gate movement test proving that an unflagged World remains unguarded while an opted-in Greyhaven World cannot move through the known Blacksmith solid.
+- explicit-gate movement test proving that an unflagged World remains unguarded while an opted-in Greyhaven World is blocked by the known Blacksmith solid;
+- Physics6's four original-World static collision tests, including swept wall tunneling and the real open gate.
 
 Still mandatory before Main0 release: independent two-physical-host original WebTransport qualification (current test server is loopback-only), current-map/Red Lion/Blacksmith owner signoff, three same-session deaths/respawns, fresh Light34 and Heavy46 genuine server HIT/HP, Chat C1 continuity, reconnect/lease fencing, and default Pre-Alpha arena regression.
 

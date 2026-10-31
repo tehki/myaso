@@ -13,7 +13,8 @@ export const GREYHAVEN_ALPHA_FOUNDATION=Object.freeze({
   kind:"outdoor",
   serverPreviewEnv:"MYASO_WORLD9_GREYHAVEN_ALPHA",
   staticLayoutId:WORLD_ALPHA_SOLIDS_LAYOUT_ID,
-  serverPhysicsCollisionActive:false,
+  serverStaticCollisionMode:"explicit-loopback-only-opt-in",
+  serverStaticCollisionActiveByDefault:false,
   hasPortalAuthority:false,
   hasItemAuthority:false,
   spawns:Object.freeze([
