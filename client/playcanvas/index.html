@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171b1b" />
+    <title>MYASO.IO — PlayCanvas Client Spike</title>
+  </head>
+  <body>
+    <main id="shell">
+      <canvas id="application" aria-label="MYASO.IO PlayCanvas Greyhaven prototype"></canvas>
+      <section class="hud" aria-live="polite">
+        <div class="panel">
+          <p class="eyebrow">MYASO.IO · PLAYCANVAS CLIENT ALPHA 0.1</p>
+          <h1>Greyhaven blockout</h1>
+          <p class="note">Diagnostic scene only. Proxy geometry, local test coordinates and no gameplay authority.</p>
+        </div>
+        <div class="status panel">
+          <strong id="renderer-status">Initializing renderer…</strong>
+          <span id="runtime-status">Rust session: not connected</span>
+          <span id="visibility-status">Tab: visible</span>
+        </div>
+      </section>
+      <div id="fatal" role="alert" hidden></div>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

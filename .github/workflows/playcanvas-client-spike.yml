@@ -1,0 +1,50 @@
+name: PlayCanvas client spike
+
+on:
+  push:
+    branches:
+      - client/playcanvas-alpha-0.1-spike-20261031
+    paths:
+      - client/playcanvas/**
+      - web/authoritative-client.mjs
+      - web/network-transport.mjs
+      - src/browser/**
+      - src/network/**
+      - .github/workflows/playcanvas-client-spike.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playcanvas-client-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact spike head
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Install pinned client dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: client/playcanvas
+      - name: Verify shared Rust client contract imports
+        run: npm test
+        working-directory: client/playcanvas
+      - name: Build PlayCanvas browser client
+        run: npm run build
+        working-directory: client/playcanvas
+      - name: Run headless Chrome WebGL/WebGPU fallback smoke
+        run: npm run smoke:browser
+        working-directory: client/playcanvas
+      - name: Confirm source-only isolation
+        run: |
+          test -z "$(git diff --name-only HEAD -- server web)"
+          test "$(node -p "require('./client/playcanvas/package-lock.json').packages['node_modules/playcanvas'].version")" = "2.23.3"
