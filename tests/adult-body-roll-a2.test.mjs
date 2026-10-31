@@ -82,8 +82,9 @@ test("350ms source roll phase does not reset at 170ms dodge to recovery boundary
 });
 test("atlas cell and approved roll rectangle strictly validate direction and elapsed time",()=>{
  assert.deepEqual(adultRollAtlasRect(5,200),{
-  source:{x:4*160,y:5*160,width:160,height:160},
-  destination:ADULT_ROLL_PRESENTATION_RECT,phase:"recovery",frame:4,
+  source:{x:5*160,y:5*160,width:160,height:160},
+  destination:ADULT_ROLL_PRESENTATION_RECT,phase:"recovery",frame:5,
+  sourceTimeMs:5000/30,
  });
  for(const direction of [-1,8,Infinity,0.5,"1",null])
   assert.equal(adultRollAtlasRect(direction,30),null);
