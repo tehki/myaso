@@ -7,19 +7,19 @@ const MAX_LIGHTS_PER_TILE = 5;
 export const GREYHAVEN_LIGHTING_VERSION = "3c-p24-1";
 export const GREYHAVEN_DAY_DUSK_VERSION = "3c-p1-day-dusk-1";
 
-// Static visual wash is only an authored, bounded city-tile overlay.
-// No clock, gameplay fog/visibility, dynamic weather or actor effects.
+// Uniform, subtle dusk ambience across the outdoor world. Applying the
+// same low-opacity wash to each cached tile avoids a visible city-rectangle
+// seam and keeps roads, trees and facades in one consistent time-of-day.
 export function paintGreyhavenDuskWash(ctx,map,tile) {
-  if(map?.kind!=="outdoor"||map?.city?.id!=="greyhaven"||!tile||
-    ![tile.x,tile.y,tile.width,tile.height].every(Number.isFinite)||
-    tile.width<=0||tile.height<=0||tile.width>512||tile.height>512)return 0;
-  const x=Math.max(tile.x,map.city.x),y=Math.max(tile.y,map.city.y);
-  const right=Math.min(tile.x+tile.width,map.city.x+map.city.w);
-  const bottom=Math.min(tile.y+tile.height,map.city.y+map.city.h);
+  if(map?.kind!=="outdoor"||
+    ![map.width,map.height,tile?.x,tile?.y,tile?.width,tile?.height].every(Number.isFinite)||
+    map.width<=0||map.height<=0||tile.width<=0||tile.height<=0||
+    tile.width>512||tile.height>512)return 0;
+  const x=Math.max(tile.x,0),y=Math.max(tile.y,0);
+  const right=Math.min(tile.x+tile.width,map.width);
+  const bottom=Math.min(tile.y+tile.height,map.height);
   if(right<=x||bottom<=y)return 0;
-  // Drawn on the existing cached background BEFORE warm pools and long
-  // before player/UI/Combat layers; it cannot obscure a fighter or tell.
-  ctx.fillStyle="rgba(23,26,35,.20)";
+  ctx.fillStyle="rgba(23,26,35,.14)";
   ctx.fillRect(x,y,right-x,bottom-y);
   return 1;
 }
