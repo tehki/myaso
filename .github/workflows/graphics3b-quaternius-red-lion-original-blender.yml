@@ -52,7 +52,7 @@ jobs:
       - name: Install authentic Blender and preview verification dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq blender python3-pil
+          sudo apt-get install -y -qq blender python3-pil python3-numpy
           blender --version
       - name: Verify pinned original Blender review WebPs
         run: |
