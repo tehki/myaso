@@ -1,6 +1,5 @@
 import * as pc from 'playcanvas';
 import { buildGreyhavenBlockout } from './scene/greyhaven-blockout.js';
-import { connectAuthoritativeClient } from './rust-authoritative-client.js';
 import './style.css';
 
 const canvas = document.querySelector('#application');
@@ -51,7 +50,7 @@ async function boot() {
       app,
       device,
       scene,
-      connectAuthoritativeClient
+      loadAuthoritativeClient: () => import('./rust-authoritative-client.js')
     });
 
     document.addEventListener('visibilitychange', () => {

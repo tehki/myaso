@@ -15,6 +15,7 @@
 npm ci
 npm test
 npm run build
+npm run smoke:browser
 npm run dev
 ```
 
@@ -25,7 +26,7 @@ The dev server binds to `127.0.0.1:4174` only. The production preview binds to `
 - PlayCanvas Engine V2 bootstraps in a browser.
 - WebGPU is preferred and WebGL 2 fallback is delegated to the engine's supported graphics-device creation path.
 - A small isometric diagnostic scene renders with lighting and shadow support.
-- The PlayCanvas client re-exports the already-qualified MYASO browser `connectAuthoritativeClient` and `connectGameTransport`; it does not fork the protocol.
+- The PlayCanvas client exposes a lazy import of the already-qualified MYASO browser `connectAuthoritativeClient` and `connectGameTransport`; the protocol adapter is not loaded until a future non-production session explicitly requests it.
 
 ## Explicitly not implemented
 
