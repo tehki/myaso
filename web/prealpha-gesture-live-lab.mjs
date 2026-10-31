@@ -51,6 +51,14 @@ async function activateNegotiatedLmb({
   const upgradeTimers = new Set();
   // Bounded loopback-only attempted-write evidence, never an ACK or a hit.
   const attemptedTransmissions = [];
+  // Loopback-only forensic chronology; never feeds transport/World decisions.
+  // Preserve original attemptedTransmissions shape for existing strict tests.
+  const gestureChronology = [];
+  function noteChronology(stage, details = {}) {
+    if (!local) return;
+    gestureChronology.push(Object.freeze({stage, epochMs:Date.now(), ...details}));
+    if (gestureChronology.length > 24) gestureChronology.shift();
+  }
   let writeBatchPending = false, writeWatchdog = null;
   let gates = null, detachGates = null;
 
@@ -100,6 +108,10 @@ async function activateNegotiatedLmb({
     writeWatchdog = setTimeout(() => fail("typed gesture writer stalled for 1500ms"),1500);
     try {
       const writes = packets.map(packet => {
+        noteChronology("wire-attempt", {
+          source:packet.source,action:packet.action,sequence:packet.sequence,
+          gestureId:packet.gestureId,attempt:packet.attempt,
+        });
         attemptedTransmissions.push(Object.freeze({
           source:packet.source, action:packet.action, sequence:packet.sequence,
           gestureId:packet.gestureId, attempt:packet.attempt,
@@ -197,12 +209,19 @@ async function activateNegotiatedLmb({
       // light and 320ms charge; this timer is merely a hold-intent edge.
       if (lastUpgradeScheduledGestureId === gestureId) return;
       lastUpgradeScheduledGestureId = gestureId;
+      noteChronology("hold-scheduled", {gestureId,pointerId});
       const timer = setTimeout(() => {
         upgradeTimers.delete(timer);
+        noteChronology("hold-fired", {gestureId,pointerId});
         if (detached || failed || !gates.lmb.snapshot.active
             || gates.lmb.snapshot.pointerId !== pointerId
             || gates.lmb.snapshot.gestureId !== gestureId) return;
-        if (gates.lmb.approvedHoldUpgrade(pointerId)) drainNewEdges();
+        if (gates.lmb.approvedHoldUpgrade(pointerId)) {
+          noteChronology("hold-approved", {gestureId,pointerId});
+          drainNewEdges();
+        } else {
+          noteChronology("hold-not-approved", {gestureId,pointerId});
+        }
       },85);
       upgradeTimers.add(timer);
     }
@@ -260,6 +279,7 @@ async function activateNegotiatedLmb({
       activeSources:outbox.snapshot.activeSources,
       nextSequence:outbox.snapshot.nextSequence,
       attemptedTransmissions:Object.freeze(attemptedTransmissions.slice()),
+      gestureChronology:Object.freeze(gestureChronology.map(entry=>({...entry}))),
       acknowledged:receipts.map(x=>({...x})),
       // Actual replicated fields only: no prediction, inferred damage,
       // allocation or gameplay writes. Each read returns detached snapshots.

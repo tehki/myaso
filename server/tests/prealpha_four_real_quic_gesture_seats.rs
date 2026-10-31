@@ -34,9 +34,18 @@ fn real_server() -> (TestServer, String, Sha256Digest) {
         .env("MYASO_FLIGHT_ACTION_PROOF", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .spawn()
         .expect("actual Rust QUIC server spawned");
+    // Test-only first-fatal correlation: stderr belongs to this subprocess,
+    // even while other pinned QUIC test seats spawn parallel servers.
+    let server_pid = child.id();
+    let stderr = child.stderr.take().expect("server stderr");
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            eprintln!("CORE8A_NATIVE_QUIC_SERVER pid={server_pid} stderr={line}");
+        }
+    });
     let stdout = child.stdout.take().expect("server stdout");
     let lines = Arc::new(Mutex::new(Vec::new()));
     let sink = Arc::clone(&lines);
@@ -63,6 +72,7 @@ fn real_server() -> (TestServer, String, Sha256Digest) {
         .recv_timeout(Duration::from_secs(15))
         .expect("real server TLS address+pin");
     assert!(url.starts_with("https://127.0.0.1:"));
+    eprintln!("CORE8A_NATIVE_QUIC_SERVER_STARTED pid={server_pid} url={url}");
     (TestServer { child, lines }, url, digest)
 }
 struct Seat {
@@ -98,7 +108,12 @@ async fn admitted_seat(url: &str, digest: &Sha256Digest) -> Seat {
     let connection = timeout(WAIT, endpoint.connect(url))
         .await
         .expect("QUIC connect timeout")
-        .expect("real pinned WebTransport connection");
+        .unwrap_or_else(|error| {
+            // Do not retry, reinterpret HTTP/3 errors, or hide the first fatal.
+            // The matching server PID / listen URL was printed at startup.
+            eprintln!("CORE8A_NATIVE_QUIC_CONNECT_FIRST_FATAL url={url} error={error:?}");
+            panic!("real pinned WebTransport connection: {error:?}");
+        });
     let (send, mut recv) = timeout(WAIT, async {
         connection
             .open_bi()
