@@ -174,9 +174,10 @@ function paintOverworld(ctx,map,tileBounds,replacedBuildings,greyhavenTimeOfDay)
     }
   }
   if(greyhavenTimeOfDay==="dusk"){
-    // Tint only canonical Greyhaven city tiles, not actors, Chat or Combat.
-    // Warm pools sit above the muted city terrain and authored facades.
+    // The same subtle ambience covers every outdoor tile, so city boundaries
+    // cannot create a rectangular seam. Actors, Combat and Chat are later layers.
     paintGreyhavenDuskWash(ctx,map,tileBounds);
+    // Practical pools remain localized to the original authored fixtures.
     paintGreyhavenLightingPools(ctx,map,tileBounds);
   }
   paintGreyhavenLightingFixtures(ctx,map,tileBounds,{lit:greyhavenTimeOfDay!=="day"});
