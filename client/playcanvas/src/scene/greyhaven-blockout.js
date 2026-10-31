@@ -51,6 +51,7 @@ function polyline(app, pc, name, points, width, height, y, centerX, centerY, sur
     if (length <= 0) continue;
     const segment = primitive(
       app,
+      pc,
       `${name} segment ${index + 1}`,
       'box',
       [(a.x + b.x) / 2, y, (a.z + b.z) / 2],
