@@ -1,0 +1,106 @@
+name: Graphics3B Red Lion original Quaternius Blender replacement source
+
+on:
+  pull_request:
+    paths:
+      - "tools/art/render_red_lion_quaternius_replacement.py"
+      - "tools/art/bake_red_lion_quaternius_review.py"
+      - "tools/art/verify_red_lion_quaternius_review.py"
+      - "tools/art/verify_red_lion_quaternius_blend.py"
+      - "assets/environment/greyhaven/red-lion-quaternius/**"
+      - "docs/art/GRAPHICS3B_RED_LION_QUATERNIUS_FULL_REPLACEMENT.md"
+      - ".github/workflows/graphics3b-quaternius-red-lion-original-blender.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify original CC0 pin and no gameplay changes
+        run: |
+          set -euo pipefail
+          test "$(git -C third_party/quaternius/medieval-village-megakit-standard rev-parse HEAD)" = 21104b4045261c28fc312360841ed1a7b0ac8782
+          git diff --name-only origin/main...HEAD > /tmp/red-lion-cc0-source-paths.txt
+          if grep -E '^(src/|server/|web/|assets/world/|tests/)' /tmp/red-lion-cc0-source-paths.txt; then
+            echo "Original Red Lion replacement art must not touch gameplay source" >&2
+            exit 1
+          fi
+          python3 -m py_compile tools/art/render_red_lion_quaternius_replacement.py tools/art/bake_red_lion_quaternius_review.py tools/art/verify_red_lion_quaternius_review.py tools/art/verify_red_lion_quaternius_blend.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('assets/environment/greyhaven/red-lion-quaternius/manifest.json').read_text())
+          assert m['sourceLicense']=='CC0-1.0'
+          assert m['sourceCommit']=='21104b4045261c28fc312360841ed1a7b0ac8782'
+          assert m['oldRedLionArtSuperseded'] and not m['originalA232ModelIncluded']
+          assert m['artReviewOnly'] and not m['gameRuntimeReplaced']
+          assert m['worldReadOnly']['authoredBuildingId']=='red-lion'
+          assert len(m['parts'])==33
+          for item in m['parts']:
+            assert (Path('third_party/quaternius/medieval-village-megakit-standard/glTF')/(item['model']+'.gltf')).is_file()
+          print('GRAPHICS3B_RED_LION_QUATERNIUS_33_ORIGINAL_CC0_MODULE_SOURCE_PASS')
+          PY
+      - name: Install authentic Blender and preview verification dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender python3-pil python3-numpy
+          blender --version
+      - name: Verify pinned original Blender review WebPs
+        run: |
+          python3 tools/art/verify_red_lion_quaternius_review.py --dir assets/environment/greyhaven/red-lion-quaternius
+      - name: Render authentic creator Quaternius red lion day+dusk source
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/graphics3b-red-lion-quaternius
+          timeout --signal=TERM --kill-after=10s 1200s blender --background --threads 2 --factory-startup \
+            --python tools/art/render_red_lion_quaternius_replacement.py -- \
+            --manifest assets/environment/greyhaven/red-lion-quaternius/manifest.json \
+            --source third_party/quaternius/medieval-village-megakit-standard/glTF \
+            --output .artifacts/graphics3b-red-lion-quaternius
+          python3 tools/art/bake_red_lion_quaternius_review.py \
+            --source .artifacts/graphics3b-red-lion-quaternius \
+            --out .artifacts/graphics3b-red-lion-quaternius/portable
+          for f in red-lion-quaternius-day.png red-lion-quaternius-dusk.png red-lion-quaternius-original.blend red-lion-quaternius-provenance.json; do
+            test -s ".artifacts/graphics3b-red-lion-quaternius/$f"
+          done
+          timeout --signal=TERM --kill-after=10s 1200s blender --background --threads 2 \
+            --python tools/art/verify_red_lion_quaternius_blend.py -- \
+            --blend .artifacts/graphics3b-red-lion-quaternius/red-lion-quaternius-original.blend \
+            --manifest assets/environment/greyhaven/red-lion-quaternius/manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.artifacts/graphics3b-red-lion-quaternius/red-lion-quaternius-provenance.json').read_text())
+          assert r['actualCreatorInstances']==33
+          assert r['actualArtistGroundFoliageLeaves']==9
+          assert r['actualCreatorVertices']>=15000
+          assert r['genuineGlazingSlots']>=5
+          assert r['originalA232MeshCount']==0
+          assert r['actualGables']==2
+          assert r['gameRuntimeNotChanged'] and r['oldRedLionVisualModelSuperseded']
+          assert [x['mood'] for x in r['captured']]==['day','dusk']
+          print('GRAPHICS3B_RED_LION_QUATERNIUS_GENUINE_BLENDER_DAY_DUSK_PASS')
+          PY
+          {
+            printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+            sha256sum .artifacts/graphics3b-red-lion-quaternius/*.png
+            sha256sum .artifacts/graphics3b-red-lion-quaternius/*.blend
+          } > .artifacts/graphics3b-red-lion-quaternius/native-source-sha256-evidence.txt
+      - name: Upload true editable Blender source and original day/dusk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3b-quaternius-red-lion-original-blender-day-dusk
+          path: .artifacts/graphics3b-red-lion-quaternius/**
+          retention-days: 7
+          if-no-files-found: ignore

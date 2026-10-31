@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "kind": "graphics3b-quaternius-red-lion-complete-visual-replacement-review",
+  "ownerRequestedRetirementOfA232": true,
+  "pinnedQuaterniusCC0Commit": "21104b4045261c28fc312360841ed1a7b0ac8782",
+  "sourceBlendSha256": "65bcec24b88872f5200e5c733c975170858a57121a76db74b706e58e2bcc578d",
+  "creatorModelInstances": 33,
+  "artistGroundFoliageLeaves": 9,
+  "oldRedLionA232MeshesUsed": false,
+  "genuineSourceGlazing": true,
+  "genuineOriginalRoofAndGables": true,
+  "measuredCorrections": {
+    "signBounds": {
+      "x": [
+        -1.100000023841858,
+        1.100000023841858
+      ],
+      "y": [
+        -4.610000133514404,
+        -4.490000247955322
+      ],
+      "z": [
+        3.2899999618530273,
+        3.809999942779541
+      ]
+    },
+    "frontWindowBounds": {
+      "x": [
+        -2.682457685470581,
+        2.682457685470581
+      ],
+      "y": [
+        -4.397292137145996,
+        -3.8677167892456055
+      ],
+      "z": [
+        1.01604425907135,
+        2.741780996322632
+      ]
+    },
+    "signClearanceAboveWindows": 0.5482189655303955,
+    "crateBounds": {
+      "x": [
+        4.68644380569458,
+        6.013556003570557
+      ],
+      "y": [
+        -4.963556289672852,
+        -3.636444330215454
+      ],
+      "z": [
+        0.0,
+        1.0629422664642334
+      ]
+    },
+    "roofBounds": {
+      "x": [
+        -4.124891757965088,
+        4.124891757965088
+      ],
+      "y": [
+        -4.8539862632751465,
+        4.828753471374512
+      ],
+      "z": [
+        2.6378731727600098,
+        8.31004524230957
+      ]
+    },
+    "crateRoofClearance": 0.5615520477294922,
+    "foliageBounds": {
+      "x": [
+        5.158030986785889,
+        5.932207107543945
+      ],
+      "y": [
+        -6.349350929260254,
+        -5.357650279998779
+      ],
+      "z": [
+        0.08648913353681564,
+        0.14499999582767487
+      ]
+    },
+    "foliageRoofClearance": 1.0331392288208008,
+    "foliageCrateGap": 0.39409399032592773,
+    "smokeBounds": {
+      "x": [
+        -2.531675100326538,
+        -1.3070809841156006
+      ],
+      "y": [
+        0.7678520083427429,
+        1.8539944887161255
+      ],
+      "z": [
+        7.363492012023926,
+        9.231348037719727
+      ]
+    }
+  },
+  "duskChimneySmoke": {
+    "x": -2.027110755443573,
+    "y": 1.2999999225139618,
+    "topZ": 7.277874946594238,
+    "plumeHeight": 1.8,
+    "realQuaterniusChimney": true,
+    "continuousClosedVolumeMesh": true,
+    "actualCyclesVolumeMaterial": true,
+    "dayVisible": false,
+    "duskVisible": true,
+    "world9RuntimeSmokeAuthorized": false
+  },
+  "images": {
+    "day": {
+      "webp": "red-lion-quaternius-day-review.webp",
+      "webpSha256": "6d80532ec4412cbff7a2e6d890b6a51ba2e098436da8e2c7cd84d098c47b4f0b",
+      "bytes": 66926,
+      "sourcePngSha256": "7e06630b097cc18dc68a465322dff74b16ec66c238475588a836cf661855b17b",
+      "alphaBounds": [
+        159,
+        38,
+        802,
+        707
+      ],
+      "alphaPixelExact": true,
+      "width": 960,
+      "height": 720,
+      "originalBlenderDayDusk": true
+    },
+    "dusk": {
+      "webp": "red-lion-quaternius-dusk-review.webp",
+      "webpSha256": "031309bc812c0f357532ee1a5791ab46c72373c07e0059c63383baf3487e6d4a",
+      "bytes": 55740,
+      "sourcePngSha256": "e9244bea0deb4ce92047482f602fcb432324a1a51b381abb82c2973c9f6b53b1",
+      "alphaBounds": [
+        159,
+        19,
+        802,
+        707
+      ],
+      "alphaPixelExact": true,
+      "width": 960,
+      "height": 720,
+      "originalBlenderDayDusk": true
+    }
+  },
+  "sourceArtOnly": true,
+  "world9VisualPlacementTested": false,
+  "world9GameplayAuthorityUnchanged": true,
+  "runtimeOldAssetNotYetReplaced": true,
+  "noMergeOrDeployment": true
+}
