@@ -4163,6 +4163,12 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   const attackerBefore = await readUiEvidence(attacker);
   const attackerKeyOffset = attackerBefore.keyTransitions.length;
   const attackerPointerOffset = attackerBefore.pointers.length;
+  // M140 first-RED: the extra post-cue WebDriver read + pointerMove delayed
+  // the real punish PRESS to 201ms after the visible recovery cue (limit 180).
+  // Pre-aim the actual defender mouse before the whiff, not after the cue.
+  const defenderBeforePunish = await readUiEvidence(defender);
+  const punishPointerOffset = defenderBeforePunish.pointers.length;
+  await aimArena(defender, defenderElementId, punishOffset);
 
   // Keep the fighters in the same close spacing that lets M136 connect, but
   // deliberately turn the narrow jump attack 180 degrees away. This proves a
@@ -4174,17 +4180,11 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
   let recoveryEvidence = null;
   const recoveryDeadline = Date.now() + 900;
   while (Date.now() < recoveryDeadline) {
-    const states = await Promise.all(entries.map(readUiEvidence));
-    const attackerResult = states.find((entry) => entry.browser === attacker.name);
-    const defenderResult = states.find((entry) => entry.browser === defender.name);
-    const ownTransitions = attackerResult?.acceptance?.ownActionTransitions ?? [];
+    // Query only the defender that actually renders the PUNISH cue here.
+    // Reading the attacker's browser serially delays the real reaction and
+    // cannot be evidence of the defender's physical response latency.
+    const defenderResult = await readUiEvidence(defender);
     const focusTransitions = defenderResult?.acceptance?.focusActionTransitions ?? [];
-
-    const ownWindup = ownTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
-    const ownActive = ownTransitions.findIndex((entry, index) =>
-      index > ownWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
-    const ownRecovery = ownTransitions.findIndex((entry, index) =>
-      index > ownActive && entry.action === COMBAT_ACTION.jumpAttackRecovery);
     const focusWindup = focusTransitions.findIndex((entry) => entry.action === COMBAT_ACTION.jumpAttackWindup);
     const focusActive = focusTransitions.findIndex((entry, index) =>
       index > focusWindup && entry.action === COMBAT_ACTION.jumpAttackActive);
@@ -4196,23 +4196,18 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
       && entry.label === "PUNISH"
       && entry.detail === "Jump attack recovery");
 
-    const pristineWhiff = attackerResult?.playerHp === 100
-      && attackerResult?.playerGuard === 100
-      && attackerResult?.opponentHp === 100
-      && attackerResult?.opponentGuard === 100
-      && defenderResult?.playerHp === 100
+    const pristineWhiff = defenderResult?.playerHp === 100
       && defenderResult?.playerGuard === 100
       && defenderResult?.opponentHp === 100
       && defenderResult?.opponentGuard === 100;
 
-    if (ownWindup >= 0 && ownActive > ownWindup && ownRecovery > ownActive
-      && focusWindup >= 0 && focusActive > focusWindup && focusRecovery > focusActive
+    if (focusWindup >= 0 && focusActive > focusWindup && focusRecovery > focusActive
       && recoveryCue && pristineWhiff) {
-      recoveryEvidence = states;
+      recoveryEvidence = defenderResult;
       break;
     }
-    if (!pristineWhiff && Number.isFinite(attackerResult?.playerHp)) {
-      throw new Error(`M140 jump attack failed to whiff cleanly: ${JSON.stringify(states)}`);
+    if (!pristineWhiff && Number.isFinite(defenderResult?.playerHp)) {
+      throw new Error(`M140 jump attack failed to whiff cleanly: ${JSON.stringify(defenderResult)}`);
     }
     await sleep(10);
   }
@@ -4220,13 +4215,21 @@ async function runOnlineUiJumpAttackWhiffPunishFlight(entries) {
     throw new Error(`M140 defender never observed punishable jump-attack recovery: ${JSON.stringify(await Promise.all(entries.map(readUiEvidence)))}`);
   }
 
-  const defenderBeforePunish = await readUiEvidence(defender);
-  const punishPointerOffset = defenderBeforePunish.pointers.length;
-  // Fire a genuine LMB as soon as the remote recovery cue becomes visible.
-  // M140 proves the player's commitment starts inside the owner-approved
-  // 450ms jump-attack recovery window. The original 135ms light windup and
-  // authoritative hit/phase checks remain unchanged.
-  await performArenaAttackHold(defender, defenderElementId, punishOffset, 90);
+  // Fire a REAL physical W3C click, with the same original 35ms short hold,
+  // immediately after the defender's recovery cue. The native mouse was
+  // pre-aimed before the jump. No second read or pointerMove steals time here.
+  // The original World still owns the 135ms Light, 450ms recovery, and HIT34.
+  await webdriver(defender.base, "POST", `/session/${defender.sessionId}/actions`, {
+    actions: [{
+      type: "pointer", id: `mouse-${defender.name}`,
+      parameters: { pointerType: "mouse" },
+      actions: [
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 35 },
+        { type: "pointerUp", button: 0 },
+      ],
+    }],
+  });
 
   let evidence = null;
   const punishDeadline = Date.now() + 650;

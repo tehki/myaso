@@ -1044,9 +1044,30 @@ try{
  assert.equal(afterSpace.failed,false,"Space chord must not retire authenticated v2 QUIC");
  assert.equal(afterSpace.closed,false,"Space chord keeps original actor connection open");
  // A previously blocked chord must not poison subsequent ordinary source0.
- await waitFor(async()=>{
-  const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
- },8000);
+ // The original Firefox first-RED reached this strict 8s Idle gate without
+ // retaining the authoritative World or client replica at the actual timeout.
+ // On failure ONLY, distinguish a genuine World phase stall from delayed
+ // Firefox replication/focus/session. Do not retry, extend, or forge Idle.
+ try {
+  await waitFor(async()=>{
+   const p=await proof();return p.replicatedFighters?.find(f=>f.netId===actorId)?.action===0?p:false;
+  },8000);
+ } catch (error) {
+  const firstRed={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   stage:"post-Space original World Idle 8s",error:String(error),actorId};
+  try{firstRed.transport=await proof()}catch(e){firstRed.transportError=String(e)}
+  try{firstRed.physical=await edges()}catch(e){firstRed.physicalError=String(e)}
+  try{firstRed.originalWorld=readAuthoritativeWorld().slice(beforeWorld).split(/\r?\n/).slice(-120)}
+  catch(e){firstRed.worldError=String(e)}
+  try{firstRed.document=await evaluate(attacker,
+   "const c=document.querySelector('#arena');return {hasFocus:document.hasFocus(),"+
+   "activeId:document.activeElement?.id??null,hidden:document.hidden,"+
+   "canvas:c?.getBoundingClientRect()?.toJSON?.()??null}")}catch(e){firstRed.documentError=String(e)}
+  console.error("COMBAT4_SPACE_IDLE_ORIGINAL_WORLD_FIRST_RED",JSON.stringify(firstRed));
+  await writeFile(join(output,"combat4-space-idle-original-world-FIRST-RED.json"),
+   JSON.stringify(firstRed,null,2)+"\n").catch(()=>{});
+  throw error;
+ }
  const beforeNormal=(await proof()).acknowledged.length;
  const beforeNormalWorld=readAuthoritativeWorld().length;
  await click();
