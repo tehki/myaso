@@ -5,7 +5,7 @@ import {createHash} from "node:crypto";
 import {
  ADULT_ROLL_PRESENTATION_MS, ADULT_ROLL_SOURCE_PX,
  ADULT_ROLL_FRAME_COUNT, ADULT_ROLL_DIRECTIONS,
- ADULT_ROLL_PRESENTATION_RECT, ADULT_ROLL_SOURCE_FRAMES,
+ ADULT_ROLL_PRESENTATION_RECT, ADULT_ROLL_SOURCE_FRAMES, ADULT_ROLL_SOURCE_TIMES_MS,
  adultRollPhase,adultRollAtlasRect,
 } from "../src/browser/adult-body-roll-a2.mjs";
 const root=new URL("../",import.meta.url);
@@ -67,12 +67,15 @@ test("350ms source roll phase does not reset at 170ms dodge to recovery boundary
  assert.equal(ADULT_ROLL_FRAME_COUNT,8);
  assert.deepEqual(ADULT_ROLL_DIRECTIONS,["south","southwest","west","northwest","north","northeast","east","southeast"]);
  assert.deepEqual(ADULT_ROLL_SOURCE_FRAMES,[1,3,5,7,9,11,15,22]);
+ assert.deepEqual(ADULT_ROLL_SOURCE_TIMES_MS,[0,1000/30,2000/30,100,4000/30,5000/30,7000/30,350]);
  assert.deepEqual(ADULT_ROLL_PRESENTATION_RECT,{x:-67,y:-78,width:134,height:134});
  const samples=[0,40,87,130,169,170,174.9,175,250,349.9,350,600];
  const phases=samples.map(t=>adultRollPhase(t));
- assert.deepEqual(phases.map(x=>x.frame),[0,0,1,2,3,3,3,4,5,7,7,7]);
+ assert.deepEqual(phases.map(x=>x.frame),[0,1,2,3,5,5,5,5,6,6,7,7]);
  assert.equal(phases[4].phase,"active");assert.equal(phases[5].phase,"recovery");
  assert.equal(phases[5].durationMs,350);
+ assert.equal(phases[5].sourceTimeMs,5000/30);
+ assert.equal(phases[9].sourceTimeMs,7000/30);
  for(let i=1;i<phases.length;i++)assert.ok(phases[i].frame>=phases[i-1].frame);
  assert.equal(adultRollPhase(-1),null);assert.equal(adultRollPhase(NaN),null);
  assert.equal(adultRollPhase(Infinity),null);
