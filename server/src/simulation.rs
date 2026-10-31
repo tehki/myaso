@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use crate::alpha_greyhaven_geometry::{overlaps_known_static_solid, swept_circle_hits_known_static_solid};
+
 pub const DEFAULT_WORLD_WIDTH: f32 = 8192.0;
 pub const DEFAULT_WORLD_HEIGHT: f32 = 8192.0;
 pub const SERVER_TICK_HZ: f32 = 60.0;
@@ -626,6 +628,7 @@ pub struct World {
     winner: Option<u32>,
     reset_at_ms: f32,
     fighters: Vec<Fighter>,
+    greyhaven_static_collisions: bool,
     next_world_incarnation: u64,
     world_instance: u64,
 }
@@ -642,6 +645,7 @@ impl Clone for World {
             winner: self.winner,
             reset_at_ms: self.reset_at_ms,
             fighters: self.fighters.clone(),
+            greyhaven_static_collisions: self.greyhaven_static_collisions,
             next_world_incarnation: self.next_world_incarnation,
             world_instance: reserve_world_instance(),
         }
@@ -676,9 +680,21 @@ impl World {
             winner: None,
             reset_at_ms: 0.0,
             fighters: Vec::new(),
+            greyhaven_static_collisions: false,
             next_world_incarnation: 1,
             world_instance: reserve_world_instance(),
         }
+    }
+
+    /// Trusted Rust-only opt-in. Map/worker epoch and geometry must be approved by Core 8C.
+    pub fn enable_greyhaven_static_collisions(&mut self) -> bool {
+        if self.width != DEFAULT_WORLD_WIDTH || self.height != DEFAULT_WORLD_HEIGHT { return false; }
+        if self.fighters.iter().any(|f| {
+            overlaps_known_static_solid(f.x, f.y, FIGHTER_RADIUS) != Ok(false)
+                || overlaps_known_static_solid(f.spawn_x, f.spawn_y, FIGHTER_RADIUS) != Ok(false)
+        }) { return false; }
+        self.greyhaven_static_collisions = true;
+        true
     }
 
     pub fn fighters(&self) -> &[Fighter] {
@@ -728,14 +744,13 @@ impl World {
             Ok(_) => return false,
             Err(index) => index,
         };
+        let x = clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS);
+        let y = clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS);
+        if self.greyhaven_static_collisions && overlaps_known_static_solid(x, y, FIGHTER_RADIUS) != Ok(false) {
+            return false;
+        }
         let world_incarnation = self.new_incarnation();
-        let fighter = Fighter::new(
-            net_id,
-            clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS),
-            clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS),
-            facing,
-            world_incarnation,
-        );
+        let fighter = Fighter::new(net_id, x, y, facing, world_incarnation);
         self.fighters.insert(insertion_index, fighter);
         true
     }
@@ -1125,7 +1140,7 @@ impl World {
                 fighter.facing = normalize_angle(input.facing_radians);
             }
             begin_requested_action(self.now_ms, fighter, input, edges);
-            move_fighter(self.width, self.height, fighter, input, dt_ms);
+            move_fighter(self.width, self.height, fighter, input, dt_ms, self.greyhaven_static_collisions);
             advance_action(self.now_ms, fighter, input, dt_ms);
             update_stamina(self.now_ms, fighter, input, dt_ms);
             fighter.attack_input_was_down = input.attack;
@@ -1145,14 +1160,15 @@ impl World {
             }
         }
 
-        resolve_roll_collisions(self.width, self.height, &mut self.fighters);
-        separate_fighters(self.width, self.height, &mut self.fighters);
+        resolve_roll_collisions(self.width, self.height, &mut self.fighters, self.greyhaven_static_collisions);
+        separate_fighters(self.width, self.height, &mut self.fighters, self.greyhaven_static_collisions);
         if let Some(winner) = resolve_attacks(
             self.width,
             self.height,
             self.now_ms,
             &mut self.fighters,
             events,
+            self.greyhaven_static_collisions,
         ) {
             self.winner = Some(winner);
             self.reset_at_ms = self.now_ms + FFA_MATCH_RESET_MS;
@@ -1512,7 +1528,41 @@ fn begin_requested_action(
     }
 }
 
-fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
+/// Applies static containment to a server-computed displacement. A swept
+/// inflated AABB prevents crossing thin walls even during fast dash/knockback.
+/// One-axis sliding is conservative: never synthesize a diagonal path around
+/// an obstacle. Errors fail closed to the last known valid position.
+fn guard_static_motion(fighter: &mut Fighter, old: (f32, f32)) {
+    let next = (fighter.x, fighter.y);
+    let permitted = |to| swept_circle_hits_known_static_solid(old, to, FIGHTER_RADIUS) == Ok(false);
+    if permitted(next) {
+        return;
+    }
+    let x_only = (next.0, old.1);
+    let y_only = (old.0, next.1);
+    let x_safe = permitted(x_only);
+    let y_safe = permitted(y_only);
+    let safe = match (x_safe, y_safe) {
+        (true, false) => x_only,
+        (false, true) => y_only,
+        (true, true) => {
+            if (next.0 - old.0).abs() >= (next.1 - old.1).abs() {
+                x_only
+            } else {
+                y_only
+            }
+        }
+        (false, false) => old,
+    };
+    fighter.x = safe.0;
+    fighter.y = safe.1;
+}
+
+fn move_fighter(
+    width: f32, height: f32, fighter: &mut Fighter,
+    input: InputIntent, dt_ms: f32, guard_static: bool,
+) {
+    let previous = (fighter.x, fighter.y);
     let mut velocity_x = input.move_x * MOVE_SPEED;
     let mut velocity_y = input.move_y * MOVE_SPEED;
     if input.run && fighter.action == Action::Idle && fighter.stamina > EPSILON {
@@ -1617,7 +1667,7 @@ fn move_fighter(width: f32, height: f32, fighter: &mut Fighter, input: InputInte
         fighter.y + velocity_y * seconds,
         FIGHTER_RADIUS,
         height - FIGHTER_RADIUS,
-    );
+    );    if guard_static { guard_static_motion(fighter, previous); }
 }
 
 fn advance_action(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms: f32) {
@@ -1723,7 +1773,7 @@ fn update_stamina(now_ms: f32, fighter: &mut Fighter, input: InputIntent, dt_ms:
     }
 }
 
-fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
+fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter], guard_static: bool) {
     let contact = FIGHTER_RADIUS * 2.0 + 8.0;
     for roller_index in 0..fighters.len() {
         if fighters[roller_index].action != Action::Dodge {
@@ -1752,13 +1802,13 @@ fn resolve_roll_collisions(width: f32, height: f32, fighters: &mut [Fighter]) {
             if target.action == Action::Knockdown {
                 continue;
             }
-            knock_back(width, height, roller, target, ROLL_COLLISION_KNOCKBACK);
+            knock_back(width, height, roller, target, ROLL_COLLISION_KNOCKBACK, guard_static);
             target.set_action(Action::Knockdown, ROLL_COLLISION_KNOCKDOWN_MS);
         }
     }
 }
 
-fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
+fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter], guard_static: bool) {
     let minimum_distance = FIGHTER_RADIUS * 2.0;
     let minimum_distance_sq = minimum_distance * minimum_distance;
     for first_index in 0..fighters.len() {
@@ -1786,6 +1836,8 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
             let nx = dx / distance;
             let ny = dy / distance;
             let shift = overlap / 2.0;
+            let first_previous = (first.x, first.y);
+            let second_previous = (second.x, second.y);
             first.x = clamp(first.x - nx * shift, FIGHTER_RADIUS, width - FIGHTER_RADIUS);
             first.y = clamp(
                 first.y - ny * shift,
@@ -1802,6 +1854,10 @@ fn separate_fighters(width: f32, height: f32, fighters: &mut [Fighter]) {
                 FIGHTER_RADIUS,
                 height - FIGHTER_RADIUS,
             );
+            if guard_static {
+                guard_static_motion(first, first_previous);
+                guard_static_motion(second, second_previous);
+            }
         }
     }
 }
@@ -1900,6 +1956,7 @@ fn resolve_attacks(
     now_ms: f32,
     fighters: &mut [Fighter],
     events: &mut Vec<CombatEvent>,
+    guard_static: bool,
 ) -> Option<u32> {
     for attacker_index in 0..fighters.len() {
         let Some(profile) = attack_profile(fighters[attacker_index].action) else {
@@ -1977,13 +2034,13 @@ fn resolve_attacks(
             }
 
             if profile.kick {
-                knock_back(width, height, attacker, target, profile.knockback);
+                knock_back(width, height, attacker, target, profile.knockback, guard_static);
                 target.set_action(Action::Knockdown, KICK_KNOCKDOWN_MS);
                 continue;
             }
 
             target.hp = (target.hp - profile.damage).max(0.0);
-            knock_back(width, height, attacker, target, profile.knockback);
+            knock_back(width, height, attacker, target, profile.knockback, guard_static);
             events.push(CombatEvent::Hit {
                 attacker: attacker.net_id,
                 target: target.net_id,
@@ -2043,7 +2100,11 @@ fn is_blocking_attack(target: &Fighter, attacker: &Fighter) -> bool {
     angle_delta(angle_to_attacker, target.facing).abs() <= BLOCK_HALF_ANGLE_RADIANS
 }
 
-fn knock_back(width: f32, height: f32, attacker: &Fighter, target: &mut Fighter, distance: f32) {
+fn knock_back(
+    width: f32, height: f32, attacker: &Fighter,
+    target: &mut Fighter, distance: f32, guard_static: bool,
+) {
+    let previous = (target.x, target.y);
     let dx = target.x - attacker.x;
     let dy = target.y - attacker.y;
     let length = dx.hypot(dy).max(1.0);
@@ -2056,7 +2117,7 @@ fn knock_back(width: f32, height: f32, attacker: &Fighter, target: &mut Fighter,
         target.y + dy / length * distance,
         FIGHTER_RADIUS,
         height - FIGHTER_RADIUS,
-    );
+    );    if guard_static { guard_static_motion(target, previous); }
 }
 
 fn respawn_fighter(fighter: &mut Fighter) {
