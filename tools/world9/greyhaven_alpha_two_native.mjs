@@ -150,6 +150,73 @@ try{
    if(!owner||!peer||owner.x>=start-15||Math.abs(owner.x-peer.x)>8)return false;
    return observed;
  },18000);
+ const leftObserved=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+ const leftOwner=leftObserved[0].review.actors.find(x=>x.netId===1);
+ assert.ok(leftOwner.x<4110-15,"real keyboard movement must first move west");
+ // Clear the eastbound frontage lane with player 2 using its own genuine
+ // browser input. Otherwise the two real fighter bodies correctly block
+ // player 1 before it can reach the Red Lion wall under test.
+ const second=actors[1].s;
+ await evaluate(second,"document.querySelector('#arena').focus();return true");
+ await request(second.base,"POST","/session/"+second.id+"/actions",
+   {actions:[{type:"key",id:"keyboard",actions:[
+     {type:"keyDown",value:"s"},{type:"pause",duration:700},{type:"keyUp",value:"s"}]}]});
+ await waitFor(async()=>{
+   const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+   const a=views[0].review.actors.find(x=>x.netId===2);
+   const b=views[1].review.actors.find(x=>x.netId===2);
+   return a&&b&&a.y>4240&&Math.abs(a.y-b.y)<8?views:null;
+ },12000);
+ // Re-focus player 1 after player 2's separate browser action. W3C focus
+ // is per browser window; never assume the previous seat still owns input.
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
+ // Walk east on the open street to the Red Lion south frontage.
+ await request(first.base,"POST","/session/"+first.id+"/actions",
+   {actions:[{type:"key",id:"keyboard",actions:[
+     {type:"keyDown",value:"d"},{type:"pause",duration:1800},{type:"keyUp",value:"d"}]}]});
+ let lastFrontage=[];
+ const frontage=await waitFor(async()=>{
+   const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+   const a=views[0].review.actors.find(x=>x.netId===1);
+   const b=views[1].review.actors.find(x=>x.netId===1);
+   lastFrontage=views.map(v=>v.review.actors.filter(x=>x.netId===1||x.netId===2));
+   return a&&b&&a.x>4330&&a.x<4410&&Math.abs(a.x-b.x)<8?views:null;
+ },18000).catch(error=>{
+   console.error("GREYHAVEN_RED_LION_FRONTAGE_FIRST_RED "+JSON.stringify(lastFrontage));
+   throw error;
+ });
+ const frontageActor=frontage[0].review.actors.find(x=>x.netId===1);
+ assert.ok(frontageActor.y>4050+18,"open south street is walkable before the building face");
+ // Move north in two physical steps: first onto the safe sidewalk, then
+ // attempt to cross the Red Lion's actual fixed building AABB.
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
+ await request(first.base,"POST","/session/"+first.id+"/actions",
+   {actions:[{type:"key",id:"keyboard",actions:[
+     {type:"keyDown",value:"w"},{type:"pause",duration:300},{type:"keyUp",value:"w"}]}]});
+ const sidewalk=await waitFor(async()=>{
+   const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+   const a=views[0].review.actors.find(x=>x.netId===1);
+   const b=views[1].review.actors.find(x=>x.netId===1);
+   return a&&b&&a.y<frontageActor.y-18&&a.y>4050+18&&Math.abs(a.y-b.y)<8?views:null;
+ },12000);
+ const sidewalkActor=sidewalk[0].review.actors.find(x=>x.netId===1);
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
+ await request(first.base,"POST","/session/"+first.id+"/actions",
+   {actions:[{type:"key",id:"keyboard",actions:[
+     {type:"keyDown",value:"w"},{type:"pause",duration:450},{type:"keyUp",value:"w"}]}]});
+ await sleeps(500);
+ const wallViews=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+ const wallOwner=wallViews[0].review.actors.find(x=>x.netId===1);
+ const wallPeer=wallViews[1].review.actors.find(x=>x.netId===1);
+ assert.ok(wallOwner.y>=4050+18-1,
+   "original Rust Physics6 swept collision must stop the actor outside Red Lion south wall");
+ assert.ok(wallOwner.y<sidewalkActor.y-4,
+   "actor must reach the real walkable frontage before being stopped by the wall");
+ assert.ok(Math.abs(wallOwner.x-wallPeer.x)<8 && Math.abs(wallOwner.y-wallPeer.y)<8,
+   "both browsers must agree on the actual server-authoritative wall stop");
+ outputTrace.physicalBuildingCollisionProven=true;
+ outputTrace.redLionWall={actorNetId:1,x:wallOwner.x,y:wallOwner.y,
+   minX:4240,maxX:4490,minY:3880,maxY:4050,actorRadius:18};
  await sleeps(900);
  for(const {s,actor} of actors){
    const data=await evaluate(s,nativeStats);
@@ -159,8 +226,10 @@ try{
    assert.equal(data.review.ownNetId,actor.id);
    assert.ok(data.review.serverTick>0,"actual source Rust World tick");
    assert.ok(Number.isFinite(data.review.camera.x));
-   assert.ok(data.review.actors.some(a=>a.netId===1 && a.x<4110-15),
-     "genuine keyboard movement replicated from Rust");
+   if(actor.id===1)assert.ok(data.review.actors.find(a=>a.netId===1).y>=4050+18-1,
+     "first player remains outside the authoritative Red Lion solid");
+   else assert.ok(data.review.actors.find(a=>a.netId===2).x>0,
+     "second original Rust player remains present");
    const page=(await request(s.base,"GET","/session/"+s.id+"/screenshot")).value;
    const pageBytes=Buffer.from(page,"base64");
    assert.ok(pageBytes.length>1000 && pageBytes.subarray(0,4).equals(
@@ -181,6 +250,8 @@ try{
    JSON.stringify({sourceSha:outputTrace.sourceSha,
      actors:outputTrace.samples.map(x=>x.actorNetId),
      final:outputTrace.samples.map(x=>x.data.review.actors),
+     physicalBuildingCollisionProven:outputTrace.physicalBuildingCollisionProven,
+     redLionWall:outputTrace.redLionWall,
      tiles:outputTrace.samples.map(x=>x.data.tiles),
      canvasSHA256:outputTrace.samples.map(x=>x.canvasSHA256)}));
 
