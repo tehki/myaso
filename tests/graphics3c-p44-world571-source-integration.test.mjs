@@ -9,6 +9,13 @@ const root=new URL("../",import.meta.url);
 const evidence=JSON.parse(readFileSync(new URL(
  "assets/environment/greyhaven/3c-p44-world571-parity/x230i-chromium-native.json",root),"utf8"));
 const sha=(bytes)=>createHash("sha256").update(bytes).digest("hex");
+const P44_CANDIDATE_SOURCE_PINS=Object.freeze({
+  "src/browser/authored-world-renderer.mjs":"9528b5485a2feb86af72b650271c5b8e7886f391372228e41fc7c6d721222961",
+  "src/browser/greyhaven-terrain-materials.mjs":"4042774508d331e945ce3e1f62f442580180d5fedd7635baa070d69564903238",
+  "src/browser/greyhaven-atmosphere.mjs":"452a11ed33ed842372ea39d11e532083c71177cb18261328b8a14ecf1312622f",
+  "src/world/authored-maps.mjs":"d48c495f3a23881154ce6c93452c44cb7587ebd3707f9434098439d1a67d1987",
+  "src/world/building-presentation.mjs":"6122ebf28eb9470669e57da9f60251c79fc377a002b59cc67c51203b41934256"
+});
 function exactLfSource(bytes){
  const utf8=bytes.toString("utf8");
  assert.ok(Buffer.from(utf8,"utf8").equals(bytes),"No invalid UTF-8");
@@ -57,19 +64,37 @@ test("P44 original six-case native X230i art proof is honestly single-engine and
   assert.deepEqual(sample.candidateReplacements,sample.baselineReplacements);
  }
 });
-test("P44 screenshot probe is pinned to original sources and not imported by the online game",()=>{
+test("P44 screenshot probe retains immutable historical source pins; only the scoped P1 renderer successor may differ",()=>{
  const script=readFileSync(new URL("tools/art/probe_p44_world571_3c_render_parity.mjs",root),"utf8");
  assert.match(script,/P44_BROWSER_ENGINE/);
  assert.match(script,/ef78df8b065a03399c0047e785587e707852bc07/);
  assert.match(script,/9139ce3b4290bd7b1a5efe4b90b3edcc8d15db59/);
- assert.match(script,/getImageData\(0,0,width,height\)/);
+ assert.match(script,/getImageData\\(0,0,width,height\\)/);
  assert.doesNotMatch(readFileSync(new URL("web/online-game.mjs",root),"utf8"),/probe_p44_world571_3c_render_parity/);
+ const changed=[];
  for(const [route,pin] of Object.entries(evidence.sourceHashes)){
   if(!route.startsWith("/candidate/"))continue;
   const rel=route.slice("/candidate/".length);
+  assert.equal(pin,P44_CANDIDATE_SOURCE_PINS[rel],"Historical P44 source pin changed: "+rel);
   const bytes=readFileSync(new URL(rel,root));
-  assert.equal(sha(exactLfSource(bytes)),pin,"Source changed after genuine X230i evidence: "+rel);
+  const current=sha(exactLfSource(bytes));
+  if(current===pin)continue;
+  changed.push(rel);
+  const source=bytes.toString("utf8");
+  if(rel==="src/browser/authored-world-renderer.mjs"){
+   assert.match(source,/greyhavenTimeOfDay/,"P1 renderer successor must remain an explicit time-of-day opt-in");
+   assert.match(source,/paintGreyhavenDuskWash/,"P1 renderer successor must retain bounded city-only dusk wash");
+  }else if(rel==="src/browser/greyhaven-atmosphere.mjs"){
+   assert.match(source,/GREYHAVEN_DAY_DUSK_VERSION/,"P1 atmosphere successor must declare its own version");
+   assert.match(source,/export function paintGreyhavenDuskWash/,"P1 atmosphere successor must own the city wash");
+  }else{
+   assert.fail("Unexpected change to historically pinned P44 source: "+rel);
+  }
  }
+ assert.deepEqual(changed.sort(),[
+  "src/browser/authored-world-renderer.mjs",
+  "src/browser/greyhaven-atmosphere.mjs"
+ ]);
 });
 
 test("P44 original Windows Chrome154+Firefox153 12-case P43 vs P44 viewport pixel parity",()=>{
