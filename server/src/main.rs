@@ -1,3 +1,4 @@
+mod greyhaven_alpha;
 #[cfg(feature = "experimental-hit-delivery-lab")]
 mod private_hit_delivery_lab;
 
@@ -504,6 +505,19 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
+    // World9 Alpha is a separate, explicit source trial on an isolated loopback
+    // QUIC server. Never allow a browser parameter to choose a server map.
+    let greyhaven_alpha = match env::var("MYASO_WORLD9_GREYHAVEN_ALPHA").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(env::VarError::NotPresent) => false,
+        Ok(_) | Err(_) => bail!("MYASO_WORLD9_GREYHAVEN_ALPHA must be 0 or 1"),
+    };
+    if greyhaven_alpha && (!bind.ip().is_loopback()
+        || player_cap > greyhaven_alpha::SPAWNS.len()
+        || flight.background_players != 0)
+    {
+        bail!("World9 Alpha requires loopback, no synthetic peers and a cap of 2..=4");
+    }
     // No account authentication service exists for this temporary arena.
     // The experiment is session-assigned, loopback-only, and default OFF.
     let v2_lab = match env::var("MYASO_EXPERIMENTAL_GESTURE_V2").as_deref() {
@@ -657,7 +671,14 @@ async fn main() -> Result<()> {
             };
             {
                 let mut state = game.state.lock().await;
-                if !state.world.add_player(player_id) {
+                let admitted = if greyhaven_alpha {
+                    greyhaven_alpha::free_spawn(&state.world).is_some_and(|(x, y)| {
+                        state.world.add_player_at(player_id, x, y, 0.0)
+                    })
+                } else {
+                    state.world.add_player(player_id)
+                };
+                if !admitted {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
