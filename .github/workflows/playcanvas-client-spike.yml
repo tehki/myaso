@@ -41,6 +41,9 @@ jobs:
       - name: Build PlayCanvas browser client
         run: npm run build
         working-directory: client/playcanvas
+      - name: Run headless Chrome WebGL/WebGPU fallback smoke
+        run: npm run smoke:browser
+        working-directory: client/playcanvas
       - name: Confirm source-only isolation
         run: |
           test -z "$(git diff --name-only HEAD -- server web)"

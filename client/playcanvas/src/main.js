@@ -42,7 +42,10 @@ async function boot() {
     const scene = buildGreyhavenBlockout(app, pc);
     app.start();
 
-    rendererStatus.textContent = `Renderer: ${rendererName(device)}`;
+    const backend = rendererName(device);
+    rendererStatus.textContent = `Renderer: ${backend}`;
+    document.documentElement.dataset.engineBooted = 'true';
+    document.documentElement.dataset.renderer = backend;
     runtimeStatus.textContent = 'Rust session: intentionally disconnected (no production endpoint configured)';
     window.__MYASO_PLAYCANVAS__ = Object.freeze({
       app,
@@ -59,6 +62,8 @@ async function boot() {
     fatal.hidden = false;
     fatal.textContent = `PlayCanvas bootstrap failed: ${error?.message ?? String(error)}`;
     rendererStatus.textContent = 'Renderer: failed';
+    document.documentElement.dataset.engineBooted = 'false';
+    document.documentElement.dataset.renderer = 'failed';
   }
 }
 
