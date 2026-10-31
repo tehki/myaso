@@ -113,7 +113,7 @@ test("missing actions fail closed and never resolve to Idle or another substitut
 test("source-time sampler follows nonuniform Blender keyframe timestamps", () => {
   const times = [0, 1000/30, 2000/30, 100, 4000/30, 5000/30, 7000/30, 350];
   const samples = [0, 32, 34, 87, 130, 134, 169, 170, 175, 232, 234, 349.9, 350, 600];
-  const expected = [0, 0, 1, 2, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7];
+  const expected = [0, 0, 1, 2, 3, 4, 5, 5, 5, 5, 6, 6, 7, 7];
   assert.deepEqual(samples.map(elapsedMs =>
     sampleAnimationFrame({elapsedMs, durationMs:350, frameTimesMs:times})?.frame), expected);
   const atEnd = sampleAnimationFrame({elapsedMs:600, durationMs:350, frameTimesMs:times});
