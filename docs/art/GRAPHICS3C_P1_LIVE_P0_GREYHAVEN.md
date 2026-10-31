@@ -1,7 +1,7 @@
 # Graphics 3C P1 — Greyhaven day/dusk source package on live P0
 
-**Direct parent:** live Pre-Alpha P0 exact SHA `88c4733c90199ab3cabf7bc85ebb58d2f8760c58` (Main0 #1141).  
-**Workstream:** Graphics 3C / environment and atmosphere.  
+**Direct parent:** live Pre-Alpha P0 exact SHA `88c4733c90199ab3cabf7bc85ebb58d2f8760c58` (Main0 #1141).
+**Workstream:** Graphics 3C / environment and atmosphere.
 **Status:** DRAFT source package / no merge / no deployment / not yet an in-game Alpha.
 
 ## Source provenance and integration strategy
@@ -33,7 +33,7 @@ No `web/online-game.mjs` change is included. The new renderer modules are **not 
 
 ## Acceptance evidence
 
-Prior old-base 3C exact-head `737b048ab244322a8162a62fc2b8fb295d765a2e` passed focused source tests and real native Chrome 156.0.8078.47 / Firefox 158.0.1 source-renderer capture (eight 960×540 PNGs). This proves the source painter only, not gameplay. **This live-P0 transplant requires fresh exact-head CI and fresh native captures.**
+**Live-P0 exact-head evidence (`abe62db4cf320d581a5fb5971ede6479e8e726a8`, 31 Oct 2026):** focused tests 13/13 PASS; native Chrome 156.0.8078.47 + Firefox 158.0.1 captured all eight 960×540 PNGs PASS; artifact [#13049545805](https://github.com/tehki/myaso/actions/runs/41218989670/artifacts/13049545805). Both browsers rendered Red Lion and Blacksmith day/dusk with six cached tiles, buildLimit=3, `createdPerDraw=[3,3,0,0,0,0,0,0]`. Warm draw p95: Chrome 0–0.1ms, Firefox 2–3ms. Cold batch timings are separately reported (Chrome 3.1–21.3ms; Firefox 6–64ms). These are headless Canvas source-renderer timings, **not GPU-present frame timings or gameplay acceptance**. Protected quality completed with one failure only: `git diff --check` found two trailing spaces in this document; all preceding source, browser-flight and capacity probes completed. This formatting-only issue is being corrected and the exact-head protected workflow must rerun.
 
 The native script records source SHA, image SHA256, browser versions, cached tile count and draw p50/p95. It honestly records zero Rust players and no GPU-present measurements. Real 2/4-player World/WebTransport, player/building occlusion, Chat/Combat readability, physical-host WAN and GPU-present performance remain separate Main0 acceptance gates.
 
