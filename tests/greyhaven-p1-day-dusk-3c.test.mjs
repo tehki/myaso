@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {MAP_IDS,AUTHORED_MAPS} from "../src/world/authored-maps.mjs";
+import {createGreyhavenTerrainPlan,GREYHAVEN_MATERIAL_VERSION}
+  from "../src/browser/greyhaven-terrain-materials.mjs";
 import {ARENA_VIEW_ZOOM,projectArenaPoint} from "../src/browser/arena-viewport.mjs";
 import {createAuthoredWorldRenderer,WORLD_TILE_SIZE}
   from "../src/browser/authored-world-renderer.mjs";
@@ -101,4 +103,48 @@ test("P1 daylight fixture remains physical but emits no glow; dusk fixture bound
   assert.equal(counts.light,0);
   paintGreyhavenLightingFixtures(ctx,map,cityTile,{lit:true});
   assert.ok(counts.light>0&&counts.light<=5);
+});
+
+test("P1 roadside shrubs are deterministic, bounded and never obstruct existing authored buildings or portals",()=>{
+  assert.equal(GREYHAVEN_MATERIAL_VERSION,"3c-p2-3");
+  const tiles=[
+    {x:3584,y:3584,width:512,height:512},
+    {x:4096,y:3584,width:512,height:512},
+    {x:3584,y:4096,width:512,height:512},
+    {x:4096,y:4096,width:512,height:512},
+    {x:4608,y:4096,width:512,height:512}
+  ];
+  let total=0;
+  for(const tile of tiles){
+    const plan=createGreyhavenTerrainPlan(map,tile);
+    assert.deepEqual(plan,createGreyhavenTerrainPlan(map,tile),
+      "original World9 road verge vegetation must not depend on time or browser");
+    assert.ok(plan.shrubs.length<=14,"fixed shrubs per cached tile");
+    total+=plan.shrubs.length;
+    for(const s of plan.shrubs){
+      assert.ok(s.x>=map.city.x+60&&s.x<=map.city.x+map.city.w-60);
+      assert.ok(s.y>=map.city.y+60&&s.y<=map.city.y+map.city.h-60);
+      assert.ok(s.size>=6&&s.size<=9);
+      assert.ok(map.buildings.every(b=>{
+        const dx=Math.max(b.x-s.x,0,s.x-(b.x+b.w));
+        const dy=Math.max(b.y-s.y,0,s.y-(b.y+b.h));
+        return Math.hypot(dx,dy)>=24;
+      }),"shrubs never enter the building and 24-unit clearance margin");
+      assert.ok(map.portals.every(p=>
+        Math.hypot(p.x-s.x,p.y-s.y)>=p.radius+52),
+        "Red Lion portal approach remains visually clear during rebuild");
+    }
+  }
+  assert.ok(total>0,"genuine World9 Greyhaven street edge must receive visible ground vegetation");
+  const interior=createGreyhavenTerrainPlan(AUTHORED_MAPS[MAP_IDS.tavern],tiles[1]);
+  assert.deepEqual(interior.shrubs,[],"interiors never inherit outdoor shrubs");
+  assert.deepEqual(createGreyhavenTerrainPlan(map,{x:0,y:0,width:512,height:512}).shrubs,[]);
+});
+
+test("P1 roadside shrubs match globally across neighboring cached tiles",()=>{
+  const a=createGreyhavenTerrainPlan(map,{x:3584,y:3584,width:512,height:512}).shrubs;
+  const b=createGreyhavenTerrainPlan(map,{x:4096,y:3584,width:512,height:512}).shrubs;
+  const left=a.filter(p=>Math.abs(p.x-4096)<=13);
+  const right=b.filter(p=>Math.abs(p.x-4096)<=13);
+  assert.deepEqual(left,right,"tile edges sample the same coordinates and shade values");
 });

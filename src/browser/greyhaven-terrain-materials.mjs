@@ -10,8 +10,10 @@ const COVER_STEP = 40;
 const MAX_PAVERS = 900;
 const MAX_COVER = 130;
 const MAX_SOIL = 80;
+const SHRUB_STEP = 62;
+const MAX_SHRUBS = 14;
 
-export const GREYHAVEN_MATERIAL_VERSION = "3c-p2-2";
+export const GREYHAVEN_MATERIAL_VERSION = "3c-p2-3";
 
 function hash(x, y, salt = 0) {
   let h = Math.imul(x ^ salt, 0x45d9f3b) ^ Math.imul(y, 0x119de1f3);
@@ -70,7 +72,7 @@ function roadDistance(x, y, segments) {
 // A stateless per-chunk plan. Padding guarantees tiles agree on seam-crossing
 // material details: the same world-grid sample is evaluated on both sides.
 export function createGreyhavenTerrainPlan(map, tile) {
-  const empty = {pavers: [], soil: [], grass: []};
+  const empty = {pavers: [], soil: [], grass: [], shrubs: []};
   if (map?.kind !== "outdoor" || map?.city?.id !== "greyhaven" ||
       !tile || ![tile.x, tile.y, tile.width, tile.height].every(Number.isFinite) ||
       tile.width <= 0 || tile.height <= 0 || tile.width > 512 || tile.height > 512)
@@ -130,6 +132,33 @@ export function createGreyhavenTerrainPlan(map, tile) {
           height: 5 + (seed % 7)});
     }
   }
+  // Small, static roadway-edge shrubs: never inside buildings, portal approach
+  // or the authored road corridor. A global world lattice and same 20-unit
+  // tile padding make edge-crossing leaves deterministic at any camera zoom.
+  // These are ground-level cosmetic sprites, not trees, collision or cover.
+  const shrubLeft = Math.max(map.city.x + 60, tile.x - 20);
+  const shrubTop = Math.max(map.city.y + 60, tile.y - 20);
+  const shrubRight = Math.min(map.city.x + map.city.w - 60, tile.x + tile.width + 20);
+  const shrubBottom = Math.min(map.city.y + map.city.h - 60, tile.y + tile.height + 20);
+  if(shrubRight >= shrubLeft && shrubBottom >= shrubTop){
+    for(let gy=Math.floor(shrubTop/SHRUB_STEP);gy<=Math.ceil(shrubBottom/SHRUB_STEP);gy++){
+      for(let gx=Math.floor(shrubLeft/SHRUB_STEP);gx<=Math.ceil(shrubRight/SHRUB_STEP);gx++){
+        if(empty.shrubs.length>=MAX_SHRUBS)break;
+        const seed=hash(gx,gy,73);
+        if((seed & 3)===0)continue;
+        const x=gx*SHRUB_STEP+(seed%13)-6;
+        const y=gy*SHRUB_STEP+((seed>>>7)%13)-6;
+        if(x<shrubLeft||x>shrubRight||y<shrubTop||y>shrubBottom)continue;
+        if(insideBuilding(x,y,buildings)||nearBuilding(x,y,buildings)<24)continue;
+        const road=roadDistance(x,y,segments);
+        const edge=road.distance-road.width/2;
+        if(edge<15||edge>65)continue;
+        if((map.portals??[]).some(p=>Math.hypot(p.x-x,p.y-y)<p.radius+52))continue;
+        empty.shrubs.push({x,y,tone:(seed>>>12)%GRASS_COLORS.length,
+          size:6+((seed>>>16)%4)});
+      }
+    }
+  }
   return empty;
 }
 
@@ -156,5 +185,18 @@ export function paintGreyhavenGroundDetails(ctx, map, tile) {
     ctx.lineTo(g.x + 5, g.y - g.height * .7);
     ctx.stroke();
   }
-  return {pavers: plan.pavers.length, soil: plan.soil.length, grass: plan.grass.length};
+  for(const s of plan.shrubs){
+    // Three compact, low silhouettes are always behind players, Chat and
+    // combat tells. No procedural animation, drawImage or per-frame allocation.
+    ctx.fillStyle="rgba(24,35,23,.17)";
+    ctx.beginPath();ctx.ellipse(s.x+2,s.y+4,s.size+5,4,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=GRASS_COLORS[s.tone];
+    ctx.beginPath();ctx.arc(s.x-5,s.y,s.size*.72,0,Math.PI*2);
+    ctx.arc(s.x+5,s.y-1,s.size*.74,0,Math.PI*2);
+    ctx.arc(s.x,s.y-4,s.size,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="rgba(198,189,126,.20)";
+    ctx.beginPath();ctx.arc(s.x-3,s.y-6,2,0,Math.PI*2);ctx.fill();
+  }
+  return {pavers: plan.pavers.length, soil: plan.soil.length,
+    grass: plan.grass.length, shrubs: plan.shrubs.length};
 }

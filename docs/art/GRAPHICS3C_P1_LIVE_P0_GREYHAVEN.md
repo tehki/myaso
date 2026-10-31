@@ -42,3 +42,26 @@ The native script records source SHA, image SHA256, browser versions, cached til
 Main0 #1141 owns one canonical Alpha integration candidate directly from the live P0 SHA. This 3C package is a source-only donor; Graphics 3/Main0 may transplant these reviewed blobs into that candidate. No old branch history is merged.
 
 **DRAFT · DEFAULT OFF · NO MERGE · NO DEPLOY.**
+
+## 31 October — Graphics 3C roadside vegetation pass
+
+The existing 3C cached terrain-material painter now includes a **static, bounded
+roadside shrub layer** on the World9 city verge. Source positions come from a
+deterministic world-coordinate lattice (62-unit spacing), with a hard maximum
+of 14 low shrubs per cached 512-unit tile. Every shrub is outside the authored
+road corridor, at least 24 world units clear of every source building footprint,
+and outside every portal radius plus 52 units. 60-unit city-edge insets prevent
+planting over the fixed city wall. Camera movement and zoom cannot reseed the
+plants; the same tile padding preserves consistent seam-crossing leaves.
+
+The shrubs are **2D ground decoration beneath actor, HUD and combat rendering**.
+They introduce no collider, pathfinding obstacle, tree/roof occlusion,
+gameplay visibility, animation, particles, network messages or clock. Existing
+P0 online game remains unchanged and the Greyhaven renderer remains unimported
+and default OFF. Red Lion building geometry is intentionally not edited
+while Graphics 3B rebuilds the asset.
+
+Focused node/world tests now require reproducible bounded shrubs, source
+building/portal clearance, no interior vegetation, and tile-edge agreement.
+Exact-head browser source PNGs, new color comparisons and full protected quality
+must be reverified on the current SHA; previous green runs are historical only.
