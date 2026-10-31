@@ -1,0 +1,82 @@
+name: Graphics 3C P1 — live P0 Greyhaven source and native browser qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/graphics3c-p1-live-p0.yml"
+      - "src/browser/authored-world-renderer.mjs"
+      - "src/browser/greyhaven-atmosphere.mjs"
+      - "src/browser/greyhaven-terrain-materials.mjs"
+      - "src/browser/arena-viewport.mjs"
+      - "src/world/authored-maps.mjs"
+      - "src/world/building-presentation.mjs"
+      - "tests/graphics3c-p1-livep0-contract.test.mjs"
+      - "tests/greyhaven-p1-day-dusk-3c.test.mjs"
+      - "tools/art/graphics3c_p1_day_dusk_native.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    name: Live P0 isolation, World9 projection and 3C day/dusk source tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact candidate source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact HEAD and syntax
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --check
+          node --check src/browser/authored-world-renderer.mjs
+          node --check src/browser/greyhaven-atmosphere.mjs
+          node --check src/browser/greyhaven-terrain-materials.mjs
+          node --check src/world/authored-maps.mjs
+          node --check src/world/building-presentation.mjs
+          node --check tests/graphics3c-p1-livep0-contract.test.mjs
+          node --check tests/greyhaven-p1-day-dusk-3c.test.mjs
+          node --check tools/art/graphics3c_p1_day_dusk_native.mjs
+      - name: Run live P0 isolation and 3C source tests
+        run: |
+          node --test \
+            tests/graphics3c-p1-livep0-contract.test.mjs \
+            tests/greyhaven-p1-day-dusk-3c.test.mjs \
+            tests/prealpha-arena-world-scroll.test.mjs \
+            tests/graphics3a-ground-shadow-airborne.test.mjs
+
+  native-source-browser:
+    name: Real Chrome Firefox — Greyhaven Red Lion and Blacksmith day/dusk source Canvas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify native browser provenance
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          node --check tools/art/graphics3c_p1_day_dusk_native.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Capture eight source-renderer screenshots
+        run: |
+          timeout --signal=TERM --kill-after=5s 480s node tools/art/graphics3c_p1_day_dusk_native.mjs
+      - name: Archive genuine Chrome Firefox source captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics3c-p1-live-p0-greyhaven-day-dusk
+          path: artifacts/graphics3c-p1-greyhaven-native/**
+          if-no-files-found: ignore
+          retention-days: 7
