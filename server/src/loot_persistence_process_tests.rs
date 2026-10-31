@@ -1,3 +1,4 @@
+//! Test-only Unix multi-process negative witness for the legacy MYASOL03
 //! checkpoint writer. This deliberately proves the missing cross-process
 //! revision fence; it does not introduce or activate a second writer.
 use super::*;
