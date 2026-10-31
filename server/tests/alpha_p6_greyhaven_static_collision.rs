@@ -40,6 +40,7 @@ fn alpha_p6_two_authoritative_players_share_wall_and_real_gate() {
         assert!(world.set_input(id, east_dash));
     }
     world.step_by(100.0);
+    world.step_by(100.0);
     let blocked = world.fighter(1).unwrap();
     let gate = world.fighter(2).unwrap();
     assert!(blocked.x <= 3501.5 - 18.0 + 0.01, "crossed west wall: {}", blocked.x);
