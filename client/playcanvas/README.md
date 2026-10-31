@@ -21,17 +21,20 @@ npm run dev
 
 The dev server binds to `127.0.0.1:4174` only. The production preview binds to `127.0.0.1:4175` only. The browser smoke supports `CHROME_BIN` overrides and saves a diagnostic screenshot under `.artifacts/`.
 
-## What this first slice proves
+## What this slice proves
 
 - PlayCanvas Engine V2 bootstraps in a browser.
 - WebGPU is preferred and WebGL 2 fallback is delegated to the engine's supported graphics-device creation path.
-- A small isometric diagnostic scene renders with lighting and shadow support.
+- The isometric visualization consumes the designer-authored World9 map source from [World9 PR #1148](https://github.com/tehki/myaso/pull/1148), exact donor commit `0843946d308bc3f88bb147d910deff450393c475`.
+- Greyhaven city, all 15 authored building footprints, roads, river, fields, groves, bridges, Red Lion entrance reference and map spawn reference are visualized using the source coordinates.
+- The map-to-engine scale is a presentation transform only. It does not define physical meters, collision or movement authority.
 - The PlayCanvas client exposes a lazy import of the already-qualified MYASO browser `connectAuthoritativeClient` and `connectGameTransport`; the protocol adapter is not loaded until a future non-production session explicitly requests it.
 
 ## Explicitly not implemented
 
-- The blockout is not the canonical World9 map, not approved art, not final building geometry and not a gameplay scene.
-- The two visible player markers are static presentation proxies, not network actors.
+- Building meshes remain diagnostic proxies; approved Blender/GLB art is not yet imported.
+- No actual player actors are rendered; the spawn is a static map reference marker.
+- The World9 source map is read-only visual data. Its portal helpers are not invoked, and it does not authorize movement, collision, portals, items or server transitions.
 - No Rust connection is attempted. No production URL, certificate pin, credential or server configuration is included.
 - No movement, combat, HP, identity, respawn or chat is client-authoritative.
 - The existing `web/` client and `server/` sources are unchanged.
