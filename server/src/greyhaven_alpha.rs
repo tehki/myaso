@@ -12,9 +12,10 @@ pub const SPAWNS: [(f32, f32); 4] = [
 
 pub fn free_spawn(world: &World) -> Option<(f32, f32)> {
     SPAWNS.iter().copied().find(|candidate| {
-        !world.fighters().iter().any(|f| {
-            (f.spawn_x, f.spawn_y) == *candidate
-        })
+        !world
+            .fighters()
+            .iter()
+            .any(|f| (f.spawn_x, f.spawn_y) == *candidate)
     })
 }
 

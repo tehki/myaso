@@ -512,9 +512,10 @@ async fn main() -> Result<()> {
         Ok("0") | Err(env::VarError::NotPresent) => false,
         Ok(_) | Err(_) => bail!("MYASO_WORLD9_GREYHAVEN_ALPHA must be 0 or 1"),
     };
-    if greyhaven_alpha && (!bind.ip().is_loopback()
-        || player_cap > greyhaven_alpha::SPAWNS.len()
-        || flight.background_players != 0)
+    if greyhaven_alpha
+        && (!bind.ip().is_loopback()
+            || player_cap > greyhaven_alpha::SPAWNS.len()
+            || flight.background_players != 0)
     {
         bail!("World9 Alpha requires loopback, no synthetic peers and a cap of 2..=4");
     }
@@ -672,9 +673,8 @@ async fn main() -> Result<()> {
             {
                 let mut state = game.state.lock().await;
                 let admitted = if greyhaven_alpha {
-                    greyhaven_alpha::free_spawn(&state.world).is_some_and(|(x, y)| {
-                        state.world.add_player_at(player_id, x, y, 0.0)
-                    })
+                    greyhaven_alpha::free_spawn(&state.world)
+                        .is_some_and(|(x, y)| state.world.add_player_at(player_id, x, y, 0.0))
                 } else {
                     state.world.add_player(player_id)
                 };
