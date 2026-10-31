@@ -167,20 +167,29 @@ try{
    const b=views[1].review.actors.find(x=>x.netId===2);
    return a&&b&&a.y>4240&&Math.abs(a.y-b.y)<8?views:null;
  },12000);
+ // Re-focus player 1 after player 2's separate browser action. W3C focus
+ // is per browser window; never assume the previous seat still owns input.
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
  // Walk east on the open street to the Red Lion south frontage.
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
      {type:"keyDown",value:"d"},{type:"pause",duration:1800},{type:"keyUp",value:"d"}]}]});
+ let lastFrontage=[];
  const frontage=await waitFor(async()=>{
    const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
    const a=views[0].review.actors.find(x=>x.netId===1);
    const b=views[1].review.actors.find(x=>x.netId===1);
+   lastFrontage=views.map(v=>v.review.actors.filter(x=>x.netId===1||x.netId===2));
    return a&&b&&a.x>4330&&a.x<4410&&Math.abs(a.x-b.x)<8?views:null;
- },18000);
+ },18000).catch(error=>{
+   console.error("GREYHAVEN_RED_LION_FRONTAGE_FIRST_RED "+JSON.stringify(lastFrontage));
+   throw error;
+ });
  const frontageActor=frontage[0].review.actors.find(x=>x.netId===1);
  assert.ok(frontageActor.y>4050+18,"open south street is walkable before the building face");
  // Move north in two physical steps: first onto the safe sidewalk, then
  // attempt to cross the Red Lion's actual fixed building AABB.
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
      {type:"keyDown",value:"w"},{type:"pause",duration:300},{type:"keyUp",value:"w"}]}]});
@@ -191,6 +200,7 @@ try{
    return a&&b&&a.y<frontageActor.y-18&&a.y>4050+18&&Math.abs(a.y-b.y)<8?views:null;
  },12000);
  const sidewalkActor=sidewalk[0].review.actors.find(x=>x.netId===1);
+ await evaluate(first,"document.querySelector('#arena').focus();return true");
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
      {type:"keyDown",value:"w"},{type:"pause",duration:450},{type:"keyUp",value:"w"}]}]});
