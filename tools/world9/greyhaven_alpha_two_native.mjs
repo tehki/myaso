@@ -153,6 +153,20 @@ try{
  const leftObserved=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
  const leftOwner=leftObserved[0].review.actors.find(x=>x.netId===1);
  assert.ok(leftOwner.x<4110-15,"real keyboard movement must first move west");
+ // Clear the eastbound frontage lane with player 2 using its own genuine
+ // browser input. Otherwise the two real fighter bodies correctly block
+ // player 1 before it can reach the Red Lion wall under test.
+ const second=actors[1].s;
+ await evaluate(second,"document.querySelector('#arena').focus();return true");
+ await request(second.base,"POST","/session/"+second.id+"/actions",
+   {actions:[{type:"key",id:"keyboard",actions:[
+     {type:"keyDown",value:"s"},{type:"pause",duration:700},{type:"keyUp",value:"s"}]}]});
+ await waitFor(async()=>{
+   const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+   const a=views[0].review.actors.find(x=>x.netId===2);
+   const b=views[1].review.actors.find(x=>x.netId===2);
+   return a&&b&&a.y>4240&&Math.abs(a.y-b.y)<8?views:null;
+ },12000);
  // Walk east on the open street to the Red Lion south frontage.
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
