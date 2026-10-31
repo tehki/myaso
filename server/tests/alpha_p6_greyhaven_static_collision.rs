@@ -15,7 +15,13 @@ fn alpha_p6_default_arena_and_unflagged_world_preserve_original_motion() {
     let mut arena = World::new(800.0, 600.0);
     assert!(!arena.enable_greyhaven_static_collisions());
     assert!(arena.add_player_at(1, 200.0, 200.0, 0.0));
-    assert!(arena.set_input(1, InputIntent { move_x: 1.0, ..Default::default() }));
+    assert!(arena.set_input(
+        1,
+        InputIntent {
+            move_x: 1.0,
+            ..Default::default()
+        }
+    ));
     arena.step_by(100.0);
     assert!(arena.fighter(1).unwrap().x > 200.0);
 
@@ -23,8 +29,16 @@ fn alpha_p6_default_arena_and_unflagged_world_preserve_original_motion() {
     let mut guarded = greyhaven();
     for world in [&mut baseline, &mut guarded] {
         assert!(world.add_player_at(1, 3740.0, 4088.0, 0.0));
-        assert!(world.set_input(1, InputIntent { move_y: -1.0, ..Default::default() }));
-        for _ in 0..3 { world.step_by(100.0); }
+        assert!(world.set_input(
+            1,
+            InputIntent {
+                move_y: -1.0,
+                ..Default::default()
+            }
+        ));
+        for _ in 0..3 {
+            world.step_by(100.0);
+        }
     }
     assert!(baseline.fighter(1).unwrap().y < 4030.0);
     assert!(guarded.fighter(1).unwrap().y >= 4030.0);
@@ -35,7 +49,11 @@ fn alpha_p6_two_authoritative_players_share_wall_and_real_gate() {
     let mut world = greyhaven();
     assert!(world.add_player_at(1, 3470.0, 4000.0, 0.0));
     assert!(world.add_player_at(2, 3470.0, 4180.0, 0.0));
-    let east_dash = InputIntent { move_x: 1.0, dash: true, ..Default::default() };
+    let east_dash = InputIntent {
+        move_x: 1.0,
+        dash: true,
+        ..Default::default()
+    };
     for id in [1, 2] {
         assert!(world.set_input(id, east_dash));
     }
@@ -43,10 +61,17 @@ fn alpha_p6_two_authoritative_players_share_wall_and_real_gate() {
     world.step_by(100.0);
     let blocked = world.fighter(1).unwrap();
     let gate = world.fighter(2).unwrap();
-    assert!(blocked.x <= 3501.5 - 18.0 + 0.01, "crossed west wall: {}", blocked.x);
+    assert!(
+        blocked.x <= 3501.5 - 18.0 + 0.01,
+        "crossed west wall: {}",
+        blocked.x
+    );
     assert!(gate.x > 3538.5 + 18.0, "gate inaccessible: {}", gate.x);
     for fighter in world.fighters() {
-        assert_eq!(overlaps_known_static_solid(fighter.x, fighter.y, 18.0), Ok(false));
+        assert_eq!(
+            overlaps_known_static_solid(fighter.x, fighter.y, 18.0),
+            Ok(false)
+        );
     }
 }
 

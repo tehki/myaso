@@ -15,10 +15,10 @@ pub mod combat_hit_receipt;
 pub mod combat_hit_world_commit_proposal;
 pub mod kill_event;
 // P0 review-only authority reducer and codec; no runtime ingress or v1 changes.
+pub mod alpha_greyhaven_geometry;
 pub mod prealpha_lmb_gesture_authority;
 pub mod prealpha_lmb_gesture_proposal;
 pub mod reliable;
-pub mod alpha_greyhaven_geometry;
 pub mod simulation;
 pub mod snapshot;
 pub mod zone;
