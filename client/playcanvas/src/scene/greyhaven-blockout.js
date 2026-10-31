@@ -1,5 +1,15 @@
+function colorFromHex(pc, hex) {
+  const value = hex.replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(value)) throw new TypeError(`Expected #RRGGBB color, received ${hex}`);
+  return new pc.Color(
+    Number.parseInt(value.slice(0, 2), 16) / 255,
+    Number.parseInt(value.slice(2, 4), 16) / 255,
+    Number.parseInt(value.slice(4, 6), 16) / 255
+  );
+}
+
 function material(pc, hex, gloss = 18, metalness = 0) {
-  const color = pc.Color.fromString(hex);
+  const color = colorFromHex(pc, hex);
   const result = new pc.StandardMaterial();
   result.diffuse = color;
   result.gloss = gloss;
