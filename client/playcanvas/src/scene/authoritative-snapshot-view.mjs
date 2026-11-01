@@ -1,4 +1,5 @@
 import { AUTHORED_MAPS, MAP_IDS } from '../world/authored-maps.mjs';
+import { projectAuthoritativeCombat } from '../combat/authoritative-combat-view.mjs';
 
 // Presentation coordinates only. The Rust World alone owns actual positions,
 // collision, map membership and respawn; this map has no authority over them.
@@ -44,6 +45,7 @@ export function createAuthoritativeSnapshotView({ create, update, remove }) {
         stamina: entity.stamina,
         action: entity.action,
         serverTick: entity.serverTick,
+        combat: projectAuthoritativeCombat(entity),
         isOwn: Number.isInteger(ownNetId) && ownNetId === netId
       });
       if (!actors.has(netId)) {
