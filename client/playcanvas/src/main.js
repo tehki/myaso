@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import { buildGreyhavenBlockout } from './scene/greyhaven-blockout.js';
+import { preparePlayCanvasOriginalInput } from './input/original-input-contract.mjs';
 import './style.css';
 
 const canvas = document.querySelector('#application');
@@ -39,6 +40,10 @@ async function boot() {
     app.scene.ambientLight = new pc.Color(0.25, 0.27, 0.30);
 
     const scene = await buildGreyhavenBlockout(app, pc);
+    // UI10 contract handoff only: NO event listeners or gameplay packet writer.
+    // A real Core8A read-only session still cannot activate PlayCanvas input.
+    const preparedInput = preparePlayCanvasOriginalInput({ canvas });
+    document.documentElement.dataset.playcanvasInputs = 'hold-core8';
     app.start();
 
     const backend = rendererName(device);
@@ -56,6 +61,7 @@ async function boot() {
       app,
       device,
       scene,
+      inputPreparation: preparedInput,
       loadAuthoritativeClient: () => import('./rust-authoritative-client.js'),
       get devRustSession() { return devRustSession; }
     });
