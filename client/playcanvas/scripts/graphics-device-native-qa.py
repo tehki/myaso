@@ -4,11 +4,14 @@ import json
 import os
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 
 URL=os.environ.get('MYASO_G3_QA_URL','http://127.0.0.1:4174/')
+if urlsplit(URL).scheme != 'http' or urlsplit(URL).hostname not in ('127.0.0.1','localhost'):
+    raise ValueError('Graphics3 W3C QA is loopback-only; no public/production targets')
 OUT=Path(__file__).parent.parent/'.artifacts'/'graphics-device-real-gpu'
 OUT.mkdir(parents=True,exist_ok=True)
 
