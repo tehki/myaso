@@ -53,10 +53,19 @@ jobs:
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
-          timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
-            cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
-            exit 1
-          }
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            # True browser + WebGL2 under a private software X display.
+            # Headless Firefox CI has no WebGL2 context (first-RED retained).
+            MYASO_PLAYCANVAS_XVFB=1 LIBGL_ALWAYS_SOFTWARE=1               xvfb-run -a -s "-screen 0 1280x720x24"               timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          else
+            timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          fi
           grep 'PLAYCANVAS_REAL_RUST_QUIC_PASS' "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
       - name: Preserve first-RED and exact-head acceptance
         if: always()

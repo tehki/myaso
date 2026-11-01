@@ -67,8 +67,10 @@ async function wd(method, path, body) {
 async function newBrowser(url) {
   const options = browserName === 'firefox'
     ? { browserName: 'firefox', 'moz:firefoxOptions': {
-        args: ['-headless'],
-        // GitHub's headless Firefox has no hardware GPU. Explicitly allow its
+        args: process.env.MYASO_PLAYCANVAS_XVFB === '1' ? [] : ['-headless'],
+        // Headless Firefox on CI has no WebGL2 context: run under Xvfb
+        // with software Mesa, without weakening actual engine boot checks.
+        // Explicitly allow its
         // software WebGL2 renderer, without changing game or protocol code.
         prefs: { 'webgl.force-enabled': true, 'webgl.disabled': false,
           'webgl.enable-webgl2': true },
