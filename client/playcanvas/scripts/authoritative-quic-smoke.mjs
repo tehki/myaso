@@ -17,6 +17,7 @@ if (!rustBinary || !isAbsolute(rustBinary) || !existsSync(rustBinary) ||
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
 const children = [];
 const sessions = [];
+const driverPorts = new Map();
 let driverPort;
 let rustOutput = '';
 let viteOutput = '';
@@ -52,8 +53,10 @@ async function poll(label, fn, ms = testDeadlineMs) {
   }
   throw new Error(label + ' TIMEOUT: ' + JSON.stringify(last) + ' Rust tail: ' + rustOutput.slice(-700));
 }
-async function wd(method, path, body) {
-  const response = await fetch('http://127.0.0.1:' + driverPort + path, {
+async function wd(method, path, body, explicitPort) {
+  const sessionId = /^\/session\/([^/]+)/.exec(path)?.[1];
+  const port = explicitPort ?? (sessionId && driverPorts.get(sessionId)) ?? driverPort;
+  const response = await fetch('http://127.0.0.1:' + port + path, {
     method, headers: { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(30_000),
@@ -65,6 +68,17 @@ async function wd(method, path, body) {
   return json.value;
 }
 async function newBrowser(url) {
+  // GeckoDriver allows one session per process. Create independent loopback
+  // driver processes for independent real Firefox browser windows. This is
+  // a WebDriver harness constraint, not a game or transport session change.
+  let sessionPort = driverPort;
+  if (browserName === 'firefox') {
+    sessionPort = await freePort();
+    child('geckodriver', ['--host', '127.0.0.1', '--port', String(sessionPort)]);
+    await poll('independent FirefoxDriver', async () => ({
+      ok: Boolean((await fetch('http://127.0.0.1:' + sessionPort + '/status').catch(() => null))?.ok),
+    }));
+  }
   const options = browserName === 'firefox'
     ? { browserName: 'firefox', 'moz:firefoxOptions': {
         args: process.env.MYASO_PLAYCANVAS_XVFB === '1' ? [] : ['-headless'],
@@ -83,9 +97,10 @@ async function newBrowser(url) {
           '--enable-webgl', '--enable-unsafe-swiftshader', '--window-size=1280,720'
         ]
       } };
-  const value = await wd('POST', '/session', { capabilities: { alwaysMatch: options } });
+  const value = await wd('POST', '/session', { capabilities: { alwaysMatch: options } }, sessionPort);
   const id = value.sessionId;
   assert.ok(id, 'real browser session');
+  driverPorts.set(id, sessionPort);
   sessions.push(id);
   const base = '/session/' + id;
   await wd('POST', base + '/timeouts', { script: 25_000, pageLoad: 35_000 });
@@ -224,13 +239,12 @@ try {
     const response = await fetch('http://127.0.0.1:' + httpPort).catch(() => null);
     return { ok: Boolean(response?.ok) };
   });
-  child(browserName === 'firefox' ? 'geckodriver' : 'chromedriver',
-    browserName === 'firefox'
-      ? ['--host', '127.0.0.1', '--port', String(driverPort)]
-      : ['--port=' + driverPort]);
-  await poll('loopback ChromeDriver', async () => ({
-    ok: Boolean((await fetch('http://127.0.0.1:' + driverPort + '/status').catch(() => null))?.ok),
-  }));
+  if (browserName === 'chrome') {
+    child('chromedriver', ['--port=' + driverPort]);
+    await poll('loopback ChromeDriver', async () => ({
+      ok: Boolean((await fetch('http://127.0.0.1:' + driverPort + '/status').catch(() => null))?.ok),
+    }));
+  }
 
   const page = 'http://127.0.0.1:' + httpPort + '/';
   // Attach the passive PlayCanvas actor bridge *before* other actors join.
