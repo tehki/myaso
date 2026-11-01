@@ -750,6 +750,20 @@ impl World {
             Ok(_) => return false,
             Err(index) => index,
         };
+        // Greyhaven has a server-owned flat XY ground footprint, not a Z
+        // heightfield. Reject illegal origins instead of silently teleporting
+        // a client to a map edge. The original arena clamping is unchanged.
+        if self.greyhaven_static_collisions
+            && (!x.is_finite()
+                || !y.is_finite()
+                || !facing.is_finite()
+                || x < FIGHTER_RADIUS
+                || x > self.width - FIGHTER_RADIUS
+                || y < FIGHTER_RADIUS
+                || y > self.height - FIGHTER_RADIUS)
+        {
+            return false;
+        }
         let x = clamp(x, FIGHTER_RADIUS, self.width - FIGHTER_RADIUS);
         let y = clamp(y, FIGHTER_RADIUS, self.height - FIGHTER_RADIUS);
         if self.greyhaven_static_collisions
@@ -1553,34 +1567,69 @@ fn begin_requested_action(
     }
 }
 
-/// Applies static containment to a server-computed displacement. A swept
-/// inflated AABB prevents crossing thin walls even during fast dash/knockback.
-/// One-axis sliding is conservative: never synthesize a diagonal path around
-/// an obstacle. Errors fail closed to the last known valid position.
-fn guard_static_motion(fighter: &mut Fighter, old: (f32, f32)) {
-    let next = (fighter.x, fighter.y);
-    let permitted = |to| swept_circle_hits_known_static_solid(old, to, FIGHTER_RADIUS) == Ok(false);
-    if permitted(next) {
+/// Advance a server-owned horizontal/vertical movement component only up to
+/// the last known safe location. Tests the entire traveled segment, not only
+/// the endpoint, so a dash cannot tunnel through a narrow authored wall.
+///
+/// The conservative 16-step bisection is only used for an actual collision;
+/// everyday arena and clear Greyhaven motion have no extra sampling.
+fn advance_greyhaven_axis_to_contact(from: (f32, f32), to: (f32, f32)) -> (f32, f32) {
+    let swept_clear =
+        |target| swept_circle_hits_known_static_solid(from, target, FIGHTER_RADIUS) == Ok(false);
+    if swept_clear(to) {
+        return to;
+    }
+    // Admission and the prior completed tick guarantee 'from' is safe.
+    // If that invariant was violated, fail closed rather than synthesize a
+    // recovery teleport through an obstacle.
+    if !swept_clear(from) {
+        return from;
+    }
+    let mut safe = 0.0_f32;
+    let mut blocked = 1.0_f32;
+    for _ in 0..16 {
+        let fraction = (safe + blocked) * 0.5;
+        let probe = (
+            from.0 + (to.0 - from.0) * fraction,
+            from.1 + (to.1 - from.1) * fraction,
+        );
+        if swept_clear(probe) {
+            safe = fraction;
+        } else {
+            blocked = fraction;
+        }
+    }
+    (
+        from.0 + (to.0 - from.0) * safe,
+        from.1 + (to.1 - from.1) * safe,
+    )
+}
+
+/// Greyhaven exterior movement slides conservatively against real static
+/// buildings and walls. Both legs are individually swept from their actual
+/// server-owned positions: no diagonal corner teleport or fake corridor.
+/// World9/Core8C have not supplied a heightfield or full river collision;
+/// this is XY ground containment, not 3D vertical elevation simulation.
+fn guard_static_motion(fighter: &mut Fighter, previous: (f32, f32)) {
+    let destination = (fighter.x, fighter.y);
+    if swept_circle_hits_known_static_solid(previous, destination, FIGHTER_RADIUS) == Ok(false) {
         return;
     }
-    let x_only = (next.0, old.1);
-    let y_only = (old.0, next.1);
-    let x_safe = permitted(x_only);
-    let y_safe = permitted(y_only);
-    let safe = match (x_safe, y_safe) {
-        (true, false) => x_only,
-        (false, true) => y_only,
-        (true, true) => {
-            if (next.0 - old.0).abs() >= (next.1 - old.1).abs() {
-                x_only
-            } else {
-                y_only
-            }
-        }
-        (false, false) => old,
+    let horizontal_first = (destination.0 - previous.0).abs() >= (destination.1 - previous.1).abs();
+    let (first, second) = if horizontal_first {
+        ((destination.0, previous.1), (destination.0, destination.1))
+    } else {
+        ((previous.0, destination.1), (destination.0, destination.1))
     };
-    fighter.x = safe.0;
-    fighter.y = safe.1;
+    let contact = advance_greyhaven_axis_to_contact(previous, first);
+    let final_axis = if horizontal_first {
+        (contact.0, second.1)
+    } else {
+        (second.0, contact.1)
+    };
+    let resolved = advance_greyhaven_axis_to_contact(contact, final_axis);
+    fighter.x = resolved.0;
+    fighter.y = resolved.1;
 }
 
 fn move_fighter(
