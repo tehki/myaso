@@ -8,6 +8,7 @@
 - Vite: `8.3.5`
 - Node.js: `22.18+` (the current X230i development node is `26.8.1`)
 - Renderer: request WebGPU first; PlayCanvas falls back to WebGL 2 when WebGPU is unavailable.
+- Resource handlers are explicitly registered for GLTF containers and textures.
 
 ## Run
 
@@ -19,7 +20,9 @@ npm run smoke:browser
 npm run dev
 ```
 
-The dev server binds to `127.0.0.1:4174` only. The production preview binds to `127.0.0.1:4175` only. The browser smoke supports `CHROME_BIN` overrides and saves a diagnostic screenshot under `.artifacts/`.
+The dev server binds to `127.0.0.1:4174` only. The production preview binds to `127.0.0.1:4175` only. Linux CI runs the headless Chrome smoke and uploads its screenshot. On Windows, the CLI smoke explicitly skips because the installed Chrome headless `--dump-dom` command emits no DOM; Windows acceptance is checked separately with Playwright-driven Chrome and Firefox.
+
+Use `http://127.0.0.1:4174/?view=red-lion` to inspect the close-up Red Lion asset assembly.
 
 ## What this slice proves
 
@@ -27,12 +30,17 @@ The dev server binds to `127.0.0.1:4174` only. The production preview binds to `
 - WebGPU is preferred and WebGL 2 fallback is delegated to the engine's supported graphics-device creation path.
 - The isometric visualization consumes the designer-authored World9 map source from [World9 PR #1148](https://github.com/tehki/myaso/pull/1148), exact donor commit `0843946d308bc3f88bb147d910deff450393c475`.
 - Greyhaven city, all 15 authored building footprints, roads, river, fields, groves, bridges, Red Lion entrance reference and map spawn reference are visualized using the source coordinates.
-- The map-to-engine scale is a presentation transform only. It does not define physical meters, collision or movement authority.
-- The PlayCanvas client exposes a lazy import of the already-qualified MYASO browser `connectAuthoritativeClient` and `connectGameTransport`; the protocol adapter is not loaded until a future non-production session explicitly requests it.
+- **The Red Lion now uses a real modular Quaternius GLTF assembly:** ten plaster/timber wall segments, two timber-framed gable ends, arched entrance wall and door, glazed arched windows, open shutters, round-tile gabled roof and masonry chimney.
+- An original heraldic signboard texture labels the building **THE RED LION — TAVERN • GREYHAVEN**.
+- Building placement is derived from the exact authored World9 footprint (6.25 × 4.25 presentation units) and entrance reference (4365, 4060); the presentation scale does not define physical meters or movement authority.
+- Quaternius Medieval Village MegaKit is distributed under **CC0 1.0**. Original creator and exact source mirror revision are recorded in `public/assets/quaternius/medieval-village-megakit/NOTICE.md`; the complete license text is retained beside the assets.
+- Source 2048×2048 material textures are resized to 1024×1024 for this browser prototype. Original source files remain in the external staging archive; upstream files are unchanged.
+- The PlayCanvas client exposes a lazy import of the already-qualified MYASO browser `connectAuthoritativeClient` and `connectGameTransport`; the protocol adapter is not loaded during initial scene boot.
 
 ## Explicitly not implemented
 
-- Building meshes remain diagnostic proxies; approved Blender/GLB art is not yet imported.
+- The Red Lion is a first-pass modular assembly, not a final bespoke Blender rebuild; facade alignment, roof fit, sign proportions, lighting and art direction still need review.
+- The other 14 buildings remain diagnostic proxies; the Blacksmith has not yet been rebuilt from modular art.
 - No actual player actors are rendered; the spawn is a static map reference marker.
 - The World9 source map is read-only visual data. Its portal helpers are not invoked, and it does not authorize movement, collision, portals, items or server transitions.
 - No Rust connection is attempted. No production URL, certificate pin, credential or server configuration is included.
@@ -41,12 +49,14 @@ The dev server binds to `127.0.0.1:4174` only. The production preview binds to `
 
 ## Next gates
 
-1. Connect the authenticated PlayCanvas Editor to the official Editor MCP server and verify real tool calls.
-2. Import approved GLB/Blender exports and the existing human animation source without altering provenance.
-3. Reuse the exact current Rust wire contract through the existing browser client modules.
-4. Qualify two independent clients on a non-production test server, including Combat, respawn, Chat C1, reconnect and tab suspension.
-5. Compare WebGPU and WebGL 2 on actual supported browsers/devices; record load size, p50/p95 frame time and memory where available.
+1. Complete close-up visual review of the Red Lion in Chrome and Firefox; correct only measured placement issues.
+2. Rebuild the Blacksmith from the same licensed modular source where suitable.
+3. Connect the authenticated PlayCanvas Editor to the official Editor MCP server and verify real tool calls.
+4. Import the reusable human animation source and approved Blender exports without altering provenance.
+5. Reuse the exact current Rust wire contract through the existing browser client modules.
+6. Qualify two independent clients on a non-production test server, including Combat, respawn, Chat C1, reconnect and tab suspension.
+7. Compare WebGPU and WebGL 2 on actual supported browsers/devices; record load size, p50/p95 frame time and memory where available.
 
-Current initial bundle baseline: 2.50 MB minified / 646 KB gzip for the engine entry, with the Rust adapter split into a separate 41.8 KB / 13 KB gzip chunk. This is a measured prototype baseline, not an optimized release target.
+Current initial JavaScript bundle baseline: 2.52 MB minified / 650.45 KB gzip, with the Rust adapter split into a separate 41.76 KB / 13.02 KB gzip chunk. The new GLTF assets and textures are tracked separately from the JavaScript bundle; optimize texture and container loading before any release.
 
 See [Main0 PlayCanvas spike #1151](https://github.com/tehki/myaso/issues/1151).

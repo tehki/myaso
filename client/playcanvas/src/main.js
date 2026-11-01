@@ -30,6 +30,7 @@ async function boot() {
       pc.CameraComponentSystem,
       pc.LightComponentSystem
     ];
+    options.resourceHandlers = [pc.TextureHandler, pc.ContainerHandler];
 
     const app = new pc.AppBase(canvas);
     app.init(options);
@@ -38,13 +39,15 @@ async function boot() {
     window.addEventListener('resize', () => app.resizeCanvas());
     app.scene.ambientLight = new pc.Color(0.25, 0.27, 0.30);
 
-    const scene = buildGreyhavenBlockout(app, pc);
+    const scene = await buildGreyhavenBlockout(app, pc);
     app.start();
 
     const backend = rendererName(device);
     rendererStatus.textContent = `Renderer: ${backend}`;
     document.documentElement.dataset.engineBooted = 'true';
     document.documentElement.dataset.renderer = backend;
+    document.documentElement.dataset.redLionAssetLoaded = scene.redLionAsset?.loaded ? 'true' : 'false';
+    document.documentElement.dataset.redLionAssetSource = scene.redLionAsset?.source ?? 'diagnostic-proxy';
     runtimeStatus.textContent = 'Rust session: intentionally disconnected (no production endpoint configured)';
     window.__MYASO_PLAYCANVAS__ = Object.freeze({
       app,

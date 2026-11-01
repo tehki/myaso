@@ -1,4 +1,5 @@
 import { AUTHORED_MAPS, MAP_IDS } from '../world/authored-maps.mjs';
+import { buildQuaterniusRedLion } from './quaternius-red-lion.js';
 
 const WORLD9_RENDER_SCALE = 0.025;
 const SOURCE_COMMIT = '0843946d308bc3f88bb147d910deff450393c475';
@@ -49,6 +50,7 @@ function polyline(app, pc, name, points, width, height, y, centerX, centerY, sur
     const dz = b.z - a.z;
     const length = Math.hypot(dx, dz);
     if (length <= 0) continue;
+
     const segment = primitive(
       app,
       pc,
@@ -93,12 +95,6 @@ function buildingProxy(app, pc, building, centerX, centerY, cache) {
     [point.x, height / 2, point.z], [width, height, depth], cache[wallColor]);
   primitive(app, pc, `${building.name} — roof proxy`, 'box',
     [point.x, height + 0.16, point.z], [width + 0.28, 0.32, depth + 0.28], cache[roofColor]);
-
-  if (building.id === 'red-lion' && building.entrance) {
-    const door = toScenePoint(building.entrance.x, building.entrance.y, centerX, centerY);
-    primitive(app, pc, 'The Red Lion — authored entrance marker (visual only)', 'box',
-      [door.x, 0.12, door.z], [0.55, 0.24, 0.55], cache.spawn);
-  }
 }
 
 function treeProxy(app, pc, x, z, trunkMaterial, canopyMaterial, index) {
@@ -108,11 +104,14 @@ function treeProxy(app, pc, x, z, trunkMaterial, canopyMaterial, index) {
     [x, 1.72, z], [1.05, 1.35, 1.05], canopyMaterial);
 }
 
-export function buildGreyhavenBlockout(app, pc) {
+export async function buildGreyhavenBlockout(app, pc) {
   const map = AUTHORED_MAPS[MAP_IDS.overworld];
   if (!map || map.city?.id !== 'greyhaven' || !Array.isArray(map.buildings)) {
     throw new Error('World9 authored Greyhaven map source is missing or invalid');
   }
+
+  const redLionBuilding = map.buildings.find(building => building.id === 'red-lion');
+  if (!redLionBuilding) throw new Error('World9 authored Red Lion building record is missing');
 
   const centerX = map.city.x + map.city.w / 2;
   const centerY = map.city.y + map.city.h / 2;
@@ -163,7 +162,20 @@ export function buildGreyhavenBlockout(app, pc) {
   }
 
   for (const building of map.buildings) {
-    buildingProxy(app, pc, building, centerX, centerY, cache);
+    if (building.id !== 'red-lion') {
+      buildingProxy(app, pc, building, centerX, centerY, cache);
+    }
+  }
+
+  let redLionAsset;
+  try {
+    redLionAsset = await buildQuaterniusRedLion(
+      app, pc, redLionBuilding, centerX, centerY, WORLD9_RENDER_SCALE
+    );
+  } catch (error) {
+    console.error('[MYASO PlayCanvas] Quaternius Red Lion asset load failed; retaining diagnostic proxy', error);
+    buildingProxy(app, pc, redLionBuilding, centerX, centerY, cache);
+    redLionAsset = Object.freeze({ loaded: false, error: error?.message ?? String(error) });
   }
 
   let treeIndex = 0;
@@ -187,8 +199,20 @@ export function buildGreyhavenBlockout(app, pc) {
     farClip: 600,
     clearColor: new pc.Color(0.075, 0.085, 0.085)
   });
-  camera.setPosition(45, 66, 45);
-  camera.lookAt(0, 0, 0);
+  const redLionFocus = toScenePoint(
+    redLionBuilding.x + redLionBuilding.w / 2,
+    redLionBuilding.y + redLionBuilding.h / 2,
+    centerX, centerY
+  );
+  const redLionView = new URLSearchParams(window.location.search).get('view') === 'red-lion';
+  if (redLionView && redLionAsset.loaded) {
+    camera.camera.orthoHeight = 10.5;
+    camera.setPosition(redLionFocus.x + 10, 11, redLionFocus.z + 10);
+    camera.lookAt(redLionFocus.x, 3.1, redLionFocus.z);
+  } else {
+    camera.setPosition(45, 66, 45);
+    camera.lookAt(0, 0, 0);
+  }
   app.root.addChild(camera);
 
   const sun = new pc.Entity('Warm dusk directional light');
@@ -218,6 +242,9 @@ export function buildGreyhavenBlockout(app, pc) {
     treeCount: treeIndex,
     spawnReference: Object.freeze({ ...map.spawn }),
     approvedArtIntegrated: false,
+    quaterniusArtIntegrated: Boolean(redLionAsset.loaded),
+    redLionAsset,
+    redLionFocus: Object.freeze(redLionFocus),
     collisionAuthority: false,
     portalAuthority: false,
     serverAuthorityConnected: false
