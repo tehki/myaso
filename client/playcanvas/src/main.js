@@ -20,7 +20,8 @@ async function boot() {
     const device = await pc.createGraphicsDevice(canvas, {
       deviceTypes: [pc.DEVICETYPE_WEBGPU]
     });
-    device.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    // Cap high-DPI render targets in the preview to control fill-rate and shadows.
+    device.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
 
     const options = new pc.AppOptions();
     options.graphicsDevice = device;
@@ -47,6 +48,10 @@ async function boot() {
     document.documentElement.dataset.renderer = backend;
     document.documentElement.dataset.redLionAssetLoaded = scene.redLionAsset?.loaded ? 'true' : 'false';
     document.documentElement.dataset.redLionAssetSource = scene.redLionAsset?.source ?? 'diagnostic-proxy';
+    document.documentElement.dataset.blacksmithAssetLoaded = scene.blacksmithAsset?.loaded ? 'true' : 'false';
+    document.documentElement.dataset.greyhavenLook = scene.lightingLook;
+    document.documentElement.dataset.greyhavenDuskSmoke = scene.duskSmokeActive ? 'true' : 'false';
+    document.documentElement.dataset.greyhavenSmokeWisps = String(scene.duskSmokeWispCount);
 
     let devRustSession = null;
     runtimeStatus.textContent = 'Rust session: intentionally disconnected (visual-only preview)';
