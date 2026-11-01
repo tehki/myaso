@@ -74,3 +74,16 @@ Use local Vite to compare:
 The time override is **presentation only**; the Rust server never receives it. Dusk adds at most 4 short-range no-shadow practical lights and 12 pooled translucent wisps (6 per successfully loaded building); daytime creates none. Reuse one smoke material, cap scene sun shadow resolution at 1024 and distance at 65, and cap preview DPR at 1.5 to protect fill rate. The real 3D depth buffer keeps geometry/roof and translucent smoke occlusion subject to subsequent native Chrome/Firefox confirmation.
 
 **Not yet qualified:** source SHA tests, browser screenshots, performance p50/p95, source-visual chimney anchor inspection, Chat/combat readability or authorized 2/4-player World9 travel. GLB meshes retain source geometry/texture; original Blender editables remain on the authorized owner computer. PlayCanvas Editor's separately verified particle-system smoke remains an independent editor-only implementation, not proof of this Vite smoke pool. Silver Knight animation files are **unchanged**: reusable adult-human animation work precedes any Silver retargeting. Production HOLD; no merge, deployment or gameplay-authoritative changes.
+
+
+## Firefox graphics-device first-RED and WebGL2 verification — 2026-11-01
+
+**Original first-RED is preserved, not overwritten or waived.** On Serj, the original Core8C PlayCanvas read-only Firefox harness against source `6d45ba5c71f33e57d8c7d92bbec184083fb404ef` logged `PlayCanvas bootstrap failed: Failed to create a graphics device`, `data-engine-booted=false`, `data-renderer=failed`, and no Rust session. The retry with `gfx.webrender.software=true` and `LIBGL_ALWAYS_SOFTWARE=1` was still RED, so this was **not** a QUIC or actor-authority failure. Untouched first-RED evidence remains on the Serj host:
+
+- `/home/serj/Work/.myaso-combat4d-qa-playcanvas-evidence/firefox-run-2.log` (real headless Firefox device failure)
+- `/home/serj/Work/.myaso-combat4d-qa-playcanvas-evidence/firefox-run-3-softwaregl.log` (independent software GL first-RED)
+- the preexisting `firefox-repro/`, `firefox-softwaregl/` and original Core8C QA reports.
+
+**Scoped graphics-only correction:** Firefox requests actual PlayCanvas `DEVICETYPE_WEBGL2` first and exclusively; other browsers keep WebGPU-first then explicit WebGL2 fallback. Selection is pure graphics presentation, and a failed/unsupported native graphics device remains a visible fatal error rather than a fake renderer. It does not promise WebGL2 will work on a host where the browser is denied all graphics devices. Do not recategorize the original headless failure as PASS simply because the source selector is corrected.
+
+**Manual native acceptance:** open loopback Vite on a host with working Chrome/Firefox installations and repeat `view=red-lion/blacksmith` × `greyhavenTime=day/dusk`. For each session record actual `WebGL2RenderingContext`, DOM device type, original model loaded flags, 0 or 12 dusk smoke wisps, real browser screenshot, graphics driver `WEBGL_debug_renderer_info` where available, and comparable 120-frame RAF p50/p95 (RAF is **not** GPU-present FPS). A genuine GPU host must be distinguished from SwiftShader/llvmpipe or WARP; report hardware identity and actual renderer. Protected CI, genuine native screenshots, original first-RED, and gameplay-independent release checks remain separate gates.
