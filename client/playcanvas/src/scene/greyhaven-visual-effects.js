@@ -62,3 +62,46 @@ export function configureGreyhavenLighting(app, pc, sun, look, redLionFocus, bla
   }
   return Object.freeze({look,lights:Object.freeze(lights),sun});
 }
+
+export function createDuskSmoke(app, pc, chimneys, look) {
+  const plan=smokePlan(chimneys,look);
+  if(plan.length===0) return Object.freeze({active:false,wispCount:0});
+
+  // Reuse one translucent source material across a fixed, small object pool.
+  // All particles depth-test against real roofs and never cast gameplay shadows.
+  const material=new pc.StandardMaterial();
+  material.diffuse=new pc.Color(0.50,0.53,0.54);
+  material.emissive=new pc.Color(0.10,0.11,0.12);
+  material.opacity=0.19;
+  material.blendType=pc.BLEND_NORMAL;
+  material.depthWrite=false;
+  material.useLighting=false;
+  material.update();
+  const wisps=[];
+  for(const chimney of plan) {
+    for(let i=0;i<GREYHAVEN_VISUAL_BUDGET.wispsPerChimney;i++) {
+      const entity=new pc.Entity(chimney.name+' smoke '+(i+1));
+      entity.addComponent('render',{type:'sphere',material,castShadows:false,receiveShadows:false});
+      app.root.addChild(entity);
+      wisps.push({entity,chimney,offset:i/GREYHAVEN_VISUAL_BUDGET.wispsPerChimney});
+    }
+  }
+  let elapsed=0;
+  const update=dt=>{
+    elapsed+=Math.min(Math.max(dt||0,0),0.1);
+    for(const {entity,chimney,offset} of wisps){
+      const t=(offset+elapsed*0.14)%1;
+      entity.setPosition(chimney.x+t*0.58+0.07*Math.sin(elapsed+offset*12),
+        chimney.y+t*2.4,chimney.z-t*0.25);
+      const radius=0.20+t*0.50;
+      entity.setLocalScale(radius,radius*0.74,radius);
+    }
+  };
+  app.on('update',update);
+  update(0);
+  return Object.freeze({active:true,wispCount:wisps.length,destroy(){
+    app.off('update',update);
+    for(const {entity} of wisps) entity.destroy();
+    material.destroy();
+  }});
+}
