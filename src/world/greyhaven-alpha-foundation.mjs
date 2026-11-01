@@ -45,6 +45,9 @@ export function validateGreyhavenAlphaFoundation() {
   const lion=map?.buildings.find(b=>b.id==="red-lion");
   const smith=map?.buildings.find(b=>b.id==="smith");
   const view=worldBuildingPresentation(MAP_IDS.overworld,"red-lion",[]);
+  const portal=map?.portals.find(p=>p.id==="red-lion-enter");
+  const smithSolid=WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS.find(r=>r.id==="building:smith");
+  const lionSolid=WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS.find(r=>r.id==="building:red-lion");
   if(map?.kind!=="outdoor"||city?.id!=="greyhaven"||
     map.width!==8192||map.height!==8192||
     city.x!==3520||city.y!==3460||
@@ -52,6 +55,18 @@ export function validateGreyhavenAlphaFoundation() {
     lion.entrance?.x!==4365||lion.entrance?.y!==4060||
     smith?.x!==3710||smith?.y!==3850||smith?.w!==182||smith?.h!==162||
     smith.entrance!==undefined||view?.visualDepthY!==4075||
+    map.spawn?.x!==GREYHAVEN_ALPHA_FOUNDATION.spawns[0].x||
+    map.spawn?.y!==GREYHAVEN_ALPHA_FOUNDATION.spawns[0].y||
+    map.portals.length!==1||portal?.x!==4365||portal?.y!==4075||
+    portal?.radius!==52||portal?.targetMap!==MAP_IDS.tavern||
+    portal?.targetPortal!=="red-lion-exit"||
+    lion.portal!==portal.id||
+    map.buildings.filter(b=>b.entrance).length!==1||
+    map.buildings.filter(b=>b.portal).length!==1||
+    lionSolid?.min_x!==lion.x||lionSolid?.min_y!==lion.y||
+    lionSolid?.max_x!==lion.x+lion.w||lionSolid?.max_y!==lion.y+lion.h||
+    smithSolid?.min_x!==smith.x||smithSolid?.min_y!==smith.y||
+    smithSolid?.max_x!==smith.x+smith.w||smithSolid?.max_y!==smith.y+smith.h||
     WORLD_ALPHA_GREYHAVEN_STATIC_SOLIDS.length!==23)
     throw new Error("Greyhaven authored source contract mismatch");
   return {map,city,lion,smith,view};
