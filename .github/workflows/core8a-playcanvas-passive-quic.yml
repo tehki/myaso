@@ -1,0 +1,77 @@
+name: Core8A passive PlayCanvas original QUIC Chrome Firefox (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "client/playcanvas/**"
+      - ".github/workflows/core8a-playcanvas-passive-quic.yml"
+permissions:
+  contents: read
+
+jobs:
+  passive-original-quic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+    env:
+      MYASO_PLAYCANVAS_BROWSER: ${{ matrix.browser }}
+      MYASO_PLAYCANVAS_RUST_BIN: ${{ github.workspace }}/server/target/debug/myaso-server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Check real browser drivers
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Install pinned client and validate read-only actor adapter
+        working-directory: client/playcanvas
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Check original Rust authority and pin
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml --all -- --check
+          cargo test --locked --manifest-path server/Cargo.toml --test webtransport_smoke
+          cargo test --locked --manifest-path server/Cargo.toml --test m12_reliable_baseline
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real loopback original QUIC passive actor join removal and reconnect
+        working-directory: client/playcanvas
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            # True browser + WebGL2 under a private software X display.
+            # Headless Firefox CI has no WebGL2 context (first-RED retained).
+            MYASO_PLAYCANVAS_XVFB=1 LIBGL_ALWAYS_SOFTWARE=1               xvfb-run -a -s "-screen 0 1280x720x24"               timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          else
+            timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          fi
+          grep 'PLAYCANVAS_REAL_RUST_QUIC_PASS' "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+      - name: Preserve first-RED and exact-head acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8a-passive-playcanvas-${{ matrix.browser }}-${{ github.sha }}
+          path: ${{ runner.temp }}/core8a-passive-quic-${{ matrix.browser }}.log
+          if-no-files-found: ignore
+          retention-days: 5
