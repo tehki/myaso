@@ -27,3 +27,39 @@ This is **incomplete static geometry**, not a universal walkability oracle: rive
 - Full exact-head protected CI plus two genuine independent-actor Chrome/Firefox original Rust WebTransport navigation through approved wall gates and near solid buildings, no trapping/rubber-band, authentic fight movements and original default legacy unchanged.
 
 **Not yet proven by a source-only Rust PR:** genuine two-player browser acceptance, network jitter/recovery, terrain/foot grounding and current revised building footprint approval. These remain HOLD until Main0 and Core 8C/World9 signoffs.
+
+## Phase A follow-up: authoritative XY ground footprint and contact-safe corridors
+
+The original World9 map has a single outdoor **2D ground plane**, with authored
+roads/cobbles/soil/grass as rendering treatments, not server-signed per-vertex
+terrain elevations. Physics 6 therefore enforces **server-authoritative XY
+contact and containment** and makes no claim of vertical height/slope grounding.
+The 8192×8192 original World footprint includes a radius-18 actor inset; with
+Greyhaven opt-in, spawn positions outside that inset, nonfinite coordinates or
+invalid facing are rejected **without silent clamping/teleporting**, before a
+new actor incarnation is minted. The original arena's historical spawn policy
+remains unchanged.
+
+For an opted-in Greyhaven movement/roll/knockback/body-separation displacement,
+the original Rust simulation performs a conservative swept static check. A
+blocked displacement advances along its source-authoritative axis only to the
+last safe contact point (16 bisection iterations); any subsequent axis slide
+is separately swept from the actual resolved position. This avoids both
+full-tick rollback/sticking and a forged diagonal corner-cut. No client
+presentation or physics packet gains authority and no Combat timing changes.
+
+The strict new Rust cases use **the exact authored World9 Alpha outdoor route**:
+Staging (4110,4160) → Blacksmith (3820,4088) → Red Lion legal exterior
+(4365,4080) → Market west (4230,4380) → Chapel south (4590,3850), using only
+actual input-driven `World::step_by` ticks, movement-speed bounds, world-radius
+bounds and 23-solid clearance. The decorative Red Lion door at (4365,4060)
+remains non-walkable for radius18 and never authorizes a portal.
+
+**Unresolved authority:** The map authoring has no authoritative heightfield,
+river-bank collision, bridges-as-terrain support, trees/grass obstacles,
+dynamic doors, authenticated zone revision or actor grounding Z coordinate.
+These cannot be inferred from a flat renderer or from a clear static query.
+World9 must approve their eventual authored surfaces and Graphics must verify
+visual foot placement. Core8C must connect this into its controlled Greyhaven
+loopback admission and real Chrome/Firefox WebTransport flight before end-to-end
+PASS; this source-only PR remains DRAFT/HOLD.

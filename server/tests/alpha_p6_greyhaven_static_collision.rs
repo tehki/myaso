@@ -108,3 +108,128 @@ fn alpha_p6_swept_wall_tunneling_and_approved_facade_approach() {
         Ok(true)
     );
 }
+
+#[test]
+fn alpha_p6_ground_footprint_rejects_invalid_actor_origins_instead_of_teleport_clamping() {
+    // World9 authoring is a flat XY overworld. Do not claim a non-existent z heightfield.
+    // An invalid ground footprint cannot be silently clamped to a new spawn.
+    let mut world = greyhaven();
+    for (id, x, y) in [
+        (1, -100.0, 4160.0),
+        (2, 10.0, 4160.0),
+        (3, 8190.0, 4160.0),
+        (4, 4110.0, -5.0),
+        (5, 4110.0, 8190.0),
+        (6, f32::NAN, 4160.0),
+        (7, 4110.0, f32::INFINITY),
+    ] {
+        assert!(
+            !world.add_player_at(id, x, y, 0.0),
+            "invalid ground spawn admitted: {id}"
+        );
+        assert!(world.fighter(id).is_none());
+    }
+    // The original arena still follows its prior source policy, including clamping.
+    let mut arena = World::new(800.0, 600.0);
+    assert!(arena.add_player_at(1, -100.0, 200.0, 0.0));
+    assert_eq!(arena.fighter(1).unwrap().x, 18.0);
+}
+
+#[test]
+fn alpha_p6_building_wall_advances_to_actual_contact_not_previous_frame_position() {
+    let mut world = greyhaven();
+    // Smith's west face is x3710, so a radius18 actor must stop just before x3692.
+    assert!(world.add_player_at(1, 3680.0, 3990.0, 0.0));
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            move_x: 1.0,
+            ..Default::default()
+        }
+    ));
+    world.step_by(100.0);
+    let first = world.fighter(1).unwrap();
+    assert!(
+        first.x >= 3691.95 && first.x < 3692.0,
+        "wall contact should advance safely, got {}",
+        first.x
+    );
+    assert_eq!(
+        overlaps_known_static_solid(first.x, first.y, 18.0),
+        Ok(false)
+    );
+
+    // Genuine lateral motion along the same physical wall must remain available.
+    assert!(world.set_input(
+        1,
+        InputIntent {
+            move_y: 1.0,
+            ..Default::default()
+        }
+    ));
+    world.step_by(100.0);
+    let slid = world.fighter(1).unwrap();
+    assert!(slid.y >= 4011.0, "tangent movement trapped at y={}", slid.y);
+    assert!(slid.x < 3692.0);
+}
+
+#[test]
+fn alpha_p6_authored_world9_streets_are_continuously_navigable_on_server() {
+    // Exactly the World9 Phase A suggested outside route, never a portal or teleport.
+    let points = [
+        (4110.0, 4160.0),
+        (4000.0, 4160.0),
+        (4000.0, 4088.0),
+        (3820.0, 4088.0),
+        (4000.0, 4088.0),
+        (4110.0, 4088.0),
+        (4110.0, 4160.0),
+        (4365.0, 4160.0),
+        (4365.0, 4080.0),
+        (4365.0, 4160.0),
+        (4230.0, 4160.0),
+        (4230.0, 4380.0),
+        (4230.0, 4160.0),
+        (4590.0, 4160.0),
+        (4590.0, 3850.0),
+    ];
+    let mut world = greyhaven();
+    assert!(world.add_player_at(1, points[0].0, points[0].1, 0.0));
+    for &(x, y) in points.iter().skip(1) {
+        let mut arrived = false;
+        for _ in 0..300 {
+            let f = world.fighter(1).unwrap();
+            let old = (f.x, f.y);
+            let dx = x - old.0;
+            let dy = y - old.1;
+            let distance = dx.hypot(dy);
+            if distance <= 2.2 {
+                arrived = true;
+                break;
+            }
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_x: dx / distance,
+                    move_y: dy / distance,
+                    ..Default::default()
+                }
+            ));
+            world.step_by(10.0);
+            let f = world.fighter(1).unwrap();
+            assert!(f.x.is_finite() && f.y.is_finite());
+            assert!(f.x >= 18.0 && f.x <= 8192.0 - 18.0);
+            assert!(f.y >= 18.0 && f.y <= 8192.0 - 18.0);
+            assert_eq!(overlaps_known_static_solid(f.x, f.y, 18.0), Ok(false));
+            assert!(
+                (f.x - old.0).hypot(f.y - old.1) < 2.151,
+                "source movement snapped beyond its original speed"
+            );
+        }
+        assert!(
+            arrived,
+            "server route blocked before ({x},{y}); actual={:?}",
+            world.fighter(1).map(|f| (f.x, f.y))
+        );
+    }
+}
