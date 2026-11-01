@@ -173,7 +173,7 @@ try{
  // Walk east on the open street to the Red Lion south frontage.
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
-     {type:"keyDown",value:"d"},{type:"pause",duration:1800},{type:"keyUp",value:"d"}]}]});
+     {type:"keyDown",value:"d"},{type:"pause",duration:1450},{type:"keyUp",value:"d"}]}]});
  let lastFrontage=[];
  const frontage=await waitFor(async()=>{
    const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
