@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import { buildGreyhavenBlockout } from './scene/greyhaven-blockout.js';
+import { createGreyhavenGraphicsDevice } from './graphics-device.js';
 import './style.css';
 
 const canvas = document.querySelector('#application');
@@ -17,9 +18,7 @@ function rendererName(device) {
 
 async function boot() {
   try {
-    const device = await pc.createGraphicsDevice(canvas, {
-      deviceTypes: [pc.DEVICETYPE_WEBGPU]
-    });
+    const device = await createGreyhavenGraphicsDevice(pc, canvas, navigator.userAgent);
     // Cap high-DPI render targets in the preview to control fill-rate and shadows.
     device.maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
 
@@ -46,6 +45,7 @@ async function boot() {
     rendererStatus.textContent = `Renderer: ${backend}`;
     document.documentElement.dataset.engineBooted = 'true';
     document.documentElement.dataset.renderer = backend;
+    document.documentElement.dataset.graphicsDeviceType = device.deviceType;
     document.documentElement.dataset.redLionAssetLoaded = scene.redLionAsset?.loaded ? 'true' : 'false';
     document.documentElement.dataset.redLionAssetSource = scene.redLionAsset?.source ?? 'diagnostic-proxy';
     document.documentElement.dataset.blacksmithAssetLoaded = scene.blacksmithAsset?.loaded ? 'true' : 'false';
