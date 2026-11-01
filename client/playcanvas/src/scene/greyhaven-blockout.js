@@ -250,8 +250,8 @@ export async function buildGreyhavenBlockout(app, pc) {
   const lighting = configureGreyhavenLighting(app, pc, sun, look,
     redLionFocus, blacksmithReference);
   const chimneySmoke = createDuskSmoke(app, pc, [
-    redLionSmokeAnchor(redLionFocus),
-    blacksmithSmokeAnchor(blacksmithReference)
+    ...(redLionAsset.loaded ? [redLionSmokeAnchor(redLionFocus)] : []),
+    ...(blacksmithAsset.loaded ? [blacksmithSmokeAnchor(blacksmithReference)] : [])
   ], look);
 
   return Object.freeze({
