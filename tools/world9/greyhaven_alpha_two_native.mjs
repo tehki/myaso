@@ -8,10 +8,17 @@ import {createHash} from "node:crypto";
 import {resolve, join, extname, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {setTimeout as delay} from "node:timers/promises";
+import {MAP_IDS,getAuthoredMap} from "../../src/world/authored-maps.mjs";
 
 // Nonrelease QA: same real Rust/Chrome/Firefox Silver + Chat client with opt-in source-verified Greyhaven Red Lion.
 // Original 3B Blender assets, 3C World9 renderer and actor painter are exercised, never fake World players.
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
+const redLion=getAuthoredMap(MAP_IDS.overworld)?.buildings.find(b=>b.id==="red-lion");
+assert.ok(redLion,"the original World9 Red Lion footprint is required for this native test");
+// The genuine browser must stand within the front face with more than a
+// fighter radius of side-wall clearance, not at one hard-coded X sample.
+const faceMargin=18+24;
+assert.ok(redLion.w>2*faceMargin,"no safe Red Lion frontage corridor");
 const engines=(process.env.MYASO_WORLD9_NATIVE_BROWSERS||"chrome,firefox").split(",");
 assert.equal(engines.length,2,"two distinct genuine browser sessions required");
 assert.ok(engines.every(x=>x==="chrome"||x==="firefox"),"unknown W3C browser engine");
@@ -180,24 +187,25 @@ try{
    const a=views[0].review.actors.find(x=>x.netId===1);
    const b=views[1].review.actors.find(x=>x.netId===1);
    lastFrontage=views.map(v=>v.review.actors.filter(x=>x.netId===1||x.netId===2));
-   return a&&b&&a.x>4330&&a.x<4410&&Math.abs(a.x-b.x)<8?views:null;
+   return a&&b&&a.x>redLion.x+faceMargin&&
+     a.x<redLion.x+redLion.w-faceMargin&&Math.abs(a.x-b.x)<8?views:null;
  },18000).catch(error=>{
    console.error("GREYHAVEN_RED_LION_FRONTAGE_FIRST_RED "+JSON.stringify(lastFrontage));
    throw error;
  });
  const frontageActor=frontage[0].review.actors.find(x=>x.netId===1);
- assert.ok(frontageActor.y>4050+18,"open south street is walkable before the building face");
+ assert.ok(frontageActor.y>redLion.y+redLion.h+18,"open south street is walkable before the building face");
  // Move north in two physical steps: first onto the safe sidewalk, then
  // attempt to cross the Red Lion's actual fixed building AABB.
  await evaluate(first,"document.querySelector('#arena').focus();return true");
  await request(first.base,"POST","/session/"+first.id+"/actions",
    {actions:[{type:"key",id:"keyboard",actions:[
-     {type:"keyDown",value:"w"},{type:"pause",duration:300},{type:"keyUp",value:"w"}]}]});
+     {type:"keyDown",value:"w"},{type:"pause",duration:120},{type:"keyUp",value:"w"}]}]});
  const sidewalk=await waitFor(async()=>{
    const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
    const a=views[0].review.actors.find(x=>x.netId===1);
    const b=views[1].review.actors.find(x=>x.netId===1);
-   return a&&b&&a.y<frontageActor.y-18&&a.y>4050+18&&Math.abs(a.y-b.y)<8?views:null;
+   return a&&b&&a.y<frontageActor.y-18&&a.y>redLion.y+redLion.h+18&&Math.abs(a.y-b.y)<8?views:null;
  },12000);
  const sidewalkActor=sidewalk[0].review.actors.find(x=>x.netId===1);
  await evaluate(first,"document.querySelector('#arena').focus();return true");
@@ -208,7 +216,7 @@ try{
  const wallViews=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
  const wallOwner=wallViews[0].review.actors.find(x=>x.netId===1);
  const wallPeer=wallViews[1].review.actors.find(x=>x.netId===1);
- assert.ok(wallOwner.y>=4050+18-1,
+ assert.ok(wallOwner.y>=redLion.y+redLion.h+18-1,
    "original Rust Physics6 swept collision must stop the actor outside Red Lion south wall");
  assert.ok(wallOwner.y<sidewalkActor.y-4,
    "actor must reach the real walkable frontage before being stopped by the wall");
@@ -216,7 +224,8 @@ try{
    "both browsers must agree on the actual server-authoritative wall stop");
  outputTrace.physicalBuildingCollisionProven=true;
  outputTrace.redLionWall={actorNetId:1,x:wallOwner.x,y:wallOwner.y,
-   minX:4240,maxX:4490,minY:3880,maxY:4050,actorRadius:18};
+   minX:redLion.x,maxX:redLion.x+redLion.w,
+   minY:redLion.y,maxY:redLion.y+redLion.h,actorRadius:18};
  await sleeps(900);
  for(const {s,actor} of actors){
    const data=await evaluate(s,nativeStats);
@@ -226,7 +235,7 @@ try{
    assert.equal(data.review.ownNetId,actor.id);
    assert.ok(data.review.serverTick>0,"actual source Rust World tick");
    assert.ok(Number.isFinite(data.review.camera.x));
-   if(actor.id===1)assert.ok(data.review.actors.find(a=>a.netId===1).y>=4050+18-1,
+   if(actor.id===1)assert.ok(data.review.actors.find(a=>a.netId===1).y>=redLion.y+redLion.h+18-1,
      "first player remains outside the authoritative Red Lion solid");
    else assert.ok(data.review.actors.find(a=>a.netId===2).x>0,
      "second original Rust player remains present");
