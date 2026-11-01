@@ -11,6 +11,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 4174,
     strictPort: true,
+    watch: { ignored: ['**/.artifacts/**'] },
     fs: { allow: [resolve(projectRoot, '../..')] }
   },
   preview: { host: '127.0.0.1', port: 4175, strictPort: true },

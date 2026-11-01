@@ -17,7 +17,6 @@ function rendererName(device) {
 
 async function boot() {
   try {
-    // PlayCanvas requests WebGPU first and automatically falls back to WebGL 2.
     const device = await pc.createGraphicsDevice(canvas, {
       deviceTypes: [pc.DEVICETYPE_WEBGPU]
     });
@@ -48,13 +47,44 @@ async function boot() {
     document.documentElement.dataset.renderer = backend;
     document.documentElement.dataset.redLionAssetLoaded = scene.redLionAsset?.loaded ? 'true' : 'false';
     document.documentElement.dataset.redLionAssetSource = scene.redLionAsset?.source ?? 'diagnostic-proxy';
-    runtimeStatus.textContent = 'Rust session: intentionally disconnected (no production endpoint configured)';
+
+    let devRustSession = null;
+    runtimeStatus.textContent = 'Rust session: intentionally disconnected (visual-only preview)';
+    document.documentElement.dataset.rustSession = 'disconnected';
+
     window.__MYASO_PLAYCANVAS__ = Object.freeze({
       app,
       device,
       scene,
-      loadAuthoritativeClient: () => import('./rust-authoritative-client.js')
+      loadAuthoritativeClient: () => import('./rust-authoritative-client.js'),
+      get devRustSession() { return devRustSession; }
     });
+
+    // Deliberately separate from the PlayCanvas Editor's hosted Launch:
+    // only local Vite DEV plus explicit ?rust=1 can enter the QUIC code path.
+    // Neither production builds nor the default preview initiates a connection.
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('rust') === '1') {
+      document.documentElement.dataset.rustSession = 'connecting';
+      runtimeStatus.textContent = 'Rust: checking local QUIC-only development configuration';
+      try {
+        const { connectDevRustActors } = await import('./network/dev-rust-session.js');
+        devRustSession = await connectDevRustActors({
+          app,
+          pc,
+          url: import.meta.env.VITE_MYASO_DEV_QUIC_URL,
+          sha256: import.meta.env.VITE_MYASO_DEV_QUIC_SHA256,
+          onStatus(message) {
+            runtimeStatus.textContent = message;
+          }
+        });
+        document.documentElement.dataset.rustSession = 'connected';
+        window.addEventListener('beforeunload', () => devRustSession?.close(), { once: true });
+      } catch (error) {
+        document.documentElement.dataset.rustSession = 'error';
+        runtimeStatus.textContent = `Local Rust session unavailable: ${error.message}`;
+        console.warn('[MYASO PlayCanvas] opt-in local QUIC connection unavailable:', error.message);
+      }
+    }
 
     document.addEventListener('visibilitychange', () => {
       visibilityStatus.textContent = `Tab: ${document.hidden ? 'background' : 'visible'}`;
