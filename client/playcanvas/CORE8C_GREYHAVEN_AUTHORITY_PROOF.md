@@ -51,3 +51,50 @@ npm run smoke:rust-world:core8c
 The opt-in native script builds only that Rust source, checks the 23-solid parity, starts an isolated loopback Rust QUIC process and local Vite, captures server-generated certificate pin (never a production pin), connects real Chrome W3C sessions, tests actual server actors/positions and attempts ongoing snapshots, deletion and rejoin **without any gameplay input**. It writes `.artifacts/core8c-rust-readonly/core8c-original-rust-first-red.json` upon a two-seat failure and cleans up its own processes. The native command is **expected to fail strictly** until the original read-only snapshot bootstrap is separately resolved.
 
 **Verdict:** original Rust/PlayCanvas initial reliable snapshot and isolated Greyhaven **operator-side** map authority **PASS_SCOPED**. Continuous read-only replication / same-session PlayCanvas respawn **BLOCKED**; public multiplayer/Combat/Chat **HOLD**. No source merge, deployment, public activation or gate waiver.
+
+
+## Independent follow-up — Core8A passive reliable-snapshot trial (2026-11-01)
+
+**Scope warning:** The first-RED and default-server HOLD above remain historically valid for published Greyhaven #1150. Core8A is independently reviewing a minimal original-server reliable snapshot change. To test it without taking ownership of 8A's server lane, Core8C created **one LOCAL, unpushed, isolated** test commit `d7456a0c0df3a033bab2bf6e0587cea45e288bfd` on exact #1150, with only the same existing `server/src/main.rs` bounded reliable catchup condition extended to `!realtime_ready || should_enqueue_reliable_catchup(...)`. The 60-tick reliable cooldown, existing frame codec, game lease and original WebTransport remain unchanged. **No Main0 signoff is implied.** Original trial executable SHA-256: `3ea902c44348d6610f0b773f6af800596197aa32ef5b0fa19a1e7f0c1f5b8b76`.
+
+### Two genuine INPUT-FREE PlayCanvas browsers — PASS_SCOPED on local trial only
+
+Core8C reran the committed strict `scripts/core8c-rust-readonly-live.mjs` against the isolated trial binary and its own short-lived loopback development cert:
+
+| Event | Original Rust / PlayCanvas observation |
+|---|---|
+| First PlayCanvas browser | actor #1 (4110,4160), HP100, reliable tick223, 1 snapshot |
+| Second PlayCanvas browser | #1 (4110,4160) and #2 (4206,4160); HP100; snapshot tick499 |
+| First viewer after peer joined | BOTH actors, 6 genuine snapshots at server tick525 |
+| Peer root closes | remaining viewer sees only #1, 8 genuine snapshots at tick645 |
+| New separate root enters | newly server-issued #3 at (4206,4160) and original #1; remaining viewer has 13 snapshots at tick945 |
+
+Both actual PlayCanvas Chromium WebGL2 instances used the parent bridge, **`ownNetId=null` and zero `sendInput`**. Positions, tick, HP, membership and removal came from the original Rust reliable stream. Test evidence is retained locally at `/home/serj/Work/myaso-core8c-passive-greyhaven-real-readonly-retry-20261101.log`, `client/playcanvas/.artifacts/core8c-rust-readonly/core8c-readonly-live.json` and an actual browser PNG (SHA256 `5482bb6abb2fa9de2fb9ccbb1510e73a330e8ad3ba728f356491d40d2633849f`).
+
+The first provisional passive run reached both actors but failed the removal gate when the test destroyed a ChromeDriver window without explicitly closing its QUIC root first. The harness now calls existing read-only `devRustSession.close()`, asserts the transport closed, then deletes the WebDriver session. That is faithful client retirement, not a simulated actor removal or softened acceptance. Original first-RED logs remain retained.
+
+### Genuine SAME-SESSION combat death and read-only resurrection — PASS_SCOPED on local trial
+
+An additional independent **temporary, non-committed test driver**, derived from Core8A's existing `authoritative-quic-smoke.mjs`, exercised **two real PlayCanvas Chromium browser sessions** using the original authenticated `connectAuthoritativeClient.sendInput` test API. It did **not** modify `web/`, `server/`, actor positions, combat state or client-side HP. This is an *active authentic-input control*, separate from the input-free spectator.
+
+Server-owned target **NetID #2** took three actual Light34 HITs: `100 → 66 → 32 → 0 HP`, then original `World::respawn_fighter` restored `100 HP` at the original `(4206,4160)` spawn on the **same authenticated QUIC root/NetID**. No new actor was minted for this death/respawn. Its real browser-observed server ticks were 891, 933, 975 (damage) and 1023 (respawn). This is live original-World death/respawn, **not** an independent two-physical-host or physical mouse-timing qualification.
+
+**Crucially, the genuine input-free PlayCanvas spectator independently observed both death and resurrection** over the original reliable snapshot stream, without sending any gameplay packets or fabricated ACK:
+
+| Passive original Rust snapshot | Death | Later respawn |
+|---|---:|---:|
+| NetID | 2 | 2 |
+| HP | 0 | 100 |
+| Action code | 8 (Dead) | 0 (Idle) |
+| X,Y | (4322,4160) | (4206,4160) |
+| Original server tick | 954 | 1074 |
+
+The spectator reached five reliable snapshots and still had `ownNetId=null`. Both the active target and passive actor view kept the same server-owned NetID #2 across this life transition. The **world-incarnation epoch is not exposed on the existing snapshot wire**, so client-side epoch attestation remains unavailable even though original Rust tests establish a fresh server-side incarnation. Captured native marker `CORE8C_PASSIVE_RUST_WORLD9_RESPAWN_PASS` and active marker `CORE8C_REAL_RUST_WORLD9_RESPAWN_PASS` in the local, immutable-in-this-run `/home/serj/Work/myaso-core8c-greyhaven-passive-death-respawn-native-20261101.log`.
+
+### Acceptance boundary / release
+
+- PASS_SCOPED: independent original Rust Greyhaven map operator gate, two real input-free PlayCanvas viewers' continuous reliable snapshots, live actor join/removal/rejoin, and same-NetID death/respawn observed from the server in both active and passive browser paths.
+- NOT QUALIFIED: a **published** Core8A+World9 exact-source combination with protected CI and independent 8A/4D signoff; Firefox parity; multi-physical-host WebTransport; map/zone signed token or incarnation on client wire; three same-session death cycles; Combat4D physical timing/M140/Firefox Space+LMB; Chat C1; full Greyhaven river/dynamic collision or editor geometry signoff.
+- Main0/#1151 and Core8A/#1153/#1155 own review, publication and integration of the server-side reliable catchup. This PR changes only isolated PlayCanvas test/docs, never `server/` or `web/`.
+
+**Current conclusion:** local trial verifies continuous genuine read-only Greyhaven and one real respawn, but **RELEASE HOLD** remains until Core8A source review, exact-head CI and full original gameplay qualification.

@@ -146,18 +146,34 @@ try{
     '/session/'+first.id+'/screenshot'),'base64');
   assert.ok(png.length>1024);
   await writeFile(join(out,'native-playcanvas-original-rust.png'),png);
+  // Retire the original QUIC root explicitly before destroying the
+  // WebDriver window; ChromeDriver deletion alone need not flush QUIC close.
+  const retired=await request(second.base,'POST',
+    '/session/'+second.id+'/execute/sync',{script:
+      'const s=window.__MYASO_PLAYCANVAS__?.devRustSession; s?.close(); return {closed:s?.client?.transport?.closed};',
+      args:[]});
+  assert.equal(retired.closed,true,'original input-free QUIC session closes');
   await request(second.base,'DELETE','/session/'+second.id);
   sessions.splice(sessions.indexOf(second),1);
+  let lastAfterRemoval;
   const afterRemoval=await waitFor(async()=>{
-    const s=await observe(first);
+    const s=await observe(first); lastAfterRemoval=s;
     return s.count===1&&s.actors.length===1&&s.actors[0].netId===1?s:null;
-  },22000);
+  },22000).catch(error=>{
+    console.error('CORE8C_REMOVAL_FIRST_RED '+JSON.stringify(lastAfterRemoval));
+    throw error;
+  });
   const third=await addBrowser(url);
+  let lastRejoin=[];
   const rejoined=await waitFor(async()=>{
     const both=await Promise.all([observe(first),observe(third)]);
+    lastRejoin=both;
     return both.every(s=>s.count===2&&s.actors.length===2
       &&s.actors.some(x=>x.netId===3))?both:null;
-  },25000);
+  },25000).catch(error=>{
+    console.error('CORE8C_REJOIN_FIRST_RED '+JSON.stringify(lastRejoin));
+    throw error;
+  });
   for(const s of rejoined)assertSpawn(s.actors[1],3,4206,4160);
   const evidence={...proof,initial:alone,twoSeats:together,
     afterRemoval,rejoined,canonicalWire:true,production:false,
