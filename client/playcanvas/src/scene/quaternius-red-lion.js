@@ -29,7 +29,37 @@ const SHUTTER_LOCAL_CENTER_Z = 0.326972514;
 const WINDOW_LOCAL_CENTER_Z = 0.012504488;
 const GABLE_LOCAL_CENTER_Z = 0.229588329;
 const DOOR_LOCAL_CENTER_X = 0.5137433372;
+const DOOR_LOCAL_BASE_Y = 0.0330896378;
 const DOOR_LOCAL_CENTER_Z = 0.00279258005;
+
+// Measured from the genuine Quaternius Wall_Plaster_Door_Round opening in
+// Blender: 1.305 m wide below the arch; arch apex approximately 2.50 m.
+// The actual Door_1_Round timber leaf is only 1.120 m wide × 2.318 m tall.
+// Fit its width to the same front-wall presentation scale, retain a visible
+// jamb reveal, and make the arch taller without touching the wall or portal.
+export const RED_LION_DOOR_FIT = Object.freeze({
+  openingWidth: 1.305,
+  archApexHeight: 2.50,
+  horizontalScale: 1.10,
+  verticalScale: 1.04
+});
+
+export function fittedRedLionDoorTransform(frontScaleX, depth) {
+  if (!(Number.isFinite(frontScaleX) && frontScaleX > 0 &&
+        Number.isFinite(depth) && depth > 0)) {
+    throw new TypeError('Red Lion door requires the real World9 presentation dimensions');
+  }
+
+  const scaleX = frontScaleX * RED_LION_DOOR_FIT.horizontalScale;
+  const scaleY = RED_LION_DOOR_FIT.verticalScale;
+  return Object.freeze({
+    x: -DOOR_LOCAL_CENTER_X * scaleX,
+    y: -DOOR_LOCAL_BASE_Y * scaleY,
+    z: depth / 2 - DOOR_LOCAL_CENTER_Z,
+    scaleX,
+    scaleY
+  });
+}
 const WALL_HEIGHT = 3.1226887703;
 const ROOF_MIN_Y = -0.5157185793;
 
@@ -231,12 +261,11 @@ export async function buildQuaterniusRedLion(app, pc, building, centerX, centerY
     });
   }
 
-  // Door leaf is a separate Quaternius mesh placed inside the authored doorway.
-  part('Door_1_Round.gltf', 'Red Lion — timber entrance door', {
-    x: -DOOR_LOCAL_CENTER_X,
-    y: -0.0330896378,
-    z: depth / 2 - DOOR_LOCAL_CENTER_Z
-  });
+  // Keep the genuine timber door centered and grounded inside the source
+  // arched opening as the World9 facade modules scale to the building width.
+  // This is a visual fit only: it does not create an interactive entrance.
+  part('Door_1_Round.gltf', 'Red Lion — timber entrance door',
+    fittedRedLionDoorTransform(frontScaleX, depth));
 
   // Three timber-framed plaster modules form the rear wall.
   for (const x of [-third, 0, third]) {
