@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4175 --strictPort",
     "test": "node --test",
-    "smoke:browser": "node scripts/browser-smoke.mjs"
+    "smoke:browser": "node scripts/browser-smoke.mjs",
+    "smoke:quic": "node scripts/authoritative-quic-smoke.mjs"
   },
   "dependencies": {
     "playcanvas": "2.23.3"

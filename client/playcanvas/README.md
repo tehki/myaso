@@ -41,9 +41,9 @@ Use `http://127.0.0.1:4174/?view=red-lion` to inspect the close-up Red Lion asse
 
 - The Red Lion is a first-pass modular assembly, not a final bespoke Blender rebuild; facade alignment, roof fit, sign proportions, lighting and art direction still need review.
 - The other 14 buildings remain diagnostic proxies; the Blacksmith has not yet been rebuilt from modular art.
-- No actual player actors are rendered; the spawn is a static map reference marker.
+- No production character mesh/animation is integrated; the opt-in Rust debug bridge renders read-only diagnostic actor silhouettes.
 - The World9 source map is read-only visual data. Its portal helpers are not invoked, and it does not authorize movement, collision, portals, items or server transitions.
-- No Rust connection is attempted. No production URL, certificate pin, credential or server configuration is included.
+- Default startup never attempts a Rust connection. No production URL, certificate pin, credential or server configuration is included. Only explicit loopback-pinned developer mode or the separately invoked local-only smoke can connect.
 - No movement, combat, HP, identity, respawn or chat is client-authoritative.
 - The existing `web/` client and `server/` sources are unchanged.
 
@@ -60,3 +60,38 @@ Use `http://127.0.0.1:4174/?view=red-lion` to inspect the close-up Red Lion asse
 Current initial JavaScript bundle baseline: 2.52 MB minified / 650.45 KB gzip, with the Rust adapter split into a separate 41.76 KB / 13.02 KB gzip chunk. The new GLTF assets and textures are tracked separately from the JavaScript bundle; optimize texture and container loading before any release.
 
 See [Main0 PlayCanvas spike #1151](https://github.com/tehki/myaso/issues/1151).
+
+
+## Isolated real Rust QUIC / PlayCanvas acceptance (opt-in)
+
+This test is **not** part of the normal renderer smoke or production runtime. It starts a
+fresh original Rust server on `127.0.0.1:0` (ephemeral UDP port and self-signed
+development certificate), a private loopback Vite server, ChromeDriver and **two
+real Chromium PlayCanvas pages**. It dynamically loads the **existing**
+`web/authoritative-client.mjs` and `web/network-transport.mjs` through the
+unchanged PlayCanvas adapter. No WebSocket fallback, alternate wire codec,
+credentials, public bind, or production URL are accepted. The harness removes any inherited `MYASO_*` server environment variables before applying only its own loopback bind and four-player cap.
+
+Build the Rust server from the checked-out source, keeping temporary build
+artifacts away from constrained shared `/tmp` volumes when necessary:
+
+```bash
+cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+cd client/playcanvas
+npm ci
+MYASO_PLAYCANVAS_RUST_BIN="$(realpath ../../server/target/debug/myaso-server)" npm run smoke:quic
+```
+
+The binary path must explicitly point to a local `myaso-server` executable.
+The test requires `chromedriver` and Chromium (override `CHROME_BIN` if needed),
+validates the opt-in PlayCanvas read-only Rust actor bridge (genuine snapshot-driven silhouettes with **zero inputs**), as well as two real server-assigned distinct actors, datagram snapshots, reliable
+snapshot baselines, processed input ACKs and World position/HP, then closes one
+QUIC root. The surviving client must observe the actor removal. Reconnecting
+must acquire a fresh server-issued actor and fresh snapshots without reusing
+the retired connection. All child processes are terminated in a `finally`
+block, including on first-RED. The output is
+`PLAYCANVAS_REAL_RUST_QUIC_PASS` or a preserved
+`PLAYCANVAS_REAL_RUST_QUIC_FIRST_RED` with the reason.
+
+This verifies basic snapshot/identity/lifecycle/reconnection only. It is **not**
+the independent Combat 4D, three-respawn, Chat C1 or production-release gate.
