@@ -68,6 +68,10 @@ async function newBrowser(url) {
   const options = browserName === 'firefox'
     ? { browserName: 'firefox', 'moz:firefoxOptions': {
         args: ['-headless'],
+        // GitHub's headless Firefox has no hardware GPU. Explicitly allow its
+        // software WebGL2 renderer, without changing game or protocol code.
+        prefs: { 'webgl.force-enabled': true, 'webgl.disabled': false,
+          'webgl.enable-webgl2': true },
         ...(process.env.FIREFOX_BIN ? { binary: process.env.FIREFOX_BIN } : {})
       } }
     : { browserName: 'chrome', 'goog:chromeOptions': {
@@ -86,7 +90,7 @@ async function newBrowser(url) {
   await wd('POST', base + '/url', { url });
   await poll('PlayCanvas boot', async () => {
     const state = await wd('POST', base + '/execute/sync', {
-      script: 'return {booted:document.documentElement.dataset.engineBooted,renderer:document.documentElement.dataset.renderer,ready:!!window.__MYASO_PLAYCANVAS__};',
+      script: 'return {booted:document.documentElement.dataset.engineBooted,renderer:document.documentElement.dataset.renderer,ready:!!window.__MYASO_PLAYCANVAS__,fatal:document.querySelector("#fatal")?.textContent?.slice(0,600),gpu:!!navigator.gpu,webgl2:(()=>{try{return !!document.createElement("canvas").getContext("webgl2")}catch{return false}})()};',
       args: [],
     });
     return { ...state, ok: state.booted === 'true' && state.ready === true };
