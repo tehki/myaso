@@ -1715,12 +1715,20 @@ async fn handle_connection(
                         }
                     }
                 }
-                if !kill_event_queued && should_enqueue_reliable_catchup(
-                    background_deadline_misses,
-                    omitted_due_to_budget,
-                    game.reliable_write_delay,
-                ) && server_tick.wrapping_sub(last_reliable_background_tick)
-                    >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
+                // No sampled input means no echoed baseline ACK, so realtime
+                // DATAGRAMs must remain gated. Still keep this admitted,
+                // passive QUIC root up to date over the EXISTING reliable
+                // snapshot stream, bounded to its normal 60-tick cooldown.
+                // This carries World-authored joins/removals without a fake
+                // neutral input, a protocol extension, or an ACK forgery.
+                if !kill_event_queued
+                    && (!realtime_ready || should_enqueue_reliable_catchup(
+                        background_deadline_misses,
+                        omitted_due_to_budget,
+                        game.reliable_write_delay,
+                    ))
+                    && server_tick.wrapping_sub(last_reliable_background_tick)
+                        >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
                 {
                     if !game.reliable_write_delay.is_zero() {
                         println!(

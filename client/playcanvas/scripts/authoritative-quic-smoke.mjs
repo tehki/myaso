@@ -20,7 +20,8 @@ const sessions = [];
 let driverPort;
 let rustOutput = '';
 let viteOutput = '';
-const testDeadlineMs = 25_000;
+const testDeadlineMs = 30_000;
+const browserName = process.env.MYASO_PLAYCANVAS_BROWSER === 'firefox' ? 'firefox' : 'chrome';
 
 function child(file, args, options = {}) {
   const proc = spawn(file, args, { stdio: ['ignore','pipe','pipe'], ...options });
@@ -64,15 +65,19 @@ async function wd(method, path, body) {
   return json.value;
 }
 async function newBrowser(url) {
-  const chromeBin = process.env.CHROME_BIN || '/usr/bin/chromium';
-  const value = await wd('POST', '/session', { capabilities: { alwaysMatch: {
-    browserName: 'chrome',
-    'goog:chromeOptions': { binary: chromeBin, args: [
-      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
-      '--disable-background-networking', '--use-gl=angle', '--use-angle=swiftshader',
-      '--enable-webgl', '--enable-unsafe-swiftshader', '--window-size=1280,720',
-    ] },
-  } } });
+  const options = browserName === 'firefox'
+    ? { browserName: 'firefox', 'moz:firefoxOptions': {
+        args: ['-headless'],
+        ...(process.env.FIREFOX_BIN ? { binary: process.env.FIREFOX_BIN } : {})
+      } }
+    : { browserName: 'chrome', 'goog:chromeOptions': {
+        binary: process.env.CHROME_BIN || '/usr/bin/chromium', args: [
+          '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+          '--disable-background-networking', '--use-gl=angle', '--use-angle=swiftshader',
+          '--enable-webgl', '--enable-unsafe-swiftshader', '--window-size=1280,720'
+        ]
+      } };
+  const value = await wd('POST', '/session', { capabilities: { alwaysMatch: options } });
   const id = value.sessionId;
   assert.ok(id, 'real browser session');
   sessions.push(id);
@@ -169,6 +174,12 @@ async function sample(base) {
     script: 'return (' + samplePlayCanvasQuic.toString() + ')();', args: [],
   });
 }
+async function bridgeSample(base) {
+  return wd('POST', base + '/execute/sync', {
+    script: 'const s=window.__MYASO_PLAYCANVAS__?.devRustSession; return {status:document.documentElement.dataset.rustSession,kind:s?.client?.transport?.kind,snapshots:s?.snapshotCount??0,actors:s?.layer?.count??0,ids:s?[...s.client.state.keys()]:[],ownNetId:s?.client?.playerNetId??null,datagramSeq:s?.client?.latestSnapshotSequence??null,hasAuthorityBridge:!!s,renderer:document.documentElement.dataset.renderer};',
+    args: [],
+  });
+}
 async function close(base) {
   return wd('POST', base + '/execute/sync', {
     script: 'return (' + closePlayCanvasQuic.toString() + ')();', args: [],
@@ -207,12 +218,23 @@ try {
     const response = await fetch('http://127.0.0.1:' + httpPort).catch(() => null);
     return { ok: Boolean(response?.ok) };
   });
-  child('chromedriver', ['--port=' + driverPort]);
+  child(browserName === 'firefox' ? 'geckodriver' : 'chromedriver',
+    browserName === 'firefox'
+      ? ['--host', '127.0.0.1', '--port', String(driverPort)]
+      : ['--port=' + driverPort]);
   await poll('loopback ChromeDriver', async () => ({
     ok: Boolean((await fetch('http://127.0.0.1:' + driverPort + '/status').catch(() => null))?.ok),
   }));
 
   const page = 'http://127.0.0.1:' + httpPort + '/';
+  // Attach the passive PlayCanvas actor bridge *before* other actors join.
+  // Never send neutral inputs to wake QUIC or invent a new packet type.
+  const readOnly = await newBrowser(page + '?rust=1');
+  const baseline = await poll('read-only baseline before another actor joins', async () => {
+    const proof = await bridgeSample(readOnly);
+    return { ...proof, ok: proof.snapshots >= 1 && proof.actors === 1
+      && proof.kind === 'webtransport' && proof.status === 'connected' };
+  });
   const a = await newBrowser(page);
   const b = await newBrowser(page);
   await bootTransport(a, server.endpoint, server.pin);
@@ -221,17 +243,15 @@ try {
   // Exercise the real source-only PlayCanvas read-only debug bridge too.
   // Unlike the two independent session/identity probes above, it sends zero
   // input, movement or Combat packets and never claims map authority.
-  const readOnly = await newBrowser(page + '?rust=1');
   // Read-only clients may receive just the initial reliable baseline until
   // their input-free lease is scheduled another catchup. Require one real
   // server snapshot with two real actor silhouettes, never fake frame ticks.
   const bridge = await poll('opt-in original Rust snapshot actor bridge', async () => {
-    const proof = await wd('POST', readOnly + '/execute/sync', {
-      script: 'const s=window.__MYASO_PLAYCANVAS__?.devRustSession; return {status:document.documentElement.dataset.rustSession,kind:s?.client?.transport?.kind,snapshots:s?.snapshotCount??0,actors:s?.layer?.count??0,hasAuthorityBridge:!!s,renderer:document.documentElement.dataset.renderer};',
-      args: [],
-    });
+    const proof = await bridgeSample(readOnly);
     return { ...proof, ok: proof.status === 'connected' &&
-      proof.kind === 'webtransport' && proof.snapshots >= 1 && proof.actors >= 2 };
+      proof.kind === 'webtransport' && proof.snapshots > baseline.snapshots &&
+      proof.actors >= 3 && proof.ids.includes(2) && proof.ids.includes(3)
+      && proof.ownNetId === null && proof.datagramSeq === 65535 };
   }, 40_000);
 
   const ready = await poll('two independently authoritative PlayCanvas snapshots and ACKs', async () => {
@@ -248,17 +268,15 @@ try {
   const before = ready.first;
   const second = ready.second;
   assert.notEqual(before.actorId, second.actorId, 'server issues distinct actor identity per QUIC root');
-  const bridgeClosed = await wd('POST', readOnly + '/execute/sync', {
-    script: 'const s=window.__MYASO_PLAYCANVAS__.devRustSession; s.close(); return {closed:s.client.transport.closed};',
-    args: [],
-  });
-  assert.equal(bridgeClosed.closed, true, 'read-only bridge retires QUIC without input');
-
   const exited = await close(a);
   assert.equal(exited.closed, true, 'old connection explicitly retires');
-  await poll('peer observes actor removal after transport close', async () => {
-    const peer = await sample(b);
-    return { peer, ok: !peer.stateIds.includes(before.actorId) && peer.processedAcks > second.processedAcks };
+  await poll('peer and passive PlayCanvas both observe actor removal', async () => {
+    const peer = await sample(b), spectator = await bridgeSample(readOnly);
+    return { peer, spectator, ok: !peer.stateIds.includes(before.actorId) &&
+      !spectator.ids.includes(before.actorId) &&
+      spectator.snapshots > bridge.snapshots && spectator.actors === 2 &&
+      spectator.ownNetId === null && spectator.datagramSeq === 65535 &&
+      peer.processedAcks > second.processedAcks };
   }, 25_000);
 
   await bootTransport(a, server.endpoint, server.pin);
@@ -273,14 +291,27 @@ try {
       peer.stateIds.includes(fresh.actorId) };
   }, 35_000);
   assert.ok(reconnected.fresh.latestTick > 0);
+  const rejoinedSpectator = await poll('passive PlayCanvas reflects server-issued rejoin', async () => {
+    const spectator = await bridgeSample(readOnly);
+    return { spectator, ok: spectator.ids.includes(reconnected.fresh.actorId) &&
+      spectator.actors === 3 && spectator.ownNetId === null &&
+      spectator.datagramSeq === 65535 };
+  }, 25_000);
+  const bridgeClosed = await wd('POST', readOnly + '/execute/sync', {
+    script: 'const s=window.__MYASO_PLAYCANVAS__.devRustSession; s.close(); return {closed:s.client.transport.closed};',
+    args: [],
+  });
+  assert.equal(bridgeClosed.closed, true, 'read-only bridge retires QUIC without input');
   await close(a);
   await close(b);
   console.log('PLAYCANVAS_REAL_RUST_QUIC_PASS', JSON.stringify({
-    sha, loopbackOnly: true, protocolFork: false,
+    sha, browser: browserName, loopbackOnly: true, protocolFork: false,
     client: 'PlayCanvas 2.23.3 + shared authoritative-client.mjs',
     renderer: before.renderer,
-    readOnlyBridge: { transport: bridge.kind, snapshots: bridge.snapshots,
-      authoritativeActors: bridge.actors, closed: bridgeClosed.closed },
+    readOnlyBridge: { transport: bridge.kind, initialActors: baseline.actors,
+      joinedActors: bridge.actors, rejoinedActors: rejoinedSpectator.spectator.actors,
+      snapshots: rejoinedSpectator.spectator.snapshots, closed: bridgeClosed.closed,
+      sentInputs: 0 },
     originalActor: before.actorId, peerActor: second.actorId,
     reconnectedActor: reconnected.fresh.actorId,
     first: { snapshots: before.datagramSnapshots, reliable: before.reliableSnapshots,
