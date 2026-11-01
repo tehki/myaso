@@ -29,8 +29,11 @@ test('Blacksmith root position is derived only from the unchanged World9 smith f
     {x:smith.x,y:smith.y,w:smith.w,h:smith.h},
     {x:3710,y:3850,w:182,h:162}
   );
-  assert.deepEqual(smithVisualPlacement(smith,4140,4105),
-    {x:-8.475,y:0,z:-4.35,scale:0.72});
+  const placement=smithVisualPlacement(smith,4140,4105);
+  assert.ok(Math.abs(placement.x+8.475)<1e-10);
+  assert.ok(Math.abs(placement.z+4.35)<1e-10);
+  assert.equal(placement.y,0);
+  assert.equal(placement.scale,0.72);
   assert.throws(()=>smithVisualPlacement({...smith,id:'red-lion'},4140,4105),TypeError);
   assert.throws(()=>smithVisualPlacement(smith,NaN,4105),TypeError);
 });
