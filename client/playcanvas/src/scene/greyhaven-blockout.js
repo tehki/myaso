@@ -1,5 +1,8 @@
 import { AUTHORED_MAPS, MAP_IDS } from '../world/authored-maps.mjs';
 import { buildQuaterniusRedLion } from './quaternius-red-lion.js';
+import { buildOriginalBlacksmith } from './original-blacksmith-r4.js';
+import { greyhavenLook, configureGreyhavenLighting, createDuskSmoke,
+  redLionSmokeAnchor, blacksmithSmokeAnchor } from './greyhaven-visual-effects.js';
 
 const WORLD9_RENDER_SCALE = 0.025;
 const SOURCE_COMMIT = '0843946d308bc3f88bb147d910deff450393c475';
@@ -112,6 +115,9 @@ export async function buildGreyhavenBlockout(app, pc) {
 
   const redLionBuilding = map.buildings.find(building => building.id === 'red-lion');
   if (!redLionBuilding) throw new Error('World9 authored Red Lion building record is missing');
+  const smithBuilding = map.buildings.find(building => building.id === 'smith');
+  if (!smithBuilding) throw new Error('World9 authored Blacksmith footprint is missing');
+  const look = greyhavenLook(new URLSearchParams(window.location.search));
 
   const centerX = map.city.x + map.city.w / 2;
   const centerY = map.city.y + map.city.h / 2;
@@ -161,21 +167,24 @@ export async function buildGreyhavenBlockout(app, pc) {
       cache.bridge);
   }
 
+  // The two approved original art sources load concurrently. Failures retain
+  // the corresponding canonical World9 placeholder, not an invented building.
+  const [redLionAsset, blacksmithAsset] = await Promise.all([
+    buildQuaterniusRedLion(app, pc, redLionBuilding, centerX, centerY, WORLD9_RENDER_SCALE)
+      .catch(error => {
+        console.error('[MYASO PlayCanvas] Red Lion art unavailable; using World9 proxy', error);
+        return Object.freeze({ loaded: false, error: String(error?.message ?? error) });
+      }),
+    buildOriginalBlacksmith(app, pc, smithBuilding, centerX, centerY, WORLD9_RENDER_SCALE)
+      .catch(error => {
+        console.error('[MYASO PlayCanvas] Blender Blacksmith art unavailable; using World9 proxy', error);
+        return Object.freeze({ loaded: false, error: String(error?.message ?? error) });
+      })
+  ]);
   for (const building of map.buildings) {
-    if (building.id !== 'red-lion') {
-      buildingProxy(app, pc, building, centerX, centerY, cache);
-    }
-  }
-
-  let redLionAsset;
-  try {
-    redLionAsset = await buildQuaterniusRedLion(
-      app, pc, redLionBuilding, centerX, centerY, WORLD9_RENDER_SCALE
-    );
-  } catch (error) {
-    console.error('[MYASO PlayCanvas] Quaternius Red Lion asset load failed; retaining diagnostic proxy', error);
-    buildingProxy(app, pc, redLionBuilding, centerX, centerY, cache);
-    redLionAsset = Object.freeze({ loaded: false, error: error?.message ?? String(error) });
+    if (building.id === 'red-lion' && redLionAsset.loaded) continue;
+    if (building.id === 'smith' && blacksmithAsset.loaded) continue;
+    buildingProxy(app, pc, building, centerX, centerY, cache);
   }
 
   let treeIndex = 0;
@@ -204,11 +213,16 @@ export async function buildGreyhavenBlockout(app, pc) {
     redLionBuilding.y + redLionBuilding.h / 2,
     centerX, centerY
   );
-  const redLionView = new URLSearchParams(window.location.search).get('view') === 'red-lion';
-  if (redLionView && redLionAsset.loaded) {
+  const selectedView = new URLSearchParams(window.location.search).get('view');
+  if (selectedView === 'red-lion' && redLionAsset.loaded) {
     camera.camera.orthoHeight = 10.5;
     camera.setPosition(redLionFocus.x + 10, 11, redLionFocus.z + 10);
     camera.lookAt(redLionFocus.x, 3.1, redLionFocus.z);
+  } else if (selectedView === 'blacksmith' && blacksmithAsset.loaded) {
+    camera.camera.orthoHeight = 11.5;
+    camera.setPosition(blacksmithAsset.placement.x + 10, 12,
+      blacksmithAsset.placement.z + 10);
+    camera.lookAt(blacksmithAsset.placement.x, 2.8, blacksmithAsset.placement.z);
   } else {
     camera.setPosition(45, 66, 45);
     camera.lookAt(0, 0, 0);
@@ -221,13 +235,24 @@ export async function buildGreyhavenBlockout(app, pc) {
     color: new pc.Color(1.0, 0.82, 0.64),
     intensity: 1.35,
     castShadows: true,
-    shadowResolution: 2048,
-    shadowDistance: 180,
+    shadowResolution: 1024,
+    shadowDistance: 65,
     shadowBias: 0.2,
     normalOffsetBias: 0.05
   });
   sun.setEulerAngles(48, 35, 0);
   app.root.addChild(sun);
+
+  const blacksmithReference = blacksmithAsset.loaded
+    ? blacksmithAsset.placement
+    : toScenePoint(smithBuilding.x + smithBuilding.w / 2,
+      smithBuilding.y + smithBuilding.h / 2, centerX, centerY);
+  const lighting = configureGreyhavenLighting(app, pc, sun, look,
+    redLionFocus, blacksmithReference);
+  const chimneySmoke = createDuskSmoke(app, pc, [
+    redLionSmokeAnchor(redLionFocus),
+    blacksmithSmokeAnchor(blacksmithReference)
+  ], look);
 
   return Object.freeze({
     sceneKind: 'world9-greyhaven-authored-map-visualization',
@@ -244,6 +269,10 @@ export async function buildGreyhavenBlockout(app, pc) {
     approvedArtIntegrated: false,
     quaterniusArtIntegrated: Boolean(redLionAsset.loaded),
     redLionAsset,
+    blacksmithAsset,
+    lightingLook: lighting.look,
+    duskSmokeActive: chimneySmoke.active,
+    duskSmokeWispCount: chimneySmoke.wispCount,
     redLionFocus: Object.freeze(redLionFocus),
     collisionAuthority: false,
     portalAuthority: false,
