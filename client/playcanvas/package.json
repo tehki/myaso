@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 4175 --strictPort",
     "test": "node --test",
     "smoke:browser": "node scripts/browser-smoke.mjs",
-    "smoke:quic": "node scripts/authoritative-quic-smoke.mjs"
+    "smoke:quic": "node scripts/authoritative-quic-smoke.mjs",
+    "smoke:rust-world:core8c": "node scripts/core8c-rust-readonly-live.mjs"
   },
   "dependencies": {
     "playcanvas": "2.23.3"
