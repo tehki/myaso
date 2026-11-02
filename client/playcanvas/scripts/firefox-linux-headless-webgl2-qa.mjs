@@ -72,6 +72,7 @@ const frameSample=String.raw`
 `;
 let session;
 const results=[];
+const dayImageHashes=new Map();
 const exec=(script,async=false)=>request('POST','/session/'+session+'/execute/'+(async?'async':'sync'),
   {script,args:[]},async?60000:25000);
 try{
@@ -100,11 +101,22 @@ try{
     await writeFile(join(output,key+'.json'),JSON.stringify(state,null,2)+'\n');
     const png=Buffer.from(await request('GET','/session/'+session+'/screenshot'),'base64');
     await writeFile(join(output,key+'.png'),png);
-    console.log('G3_FIREFOX_LINUX_NATIVE_FRAME',key,JSON.stringify({...state,pngSHA256:hash(png)}));
+    const pngSHA256=hash(png);
+    // A healthy WebGL2 object does not prove the Canvas is actually painting:
+    // Linux headless Chromium once returned WebGL2 while all screenshots were
+    // byte-identical blank scenes. Require day/dusk image differentiation.
+    if(look==='day')dayImageHashes.set(view,pngSHA256);
+    else {
+      assert.ok(dayImageHashes.has(view),'Corresponding daylight screenshot required');
+      assert.notEqual(pngSHA256,dayImageHashes.get(view),
+        'Day and dusk screenshot bytes identical: visual renderer not qualified');
+    }
+    console.log('G3_FIREFOX_LINUX_NATIVE_FRAME',key,JSON.stringify({...state,pngSHA256}));
     assert.equal(state?.booted,'true','preserve first-RED when context fails');
     assert.equal(state?.renderer,'WebGL2');
     assert.equal(state?.deviceType,'webgl2');
     assert.equal(state?.realWebGL2,true);
+    assert.match(state?.glVersion||'',/^WebGL 2\.0/,'Actual WebGL2 version string required');
     assert.equal(state?.redLion,'true');
     assert.equal(state?.blacksmith,'true');
     assert.equal(state?.look,look);
