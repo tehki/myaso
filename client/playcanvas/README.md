@@ -87,3 +87,93 @@ The time override is **presentation only**; the Rust server never receives it. D
 **Scoped graphics-only correction:** Firefox requests actual PlayCanvas `DEVICETYPE_WEBGL2` first and exclusively; other browsers keep WebGPU-first then explicit WebGL2 fallback. Selection is pure graphics presentation, and a failed/unsupported native graphics device remains a visible fatal error rather than a fake renderer. It does not promise WebGL2 will work on a host where the browser is denied all graphics devices. Do not recategorize the original headless failure as PASS simply because the source selector is corrected.
 
 **Manual native acceptance:** open loopback Vite on a host with working Chrome/Firefox installations and repeat `view=red-lion/blacksmith` × `greyhavenTime=day/dusk`. For each session record actual `WebGL2RenderingContext`, DOM device type, original model loaded flags, 0 or 12 dusk smoke wisps, real browser screenshot, graphics driver `WEBGL_debug_renderer_info` where available, and comparable 120-frame RAF p50/p95 (RAF is **not** GPU-present FPS). A genuine GPU host must be distinguished from SwiftShader/llvmpipe or WARP; report hardware identity and actual renderer. Protected CI, genuine native screenshots, original first-RED, and gameplay-independent release checks remain separate gates.
+
+## Graphics 3 — Linux Firefox headless first-RED recovered, 2 November 2026
+
+**Original RED is evidence, never a waived check.** The untouched October/November Linux Firefox first-RED logs remain on Serj at
+`/home/serj/Work/.myaso-combat4d-qa-playcanvas-evidence/firefox-run-2.log` and `firefox-run-3-softwaregl.log`.
+Both showed `Failed to create a graphics device` with no authenticated Rust session. During this recovery, new independent first-RED snapshots/logs were created under
+`/home/serj/Work/myaso-graphics3-firefox-headless-20261102/first-post-fix-linux-headless/`:
+`first-RED-prefs.json`, `first-RED-no-prefs.json`, `first-RED-host-blocklist.json`,
+`first-RED-exhausted-drivers.json`, `geckodriver-exhausted-drivers.log`. No historic logs were edited or erased.
+
+### Root cause verified on the original Linux host
+
+Firefox 159.0 + original geckodriver 0.37.1 on Serj initially ran under a shell **without** the active compositor/Xwayland variables. Firefox's WebGL2 context failed with explicit
+`AllowWebgl2:false restricts context creation`, then with forced WebGL2 preferences
+`FEATURE_FAILURE_WEBGL_EXHAUSTED_DRIVERS`. `gfx.webrender.software` alone did not solve the original first-RED.
+
+Serj already had a real graphical session: Hyprland/Xwayland `:0`, Wayland socket `wayland-1`,
+and physical Intel GPU PCI `8086:0152` (Xeon E3-1200 v2/3rd Gen graphics controller).
+**Without changing system packages or bypassing WebGL2**, passing the actual running
+compositor session variables to the *headless* geckodriver/Firefox process restored genuine hardware-backed WebGL2:
+
+- `DISPLAY=:0` / `WAYLAND_DISPLAY=wayland-1` — actual running Xwayland/Wayland compositor, not an invented display
+- `XDG_RUNTIME_DIR=/run/user/1000` — matching user session
+- `MOZ_ENABLE_WAYLAND=1` — use the available native Wayland graphics path
+- `TMPDIR=<isolated writable QA directory>` — avoid restricted/exhausted shared temp profiles; the earlier no-TMP attempt failed at Firefox preference preparation
+- `MYASO_G3_FIREFOX_BINARY` and `MYASO_G3_GECKODRIVER_BINARY` — exact, real local Firefox/driver binaries
+
+**Never hard-code these host values for users or production.** Copy the *real current*
+host session environment. If a headless CI runner has no supported GPU, EGL/GLX
+or active compositor, **keep first-RED** rather than pretending a fake context exists.
+No separate Rust/QUIC, Combat, Chat, Physics, gameplay or World authority changes.
+
+### Reproducible host-scoped four-scene test
+
+The new checked-in `scripts/firefox-linux-headless-webgl2-qa.mjs` (Node, native W3C,
+no mocks) requires an operator-controlled loopback Vite preview and explicit real
+Firefox and geckodriver paths, verifies their actual graphics device and original
+assets, stores first-RED and source PNG/GL metadata separately, and samples 120 RAF
+intervals per scene. Example **Serj-only** operator environment:
+
+```sh
+export DISPLAY=:0 WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR=/run/user/1000
+export MOZ_ENABLE_WAYLAND=1
+export TMPDIR="$HOME/Work/myaso-graphics3-firefox-headless-20261102/tmp"
+export MYASO_G3_FIREFOX_BINARY=/tmp/combat4-p0-native-browsers-ba85024/firefox/firefox
+export MYASO_G3_GECKODRIVER_BINARY=/tmp/combat4-p0-native-browsers-ba85024/bin/geckodriver
+export MYASO_G3_QA_URL=http://127.0.0.1:4219/
+export MYASO_G3_GECKODRIVER_PORT=19742 MYASO_G3_REQUIRE_GPU=1
+export MYASO_G3_QA_OUT="$HOME/Work/myaso-graphics3-firefox-headless-20261102/verified-source-qa"
+node scripts/firefox-linux-headless-webgl2-qa.mjs
+```
+
+The script never opens external URLs, never sends input or joins a Rust session. It
+requires a *real* `WebGL2RenderingContext`, actual driver version, Red Lion and
+Blacksmith, day (0 wisps) and dusk (12 wisps), PNGs with distinct daylight/dusk
+pixel content, GPU vendor when requested, and true client boot. Blank WebGL2
+surfaces must not pass.
+
+### Independent 2 November Linux headless evidence — PASS
+
+Exact PlayCanvas runtime derived from Graphics 3 Draft #1166, source `99786096ea547e1ad1fe7f9d8477550e99ce6baf` (subsequent commits add only QA/docs, not renderer changes). Four real **Firefox 159** headless screenshot scenes, original bundled source-authentic Red Lion and Blender R4 Blacksmith, original World9 positions, real WebGL2 on Intel, **all PASS**:
+
+| Real Firefox Linux headless scene | RAF p50 | RAF p95 | Smoke |
+| --- | ---: | ---: | ---: |
+| Red Lion day | 17.14 ms | 34.14 ms | 0 |
+| Red Lion dusk | 17.14 ms | 34.14 ms | 12 |
+| Blacksmith day | 17.16 ms | 34.12 ms | 0 |
+| Blacksmith dusk | 17.12 ms | 34.16 ms | 12 |
+
+One reproducible source harness pass and four page PNGs with original model content:
+`/home/serj/Work/myaso-graphics3-firefox-headless-20261102/verified-source-qa/attempt-1nicsO/`.
+The inspected Linux Firefox Blacksmith dusk screenshot contains both recognizable
+original buildings and forge/tavern light, not a black frame. RAF is a callback
+interval, **not GPU-present FPS**, and image identity alone does not prove shadows
+and roof/actor occlusion with authenticated players.
+
+**Separate Chromium Linux limitation:** native Chromium 152 headless reported
+`WebGL2` and scene-loader flags `true` but produced *identical blank screenshots*
+for day/dusk and no reliable vendor information. That is **NOT** a native visual
+PASS or GPU qualification. Its first-RED/evidence is held at
+`/home/serj/Work/myaso-graphics3-firefox-headless-20261102/chrome-hardware-evidence/`
+and `chrome-webgl2-evidence/`. The independent **Windows headed Chrome** visual
+proof remains valid, although Chrome chose Microsoft's software Basic Render
+driver there. Both W3C QA harnesses now reject byte-identical day/dusk screenshots;
+browser boot flags alone are not sufficient for graphics acceptance.
+
+**Remaining:** exact updated-head protected quality, independent authenticated
+Rust/QUIC multiplayer continuity, real four-player combat/Chat and authoritative
+occlusion, and Main0 release authorization. This is a Graphics source-only
+correction and **release remains HOLD**.
