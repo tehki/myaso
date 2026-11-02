@@ -1,6 +1,7 @@
 """MYASO Graphics3 nonproduction genuine Chrome/Firefox W3C visual device test.
 Runs against a separately started loopback Vite URL; never sends game input."""
 import json
+import hashlib
 import os
 import time
 from pathlib import Path
@@ -49,6 +50,7 @@ def run(browser):
         driver=webdriver.Chrome(options=opts)
     driver.set_window_size(1280,720)
     outcomes=[]
+    daylight_hashes={}
     try:
         for view,look in [('red-lion','day'),('red-lion','dusk'),('blacksmith','day'),('blacksmith','dusk')]:
             driver.get(URL+f'?view={view}&greyhavenTime={look}')
@@ -59,7 +61,14 @@ def run(browser):
                 time.sleep(.3)
             name=f'{browser}-{view}-{look}'
             (OUT/(name+'.json')).write_text(json.dumps(state,indent=2),encoding='utf-8')
-            driver.save_screenshot(str(OUT/(name+'.png')))
+            screenshot=OUT/(name+'.png')
+            assert driver.save_screenshot(str(screenshot)),f'{name} original browser PNG unavailable'
+            image_hash=hashlib.sha256(screenshot.read_bytes()).hexdigest()
+            if look=='day':
+                daylight_hashes[view]=image_hash
+            else:
+                assert image_hash!=daylight_hashes[view],(
+                    f'{name} day and dusk screenshots are identical: WebGL2 device without visible scene')
             print('GRAPHICS3_W3C_PROBE',name,json.dumps(state),flush=True)
             assert state['booted']=='true',f'{name} cannot boot: {state}'
             assert state['renderer']=='WebGL2' and state['deviceType']=='webgl2',f'{name} not genuine WebGL2'
