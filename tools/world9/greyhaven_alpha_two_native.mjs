@@ -170,21 +170,41 @@ try{
  // Re-focus player 1 after player 2's separate browser action. W3C focus
  // is per browser window; never assume the previous seat still owns input.
  await evaluate(first,"document.querySelector('#arena').focus();return true");
- // Walk east on the open street to the Red Lion south frontage.
- await request(first.base,"POST","/session/"+first.id+"/actions",
-   {actions:[{type:"key",id:"keyboard",actions:[
-     {type:"keyDown",value:"d"},{type:"pause",duration:1800},{type:"keyUp",value:"d"}]}]});
+ // Walk east on the open street to the Red Lion south frontage. Use short,
+ // genuine W3C key gestures and observe each server snapshot. A single long
+ // keyDown can cross the entire acceptance window before the next poll on
+ // a faster runner; it must not turn a valid movement into a timing false-RED.
  let lastFrontage=[];
- const frontage=await waitFor(async()=>{
-   const views=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+ let frontage=null;
+ let eastX=leftOwner.x;
+ for(let step=0;step<24;step++){
+   await request(first.base,"POST","/session/"+first.id+"/actions",
+     {actions:[{type:"key",id:"keyboard",actions:[
+       {type:"keyDown",value:"d"},{type:"pause",duration:150},{type:"keyUp",value:"d"}]}]});
+   const views=await waitFor(async()=>{
+     const observed=await Promise.all(actors.map(async({s})=>evaluate(s,nativeStats)));
+     const a=observed[0].review.actors.find(x=>x.netId===1);
+     const b=observed[1].review.actors.find(x=>x.netId===1);
+     lastFrontage=observed.map(v=>v.review.actors.filter(x=>x.netId===1||x.netId===2));
+     return a&&b&&a.x>eastX+3&&Math.abs(a.x-b.x)<8?observed:null;
+   },3500).catch(error=>{
+     console.error("GREYHAVEN_RED_LION_EAST_STEP_FIRST_RED "+
+       JSON.stringify({step,eastX,lastFrontage}));
+     throw error;
+   });
    const a=views[0].review.actors.find(x=>x.netId===1);
-   const b=views[1].review.actors.find(x=>x.netId===1);
-   lastFrontage=views.map(v=>v.review.actors.filter(x=>x.netId===1||x.netId===2));
-   return a&&b&&a.x>4330&&a.x<4410&&Math.abs(a.x-b.x)<8?views:null;
- },18000).catch(error=>{
+   eastX=a.x;
+   if(a.x>=4330&&a.x<4410){frontage=views;break;}
+   if(a.x>=4410){
+     console.error("GREYHAVEN_RED_LION_FRONTAGE_OVERSHOOT_FIRST_RED "+
+       JSON.stringify({step,eastX,lastFrontage}));
+     throw Error("genuine W3C eastbound movement crossed Red Lion frontage window");
+   }
+ }
+ if(!frontage){
    console.error("GREYHAVEN_RED_LION_FRONTAGE_FIRST_RED "+JSON.stringify(lastFrontage));
-   throw error;
- });
+   throw Error("genuine W3C movement did not reach Red Lion frontage");
+ }
  const frontageActor=frontage[0].review.actors.find(x=>x.netId===1);
  assert.ok(frontageActor.y>4050+18,"open south street is walkable before the building face");
  // Move north in two physical steps: first onto the safe sidewalk, then
