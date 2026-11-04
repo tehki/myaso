@@ -70,13 +70,34 @@ observed in Chrome remain mandatory blockers.
    anchors; the native harness refuses dirty SHA attribution. Historical
    high-load Light/Heavy first-REDs remain recorded. Not an M147 receipt.
    New source-only `MYASO_CHROME_JUMP_P0=1` is a strict physical
-   Space+LMB original Rust JumpAttack42 candidate: require original
-   action 16/17/18 and independent defender 100→58 HP, no false Light/Heavy.
-   Remains unqualified until real exact-head browser PASS is recorded.
-   Still P0: **Google Chrome Stable** (Chromium is not branded qualification),
-   original JumpAttack42 proof and true M147 private HIT/HP/stamina receipts,
-   Block/Kick/Dodge, four-player real Combat/reconnect, security and
-   stale-lease/focus regression. No client-created gameplay.
+   Space+LMB original Rust JumpAttack42 is now **PASS on exact HEAD
+   30b741c6efef5c299fdc9173c831b2867433a649** in two real Chromium 152
+   sessions: original World actions 15→16→17→18 and defender HP 100→58,
+   exactly 42 damage; native W3C Space-first chord, no false Light/Heavy.
+   This is Chromium evidence, not branded Google Chrome Stable qualification.
+   **M147 private HIT loopback integration also PASS** at this exact HEAD
+   (CI 41868420133): four browser sessions (Chrome/Firefox/Chrome/Firefox),
+   one genuine physical Light34, original Rust HIT, contiguous sequence-0
+   private receipt delivered to attacker and defender, role-specific first-party
+   HUD presentation before application ACK, and no spectator receipt/credit.
+   The server feature is compiled only for this test and requires explicit
+   original-v2 + loopback gates; Cargo default features remain empty. Packet
+   types 5/6 remain proposal/private-lab only, not registered as public gameplay
+   packets; QUIC actor leases are not account authentication. This is one
+   host, not four independent human machines, and does not yet qualify
+   multi-hit/replay/reconnect on independent hosts or public activation.
+   New exact-head workflow adds **four branded Google Chrome Stable sessions**
+   for three same-session deaths/respawns and Chat C1; awaiting CI evidence.
+   Remaining P0: Chrome Stable four-player Combat/reconnect, independent-host
+   stress, full Block/Kick/Dodge/stamina acceptance, security and stale-lease/
+   focus regression. No client-created gameplay.
+   Exact-head CI at 30b741c after failed-job reruns: quality passed and 27/28
+   workflows passed. The original two M27/renderer timeout reds were cleared
+   by retry; the remaining standard-path M35 first-RED is real: original Rust
+   World HIT at tick1121 precedes defender Block admission at tick1122, so the
+   attack lands for 34 HP. The same M35 result reproduced on retry. Preserve
+   this Combat timing blocker; do not change the 125ms parry window or waive it.
+   See runs 41868420936 and 41868420274.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and

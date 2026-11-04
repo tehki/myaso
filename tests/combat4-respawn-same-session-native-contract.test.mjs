@@ -31,3 +31,13 @@ test("Source11 acceptance cannot displace original first-red stale-generation is
   assert.match(source, /nativeChatRound\("After same-session death and renewed physical Combat"\)/);
   assert.match(source, /original World 34HP HIT after respawn/);
 });
+
+test("Alpha 0.2 adds four branded Google Chrome Stable W3C sessions for Source11 lifecycle", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/core8a-source11-respawn.yml", import.meta.url), "utf8");
+  assert.match(workflow, /acceptance: fresh-incarnation-four-chrome-stable/);
+  assert.match(workflow, /mode: four-combat-respawn-same-session\s+browsers: chrome,chrome,chrome,chrome/);
+  assert.match(workflow, /max-parallel: 2/);
+  assert.match(workflow, /case "\$chrome_version" in\s+"Google Chrome "\*\)/);
+  assert.match(workflow, /timeout --signal=TERM --kill-after=5s 360s node tools\/art\/main0_v2_knights_combat_four_native\.mjs/);
+  assert.match(workflow, /MYASO_LIVE_GESTURE_CHAT_C1: "1"/);
+});
