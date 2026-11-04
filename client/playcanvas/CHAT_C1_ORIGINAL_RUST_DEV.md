@@ -89,11 +89,10 @@ received original player identities; source0's original Rust typed Combat
 lease was **granted**; a genuine W3C D keypress moved the authoritative
 player from x=4110 to x=4168; and a genuine W3C LMB produced the original
 Rust actor action phases 1/2/3 and a defender snapshot with **66 HP**.
-The new regression gate explicitly requires **100→66 HP** on the unchanged
-original defender actor; a server-granted input lease or local attack
-animation alone is insufficient. This is **Light34 World damage**, not a
-private M147 HIT receipt. Re-run this stricter assertion at the new commit
-before declaring its exact-head PASS.
+The existing exact-head regression gate on **7ab7b69** passed and explicitly
+required **100→66 HP** on the unchanged original defender; the granted input
+lease or attack animation alone was insufficient. This is **Light34 World
+damage**, not a private M147 HIT receipt.
 
 ```sh
 MYASO_CHROME_COMBAT_P0=1 \
@@ -101,6 +100,34 @@ MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/server/target/debug/myaso-server \
 CHROME_BIN=/usr/bin/chromium \
 npm run smoke:chrome-chat-c1
 ```
+
+**Heavy46 (independent native fight, source-only):** use
+`MYASO_CHROME_HEAVY_P0=1` instead of `MYASO_CHROME_COMBAT_P0=1`.
+The same two real Chromium sessions, verified Rust actor IDs and Chat C1
+must precede the W3C 450 ms held LMB. The original game owns one typed
+source0 lease and the original Rust World alone upgrades provisional Light
+windup (action 1) into Heavy windup (9), Heavy active (10), and Heavy
+recovery (11). A valid result **requires** independent defender NetID
+with **100→54 HP**, exact **46 Heavy damage**, and no Light active (2).
+The physical movement and chat focus checks remain unchanged.
+The candidate native run observed all phases **9/10/11** plus 100→54 HP;
+it was not an M147 private HIT receipt. Early first-RED showed the initial
+pre-HIT snapshot evidence could end at Heavy windup before the subsequent
+active/recovery snapshots. That observer race is now resolved by polling
+after the already-required real Rust defender HP change. Neither a passive
+snapshot nor a local presentation event suffices for damage acceptance.
+
+```sh
+MYASO_CHROME_HEAVY_P0=1 \
+MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/server/target/debug/myaso-server \
+CHROME_BIN=/usr/bin/chromium \
+npm run smoke:chrome-chat-c1
+```
+
+**CI on prior SHA 7ab7b69:** 26/28 GitHub workflows passed. The original
+Chrome passive QUIC job timed out at 180 s and M142 secondary FFA trial 1
+failed (trial 2 passed). Preserve these first-REDs; the local Chrome
+Heavy46 result does not waive quality or passive-QUIC qualification.
 
 This remains loopback-only, source-only, Chromium-engine evidence. Do not
 equate Chromium with independently qualified Google Chrome Stable, or

@@ -56,17 +56,20 @@ observed in Chrome remain mandatory blockers.
    and removal. The snapshot wire has no trustworthy map ID; use server launch
    proof rather than claiming the renderer selects Greyhaven.
 3. **P0 — Actual PlayCanvas physical Combat:** **two real Chromium 152**
-   PlayCanvas sessions locally demonstrated separate original QUIC+ACK+NetIDs,
-   server-granted typed source0, trusted physical D movement (+58 world X),
-   trusted physical LMB and Rust snapshot attack phases 1/2/3. The defender's
-   original Rust World HP reached 66 from 100 (Light34); this was **not** a
-   private M147 HIT receipt. Strict repeatable Light34 recipient HP assertion
-   is now included in `scripts/main0-chrome-chat-c1-native.mjs` when
-   `MYASO_CHROME_COMBAT_P0=1`. Still required: **Google Chrome Stable**
-   (Chromium alone is not its release qualification), true Heavy46 and
-   JumpAttack42, genuine M147 HIT/HP/stamina receipts, Block/Kick/Dodge,
-   four-player acceptance, input security and stale-lease/focus regression.
-   Fail-closed on old actor, hidden tab or loss of focus.
+   PlayCanvas sessions locally proved distinct original QUIC+ACK+NetIDs,
+   server-granted typed source0, trusted W3C D movement, and original Rust
+   authoritative **Light34** (defender 100→66 HP, phases 1/2/3) and
+   **Heavy46** (defender 100→54 HP, phases 9/10/11) as separate isolated
+   fights. Heavy begins with a provisional Light windup 1, upgrades to Heavy
+   windup 9 on real held LMB, and does **not** land Light active 2. Strict
+   native `main0-chrome-chat-c1-native.mjs` modes are
+   `MYASO_CHROME_COMBAT_P0=1` (Light) and
+   `MYASO_CHROME_HEAVY_P0=1` (Heavy), both requiring defender-owned
+   exact HP and no simulated Combat. Not a private M147 HIT receipt.
+   Still P0: **Google Chrome Stable** (Chromium is not branded qualification),
+   original JumpAttack42, true M147 private HIT/HP/stamina receipts,
+   Block/Kick/Dodge, four-player real Combat/reconnect, security and
+   stale-lease/focus regression. No client-created gameplay.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and
