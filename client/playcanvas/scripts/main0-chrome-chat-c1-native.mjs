@@ -196,22 +196,38 @@ async function physicalRustCombat(s, peer, {heavy = false, jump = false} = {}) {
       actions:[{type:'pointerMove',origin:'viewport',x:630,y:250,duration:0},
         {type:'pointerDown',button:0},{type:'pause',duration:jump?110:heavy?450:75},
         {type:'pointerUp',button:0}]};
-    // The original PlayCanvas gate specifically CANCELS pending LMB if
-    // Space comes later. Press physical Space first and keep it held over
-    // genuine pointerDOWN/UP, with original Rust deciding JumpAttack.
-    // Both events are real ChromeDriver W3C actions, never JS dispatch.
-    if(jump)await action(s,[{type:'keyDown',value:' '}]);
-    try {
+    if(jump){
+      // A separate WebDriver Space request can delay the authenticated
+      // pointer event past the server's 12-tick / 200ms jump review window.
+      // Pre-aim then send one W3C native two-source sequence: Space DOWN on
+      // tick 1, pointer DOWN on tick 2 while Space is held, then both UP.
+      // No synthesized JS event, local World jump, or parallel attack owner.
+      await wd('POST','/session/'+s+'/actions',{actions:[{
+        type:'pointer',id:'main0-real-mouse',parameters:{pointerType:'mouse'},
+        actions:[{type:'pointerMove',origin:'viewport',x:630,y:250,duration:0}],
+      }]});
+      await wd('POST','/session/'+s+'/actions',{actions:[{
+        type:'key',id:'main0-jump-space',actions:[
+          {type:'keyDown',value:' '},{type:'pause',duration:0},
+          {type:'pause',duration:110},{type:'keyUp',value:' '}],
+      },{
+        type:'pointer',id:'main0-real-mouse',parameters:{pointerType:'mouse'},
+        actions:[{type:'pause',duration:0},{type:'pointerDown',button:0},
+          {type:'pause',duration:110},{type:'pointerUp',button:0}],
+      }]});
+    }else{
       await wd('POST','/session/'+s+'/actions',{actions:[pointer]});
-    } finally {
-      if(jump)await action(s,[{type:'keyUp',value:' '}]);
     }
     const committed=await poll(jump?'genuine Space+LMB JumpAttack original Rust World action':
       heavy?'genuine typed Heavy original Rust World action':
       'genuine typed Light original Rust World action',async()=>{
       const data=await ev(s,`const w=window.__MAIN0_ORIGINAL_COMBAT_WITNESS__;
+        const p=window.__MYASO_LOCAL_GESTURE_PROOF__?.();
         return {actions:w?.changes??[],clientNetId:window.__MYASO_PLAYCANVAS__?.devRustSession?.client?.playerNetId,
-          tick:window.__MYASO_PLAYCANVAS__?.devRustSession?.client?.latestServerTick};`);
+          tick:window.__MYASO_PLAYCANVAS__?.devRustSession?.client?.latestServerTick,
+          gesture:p?{failed:p.failed,pending:p.pending,closed:p.closed,
+            recentAcks:p.acknowledged?.slice(-4).map(x=>({action:x.action,status:x.status})),
+            recentPhysical:p.attemptedTransmissions?.slice(-4).map(x=>({action:x.action,sequence:x.sequence}))}:null};`);
       return {...data,ok:data.clientNetId===initial.netId
         &&data.actions.some(x=>(jump?[16,17,18]:heavy?[9,10,11]:[1,2,3]).includes(x.action))};
     },6000);
