@@ -22,6 +22,15 @@
           <span id="visibility-status">Tab: visible</span>
         </div>
       </section>
+      <section id="combat-panel" class="panel" aria-live="polite" hidden>
+        <strong>COMBAT 4 · Original Rust World</strong>
+        <span id="combat-status">Combat: awaiting genuine Rust actor and snapshot</span>
+        <span id="hit-status">HIT: requires separately granted original Rust receipt</span>
+        <small>UI 10: click the canvas, use W/A/S/D, Space, RMB and wheel.
+          LMB activates only after the original QUIC typed Combat grant.
+          Chat focus cancels gameplay input; Enter/Escape remain reserved for UI 10.
+          No client-side HIT or damage.</small>
+      </section>
       <div id="fatal" role="alert" hidden></div>
     </main>
     <script type="module" src="/src/main.js"></script>
