@@ -10,6 +10,7 @@ const fatal = document.querySelector('#fatal');
 const combatPanel = document.querySelector('#combat-panel');
 const combatStatus = document.querySelector('#combat-status');
 const hitStatus = document.querySelector('#hit-status');
+const chatStatus = document.querySelector('#chat-status');
 
 function rendererName(device) {
   const name = device?.constructor?.name ?? 'UnknownGraphicsDevice';
@@ -52,6 +53,7 @@ async function boot() {
     document.documentElement.dataset.redLionAssetSource = scene.redLionAsset?.source ?? 'diagnostic-proxy';
 
     let devRustSession = null;
+    let chatSession = null;
     runtimeStatus.textContent = 'Rust session: intentionally disconnected (visual-only preview)';
     document.documentElement.dataset.rustSession = 'disconnected';
 
@@ -70,6 +72,12 @@ async function boot() {
     if (import.meta.env.DEV && query.get('rust') === '1') {
       const combatRequested = query.get('combatInput') === '1';
       const hitRequested = combatRequested && query.get('privateHit') === '1';
+      const chatRequested = query.get('chatC1') === '1';
+      if (chatRequested) {
+        chatStatus.hidden = false;
+        chatStatus.textContent = 'Chat C1: waiting for original Rust QUIC';
+        document.documentElement.dataset.chatC1 = 'connecting';
+      }
       document.documentElement.dataset.rustSession = 'connecting';
       document.documentElement.dataset.combatInput = combatRequested ? 'connecting' : 'disabled';
       combatPanel.hidden = !combatRequested;
@@ -103,10 +111,41 @@ async function boot() {
         document.documentElement.dataset.rustSession = 'connected';
         if (combatRequested && document.documentElement.dataset.combatInput !== 'granted')
           document.documentElement.dataset.combatInput = 'armed';
-        window.addEventListener('beforeunload', () => devRustSession?.close(), { once: true });
+        window.addEventListener('beforeunload', () => {
+          void chatSession?.close()?.catch(() => {});
+          devRustSession?.close();
+        }, { once: true });
+        if (chatRequested) {
+          try {
+            await import('../../../web/local-chat.css');
+            const { connectPlayCanvasChatC1 } =
+              await import('./chat/original-rust-chat-c1.mjs');
+            chatSession = await connectPlayCanvasChatC1({
+              documentObj: document,
+              stage: document.querySelector('#shell'),
+              canvas,
+              gameClient: devRustSession.client,
+              onStatus(message) {
+                chatStatus.textContent = message;
+                if (/disconnected/.test(message)) {
+                  document.documentElement.dataset.chatC1 = 'disconnected';
+                }
+              }
+            });
+            document.documentElement.dataset.chatC1 =
+              chatSession?.ready ? 'connected' : 'unavailable';
+          } catch {
+            chatStatus.textContent = 'Chat C1 unavailable; Rust gameplay remains connected';
+            document.documentElement.dataset.chatC1 = 'unavailable';
+          }
+        }
       } catch (error) {
         document.documentElement.dataset.rustSession = 'error';
         document.documentElement.dataset.combatInput = 'error';
+        if (chatRequested) {
+          document.documentElement.dataset.chatC1 = 'unavailable';
+          chatStatus.textContent = 'Chat C1 requires a connected Rust QUIC session';
+        }
         runtimeStatus.textContent = `Local Rust session unavailable: ${error.message}`;
         console.warn('[MYASO PlayCanvas] opt-in local QUIC connection unavailable:', error.message);
       }

@@ -64,9 +64,11 @@ observed in Chrome remain mandatory blockers.
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and
    independent M158 combat QA; do not waive historical first-RED.
-5. **P0 — Original Chat C1 integration:** reuse existing Chat C1 contract,
-   Enter/Escape, UTF-8, visible messages and combat/movement focus suspension;
-   no duplicate input owner or client-side chat transport.
+5. **P0 — Original Chat C1 integration:** source-only PlayCanvas adapter now
+   reuses the exact original Chat C1 panel and reliable game QUIC bridge, with
+   Enter/Escape, server ACK, UTF-8 and Combat focus suspension. Node contracts
+   are locally tested; genuine two-/four-Chrome sender/recipient acceptance
+   and reconnect still required. See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
 6. **P1 — Reusable human animations:** drive eight-way locomotion and
    Idle/Walk/Sprint/Jump/Roll/action state exclusively from authoritative
    snapshots. Keep Silver Knight optional until human animation is stable.

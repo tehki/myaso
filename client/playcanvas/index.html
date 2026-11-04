@@ -9,7 +9,7 @@
   </head>
   <body>
     <main id="shell">
-      <canvas id="application" aria-label="MYASO.IO PlayCanvas Greyhaven prototype"></canvas>
+      <canvas id="application" tabindex="0" aria-label="MYASO.IO PlayCanvas Greyhaven prototype"></canvas>
       <section class="hud" aria-live="polite">
         <div class="panel">
           <p class="eyebrow">MYASO.IO · PLAYCANVAS CLIENT ALPHA 0.1</p>
@@ -20,6 +20,7 @@
           <strong id="renderer-status">Initializing renderer…</strong>
           <span id="runtime-status">Rust session: not connected</span>
           <span id="visibility-status">Tab: visible</span>
+          <span id="chat-status" hidden>Chat C1: disconnected</span>
         </div>
       </section>
       <section id="combat-panel" class="panel" aria-live="polite" hidden>
@@ -28,7 +29,7 @@
         <span id="hit-status">HIT: requires separately granted original Rust receipt</span>
         <small>UI 10: click the canvas, use W/A/S/D, Space, RMB and wheel.
           LMB activates only after the original QUIC typed Combat grant.
-          Chat focus cancels gameplay input; Enter/Escape remain reserved for UI 10.
+          Original Chat C1 uses Enter to compose and Escape to cancel; typing suspends Combat.
           No client-side HIT or damage.</small>
       </section>
       <div id="fatal" role="alert" hidden></div>
