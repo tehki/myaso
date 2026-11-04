@@ -196,12 +196,16 @@ async function physicalRustCombat(s, peer, {heavy = false, jump = false} = {}) {
       actions:[{type:'pointerMove',origin:'viewport',x:630,y:250,duration:0},
         {type:'pointerDown',button:0},{type:'pause',duration:jump?110:heavy?450:75},
         {type:'pointerUp',button:0}]};
-    const nativeActions=jump?[pointer,{
-      type:'key',id:'main0-jump-space',actions:[
-        {type:'pause',duration:0},{type:'keyDown',value:' '},
-        {type:'pause',duration:110},{type:'keyUp',value:' '}],
-    }]:[pointer];
-    await wd('POST','/session/'+s+'/actions',{actions:nativeActions});
+    // The original PlayCanvas gate specifically CANCELS pending LMB if
+    // Space comes later. Press physical Space first and keep it held over
+    // genuine pointerDOWN/UP, with original Rust deciding JumpAttack.
+    // Both events are real ChromeDriver W3C actions, never JS dispatch.
+    if(jump)await action(s,[{type:'keyDown',value:' '}]);
+    try {
+      await wd('POST','/session/'+s+'/actions',{actions:[pointer]});
+    } finally {
+      if(jump)await action(s,[{type:'keyUp',value:' '}]);
+    }
     const committed=await poll(jump?'genuine Space+LMB JumpAttack original Rust World action':
       heavy?'genuine typed Heavy original Rust World action':
       'genuine typed Light original Rust World action',async()=>{
