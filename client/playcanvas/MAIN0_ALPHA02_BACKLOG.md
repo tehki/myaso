@@ -67,8 +67,15 @@ observed in Chrome remain mandatory blockers.
 5. **P0 — Original Chat C1 integration:** source-only PlayCanvas adapter now
    reuses the exact original Chat C1 panel and reliable game QUIC bridge, with
    Enter/Escape, server ACK, UTF-8 and Combat focus suspension. Node contracts
-   are locally tested; genuine two-/four-Chrome sender/recipient acceptance
-   and reconnect still required. See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
+   passed local mocked contract tests **and** a distinct real two-browser
+   Chromium 152 + original Rust WebTransport Chat C1 ACK/receipt test at
+   `67bb7eef`. An independent local 3x same-session Rust respawn proof passed
+   with a passive PlayCanvas spectator. Google Chrome Stable and four-player
+   PlayCanvas physical Combat/reconnect still require separate qualification.
+   **First-RED:** expanded native Chrome Chat acceptance on loaded X230i
+   reached player #1 but player #2 remained in original QUIC `connecting`.
+   Keep strict two-real-client acceptance blocked; preserve diagnostic logs.
+   See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
 6. **P1 — Reusable human animations:** drive eight-way locomotion and
    Idle/Walk/Sprint/Jump/Roll/action state exclusively from authoritative
    snapshots. Keep Silver Knight optional until human animation is stable.

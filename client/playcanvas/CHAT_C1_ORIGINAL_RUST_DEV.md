@@ -29,6 +29,56 @@ reliable server acknowledgement, inbound sender NetID, bounded local history,
 UTF-8 validation and physical gameplay focus suppression. The canvas is
 focusable; composing text suspends original Rust physical Combat input.
 
+## Genuine local Chromium-engine acceptance — 2026-11-04
+
+Main0 added an **independent browser-to-Rust-to-browser Chat C1 acceptance**
+runner: `scripts/main0-chrome-chat-c1-native.mjs`. It uses two real,
+independent ChromeDriver-controlled Chromium browser sessions on X230i.
+The local evidence at original source `67bb7eef` was:
+`MAIN0_PLAYCANVAS_TWO_CHROME_ORIGINAL_CHAT_PASS` with
+`Chromium 152.0.7977.82 Arch Linux`, server-owned IDs **1** and **2**,
+actual original QUIC reliable Chat C1 send/ACK/receive, server-rendered
+`Player #1` identity on the recipient, and no physical input tick advance
+when typing. **This proves the local Chromium engine, not separate branded
+Google Chrome Stable qualification.**
+
+Run after the *local* original Rust server has been built, from
+`client/playcanvas`:
+
+```sh
+MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/server/target/debug/myaso-server \
+CHROME_BIN=/usr/bin/chromium \
+npm run smoke:chrome-chat-c1
+```
+
+The script itself launches only ephemeral `127.0.0.1` servers and pinned
+original Rust certificates, prints its current exact HEAD SHA, and fails
+closed with `MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED` on missing
+identities, missing original ACK, forged sender/delivery, missing rendering,
+or Chat focus input leakage. Successful runs save source/version evidence
+under ignored `client/playcanvas/.artifacts/main0-chrome-chat-c1/`.
+A real browser PNG is an **optional additional strict** check using
+`MYASO_CHROME_CHAT_SCREENSHOT=1`; software-renderer screenshot capture is not
+a gameplay-authority proof. Do not upload the private development certificate
+as an artifact.
+
+**Extended-run first-RED (same day):** the stricter reproducible runner,
+with independent physical actor admission and Escape cancellation, reached
+Rust actor #1 but its second genuine Chromium WebTransport connection stayed
+at `connecting` beyond the strict deadline. During this run, X230i's load
+average exceeded 20. The cause is **not proven** (resource pressure versus
+session startup); this is a release/acceptance blocker, not a pass. The
+previous independently observed two-browser original Chat C1 ACK/receive PASS
+on `67bb7eef` remains recorded, and the new runner will store first-RED
+context in its ignored `.artifacts/main0-chrome-chat-c1/first-red.json`.
+Do not relax browser/identity assertions to declare success.
+
+The existing `smoke:greyhaven:three-respawns` ran locally on `67bb7eef`
+with **three actual original Rust World death/respawn cycles**, verified
+by two original authoritative input clients and the PlayCanvas passive
+spectator, with no client HP mutation or fake respawn. This does not
+demonstrate full PlayCanvas physical typed LMB gameplay by itself.
+
 ## Local Chrome-only genuine acceptance still required
 
 1. Build/start an **isolated** original Rust World on loopback with the
