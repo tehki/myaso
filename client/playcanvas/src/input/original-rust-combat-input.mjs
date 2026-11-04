@@ -257,7 +257,14 @@ export function createOriginalRustCombatInput({
   // script-created DOM events can never author a PlayCanvas LMB gesture.
   // Server grants and authenticated event/lease validation remain mandatory.
   const rejectUntrustedLmb = event => {
-    if (!closed && event.button === 0 && event.isTrusted !== true) {
+    if (closed || event.button !== 0) return;
+    const editorFocused = textFocused();
+    if (event.isTrusted !== true || editorFocused) {
+      // A text editor outside [data-local-chat] is also protected. The
+      // physical return-to-canvas click only restores focus; it never
+      // becomes the first typed LMB PRESS while text was being edited.
+      if (event.isTrusted === true && editorFocused && event.target === canvas)
+        canvas.focus();
       event.stopImmediatePropagation?.();
       event.preventDefault?.();
     }

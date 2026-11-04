@@ -118,6 +118,12 @@ test('UI10 captures fake left pointer/mouse events BEFORE original typed gate',(
   f.win.emit('pointerup',{button:0,pointerId:1});
   assert.deepEqual(typed,['pointerdown','mousedown','pointerup']);
   assert.equal(f.sent.length,0,'no second v1 LMB writer');
+  const textInput={closest:()=>null,matches:selector=>selector.includes('input')};
+  f.doc.activeElement=textInput;
+  f.canvas.emit('pointerdown',{button:0,pointerId:2});
+  assert.deepEqual(typed,['pointerdown','mousedown','pointerup'],
+    'first real LMB while text editing restores focus, without a typed PRESS');
+  assert.equal(f.doc.activeElement,f.canvas);
   f.input.stop();
 });
 
