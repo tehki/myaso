@@ -1,6 +1,8 @@
 # Combat 4 → PlayCanvas | authoritative presentation contract
 
-**Source-only, read-only, local PlayCanvas Alpha 0.1 feasibility spike.** The
+**Source-only, local PlayCanvas Alpha 0.1 feasibility spike.** The original
+snapshot presentation remains read-only. UI10 has an explicitly opted-in
+physical-input adapter that uses original Rust transport and Combat owners. The
 original Rust 60 Hz World owns action, HP, guard, stamina, HIT, collision,
 input admission, death, respawn and session identity. The existing
 `web/authoritative-client.mjs` decoder and QUIC snapshot state Map are the
@@ -15,14 +17,25 @@ sole source for `projectAuthoritativeCombat(entity)`.
   original World snapshot action equals 18. It never starts a local
   180 ms punish timer, admits an LMB, or guarantees an attack can HIT.
 - A 100→66/54/58 HP snapshot change only updates an existing Rust-owned HP
-  display. It is **not** an authenticated per-gesture HIT receipt. To display
-  HIT confirmation, Main0/Core8A/Combat4 must connect an existing
-  server-validated HIT event and bind it to the original actor, active QUIC
-  session and server chronology; a typed gesture ACK is not HIT proof.
-- The current `connectDevRustActors` bridge stays snapshot-only. It never
-  sends input, falls back to WebSocket, grants stamina locally or manufactures
-  an entity. The entire client remains guarded by local Vite DEV `?rust=1`
-  plus original loopback WebTransport/certificate SHA256 validation.
+  display. It is **not** an authenticated per-gesture HIT receipt. An
+  **additional** `privateHit=1` operator-only opt-in negotiates the existing
+  M147 server-granted private HIT delivery lab on the **same** QUIC transport,
+  after an authenticated actor and typed source0 grant. The original receipt
+  inbox authenticates the actor, receipt and replay cursor. Only this callback
+  can show a HIT confirmation; typed ACKs and HP deltas never can.
+- The **default** `connectDevRustActors` remains snapshot-only. The explicitly
+  opted-in `combatInput=1` UI10 adapter sends only trusted physical v1
+  movement/Space/roll/Block/RMB on the original `client.sendInput` writer,
+  with the existing one monotonic tick, and reuses original
+  `activateLoopbackGestureLab` for all physical LMB, 85ms Heavy intent,
+  same-lease typed ACKs and typed JumpAttack. It never sends v1 Light/Heavy,
+  generates a client HIT, falls back to WebSocket, grants stamina locally or
+  manufactures an actor. A genuine processed-input ACK plus matching original
+  snapshot is required before the typed LMB grant.
+- The entire input integration requires local Vite DEV `?rust=1&combatInput=1`
+  plus original loopback WebTransport/certificate SHA256 validation. In
+  production builds, disconnected/default previews and without this flag, no
+  input listeners are activated.
 - Removal and respawn follow original snapshots/NetID. Reconnect, stale
   lease rejection and real HIT presentation remain **integration acceptance
   gates**, not claims made by this change.
