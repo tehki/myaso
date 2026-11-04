@@ -121,6 +121,92 @@ async function secondReceives(s,message,senderId) {
     return {...v,ok:v.messages.some(x=>x.text===message&&x.name==='Player #'+senderId)};
   },12_000);
 }
+async function readCombatWorld(s) {
+  return ev(s,`const g=window.__MYASO_PLAYCANVAS__,session=g?.devRustSession,
+    c=session?.client,netId=c?.playerNetId,own=c?.state?.get(netId);
+    return {netId:netId??null,x:own?.x??null,y:own?.y??null,
+      hp:own?.hp??null,action:own?.action??null,
+      tick:c?.latestServerTick??0,
+      typedGranted:session?.combatInput?.typedGranted===true,
+      combatStatus:document.documentElement.dataset.combatInput,
+      transport:c?.transport?.kind??null,
+      active:document.activeElement?.id??null};`);
+}
+async function physicalRustCombat(s, peer) {
+  await ev(s,'document.querySelector("#application").focus();');
+  const initial=await readCombatWorld(s);
+  const opponentBefore=await readCombatWorld(peer);
+  assert.equal(opponentBefore.hp,100,'isolated original Rust defender starts at 100 HP');
+  assert.notEqual(opponentBefore.netId,initial.netId,'World owners must be distinct');
+  assert.equal(initial.netId>0,true,'original ACK identity required');
+  assert.equal(initial.transport,'webtransport','never a Combat protocol fork');
+  const granted=await poll('original Rust typed source0 server GRANT',async()=>{
+    const v=await readCombatWorld(s);
+    return {...v,ok:v.typedGranted&&v.netId===initial.netId};
+  },12_000);
+  console.log('MAIN0_CHROME_TYPED_SOURCE0_GRANTED',JSON.stringify({
+    netId:granted.netId,combatStatus:granted.combatStatus}));
+  // The W3C keyboard is a genuine native Chrome physical event. The only
+  // gameplay writer is the existing original Rust v1 owner.
+  await action(s,[{type:'keyDown',value:'d'},
+    {type:'pause',duration:235},{type:'keyUp',value:'d'}]);
+  const moved=await poll('original World authoritative physical D movement',async()=>{
+    const v=await readCombatWorld(s);
+    return {...v,ok:v.netId===initial.netId&&v.tick>initial.tick
+      &&Number.isFinite(v.x)&&v.x>initial.x+4};
+  },7000);
+  console.log('MAIN0_CHROME_PHYSICAL_WORLD_MOVE_PASS',JSON.stringify({
+    actorId:initial.netId,before:[initial.x,initial.y],
+    after:[moved.x,moved.y],originalTick:moved.tick}));
+  // A read-only periodic witness records ONLY the actor's original Rust
+  // snapshot state. It does not manufacture Combat events, packets or HIT.
+  await ev(s,`const c=window.__MYASO_PLAYCANVAS__.devRustSession.client,
+    netId=c.playerNetId,watch={changes:[],last:null};
+    watch.timer=setInterval(()=>{
+      const actor=c.state.get(netId),action=actor?.action;
+      if(Number.isInteger(action)&&action!==watch.last){
+        watch.changes.push({action,tick:c.latestServerTick,hp:actor.hp});
+        watch.last=action;
+      }
+    },12);
+    window.__MAIN0_ORIGINAL_COMBAT_WITNESS__=watch;`);
+  // Actual ChromeDriver W3C pointer input; script-created MouseEvents are
+  // explicitly rejected by the unchanged original Combat input owner.
+  try {
+    await wd('POST','/session/'+s+'/actions',{actions:[{
+      type:'pointer',id:'main0-real-mouse',parameters:{pointerType:'mouse'},
+      actions:[{type:'pointerMove',origin:'viewport',x:630,y:250,duration:0},
+        {type:'pointerDown',button:0},{type:'pause',duration:75},
+        {type:'pointerUp',button:0}]
+    }]});
+    const committed=await poll('genuine typed LMB original Rust World action',async()=>{
+      const data=await ev(s,`const w=window.__MAIN0_ORIGINAL_COMBAT_WITNESS__;
+        return {actions:w?.changes??[],clientNetId:window.__MYASO_PLAYCANVAS__?.devRustSession?.client?.playerNetId,
+          tick:window.__MYASO_PLAYCANVAS__?.devRustSession?.client?.latestServerTick};`);
+      return {...data,ok:data.clientNetId===initial.netId
+        &&data.actions.some(x=>[1,2,3].includes(x.action))};
+    },6000);
+    // A real original Rust defender snapshot, not visual HP inference or
+    // source0 ACK, must prove the complete 34 HP authoritative Light hit.
+    const target=await poll('original Rust Light34 real defender HP',async()=>{
+      const v=await readCombatWorld(peer);
+      return {...v,ok:v.netId===opponentBefore.netId
+        &&v.hp===opponentBefore.hp-34&&v.tick>opponentBefore.tick};
+    },8000);
+    return {actorId:initial.netId,movedX:moved.x-initial.x,
+      source0ServerGranted:true,
+      authoritativeWorldActions:committed.actions,
+      originalDefenderNetId:target.netId,
+      defenderHpBefore:opponentBefore.hp,
+      defenderHpAfter:target.hp,
+      authoritativeLightDamage:opponentBefore.hp-target.hp,
+      originalTick:target.tick,privateHitReceiptClaimed:false};
+  } finally {
+    await ev(s,`const w=window.__MAIN0_ORIGINAL_COMBAT_WITNESS__;
+      if(w){clearInterval(w.timer);delete window.__MAIN0_ORIGINAL_COMBAT_WITNESS__;}`);
+  }
+}
+let acceptanceStage='chat';
 try {
   const scrubbed=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('MYASO_')));
   const rust=track(binary,[],{env:{...scrubbed,MYASO_BIND:'127.0.0.1:0',
@@ -209,15 +295,26 @@ try {
       escapeCancelledWithoutSend:true,screenshotSha256,
       gameplayTickUnchangedWhileTyping:true,transport:'original QUIC',
       simulatedServerAcks:false,publicActivation:false}));
+  if(process.env.MYASO_CHROME_COMBAT_P0==='1'){
+    acceptanceStage='combat';
+    const combat=await physicalRustCombat(sessions[0],sessions[1]);
+    console.log('MAIN0_PLAYCANVAS_TWO_CHROME_PHYSICAL_COMBAT_PASS',
+      JSON.stringify({sha,chromeVersion,realChromes:2,...combat,
+        originalRustAuthority:true,localCombatSimulation:false,
+        production:false}));
+    writeFileSync(resolve(evidenceDir,'main0-original-rust-combat.json'),
+      JSON.stringify({sha,chromeVersion,...combat,production:false},null,2)
+      +String.fromCharCode(10));
+  }
 } catch(error) {
-  const firstRed={sha,chromeVersion,reason:safeError(error),
+  const firstRed={sha,chromeVersion,acceptanceStage,reason:safeError(error),
     originalRustTail:rustStderr.slice(-800),localViteTail:viteLog.slice(-500),
     production:false,untouchedTestAssertions:true};
   const evidenceDir=resolve('.artifacts/main0-chrome-chat-c1');
   mkdirSync(evidenceDir,{recursive:true});
-  writeFileSync(resolve(evidenceDir,'first-red.json'),
+  writeFileSync(resolve(evidenceDir,acceptanceStage==='combat' ? 'combat-first-red.json' : 'first-red.json'),
     JSON.stringify(firstRed,null,2)+String.fromCharCode(10));
-  console.error('MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
+  console.error(acceptanceStage==='combat' ? 'MAIN0_PLAYCANVAS_TWO_CHROME_COMBAT_FIRST_RED' : 'MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
   process.exitCode=1;
 } finally {
   for(const id of sessions.reverse()) await wd('DELETE','/session/'+id).catch(()=>{});

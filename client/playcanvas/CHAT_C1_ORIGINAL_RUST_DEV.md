@@ -73,6 +73,40 @@ on `67bb7eef` remains recorded, and the new runner will store first-RED
 context in its ignored `.artifacts/main0-chrome-chat-c1/first-red.json`.
 Do not relax browser/identity assertions to declare success.
 
+**Exact-head Chromium engine confirmation on X230i:** after host load
+fell to 0.33, the unchanged strict `npm run smoke:chrome-chat-c1` completed
+**PASS** on source commit `31ade88f9715f2b8f847af63fc1b9890538db980`,
+with Chromium 152/ChromeDriver, two original Rust server-issued NetIDs
+**1 and 2**, authoritative WebTransport snapshots, original reliable Chat
+C1 result ACK and receipt bearing `Player #1`, a cancelled draft after
+real Escape, and no movement packet while Chat owned focus. Local proof
+`MAIN0_PLAYCANVAS_TWO_CHROME_ORIGINAL_CHAT_PASS`. The first-RED under
+overload remains material; reduced load is correlated, not proven causal.
+
+**Additional physical Combat acceptance (same original Rust source on X230i):**
+with `MYASO_CHROME_COMBAT_P0=1` on the above command, two Chromium sessions
+received original player identities; source0's original Rust typed Combat
+lease was **granted**; a genuine W3C D keypress moved the authoritative
+player from x=4110 to x=4168; and a genuine W3C LMB produced the original
+Rust actor action phases 1/2/3 and a defender snapshot with **66 HP**.
+The new regression gate explicitly requires **100→66 HP** on the unchanged
+original defender actor; a server-granted input lease or local attack
+animation alone is insufficient. This is **Light34 World damage**, not a
+private M147 HIT receipt. Re-run this stricter assertion at the new commit
+before declaring its exact-head PASS.
+
+```sh
+MYASO_CHROME_COMBAT_P0=1 \
+MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/server/target/debug/myaso-server \
+CHROME_BIN=/usr/bin/chromium \
+npm run smoke:chrome-chat-c1
+```
+
+This remains loopback-only, source-only, Chromium-engine evidence. Do not
+equate Chromium with independently qualified Google Chrome Stable, or
+light-strike damage with Heavy46, JumpAttack42, private HIT receipts,
+four-player performance, or production acceptance.
+
 The existing `smoke:greyhaven:three-respawns` ran locally on `67bb7eef`
 with **three actual original Rust World death/respawn cycles**, verified
 by two original authoritative input clients and the PlayCanvas passive

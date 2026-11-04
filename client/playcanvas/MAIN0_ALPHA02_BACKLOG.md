@@ -55,11 +55,18 @@ observed in Chrome remain mandatory blockers.
    4160), (4206,4160), (4110,4256), (4206,4256), 23 solids, actor membership
    and removal. The snapshot wire has no trustworthy map ID; use server launch
    proof rather than claiming the renderer selects Greyhaven.
-3. **P0 — Actual PlayCanvas physical Combat:** 2 genuinely independent real
-   Google Chrome Stable sessions via original QUIC and original input ACK; W/A/S/D,
-   RMB Kick/Run, Space, wheel Dodge/Block, typed LMB Light34/Heavy46 and
-   JumpAttack42 with real source0 lease, private HIT/HP/stamina receipts.
-   Fail-closed on old actor, stale lease, hidden tab or loss of focus.
+3. **P0 — Actual PlayCanvas physical Combat:** **two real Chromium 152**
+   PlayCanvas sessions locally demonstrated separate original QUIC+ACK+NetIDs,
+   server-granted typed source0, trusted physical D movement (+58 world X),
+   trusted physical LMB and Rust snapshot attack phases 1/2/3. The defender's
+   original Rust World HP reached 66 from 100 (Light34); this was **not** a
+   private M147 HIT receipt. Strict repeatable Light34 recipient HP assertion
+   is now included in `scripts/main0-chrome-chat-c1-native.mjs` when
+   `MYASO_CHROME_COMBAT_P0=1`. Still required: **Google Chrome Stable**
+   (Chromium alone is not its release qualification), true Heavy46 and
+   JumpAttack42, genuine M147 HIT/HP/stamina receipts, Block/Kick/Dodge,
+   four-player acceptance, input security and stale-lease/focus regression.
+   Fail-closed on old actor, hidden tab or loss of focus.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and
@@ -72,10 +79,12 @@ observed in Chrome remain mandatory blockers.
    `67bb7eef`. An independent local 3x same-session Rust respawn proof passed
    with a passive PlayCanvas spectator. Google Chrome Stable and four-player
    PlayCanvas physical Combat/reconnect still require separate qualification.
-   **First-RED:** expanded native Chrome Chat acceptance on loaded X230i
-   reached player #1 but player #2 remained in original QUIC `connecting`.
-   Keep strict two-real-client acceptance blocked; preserve diagnostic logs.
-   See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
+   **Historical first-RED:** under X230i load >20, client #2 remained
+   `connecting`. With load ~0.33, the **same strict native two-Chromium test**
+   passed on exact `31ade88`: real actor IDs 1/2, original Chat C1 ACK,
+   recipient `Player #1`, Escape cancellation, no typing→Combat packet.
+   First-RED stays preserved; resource sensitivity requires repeat/stress
+   evidence. See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
 6. **P1 — Reusable human animations:** drive eight-way locomotion and
    Idle/Walk/Sprint/Jump/Roll/action state exclusively from authoritative
    snapshots. Keep Silver Knight optional until human animation is stable.
