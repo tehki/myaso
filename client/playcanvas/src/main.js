@@ -7,6 +7,9 @@ const rendererStatus = document.querySelector('#renderer-status');
 const runtimeStatus = document.querySelector('#runtime-status');
 const visibilityStatus = document.querySelector('#visibility-status');
 const fatal = document.querySelector('#fatal');
+const combatPanel = document.querySelector('#combat-panel');
+const combatStatus = document.querySelector('#combat-status');
+const hitStatus = document.querySelector('#hit-status');
 
 function rendererName(device) {
   const name = device?.constructor?.name ?? 'UnknownGraphicsDevice';
@@ -63,24 +66,47 @@ async function boot() {
     // Deliberately separate from the PlayCanvas Editor's hosted Launch:
     // only local Vite DEV plus explicit ?rust=1 can enter the QUIC code path.
     // Neither production builds nor the default preview initiates a connection.
-    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('rust') === '1') {
+    const query = new URLSearchParams(window.location.search);
+    if (import.meta.env.DEV && query.get('rust') === '1') {
+      const combatRequested = query.get('combatInput') === '1';
+      const hitRequested = combatRequested && query.get('privateHit') === '1';
       document.documentElement.dataset.rustSession = 'connecting';
+      document.documentElement.dataset.combatInput = combatRequested ? 'connecting' : 'disabled';
+      combatPanel.hidden = !combatRequested;
       runtimeStatus.textContent = 'Rust: checking local QUIC-only development configuration';
       try {
         const { connectDevRustActors } = await import('./network/dev-rust-session.js');
         devRustSession = await connectDevRustActors({
-          app,
-          pc,
+          app, pc, canvas, windowObj: window, documentObj: document,
+          enableCombatInput: combatRequested,
+          enablePrivateHit: hitRequested,
+          onHitReceipt(receipt, presentation) {
+            // Authenticated M147 receipt only; never infer from HP deltas or ACK.
+            if (presentation?.kind === 'hit') hitStatus.textContent =
+              `Rust HIT #${receipt.sequence}: ${presentation.text}`;
+          },
           url: import.meta.env.VITE_MYASO_DEV_QUIC_URL,
           sha256: import.meta.env.VITE_MYASO_DEV_QUIC_SHA256,
           onStatus(message) {
             runtimeStatus.textContent = message;
+            if (combatRequested && /Combat granted/.test(message))
+              document.documentElement.dataset.combatInput = 'granted';
+          },
+          onCombatPose(combat) {
+            // UI10 is a read-only consumer; no HIT inferred from HP changes.
+            combatStatus.textContent = combat
+              ? `Rust #${combat.netId} · HP ${combat.hp} · guard ${combat.guard} · stamina ${combat.stamina} · ${combat.actionName}`
+                + (combat.recoveryCue ? ' · JUMP RECOVERY (render-only)' : '')
+              : 'Combat: waiting for complete Rust World snapshot';
           }
         });
         document.documentElement.dataset.rustSession = 'connected';
+        if (combatRequested && document.documentElement.dataset.combatInput !== 'granted')
+          document.documentElement.dataset.combatInput = 'armed';
         window.addEventListener('beforeunload', () => devRustSession?.close(), { once: true });
       } catch (error) {
         document.documentElement.dataset.rustSession = 'error';
+        document.documentElement.dataset.combatInput = 'error';
         runtimeStatus.textContent = `Local Rust session unavailable: ${error.message}`;
         console.warn('[MYASO PlayCanvas] opt-in local QUIC connection unavailable:', error.message);
       }

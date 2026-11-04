@@ -16,3 +16,13 @@ h1 { margin: 0 0 5px; font-size: 20px; font-weight: 650; }
 .status strong { color: #d9bd8c; }
 #fatal { position: fixed; inset: auto 18px 18px; padding: 14px 16px; border: 1px solid #a65d4b; border-radius: 8px; background: #321e1b; color: #ffe4dc; white-space: pre-wrap; }
 @media (max-width: 720px) { .hud { inset: 10px; flex-direction: column; } .panel { padding: 10px 12px; } .status { min-width: 0; } h1 { font-size: 17px; } }
+
+/* UI10 Combat is original Rust read-only presentation, opt-in local debug. */
+#combat-panel { position: fixed; left: 18px; bottom: 18px; max-width: 450px;
+  display: grid; gap: 7px; font-size: 12px; pointer-events: none; }
+#combat-panel[hidden] { display: none; }
+#combat-panel strong { color: #d9bd8c; }
+#combat-panel small { color: #c7c3b8; line-height: 1.45; }
+@media (max-width: 720px) {
+  #combat-panel { left: 10px; right: 10px; bottom: 10px; max-width: none; }
+}
