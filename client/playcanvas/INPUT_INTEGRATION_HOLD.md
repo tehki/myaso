@@ -25,3 +25,11 @@
 4. Core8A+Core8C signoff, independent Combat4D, Main0 review and explicit owner release authorization. Only then a **separate source commit** may wire physical events to the already-qualified original owner. No public switch is provided in this branch.
 
 No protected-main merge, deployment, production configuration, new server endpoint, WebSocket fallback, public feature flag or live input activation.
+
+## UI10 follow-up — verified original-owner behavior (4 Nov 2026)
+
+PlayCanvas's `#application` canvas is **not** the original Combat canvas `#arena`, and it lacks the legacy `.arena-stage` host required by `installLocalChat`. Do not quietly mount a separate chat composer or let PlayCanvas capture typing outside the original Chat C1 focus fence. The later Core8-signed activation patch must explicitly adapt the original host/installer while preserving its document-level capture guards, Enter/Escape, pending ACK, authenticated sender, and canvas blur → original source0 CANCEL. This is an **unmet activation prerequisite**, not a defect to bypass with `?rust=1`.
+
+The added `tests/original-input-owners.test.mjs` exercises **the original source modules themselves**, not a PlayCanvas reimplementation: RMB short Kick vs 180ms held Run, exact pointer identity and blur; 60ms trusted Space chord, key release; same-gesture LMB PRESS→CANCEL on Chat focus and fresh PRESS→RELEASE; Chat C1 240 UTF-8 bytes and capture fence; original wheel sign and immediate authenticated v1 sender. It also verifies the PlayCanvas mount remains inert even when passed a connected-looking QUIC actor, snapshots, a fake `activate:true`, or `core8Signed:true`. Tests use synthetic Node events to prove module contracts, **not** genuine Chrome/Firefox gameplay acceptance.
+
+The immutable `PLAYCANVAS_INPUT_ACTIVATION_GATES` checklist is explanatory/observable only. It cannot be satisfied by a client-side boolean, URL parameter or NetID. Core8A/8C must independently authorize a real gameplay session and single original writer; Combat4D and Main0 must qualify the physical browser path in a **separate reviewed activation change**. Current read-only Core8C [#1167](https://github.com/tehki/myaso/pull/1167) demonstrates genuine Greyhaven actor snapshots, but is still explicit HOLD on interactive Combat and Chat C1. No input hooks or production changes are made here.

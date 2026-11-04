@@ -61,6 +61,18 @@ export const ORIGINAL_PLAYCANVAS_INPUT_CONTRACT = Object.freeze({
   }),
 });
 
+// Integration prerequisites, not user/client switches. The browser cannot
+// self-assert Core8A/8C signoff merely by connecting to a QUIC test socket,
+// seeing a NetID, or receiving a server snapshot. None unlocks this build.
+export const PLAYCANVAS_INPUT_ACTIVATION_GATES = Object.freeze([
+  'Core8A/8C independently signed authenticated original QUIC gameplay and Greyhaven World authority',
+  'Original single input owner extracted/reused (no competing v1 and typed LMB writers)',
+  'PlayCanvas chat host adapted to original installLocalChat focus and cancel, without a second chat handler',
+  'Original first-party Chat C1 reliable session and authenticated actor lifecycle accepted',
+  'Independent Combat4D physical Chrome/Firefox and same-session respawn acceptance',
+  'Main0 and owner separately authorize a reviewed activation patch',
+]);
+
 // There is deliberately NO activate(), attach(), sample(), sendInput() or
 // event handler here. Connecting read-only QUIC, observing a snapshot, adding
 // URL params or calling this function MUST NOT be able to enable controls.
@@ -76,6 +88,7 @@ export function preparePlayCanvasOriginalInput({ canvas } = {}) {
   return Object.freeze({
     state: 'HOLD_CORE8_GENUINE_SESSIONS',
     active: false,
+    missingGates: PLAYCANVAS_INPUT_ACTIVATION_GATES,
     contract: ORIGINAL_PLAYCANVAS_INPUT_CONTRACT,
   });
 }
