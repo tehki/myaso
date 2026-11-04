@@ -65,7 +65,10 @@ observed in Chrome remain mandatory blockers.
    native `main0-chrome-chat-c1-native.mjs` modes are
    `MYASO_CHROME_COMBAT_P0=1` (Light) and
    `MYASO_CHROME_HEAVY_P0=1` (Heavy), both requiring defender-owned
-   exact HP and no simulated Combat. Not a private M147 HIT receipt.
+   exact HP and no simulated Combat. The non-moving initial identity probe
+   now uses real wheel-back Block/Parry and checks authentic World9 spawn
+   anchors; the native harness refuses dirty SHA attribution. Historical
+   high-load Light/Heavy first-REDs remain recorded. Not an M147 receipt.
    Still P0: **Google Chrome Stable** (Chromium is not branded qualification),
    original JumpAttack42, true M147 private HIT/HP/stamina receipts,
    Block/Kick/Dodge, four-player real Combat/reconnect, security and

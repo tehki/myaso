@@ -16,6 +16,10 @@ assert.ok(binary && isAbsolute(binary) && basename(binary) === 'myaso-server'
 const chrome = process.env.CHROME_BIN || '/usr/bin/chromium';
 assert.ok(isAbsolute(chrome) && existsSync(chrome), 'real local Chrome/Chromium required');
 const sha = execFileSync('git', ['rev-parse','HEAD'], {cwd:root,encoding:'utf8'}).trim();
+// Do not mislabel a dirty development candidate as an exact-head native PASS.
+// First commit the reviewed source on the isolated Main0 branch.
+const dirty = execFileSync('git', ['status','--porcelain'], {cwd:root,encoding:'utf8'}).trim();
+assert.equal(dirty,'','real Chrome/Rust acceptance requires clean committed exact HEAD');
 const chromeVersion = execFileSync(chrome,['--version'],{encoding:'utf8'}).trim();
 const children = [], sessions = [];
 let rustStdout = '', rustStderr = '', viteLog = '', driverPort = 0;
@@ -57,14 +61,25 @@ const action=(s,items)=>wd('POST','/session/'+s+'/actions',{
   actions:[{type:'key',id:'main0-physical',actions:items}],
 });
 const press=(s,value)=>action(s,[{type:'keyDown',value},{type:'keyUp',value}]);
-async function physicalJoin(s) {
+async function physicalJoin(s, expectedAnchor) {
   await ev(s,'document.querySelector("#application").focus();');
-  await action(s,[{type:'keyDown',value:'w'},{type:'pause',duration:130},{type:'keyUp',value:'w'}]);
+  // A trusted W3C wheel-back Block/Parry triggers the original v1 writer
+  // without moving the World9 spawn or leaving a Space/Jump state active.
+  // Prior held-W admission drifted Y under load; Space admission could
+  // leave a live Jump (15) and interfere with later typed LMB. No neutral
+  // packets, fabricated ACK, client-selected spawn or gameplay bypass.
+  await wd('POST','/session/'+s+'/actions',{actions:[{
+    type:'wheel',id:'main0-native-admission-parry',
+    actions:[{type:'scroll',origin:'viewport',x:480,y:250,
+      deltaX:0,deltaY:120,duration:0}],
+  }]});
   return poll('original Rust actor ACK/snapshot and chat stream',async()=>{
     const v=await ev(s,`const g=window.__MYASO_PLAYCANVAS__,d=document.documentElement,
       p=g?.devRustSession,c=p?.client;
       return {connected:d.dataset.rustSession,chat:d.dataset.chatC1,
         actor:c?.playerNetId??null,hasActor:!!c?.state?.has(c?.playerNetId),
+        spawnX:c?.state?.get(c?.playerNetId)?.x??null,
+        spawnY:c?.state?.get(c?.playerNetId)?.y??null,
         renderer:d.dataset.renderer,
         gameKind:c?.transport?.kind,gameClosed:c?.transport?.closed,
         composer:document.querySelector('[data-local-chat]')?.dataset?.connected??null,
@@ -72,6 +87,8 @@ async function physicalJoin(s) {
         snapshots:p?.snapshotCount??0,serverTick:c?.latestServerTick??0};`);
     return {...v,ok:v.connected==='connected'&&v.chat==='connected'
       &&v.composer==='true'&&v.actor>0&&v.hasActor
+      &&Math.abs(v.spawnX-expectedAnchor[0])<=2
+      &&Math.abs(v.spawnY-expectedAnchor[1])<=2
       &&v.gameKind==='webtransport'&&!v.gameClosed
       &&v.serverTick>0&&v.snapshots>0};
   },45_000);
@@ -277,7 +294,8 @@ try {
     },45_000);
     // Bind each original Rust actor before allocating a second software
     // WebGL2 renderer; X230i's memory/CPU remain a genuine QA constraint.
-    owned.push(await physicalJoin(session.sessionId));
+    owned.push(await physicalJoin(session.sessionId,
+      i===0?[4110,4160]:[4206,4160]));
     console.log('MAIN0_CHROME_CHAT_BROWSER_ACTOR_READY',i+1,owned[i].actor);
   }
   console.log('MAIN0_CHROME_CHAT_BROWSER_BOOTED',sessions.length);

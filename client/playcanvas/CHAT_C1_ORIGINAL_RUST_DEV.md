@@ -111,7 +111,23 @@ recovery (11). A valid result **requires** independent defender NetID
 with **100→54 HP**, exact **46 Heavy damage**, and no Light active (2).
 The physical movement and chat focus checks remain unchanged.
 The candidate native run observed all phases **9/10/11** plus 100→54 HP;
-it was not an M147 private HIT receipt. Early first-RED showed the initial
+it was not an M147 private HIT receipt.
+
+**Admission reliability under X230i contention:** earlier held W v1 admission
+moved the actor north before Combat, unpredictably breaking the later attack
+arc; a subsequent Space admission kept world coordinates but left a Jump
+(action 15) during the loaded run and the typed gesture was rejected by
+the original Rust World. The final source harness instead admits each
+player with a **real wheel-back Block/Parry**, which sends original
+physical v1 input and preserves the authentic server spawn anchors
+(4110,4160) and (4206,4160). No neutral input, teleport, client-assigned
+identity or test bypass is used. The two-browser candidate subsequently
+passed with two authentic actor IDs, Chat ACK, original typed source0 grant,
+physical D movement, Heavy phases 9/10/11 and exact defender 100→54 HP.
+No claim is made that system load was the only cause of historical failures.
+The native runner now **refuses a dirty working tree** so a future PASS
+cannot be misattributed to the previous commit SHA; commit source first
+and report the new exact-head Chromium/CI result separately. Early first-RED showed the initial
 pre-HIT snapshot evidence could end at Heavy windup before the subsequent
 active/recovery snapshots. That observer race is now resolved by polling
 after the already-required real Rust defender HP change. Neither a passive
