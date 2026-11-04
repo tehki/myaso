@@ -140,6 +140,8 @@ CHROME_BIN=/usr/bin/chromium \
 npm run smoke:chrome-chat-c1
 ```
 
+**JumpAttack42 native source candidate:** `MYASO_CHROME_JUMP_P0=1` enables the original loopback Rust review gate and sends a real simultaneous W3C Space+LMB 110ms chord. It strictly requires authentic Rust actions 16 and 17/18, distinct original player NetIDs, and the defender's 100→58 HP (exact 42 World damage). It forbids a separate Light/Heavy active hit. This is unqualified until an exact-head real browser PASS; any first-RED remains a blocker. Private M147 HIT receipt delivery is a separate original Rust feature gate, never inferred from HP.
+
 **CI on prior SHA 7ab7b69:** 26/28 GitHub workflows passed. The original
 Chrome passive QUIC job timed out at 180 s and M142 secondary FFA trial 1
 failed (trial 2 passed). Preserve these first-REDs; the local Chrome

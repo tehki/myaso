@@ -69,8 +69,12 @@ observed in Chrome remain mandatory blockers.
    now uses real wheel-back Block/Parry and checks authentic World9 spawn
    anchors; the native harness refuses dirty SHA attribution. Historical
    high-load Light/Heavy first-REDs remain recorded. Not an M147 receipt.
+   New source-only `MYASO_CHROME_JUMP_P0=1` is a strict physical
+   Space+LMB original Rust JumpAttack42 candidate: require original
+   action 16/17/18 and independent defender 100→58 HP, no false Light/Heavy.
+   Remains unqualified until real exact-head browser PASS is recorded.
    Still P0: **Google Chrome Stable** (Chromium is not branded qualification),
-   original JumpAttack42, true M147 private HIT/HP/stamina receipts,
+   original JumpAttack42 proof and true M147 private HIT/HP/stamina receipts,
    Block/Kick/Dodge, four-player real Combat/reconnect, security and
    stale-lease/focus regression. No client-created gameplay.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
