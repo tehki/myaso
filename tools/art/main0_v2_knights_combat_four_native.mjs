@@ -920,10 +920,16 @@ try{
  const prior=await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
  assert.equal(prior.transportState,"granted","real QUIC source0 lease required");
  const before=readAuthoritativeWorld().length;
- // One native WebDriver ticks request coordinates TWO real input sources.
- // Separate HTTP requests previously delayed physical LMB 2240ms after
- // Space: original World Jump(430ms) had already expired. Never change
- // World duration, deadlines or test assertions to conceal this W3C delay.
+ // Pre-position the real mouse while Space is UP. A first pointerMove in the
+ // same chord request can consume hundreds of milliseconds on a contended
+ // headless runner; the original 430ms World Jump then expires before LMB.
+ // Keep the physical Space+LMB chord itself in ONE multi-source W3C request,
+ // with no movement, and preserve the exact trusted event order below.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
+  actions:[{type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
+   {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0}
+  ]}]
+ });
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
   actions:[
    {type:"key",id:"jump-review-space",actions:[
@@ -931,7 +937,7 @@ try{
     {type:"pause",duration:30},{type:"keyUp",value:" "}
    ]},
    {type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
-    {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0},
+    {type:"pause",duration:30},
     {type:"pointerDown",button:0},{type:"pointerUp",button:0},
     {type:"pause",duration:0}
    ]}

@@ -101,15 +101,28 @@ The mode is a **source trial**, not robust public zone selection.
 
 The existing Rust `World` still bounds 8192×8192 and handles genuine
 actor movement, HP, stamina, combat, death/respawn and QUIC snapshots.
-**It does not enforce the copied 23 Greyhaven static AABBs** merely
-because World9 renders them. Core8C must bind authoritative map ID,
-revision, zone/actor epoch and spawn selection to server admission.
-Physics6 must approve same-tick **complete** static+dynamic collision,
-river, doors and occupied fighter separation, plus swept movement,
-reject unknown/incomplete snapshots, and preserve all original arena
-and Combat physics. No JSON manifest from the browser may claim
-`complete=true` or mutate server state. No item/corpse/portal
-transaction, owned sword or NPC proof exists in this slice.
+Physics6's pinned 23-building/wall AABB geometry and swept-circle
+containment are wired into the original Rust `World`, but ONLY when
+the trusted server constructor receives the independently validated
+loopback `MYASO_WORLD9_GREYHAVEN_ALPHA=1` mode. The default Pre-Alpha
+arena and every ordinary `GameState::new` remain collision guard OFF.
+The Greyhaven constructor fails closed if the original 8192×8192 world
+cannot enable the guard or synthetic flight actors are requested.
+Core8C's spawn helper also rejects wrong-sized/match-over Worlds and
+any spawn within the 36-unit fighter diameter of a current server-owned
+actor, while preserving the session's immutable respawn reservation.
+Actual actor admission still goes through original
+`World::add_player_at`; the Physics6 guard rejects a spawn inside any
+of the 23 known solids.
+
+This is **authoritative static containment, not complete world
+collision**: river/bridge/trees, dynamic doors, other moving obstacles,
+a signed current map/zone/worker epoch and full obstacle revision are
+still absent. A negative overlap against the 23 known solids is not a
+universal walkability oracle. Core8C must still bind authoritative map
+ID/revision/zone+actor epoch to admission before public activation.
+No browser JSON may claim `complete=true` or mutate server state.
+No item/corpse/portal transaction, owned sword or NPC proof exists.
 
 Graphics3B/3C must confirm real source facade footprint, visual y4075
 Red Lion actor occlusion, source SHA, day/dusk and Silver Knight HUD

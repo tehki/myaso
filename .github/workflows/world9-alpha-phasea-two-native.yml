@@ -3,7 +3,13 @@ on:
   pull_request:
     paths:
       - "server/src/greyhaven_alpha.rs"
+      - "server/src/alpha_greyhaven_geometry.rs"
+      - "server/src/alpha_greyhaven_solids_generated.rs"
+      - "server/src/simulation.rs"
+      - "server/tests/alpha_p6_greyhaven_static_collision.rs"
       - "server/src/main.rs"
+      - "assets/world/greyhaven-alpha-solids-v1.json"
+      - "scripts/verify-core8c-greyhaven-geometry.mjs"
       - "web/online-game.mjs"
       - "src/world/**"
       - "src/browser/authored-world-renderer.mjs"
@@ -38,8 +44,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "$MYASO_WORLD9_SOURCE_SHA"
           node --check web/online-game.mjs
           node --check tools/world9/greyhaven_alpha_two_native.mjs
+          node scripts/verify-core8c-greyhaven-geometry.mjs
           node --test tests/world9-alpha-foundation.test.mjs tests/graphics3-p1-greyhaven-preview-integration.test.mjs
           cargo fmt --all --manifest-path server/Cargo.toml --check
+          cargo test --locked --manifest-path server/Cargo.toml --bin myaso-server greyhaven_static_collision_guard_uses_the_explicit_world9_server_gate
+          cargo test --locked --manifest-path server/Cargo.toml --test alpha_p6_greyhaven_static_collision
           google-chrome --version
           firefox --version
           chromedriver --version

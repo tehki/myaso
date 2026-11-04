@@ -29,7 +29,8 @@ test("one canonical original World9 Greyhaven Red Lion/Smith and visual-only por
   assert.equal(view.visualDepthY,4075);assert.equal(view.interactionPortal.y,4075);
   assert.equal(smith.entrance,undefined);
   assert.equal(a.hasPortalAuthority,false);assert.equal(a.hasItemAuthority,false);
-  assert.equal(a.serverPhysicsCollisionActive,false);
+  assert.equal(a.serverStaticCollisionMode,"explicit-loopback-only-opt-in");
+  assert.equal(a.serverStaticCollisionActiveByDefault,false);
 });
 test("four original Rust spawns and the authored landmark promenade are clear of ALL 23 pinned solids",()=>{
   assert.equal(a.spawns.length,4);
@@ -53,6 +54,8 @@ test("source opt-in is gated in BOTH original Rust admission and actual browser;
   assert.match(server,/MYASO_WORLD9_GREYHAVEN_ALPHA/);
   assert.match(server,/bind\.ip\(\)\.is_loopback\(\)/);
   assert.match(server,/greyhaven_alpha::free_spawn\(&state\.world\)/);
+  assert.match(server,/configure_greyhaven_alpha_runtime\(&mut state\.world, greyhaven_alpha\)/);
+  assert.match(server,/world\.enable_greyhaven_static_collisions\(\)/);
   assert.match(server,/state\.world\.add_player_at\(player_id, x, y, 0\.0\)/);
   assert.match(server,/state\.world\.add_player\(player_id\)/);
   assert.match(browser,/params\.get\("world"\) === "1"/);
