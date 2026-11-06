@@ -125,6 +125,19 @@ observed in Chrome remain mandatory blockers.
    tests; the original 34 HP and directional presentation gates still fail.
    Earlier M35 HIT-before-Block first-RED and fast-vs-slow W3C wheel
    latency evidence remain preserved; no changes to Parry125 or World rules.
+   At `c9d948f`, CI first attempt passed 26/29. Both four-Chrome M147
+   and mixed-engine original HIT, Source11 four-Chrome lifecycle, M121
+   directional Light, all eight mandatory Combat/M35 lanes and standard M156
+   passed. Failures: native M151 missing genuine trusted Firefox wheel inside
+   strict 190ms; Firefox passive PlayCanvas QUIC startup timeout; quality
+   M140 failed to commit a genuine recovery-window Light. Targeted M151 and
+   passive Firefox QUIC reruns subsequently PASSED; quality rerun remained
+   in progress at the last verified checkpoint. All first-REDs preserved.
+   Review-only `M194_NATIVE_WHEEL_TIMEOUT_FIRST_RED` now attaches original
+   W3C dispatch/ACK/attestation clock evidence and bounded original World
+   actions to a failed guard-break exchange; neither the missing wheel nor
+   simulated Block can satisfy acceptance. No release/up-input after timeout,
+   no additional gameplay owner, no parry or server timing change.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and

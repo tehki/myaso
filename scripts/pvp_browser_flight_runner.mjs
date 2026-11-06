@@ -10348,6 +10348,24 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
+      } catch (error) {
+        if (error?.nativeTiming) {
+          // Failed M194 wheel is a first-RED: never synthesize a Block or
+          // replay the physical input. Preserve original World chronology
+          // and the exact native W3C command clocks before aborting.
+          const originalWorld = m201ServerOutput().slice(m320ServerOutputStart)
+            .split(/\r?\n/)
+            .filter(line => /^(M201_AUTH_(ACTION|BLOCK|PARRY|BREAK|HIT)|CORE8C_WORLD_CONTACT) /.test(line))
+            .slice(-18);
+          console.error("M194_NATIVE_WHEEL_TIMEOUT_FIRST_RED " + JSON.stringify({
+            scenario, attempt: attempt + 1,
+            attackerNetId: attackerReady.playerNetId,
+            defenderNetId: defenderReady.playerNetId,
+            nativeTiming: error.nativeTiming,
+            originalWorld,
+          }));
+        }
+        throw error;
       } finally {
         challenge.close();
         // If the trusted wheel or W3C release failed, terminate the still
