@@ -94,11 +94,14 @@ observed in Chrome remain mandatory blockers.
    and stale-generation negative lanes also passed. This proves one CI host,
    **not** four independent machines or four PlayCanvas renderer sessions.
    Original feature-gated M147 four-native mixed-engine integration also
-   **PASS** at `abafa91` in CI 41911706689. A new *separate* CI matrix lane
-   will now require four branded Google Chrome Stable sessions for private HIT
-   with independent attacker/defender receipt and spectator exclusion, while
-   retaining the original mixed-engine test; this lane is **pending** until
-   exact-head native results are available.
+   **PASS** at `abafa91` in CI 41911706689. The new independent four-branded
+   Google Chrome Stable **private HIT** lane **PASSED** at exact head
+   `2671f2aaf191910e51bb80efc4d7844673c7190b` in
+   [CI 42219272543](https://github.com/tehki/myaso/actions/runs/42219272543),
+   alongside the retained mixed-engine lane: original Rust authoritative Light
+   34, attacker/defender-only M147 receipt + present-before-ACK, no spectator
+   receipt, all four native browser sessions. This is still one CI host, still
+   developer-loopback opt-in, NOT public or independent-host qualification.
    Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect sessions,
    independent-host private HIT stress, multiple-hit replay/incarnation and
    stamina, full Block/Kick/Dodge/focus acceptance. No client-created gameplay.
@@ -108,14 +111,20 @@ observed in Chrome remain mandatory blockers.
    World HIT at tick1121 precedes defender Block admission at tick1122, so the
    attack lands for 34 HP. The same M35 result reproduced on retry. Preserve
    this Combat timing blocker; do not change the 125ms parry window or waive it.
-   See runs 41868420936 and 41868420274. Latest `abafa91` CI is 26/28:
-   quality, Source11 (including four Chrome Stable), M147 private loopback all
-   passed; Combat mandatory M35 remained RED (original HIT tick1753,
-   defender Block tick1754) and one Firefox recovery-buffer native job failed.
-   Successful dedicated M35 runs had fast W3C wheel ACK (~5–12 ms), while
-   the failing M35 wheel ACK took ~140 ms; this is observed scheduling
-   evidence, not proof of a network-only cause. No Parry125 or server rule
-   changes are authorized.
+   See runs 41868420936 and 41868420274. At `abafa91` CI was 26/28.
+   At `2671f2a`, first-attempt CI was 24/28: branded four-Chrome M147,
+   Source11, and all eight mandatory Combat jobs passed. Quality, M151
+   three-fighter guard-break, M121 directional Light, and M156 roll-punish
+   were RED. Targeted failed-job reruns subsequently passed M151, M121,
+   and M156; the quality job was still running at the latest check.
+   Historical first-REDs remain relevant despite those successful reruns.
+   M121 specifically had real W3C LMB down/up separated by ~239ms rather
+   than a native plan's 40ms; original World correctly committed Heavy
+   9→24→25→26 instead of directional Light34. Main0 adds a read-only
+   actor-bound `M121_NATIVE_PHYSICAL_LIGHT_FIRST_RED` diagnostic with unit
+   tests; the original 34 HP and directional presentation gates still fail.
+   Earlier M35 HIT-before-Block first-RED and fast-vs-slow W3C wheel
+   latency evidence remain preserved; no changes to Parry125 or World rules.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and

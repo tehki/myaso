@@ -41,6 +41,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { summarizeM121NativeFirstRed } from "./m121-native-first-red.mjs";
 import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { planM147CloserIdleGeometry } from "./m147-closer-idle-geometry.mjs";
@@ -1836,6 +1837,13 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 66
     || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    console.error("M121_NATIVE_PHYSICAL_LIGHT_FIRST_RED " + JSON.stringify(
+      summarizeM121NativeFirstRed({
+        actorId:attackerResult.playerNetId,
+        physicalPointers:attackerResult.pointers,
+        worldActions:attackerResult.acceptance?.ownActionTransitions ?? [],
+        senderSamples:attackerResult.acceptance?.m121SentSamples ?? [],
+      })));
     throw new Error(`M121 directional light did not resolve as one 34 HP hit: ${JSON.stringify(evidence)}`);
   }
   if (!attackerResult.events.includes("Opponent hit - 34 HP.")
