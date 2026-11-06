@@ -86,18 +86,36 @@ observed in Chrome remain mandatory blockers.
    packets; QUIC actor leases are not account authentication. This is one
    host, not four independent human machines, and does not yet qualify
    multi-hit/replay/reconnect on independent hosts or public activation.
-   New exact-head workflow adds **four branded Google Chrome Stable sessions**
-   for three same-session deaths/respawns and Chat C1; awaiting CI evidence.
-   Remaining P0: Chrome Stable four-player Combat/reconnect, independent-host
-   stress, full Block/Kick/Dodge/stamina acceptance, security and stale-lease/
-   focus regression. No client-created gameplay.
+   **Source11 four branded Google Chrome Stable** original-game lifecycle
+   **PASS** at `abafa9142fbf3037b456c0687cbdc431f27b8a04` in
+   [CI 41911706564](https://github.com/tehki/myaso/actions/runs/41911706564):
+   four independent Chrome 156 browser sessions, real original Rust Combat,
+   three same-session deaths/respawns, renewed source0 and Chat C1; mixed
+   and stale-generation negative lanes also passed. This proves one CI host,
+   **not** four independent machines or four PlayCanvas renderer sessions.
+   Original feature-gated M147 four-native mixed-engine integration also
+   **PASS** at `abafa91` in CI 41911706689. A new *separate* CI matrix lane
+   will now require four branded Google Chrome Stable sessions for private HIT
+   with independent attacker/defender receipt and spectator exclusion, while
+   retaining the original mixed-engine test; this lane is **pending** until
+   exact-head native results are available.
+   Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect sessions,
+   independent-host private HIT stress, multiple-hit replay/incarnation and
+   stamina, full Block/Kick/Dodge/focus acceptance. No client-created gameplay.
    Exact-head CI at 30b741c after failed-job reruns: quality passed and 27/28
    workflows passed. The original two M27/renderer timeout reds were cleared
    by retry; the remaining standard-path M35 first-RED is real: original Rust
    World HIT at tick1121 precedes defender Block admission at tick1122, so the
    attack lands for 34 HP. The same M35 result reproduced on retry. Preserve
    this Combat timing blocker; do not change the 125ms parry window or waive it.
-   See runs 41868420936 and 41868420274.
+   See runs 41868420936 and 41868420274. Latest `abafa91` CI is 26/28:
+   quality, Source11 (including four Chrome Stable), M147 private loopback all
+   passed; Combat mandatory M35 remained RED (original HIT tick1753,
+   defender Block tick1754) and one Firefox recovery-buffer native job failed.
+   Successful dedicated M35 runs had fast W3C wheel ACK (~5–12 ms), while
+   the failing M35 wheel ACK took ~140 ms; this is observed scheduling
+   evidence, not proof of a network-only cause. No Parry125 or server rule
+   changes are authorized.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and

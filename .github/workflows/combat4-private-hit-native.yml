@@ -15,6 +15,7 @@ on:
       - "src/browser/m147-hit-receipt-feedback.mjs"
       - "tools/art/main0_v2_knights_combat_four_native.mjs"
       - "tests/private-hit-delivery-client.test.mjs"
+      - "tests/main0-private-hit-four-chrome-lane.test.mjs"
       - ".github/workflows/combat4-private-hit-native.yml"
   workflow_dispatch:
 
@@ -25,8 +26,17 @@ jobs:
   private-four-native-original-world:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - acceptance: historical-mixed-engines
+            browsers: chrome,firefox,chrome,firefox
+          - acceptance: alpha02-four-google-chrome-stable
+            browsers: chrome,chrome,chrome,chrome
     env:
-      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: chrome,firefox,chrome,firefox
+      MYASO_LIVE_GESTURE_NATIVE_BROWSERS: ${{ matrix.browsers }}
       MYASO_LIVE_GESTURE_PHYSICAL_MODE: private-hit
       MYASO_LIVE_GESTURE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       MYASO_LIVE_GESTURE_CARGO_OFFLINE: "0"
@@ -54,10 +64,17 @@ jobs:
           node --check tools/art/main0_v2_knights_combat_four_native.mjs
           node --check web/private-hit-delivery-lab.mjs
           node --test tests/*.test.mjs
-          google-chrome --version
-          firefox --version
+          chrome_version="$(google-chrome --version)"
+          printf '%s\n' "$chrome_version"
+          case "$chrome_version" in
+            "Google Chrome "*) ;;
+            *) echo "Requires branded Google Chrome Stable" >&2; exit 1 ;;
+          esac
           chromedriver --version
-          geckodriver --version
+          if [[ "$MYASO_LIVE_GESTURE_NATIVE_BROWSERS" == *firefox* ]]; then
+            firefox --version
+            geckodriver --version
+          fi
       - name: Four original browsers genuine LMB World HIT and participant-only private receipts
         run: timeout --signal=TERM --kill-after=5s 300s node tools/art/main0_v2_knights_combat_four_native.mjs
       - name: Save formatter correction for failed exact-source verification
@@ -69,7 +86,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: combat4-private-hit-native-${{ github.event.pull_request.head.sha || github.sha }}
+          name: combat4-private-hit-native-${{ matrix.acceptance }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             .artifacts/main0-knights-combat-gesture/
             rustfmt.patch
