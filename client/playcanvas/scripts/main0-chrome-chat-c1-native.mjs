@@ -311,6 +311,11 @@ async function source11Witness(s){
     return {actor:c?.playerNetId??null, hp:own?.hp??null,
       x:own?.x??null,y:own?.y??null,
       action:own?.action??null,serverTick:c?.latestServerTick??0,
+      snapshotSequence:c?.latestSnapshotSequence??null,
+      acknowledgedSnapshotSequence:c?.acknowledgedSnapshotSequence??null,
+      processedClientTick:c?.processedClientTick??null,
+      ownedInputTick:g?.combatInput?.tick??null,
+      reliableSnapshots:c?.reliableSnapshots??0,
       closed:c?.transport?.closed??true,kind:c?.transport?.kind??null,
       typedGranted:g?.combatInput?.typedGranted===true,
       typedGeneration:p?.typedGeneration??null,
@@ -376,17 +381,41 @@ async function physicalThreeSameRootRespawns(attacker,victim){
         return {...v,ok:v.actor===b.actor&&v.hp===0
           &&v.action===8&&!v.closed};
       },2200);
-    const renewed=await poll('original Rust Source11 bound typed GRANT after respawn '+cycle,
+    // The original root notice and server-bound typed GRANT prove a fresh
+    // World incarnation, but not yet a current client HP snapshot. The first
+    // Chrome first-RED had a legitimate root hint while client HP remained 0.
+    const grant=await poll('original Rust Source11 bound typed GRANT '+cycle,
       async()=>{const v=await source11Witness(victim);
         const hasRenew=v.source11Events.some(x=>x.stage==='renew-lease-active'
           &&x.generation>previousGeneration);
-        return {...v,ok:v.actor===b.actor&&v.hp===100&&v.typedGranted
+        return {...v,ok:v.actor===b.actor&&v.typedGranted
           &&v.typedGeneration>previousGeneration&&hasRenew
           &&v.typedRenewalPending===false&&!v.failed&&!v.leaseClosed
           &&v.kind==='webtransport'&&!v.closed};
       },9_000);
+    // A REAL W3C physical Block/Parry carries the original v1 snapshot ACK.
+    // An otherwise-idle actor may retain a stale acknowledged baseline and
+    // display HP0 even after the server-owned World has respawned. Do not
+    // manufacture a neutral input, modify HP or advance a snapshot cursor.
+    await ev(victim,'document.querySelector("#application").focus();');
+    await wd('POST','/session/'+victim+'/actions',{actions:[{
+      type:'wheel',id:'main0-source11-real-snapshot-ack-wheel',
+      actions:[{type:'scroll',origin:'viewport',x:480,y:250,
+        deltaX:0,deltaY:120,duration:0}],
+    }]});
+    const renewed=await poll('real Rust HP100 respawn snapshot after trusted wheel '+cycle,
+      async()=>{const v=await source11Witness(victim);
+        return {...v,ok:v.actor===b.actor&&v.hp===100&&v.typedGranted
+          &&v.typedGeneration===grant.typedGeneration
+          &&v.ownedInputTick>grant.ownedInputTick
+          &&v.processedClientTick>grant.processedClientTick
+          &&v.typedRenewalPending===false&&!v.failed&&!v.leaseClosed
+          &&v.kind==='webtransport'&&!v.closed
+          &&v.serverTick>died.serverTick};
+      },9_000);
     const oldGeneration=previousGeneration;
     previousGeneration=renewed.typedGeneration;
+    await delay(320); // original 240ms physical Block must expire before Light
     // The renewed lease must process a NEW trusted LMB rather than
     // reusing the retired source0 sequence from the previous World life.
     const before=await source11Witness(victim);
@@ -599,7 +628,14 @@ try {
       +String.fromCharCode(10));
   }
 } catch(error) {
-  const firstRed={sha,chromeVersion,acceptanceStage,reason:safeError(error),
+  // Read-only actor/lease/snapshot evidence, no tokens or credentials.
+  const source11FirstRed=respawnMode&&sessions.length===2 ? {
+    attacker:await source11Witness(sessions[0]).catch(e=>({error:safeError(e)})),
+    victim:await source11Witness(sessions[1]).catch(e=>({error:safeError(e)})),
+  }:null;
+  const firstRed={sha,chromeVersion,acceptanceStage,
+    reason:respawnMode?String(error?.message??error).slice(0,3500):safeError(error),
+    source11FirstRed,
     realBrowserSessionsStarted:sessions.length,
     expectedFourPlayCanvasSessions:fourMode?4:null,
     originalRustTail:rustStderr.slice(-800),localViteTail:viteLog.slice(-500),
