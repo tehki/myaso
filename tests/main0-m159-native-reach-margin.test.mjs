@@ -46,6 +46,21 @@ test("M159 refuses edge-of-reach staging without a real trusted server-validated
   assert.match(flight,/provenance\.firstKnockdown\.epochMs/);
 });
 
+test("M159 stages genuine post-knockback contact geometry BEFORE the original roll without inflating reach",()=>{
+  assert.match(flight,/const postRollLaneStages=\[\]/);
+  assert.match(flight,/const wantedX=postRollLane\.target\.x\+28/);
+  assert.match(flight,/const wantedY=postRollLane\.target\.y-68/);
+  assert.match(flight,/await pulseMovementKeyBoundedW3c\(punisher,delta>0\?positive:negative,pulseMs\)/);
+  assert.match(flight,/postRollLane=await stageM159ReachMargin\(\)/);
+  assert.match(flight,/M159_POST_ROLL_CONTACT_LANE_STAGE/);
+  assert.match(flight,/Math\.abs\(laneDx\)>12\|\|Math\.abs\(laneDy\)>12/);
+  assert.match(flight,/postRollLane\.target\.y-postRollLane\.own\.y<55/);
+  assert.match(flight,/postRollLane\.distance>originalLightReach-7/);
+  assert.match(flight,/M159 physical post-roll contact lane not demonstrated/);
+  assert.ok(flight.indexOf("M159_POST_ROLL_CONTACT_LANE_STAGE") <
+    flight.indexOf("await scrollArenaWheel(roller"));
+  assert.doesNotMatch(flight,/COMBAT\.attack\.reach\s*=|COMBAT\.dodge\.collisionKnockdownMs\s*=/);
+});
 test("M159 physical staging happens before original wheel and never changes gameplay timing or hit admission",()=>{
   const stage=flight.indexOf("M159_NATIVE_REACH_MARGIN_STAGE");
   const roll=flight.indexOf("await scrollArenaWheel(roller");

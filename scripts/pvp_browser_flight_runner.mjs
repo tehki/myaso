@@ -5604,6 +5604,47 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       JSON.stringify({before:reachBefore,after:reachAfter,reachStages,
         unchangedLightReach:originalLightReach}));
   }
+  // M159 original first-RED d4b9e3f: the authentic roll knocked the selected
+  // victim from x134 to x208; a pre-roll 78px center distance still left the
+  // punisher at (136,32) to (208,114), OUTSIDE unchanged 94px Light reach.
+  // Stage #4 to a safer lateral/downward contact lane BEFORE the real roll.
+  // This is only original W3C movement, not a prediction credited as a HIT.
+  // The existing strict first/second/roller HP and M209 server overlap gates
+  // below remain the ONLY authority for success.
+  const postRollLaneStages=[];
+  let postRollLane=reachAfter;
+  for(let adjustment=0;adjustment<3;adjustment++){
+    const wantedX=postRollLane.target.x+28;
+    const wantedY=postRollLane.target.y-68;
+    const dx=wantedX-postRollLane.own.x;
+    const dy=wantedY-postRollLane.own.y;
+    if(Math.abs(dx)<=10&&Math.abs(dy)<=10)break;
+    const moves=[];
+    for(const [delta,positive,negative] of [[dx,"d","a"],[dy,"s","w"]]){
+      if(Math.abs(delta)<=10)continue;
+      const pulseMs=Math.min(160,Math.max(45,
+        Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+      await pulseMovementKeyBoundedW3c(punisher,delta>0?positive:negative,pulseMs);
+      await sleep(100);
+      moves.push({key:delta>0?positive:negative,pulseMs});
+    }
+    const previous=postRollLane;
+    postRollLane=await stageM159ReachMargin();
+    postRollLaneStages.push({adjustment,moves,before:previous,after:postRollLane});
+  }
+  const laneDx=postRollLane.own.x-(postRollLane.target.x+28);
+  const laneDy=postRollLane.own.y-(postRollLane.target.y-68);
+  console.log("M159_POST_ROLL_CONTACT_LANE_STAGE "+JSON.stringify({
+    postRollLaneStages,actualWorld:postRollLane,
+    laneDx,laneDy,unchangedLightReach:originalLightReach,
+  }));
+  if(Math.abs(laneDx)>12||Math.abs(laneDy)>12
+    ||postRollLane.target.y-postRollLane.own.y<55
+    ||postRollLane.distance>originalLightReach-7){
+    throw new Error(milestone+" M159 physical post-roll contact lane not demonstrated: "+
+      JSON.stringify({postRollLaneStages,postRollLane,laneDx,laneDy,
+        unchangedLightReach:originalLightReach}));
+  }
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
