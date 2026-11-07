@@ -1,4 +1,4 @@
-// Main0 Chrome-only nonrelease: TWO independent real Chrome windows,
+// Main0 Chrome-only nonrelease: TWO or FOUR independent real Chrome windows,
 // original loopback Rust QUIC, physical v1 sender identity and original Chat C1.
 // Never opens a public host, rewrites packet codec, fakes ACK or deploys.
 import assert from 'node:assert/strict';
@@ -21,6 +21,14 @@ const sha = execFileSync('git', ['rev-parse','HEAD'], {cwd:root,encoding:'utf8'}
 const dirty = execFileSync('git', ['status','--porcelain'], {cwd:root,encoding:'utf8'}).trim();
 assert.equal(dirty,'','real Chrome/Rust acceptance requires clean committed exact HEAD');
 const chromeVersion = execFileSync(chrome,['--version'],{encoding:'utf8'}).trim();
+const fourMode=process.env.MYASO_CHROME_FOUR_P0==='1';
+if(fourMode){
+  assert.match(chromeVersion,/^Google Chrome /,
+    'four-PlayCanvas release qualification requires branded Google Chrome Stable');
+  assert.equal(['MYASO_CHROME_COMBAT_P0','MYASO_CHROME_HEAVY_P0',
+    'MYASO_CHROME_JUMP_P0'].some(k=>process.env[k]==='1'),false,
+    'four-PlayCanvas native acceptance owns one independent Light34 trial');
+}
 const children = [], sessions = [];
 let rustStdout = '', rustStderr = '', viteLog = '', driverPort = 0;
 const loopback = /^https:\/\/127\.0\.0\.1:\d+\/game$/;
@@ -322,7 +330,8 @@ try {
   const driver=track('chromedriver',['--port='+driverPort]);
   await poll('ChromeDriver',async()=>({ok:(await fetch('http://127.0.0.1:'+driverPort+'/status').catch(()=>null))?.ok===true}));
   const owned=[];
-  for(let i=0;i<2;i++){
+  const anchors=[[4110,4160],[4206,4160],[4110,4256],[4206,4256]];
+  for(let i=0;i<(fourMode?4:2);i++){
     const session=await wd('POST','/session',{capabilities:{alwaysMatch:{
       browserName:'chrome','goog:chromeOptions':{binary:chrome,args:[
         '--headless=new','--no-sandbox','--disable-dev-shm-usage',
@@ -338,20 +347,22 @@ try {
     },45_000);
     // Bind each original Rust actor before allocating a second software
     // WebGL2 renderer; X230i's memory/CPU remain a genuine QA constraint.
-    owned.push(await physicalJoin(session.sessionId,
-      i===0?[4110,4160]:[4206,4160]));
+    owned.push(await physicalJoin(session.sessionId,anchors[i]));
     console.log('MAIN0_CHROME_CHAT_BROWSER_ACTOR_READY',i+1,owned[i].actor);
   }
   console.log('MAIN0_CHROME_CHAT_BROWSER_BOOTED',sessions.length);
   const [a,b]=owned;
-  console.log('MAIN0_CHROME_CHAT_ACTOR_ACKS',JSON.stringify({a:a.actor,b:b.actor}));
-  assert.notEqual(a.actor,b.actor,'Rust MUST issue different actor identities');
+  console.log('MAIN0_CHROME_CHAT_ACTOR_ACKS',
+    JSON.stringify({actors:owned.map(x=>x.actor)}));
+  assert.equal(new Set(owned.map(x=>x.actor)).size,owned.length,
+    'original Rust must issue a unique actor identity for every real PlayCanvas session');
   const cancelled=await cancelChatWithoutSending(sessions[0]);
   console.log('MAIN0_CHROME_CHAT_ESCAPE_CANCEL_PASS');
   const text='Main0 genuine Greyhaven Chrome Chat C1 '+sha.slice(0,8);
   const send=await sendChat(sessions[0],text);
-  const received=await secondReceives(sessions[1],text,a.actor);
-  console.log('MAIN0_CHROME_CHAT_AUTHORITATIVE_ACK_RECEIVE_PASS');
+  const receivedAll=await Promise.all(sessions.slice(1)
+    .map(s=>secondReceives(s,text,a.actor)));
+   console.log('MAIN0_CHROME_CHAT_AUTHORITATIVE_ACK_RECEIVE_PASS');
   // Optional visual witness: software-GPU screenshot retrieval is not
   // authoritative World or Chat acceptance and must not block gameplay QA.
   // When explicitly requested, it is an additional strict (not silent) gate.
@@ -366,21 +377,71 @@ try {
     screenshotSha256=createHash('sha256').update(screenshot).digest('hex');
     writeFileSync(resolve(evidenceDir,'recipient-chrome.png'),screenshot);
   }
-  const evidence={sha,chromeVersion,realChromes:2,actors:[a.actor,b.actor],
-    rustServerTick:[a.serverTick,b.serverTick],chatText:text,renderer:a.renderer,
+  const evidence={sha,chromeVersion,realChromes:owned.length,actors:owned.map(x=>x.actor),
+    rustServerTick:owned.map(x=>x.serverTick),chatText:text,renderer:a.renderer,
     serverAcknowledged:true,recipientSenderId:a.actor,
     composerEscapeCancelledWithoutSend:cancelled.messages===0,
     gameplayTickUnchangedWhileTyping:true,
     screenshotSha256,transport:'original QUIC',publicActivation:false};
   writeFileSync(resolve(evidenceDir,'main0-original-rust-chat.json'),
     JSON.stringify(evidence,null,2)+String.fromCharCode(10));
-  console.log('MAIN0_PLAYCANVAS_TWO_CHROME_ORIGINAL_CHAT_PASS',
-    JSON.stringify({sha,chromeVersion,realChromes:2,actors:[a.actor,b.actor],
-      rustServerTick:[a.serverTick,b.serverTick],chatText:text,
-      acknowledged:send.ack.accepted.includes(text),received:received.messages,
+  console.log(fourMode?'MAIN0_PLAYCANVAS_FOUR_CHROME_ORIGINAL_CHAT_PASS':
+    'MAIN0_PLAYCANVAS_TWO_CHROME_ORIGINAL_CHAT_PASS',
+    JSON.stringify({sha,chromeVersion,realChromes:owned.length,
+      actors:owned.map(x=>x.actor),rustServerTick:owned.map(x=>x.serverTick),chatText:text,
+      acknowledged:send.ack.accepted.includes(text),
+      received:receivedAll.map(x=>x.messages),
       escapeCancelledWithoutSend:true,screenshotSha256,
       gameplayTickUnchangedWhileTyping:true,transport:'original QUIC',
       simulatedServerAcks:false,publicActivation:false}));
+  if(fourMode){
+    acceptanceStage='four-combat';
+    assert.equal(owned.length,4,'four real PlayCanvas browser sessions required');
+    assert.ok(owned.every(x=>x.renderer==='WebGL2'),
+      'each of four genuine Chrome clients must render real PlayCanvas WebGL2');
+    // Four independently rendered PlayCanvas clients must all retain real
+    // server-owned identities and typed source0 leases. Real Chat C1 was
+    // acknowledged and delivered separately to all THREE other clients.
+    const participants=await Promise.all(sessions.map(s=>poll(
+      'four genuine PlayCanvas original Rust actor grants',async()=>{
+        const v=await readCombatWorld(s);
+        return {...v,ok:v.netId>0&&v.typedGranted
+          &&v.transport==='webtransport'&&v.hp===100};
+      },18_000)));
+    assert.equal(new Set(participants.map(x=>x.netId)).size,4,
+      'four independently authenticated original Rust actor IDs');
+    const combat=await physicalRustCombat(sessions[0],sessions[1]);
+    assert.equal(combat.authoritativeWorldDamage,34);
+    assert.equal(combat.originalDefenderNetId,participants[1].netId);
+    const spectatorProof=await Promise.all(sessions.slice(2).map(s=>poll(
+      'original Rust four-client spectator replication of authoritative HIT',
+      async()=>{
+        const v=await ev(s,`const z=window.__MYASO_PLAYCANVAS__?.devRustSession?.client;
+          const own=z?.state?.get(z.playerNetId),target=z?.state?.get(arguments[0]);
+          return {observer:z?.playerNetId??null,observerHp:own?.hp??null,
+            victimHp:target?.hp??null,serverTick:z?.latestServerTick??0,
+            transport:z?.transport?.kind??null,closed:z?.transport?.closed};`,
+          [participants[1].netId]);
+        return {...v,ok:v.observer>0&&v.observerHp===100
+          &&v.victimHp===66&&v.serverTick>combat.originalTick
+          &&v.transport==='webtransport'&&!v.closed};
+      },15_000)));
+    assert.deepEqual(spectatorProof.map(x=>x.observer),
+      participants.slice(2).map(x=>x.netId),
+      'spectators must not get forged actor identities or World HP');
+    const fourEvidence={sha,chromeVersion,realChromes:4,
+      actors:participants.map(x=>x.netId),
+      individuallyGrantedTypedSource0:participants.every(x=>x.typedGranted),
+      serverChatAcknowledged:send.ack.accepted.includes(text),
+      serverChatDeliveredToThree:receivedAll.length===3,
+      combat,spectatorProof,
+      originalRustAuthority:true,localCombatSimulation:false,
+      privateHitReceiptClaimed:false,publicActivation:false};
+    writeFileSync(resolve(evidenceDir,'main0-four-playcanvas-original-rust.json'),
+      JSON.stringify(fourEvidence,null,2)+String.fromCharCode(10));
+    console.log('MAIN0_PLAYCANVAS_FOUR_CHROME_RUST_CHAT_LIGHT34_PASS',
+      JSON.stringify(fourEvidence));
+  }
   if(['MYASO_CHROME_COMBAT_P0','MYASO_CHROME_HEAVY_P0','MYASO_CHROME_JUMP_P0']
     .some(key=>process.env[key]==='1')){
     const heavy=process.env.MYASO_CHROME_HEAVY_P0==='1';
@@ -400,13 +461,21 @@ try {
   }
 } catch(error) {
   const firstRed={sha,chromeVersion,acceptanceStage,reason:safeError(error),
+    realBrowserSessionsStarted:sessions.length,
+    expectedFourPlayCanvasSessions:fourMode?4:null,
     originalRustTail:rustStderr.slice(-800),localViteTail:viteLog.slice(-500),
     production:false,untouchedTestAssertions:true};
   const evidenceDir=resolve('.artifacts/main0-chrome-chat-c1');
   mkdirSync(evidenceDir,{recursive:true});
-  writeFileSync(resolve(evidenceDir,acceptanceStage.startsWith('combat') ? 'combat-first-red.json' : 'first-red.json'),
+  const combatFailure=acceptanceStage.startsWith('combat')
+    ||acceptanceStage==='four-combat';
+  writeFileSync(resolve(evidenceDir,
+    fourMode?'four-playcanvas-first-red.json':
+      combatFailure?'combat-first-red.json':'first-red.json'),
     JSON.stringify(firstRed,null,2)+String.fromCharCode(10));
-  console.error(acceptanceStage.startsWith('combat') ? 'MAIN0_PLAYCANVAS_TWO_CHROME_COMBAT_FIRST_RED' : 'MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
+  console.error(fourMode?'MAIN0_PLAYCANVAS_FOUR_CHROME_FIRST_RED':
+    combatFailure?'MAIN0_PLAYCANVAS_TWO_CHROME_COMBAT_FIRST_RED':
+      'MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
   process.exitCode=1;
 } finally {
   for(const id of sessions.reverse()) await wd('DELETE','/session/'+id).catch(()=>{});

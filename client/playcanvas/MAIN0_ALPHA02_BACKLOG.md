@@ -102,7 +102,23 @@ observed in Chrome remain mandatory blockers.
    34, attacker/defender-only M147 receipt + present-before-ACK, no spectator
    receipt, all four native browser sessions. This is still one CI host, still
    developer-loopback opt-in, NOT public or independent-host qualification.
-   Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect sessions,
+   **NEW FOUR-ACTOR PLAYCANVAS Chrome Stable native source-only candidate:**
+   `MYASO_CHROME_FOUR_P0=1` now requires *four real PlayCanvas WebGL2*
+   renderer clients, all with independent original Rust World9 actors at
+   (4110,4160), (4206,4160), (4110,4256), (4206,4256), all granted
+   original typed source0 + ACK and genuinely connected QUIC. Original
+   Chat C1 Player #1 must be ACKed by Rust and delivered to all three real
+   peers; local typing must suppress physical gameplay, Escape cancel must
+   not send. One real Chrome W3C LMB and original World Light34 must reduce
+   actor #2 100→66 HP, *and* third/fourth PlayCanvas actors must independently
+   replicate #2 at 66 while preserving their own original HP100. This is
+   isolated ephemeral loopback, no fake Combat authority, no private HIT claim.
+   The separately named `four-playcanvas-chrome-stable` job in the existing
+   nonrelease PlayCanvas CI enforces branded Google Chrome and preserves
+   fail-closed native evidence. **PENDING exact-head real browser CI**, not
+   claimed qualified merely because contract tests PASS. These are four
+   PlayCanvas sessions on one runner, not four physical hosts.
+   Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect signoff,
    independent-host private HIT stress, multiple-hit replay/incarnation and
    stamina, full Block/Kick/Dodge/focus acceptance. No client-created gameplay.
    Exact-head CI at 30b741c after failed-job reruns: quality passed and 27/28

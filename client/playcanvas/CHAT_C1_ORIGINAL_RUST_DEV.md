@@ -147,10 +147,43 @@ Chrome passive QUIC job timed out at 180 s and M142 secondary FFA trial 1
 failed (trial 2 passed). Preserve these first-REDs; the local Chrome
 Heavy46 result does not waive quality or passive-QUIC qualification.
 
-This remains loopback-only, source-only, Chromium-engine evidence. Do not
-equate Chromium with independently qualified Google Chrome Stable, or
-light-strike damage with Heavy46, JumpAttack42, private HIT receipts,
-four-player performance, or production acceptance.
+### Four actual PlayCanvas Chrome Stable clients (new source-only CI gate)
+
+The distinct `MYASO_CHROME_FOUR_P0=1` mode reuses the exact original Rust
+World9 loopback QUIC+pin, native ChromeDriver, the same actual PlayCanvas
+renderers and original Chat C1/Combat input owner. It additionally **requires
+branded Google Chrome Stable**, four WebGL2 clients and unique server-owned
+NetIDs at the four canonical Greyhaven spawn anchors; all four must obtain
+the genuine server-granted typed Source0 lease. Chat C1 sends a single
+real server-ACKed message from the first client, and **each** of the other
+three browsers must receive the real player identity. Escape cancellation and
+typing/gameplay isolation stay mandatory. One original physical Light34 must
+then cause defender #2 HP100→66; clients #3 and #4 must independently observe
+that original server-owned change without taking damage themselves. An
+animation, local ACK, snapshot from a different session or client-side HP
+mutation never passes this gate.
+
+```sh
+cd client/playcanvas
+MYASO_CHROME_FOUR_P0=1 \
+MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/server/target/debug/myaso-server \
+CHROME_BIN=/usr/bin/google-chrome \
+npm run smoke:chrome-chat-c1
+```
+
+The existing nonrelease PlayCanvas workflow contains a separate
+`four-playcanvas-chrome-stable` job with real-browser acceptance and
+a strict `MAIN0_PLAYCANVAS_FOUR_CHROME_RUST_CHAT_LIGHT34_PASS` marker.
+Failure preserves `.artifacts/main0-chrome-chat-c1/four-playcanvas-first-red.json`
+and exits nonzero. **Source-only and PENDING live exact-head CI** until
+confirmed. Even a pass would be four independent browser sessions on one
+CI machine, **not four independent physical hosts**, reconnect/stress
+qualification or private M147 receipts. No public activation.
+
+Historical two-Chromium Light34/Heavy46/JumpAttack42 acceptance remains
+separate. Do not equate Chromium with Google Chrome Stable, Light damage
+with private HIT receipts, or first-party original Silver native proofs with
+four actual PlayCanvas renderers.
 
 The existing `smoke:greyhaven:three-respawns` ran locally on `67bb7eef`
 with **three actual original Rust World death/respawn cycles**, verified
