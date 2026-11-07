@@ -1,0 +1,73 @@
+name: Main0 Alpha 0.2 M158 M159 independent native QA (NONRELEASE)
+
+# Independent diagnostics only: this does not replace, skip or waive the
+# protected full quality/M137/M158/M159 gate. Existing original Rust mechanics,
+# trusted physical input, reach (94) and stun/knockdown clocks are unchanged.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/main0-alpha02-m158-m159-independent-native.yml"
+      - "scripts/pvp_browser_flight_runner.mjs"
+      - "scripts/m158-native-geometry.mjs"
+      - "scripts/m197-knockdown-cluster.mjs"
+      - "src/combat/**"
+      - "server/src/**"
+      - "web/online-game.mjs"
+      - "tests/main0-m159-native-reach-margin.test.mjs"
+      - "tests/r1-m159-early-light-release.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-rust-independent-ffa:
+    name: ${{ matrix.id }} original Rust physical FFA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: M158
+            scenario: uimultiknockdownffa
+          - id: M159
+            scenario: uimultiknockdownffahit
+    env:
+      MYASO_PVP_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Identify exact source and original native input drivers
+        run: |
+          echo "MAIN0_FFA_NATIVE_EXACT_HEAD=$(git rev-parse HEAD) MILESTONE=${{ matrix.id }}"
+          node --check scripts/pvp_browser_flight_runner.mjs
+          node --check web/online-game.mjs
+          google-chrome --version
+          firefox --version
+          chromedriver --version
+          geckodriver --version
+      - name: Verify strict unchanged arbitration and physical staging contracts
+        run: |
+          node --test --test-name-pattern="FFA knockdown arbitration|FFA knockdown punish focus" tests/m29-combat-readability.test.mjs
+          if [ "$MYASO_PVP_SCENARIO" = "uimultiknockdownffahit" ]; then
+            node --test tests/r1-m159-early-light-release.test.mjs
+            node --test tests/main0-m159-native-reach-margin.test.mjs
+          fi
+      - name: Compile original server-authoritative Rust World
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Require actual original Rust W3C physical ${{ matrix.id }} acceptance
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=5s 180s node scripts/pvp_browser_flight_runner.mjs 2>&1 | tee "$RUNNER_TEMP/main0-${{ matrix.id }}-first-attempt.log"
+      - name: Retain exact-head native first-attempt evidence, including RED
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-${{ matrix.id }}-native-first-attempt-${{ github.run_id }}
+          path: ${{ runner.temp }}/main0-${{ matrix.id }}-first-attempt.log
+          if-no-files-found: ignore
+          retention-days: 14

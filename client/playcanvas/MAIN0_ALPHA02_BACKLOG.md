@@ -44,6 +44,15 @@ observed in Chrome remain mandatory blockers.
 - PlayCanvas Editor project 1634867 / scene 2639984 must be independently
   inspected while its authenticated MCP service is connected before any edits.
 
+## Independent native gate checkpoint — 2026-11-07
+
+- **Prior source SHA:** `2bbce942c1d6b1eb91f1dd2b9c482f09756e4e8f` on Draft #1169. The exact-head first-attempt batch finished **26 SUCCESS / 3 FAILURE**. This is not a release candidate PASS.
+- **Quality first-RED:** [run 42364702894](https://github.com/tehki/myaso/actions/runs/42364702894) stopped on genuine M137 buffered Space+LMB after original Light34. Original Rust committed a second Light34 (defender 100→66→32), not mandatory JumpAttack42; untouched M137 assertion failed. This means the quality sequence did **not** reach M158 or M159: neither is verified at this SHA.
+- **Other first-REDs:** [original-game native browser QA 42364702931](https://github.com/tehki/myaso/actions/runs/42364702931) retained a real Chrome original actor in Jump action15 beyond the eight-second idle gate; [PlayCanvas QUIC 42364702964](https://github.com/tehki/myaso/actions/runs/42364702964) had a passive Firefox QUIC timeout, while four real PlayCanvas Chrome and Source11 three-lives native jobs **PASSED**. Firefox is historical regression evidence, **not** the Alpha 0.2 product target.
+- **New separate source-only lane:** `.github/workflows/main0-alpha02-m158-m159-independent-native.yml` gives M158 `uimultiknockdownffa` and M159 `uimultiknockdownffahit` independently scheduled **real original Rust + physical W3C driver** jobs, each retaining its own first-attempt run log artifact. Existing full quality, M137, reach94, roll-order and 260ms server World gates remain unmodified. The native QA lane uses the original legacy mixed browsers because those two *historical* scenarios require them; it does **not** claim Chrome-only PlayCanvas release qualification. A new source commit and exact-head runs are **PENDING** until verified.
+- **Local source checks for the new QA lane:** YAML parses two matrix jobs; M158 readability contracts 2/2 PASS, M159 staging and early-release contracts 4/4 PASS; original runner `node --check` and `git diff --check` PASS. These are not browser QA PASS.
+- **Release signoff remains blocked:** require independent M158 + M159 genuine first-attempt evidence, clean quality/M137 and Chrome Space-chord, source-only 4 PlayCanvas Chrome and three Source11 lives at **the same final SHA**, genuine four physically independent authorized Chrome hosts, original Rust server SHA, authenticated identity/ACK, Chat C1, collision/respawns/reconnect, hit isolation, stamina and preserved security gates. No merge/deploy/public activation.
+
 ## Prioritized backlog — smallest playable increments first
 
 1. **P0 — Exact-head source health:** run Node client, Vite build, Rust locked
