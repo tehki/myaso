@@ -11,6 +11,7 @@ import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
 import {runNativeRecoveryBuffer} from "../../scripts/native-recovery-buffer.mjs";
 import {runNativeJumpStamina} from "../../scripts/native-jump-stamina.mjs";
+import {planMain0NativeJumpReviewChord} from "./main0-jump-review-native-chord.mjs";
 import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -920,23 +921,25 @@ try{
  const prior=await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
  assert.equal(prior.transportState,"granted","real QUIC source0 lease required");
  const before=readAuthoritativeWorld().length;
- // One native WebDriver ticks request coordinates TWO real input sources.
- // Separate HTTP requests previously delayed physical LMB 2240ms after
- // Space: original World Jump(430ms) had already expired. Never change
- // World duration, deadlines or test assertions to conceal this W3C delay.
+ // Pre-position the real mouse while Space is UP. A first pointerMove in the
+ // same chord request can consume hundreds of milliseconds on a contended
+ // headless runner; the original 430ms World Jump then expires before LMB.
+ // Keep the physical Space+LMB chord itself in ONE multi-source W3C request,
+ // with no movement, and preserve the exact trusted event order below.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-  actions:[
-   {type:"key",id:"jump-review-space",actions:[
-    {type:"keyDown",value:" "},{type:"pause",duration:40},
-    {type:"pause",duration:30},{type:"keyUp",value:" "}
-   ]},
-   {type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
-    {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0},
-    {type:"pointerDown",button:0},{type:"pointerUp",button:0},
-    {type:"pause",duration:0}
-   ]}
-  ]
+  actions:[{type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
+   {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0}
+  ]}]
  });
+ // The prior native first-RED had genuine Space DOWN 529ms BEFORE LMB
+ // DOWN: the 30/40ms action ticks were delayed by headless runner load past
+ // Rust's unchanged jump-chord window, yielding plain Jump 15. Use one W3C
+ // command with only ONE zero-duration tick between trusted Space and LMB,
+ // release LMB first then Space. Preserve first-RED if this still stalls.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",
+  planMain0NativeJumpReviewChord({
+   keyboardId:"jump-review-space",pointerId:"jump-review-lmb",holdMs:90,
+  }));
  const result=await waitFor(async()=>{
   const log=readAuthoritativeWorld().slice(before),p=await evaluate(attacker,
    "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
@@ -952,9 +955,22 @@ try{
      || !worldTransition(log,1,16,17))return false;
   return {log,p,worldJumpEntry};
  },12000).catch(async error=>{
-  const diag={error:String(error),world:readAuthoritativeWorld().slice(before),
+  const native=await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]")
+    .catch(e=>String(e));
+  const keyDown=Array.isArray(native)?native.find(e=>e.type==="keydown"&&e.code==="Space"):null;
+  const pointerDown=Array.isArray(native)?native.find(e=>e.type==="pointerdown"&&e.pointerId!==null):null;
+  const chordGapMs=Number.isFinite(keyDown?.at)&&Number.isFinite(pointerDown?.at)
+    ?Math.round((pointerDown.at-keyDown.at)*10)/10:null;
+  const diag={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+    error:String(error),world:readAuthoritativeWorld().slice(before),
     browser:await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null").catch(e=>String(e)),
-    native:await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]").catch(e=>String(e))};
+    native,observedSpaceToPointerDownMs:chordGapMs,
+    // Original authenticated JumpAttack admission expires after 12 World
+    // ticks. This browser-local measurement is diagnostic, not the server
+    // decision; the original World journal remains mandatory.
+    authoritativeWorldRequired:true,releaseHold:true};
+  await writeFile(join(output,"combat4-jump-review-FIRST-RED.json"),
+    JSON.stringify(diag,null,2)+"\n").catch(()=>{});
   console.error("COMBAT4_JUMP_NATIVE_FIRST_RED",JSON.stringify(diag));
   throw error;
  });

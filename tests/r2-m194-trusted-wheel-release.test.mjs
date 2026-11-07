@@ -59,7 +59,16 @@ test("M194 missing trusted wheel fails closed before Chrome LMB release", async 
   await tick();
   now = 190;
   ceiling.resolve();
-  await assert.rejects(flight, /M194 trusted native wheel not delivered/);
+  await assert.rejects(flight, error => {
+    assert.match(error.message, /M194 trusted native wheel not delivered/);
+    assert.equal(error.nativeTiming.kind, "release-anchored-wheel-timeout");
+    assert.equal(error.nativeTiming.trustedWheelWaitMs, 190);
+    assert.equal(error.nativeTiming.elapsedMs, 190);
+    assert.equal(error.nativeTiming.wheelAckMs, 0);
+    assert.equal(error.nativeTiming.trustedWheelObservedMs, null);
+    assert.equal(error.nativeTiming.releaseAttempted, false);
+    return true;
+  });
   assert.equal(ups, 0);
 });
 
@@ -159,7 +168,14 @@ test("M194 wheel-first misses native trusted wheel and aborts BEFORE Chrome LMB 
     sendAttackDown: () => { downs++; },
     sendAttackUp: () => { ups++; },
     sleep: ms => ms === 190 ? Promise.resolve() : Promise.reject(Error("unexpected extra wait")),
-  }), /wheel not delivered before wheel-first attack/);
+  }), error => {
+    assert.match(error.message, /wheel not delivered before wheel-first attack/);
+    assert.equal(error.nativeTiming.kind, "wheel-first-attestation-timeout");
+    assert.equal(error.nativeTiming.trustedWheelWaitMs, 190);
+    assert.equal(error.nativeTiming.attackDownAttempted, false);
+    assert.equal(error.nativeTiming.trustedWheelObservedMs, null);
+    return true;
+  });
   assert.equal(downs, 0);
   assert.equal(ups, 0);
   for (const invalid of [NaN, -1, 81, Infinity]) {

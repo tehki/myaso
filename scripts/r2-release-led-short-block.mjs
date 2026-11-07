@@ -80,7 +80,24 @@ export async function dispatchR2ReleaseLedShortBlock({
   if (trustedWheelWaitMs > 0) {
     await Promise.race([
       attestation,
-      sleep(trustedWheelWaitMs).then(() => { throw new Error("M194 trusted native wheel not delivered within light-release budget"); }),
+      sleep(trustedWheelWaitMs).then(() => {
+        // Only on real failure: report bounded native W3C command clocks.
+        // This is NOT wheel attestation, input acceptance, or a release.
+        const error = new Error("M194 trusted native wheel not delivered within light-release budget");
+        error.nativeTiming = Object.freeze({
+          kind: "release-anchored-wheel-timeout",
+          trustedWheelWaitMs,
+          elapsedMs: Number(ms().toFixed(1)),
+          attackDownDispatchMs: Number(attackDownDispatchMs.toFixed(1)),
+          attackDownAckMs: Number(attackDownAckMs.toFixed(1)),
+          wheelDispatchMs: Number(wheelDispatchMs.toFixed(1)),
+          wheelAckMs: wheelAckMs === null ? null : Number(wheelAckMs.toFixed(1)),
+          trustedWheelObservedMs: trustedWheelObservedMs === null
+            ? null : Number(trustedWheelObservedMs.toFixed(1)),
+          releaseAttempted: false,
+        });
+        throw error;
+      }),
       earlyWheelFailure,
     ]);
   } else {
@@ -154,7 +171,20 @@ async function dispatchR2WheelFirstShortBlock({
   await Promise.race([
     attestation,
     sleep(trustedWheelWaitMs).then(() => {
-      throw new Error("M194 trusted native wheel not delivered before wheel-first attack");
+      // Fail before any LMB-down. Preserve the original strict rejection
+      // and attach only read-only dispatch / driver-ACK timing.
+      const error = new Error("M194 trusted native wheel not delivered before wheel-first attack");
+      error.nativeTiming = Object.freeze({
+        kind: "wheel-first-attestation-timeout",
+        trustedWheelWaitMs,
+        elapsedMs: Number(ms().toFixed(1)),
+        wheelDispatchMs: Number(wheelDispatchMs.toFixed(1)),
+        wheelAckMs: wheelAckMs === null ? null : Number(wheelAckMs.toFixed(1)),
+        trustedWheelObservedMs: trustedWheelObservedMs === null
+          ? null : Number(trustedWheelObservedMs.toFixed(1)),
+        attackDownAttempted: false,
+      });
+      throw error;
     }),
     earlyWheelFailure,
   ]);

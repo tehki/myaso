@@ -55,14 +55,17 @@ function element(doc, tag, className, label) {
 export function installLocalChat(doc, {
   online = false, adapter = null, idFactory = () => globalThis.crypto?.randomUUID?.(),
   onMessage = () => {}, onAccepted = () => {},
+  // Original P0 callers keep #arena/.arena-stage and their stylesheet.
+  // PlayCanvas supplies its actual host/canvas and bundles the same CSS once.
+  stageElement = null, canvasElement = null, includeStylesheet = true,
 } = {}) {
   if (INSTANCES.has(doc)) {
     const existing = INSTANCES.get(doc);
     if (adapter) existing.bindAdapter(adapter);
     return existing;
   }
-  const stage = doc.querySelector(".arena-stage");
-  const canvas = doc.querySelector("#arena");
+  const stage = stageElement ?? doc.querySelector(".arena-stage");
+  const canvas = canvasElement ?? doc.querySelector("#arena");
   if (!stage || !canvas) return null;
 
   const root = element(doc, "section", "local-chat");
@@ -107,11 +110,13 @@ export function installLocalChat(doc, {
   root.append(toggle, body);
   stage.append(root);
 
-  const css = element(doc, "link");
-  css.rel = "stylesheet";
-  css.href = "./local-chat.css";
-  css.setAttribute("data-local-chat-style", "");
-  doc.head?.append(css);
+  const css = includeStylesheet ? element(doc, "link") : null;
+  if (css) {
+    css.rel = "stylesheet";
+    css.href = "./local-chat.css";
+    css.setAttribute("data-local-chat-style", "");
+    doc.head?.append(css);
+  }
 
   const store = createLocalChatHistory();
   let transport = null;
@@ -353,7 +358,7 @@ export function installLocalChat(doc, {
       form.removeEventListener("submit", onSubmit);
       toggle.removeEventListener("click", onToggle);
       root.remove();
-      css.remove();
+      css?.remove();
       INSTANCES.delete(doc);
     },
   };

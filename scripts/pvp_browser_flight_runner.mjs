@@ -41,6 +41,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { summarizeM121NativeFirstRed } from "./m121-native-first-red.mjs";
 import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { planM147CloserIdleGeometry } from "./m147-closer-idle-geometry.mjs";
@@ -1836,6 +1837,13 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 66
     || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    console.error("M121_NATIVE_PHYSICAL_LIGHT_FIRST_RED " + JSON.stringify(
+      summarizeM121NativeFirstRed({
+        actorId:attackerResult.playerNetId,
+        physicalPointers:attackerResult.pointers,
+        worldActions:attackerResult.acceptance?.ownActionTransitions ?? [],
+        senderSamples:attackerResult.acceptance?.m121SentSamples ?? [],
+      })));
     throw new Error(`M121 directional light did not resolve as one 34 HP hit: ${JSON.stringify(evidence)}`);
   }
   if (!attackerResult.events.includes("Opponent hit - 34 HP.")
@@ -5506,7 +5514,10 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       clusterAligned = plan;
       break;
     }
-    await pulseMovementKey(secondVictim, plan.key, plan.pulseMs);
+    // One genuine W3C keyDown/pause/keyUp transaction avoids an unbounded
+    // cross-driver key-held gap under CI load. The subsequent ORIGINAL
+    // authoritative snapshot still decides whether the cluster is aligned.
+    await pulseMovementKeyBoundedW3c(secondVictim, plan.key, plan.pulseMs);
     await sleep(90);
   }
   if (!clusterAligned) {
@@ -5524,6 +5535,45 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   console.log("M197_GENUINE_CLUSTER_STAGING " + JSON.stringify({
     milestone, rollRight, clusterPlans,
   }));
+  // M159 first-RED: selected #2 could be 94.021 units away from #4,
+  // outside the immutable 94 reach by only 0.021. Stage a small physical
+  // downward step BEFORE the roll, with actual server-owned positions, so
+  // W3C timing and geometry quantization cannot turn an edge aim into a
+  // false claim of a reachable HIT. Never change Combat reach or target arc.
+  const stageM159ReachMargin = async () => {
+    const evidence = await readUiEvidence(punisher);
+    const fighters = evidence.acceptance?.fighters ?? [];
+    const own = fighters.find(f => f.netId === punisherId);
+    const target = fighters.find(f => f.netId === firstVictimId);
+    if (![own?.x,own?.y,target?.x,target?.y].every(Number.isFinite)) {
+      throw new Error(milestone+" M159 missing original World reach-staging positions: "+
+        JSON.stringify({own,target}));
+    }
+    const distance = Math.hypot(target.x-own.x,target.y-own.y);
+    return {own,target,distance};
+  };
+  const originalLightReach=COMBAT.attack.reach+COMBAT.fighterRadius;
+  const reachBefore=await stageM159ReachMargin();
+  let reachAfter=reachBefore;
+  if(reachBefore.distance > originalLightReach-9){
+    if(reachBefore.target.y<=reachBefore.own.y) {
+      throw new Error(milestone+" M159 cannot safely stage physical downward reach margin: "+
+        JSON.stringify(reachBefore));
+    }
+    // A single bounded authentic W3C S pulse, never scripted movement.
+    await pulseMovementKeyBoundedW3c(punisher,"s",45);
+    reachAfter=await stageM159ReachMargin();
+  }
+  console.log("M159_NATIVE_REACH_MARGIN_STAGE "+JSON.stringify({
+    before:reachBefore.distance,after:reachAfter.distance,
+    unchangedLightReach:originalLightReach,
+    firstVictimId,punisherId,
+  }));
+  if(reachAfter.distance > originalLightReach-7){
+    throw new Error(milestone+" M159 original World reach margin not demonstrated: "+
+      JSON.stringify({before:reachBefore,after:reachAfter,
+        unchangedLightReach:originalLightReach}));
+  }
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
@@ -10340,6 +10390,24 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
+      } catch (error) {
+        if (error?.nativeTiming) {
+          // Failed M194 wheel is a first-RED: never synthesize a Block or
+          // replay the physical input. Preserve original World chronology
+          // and the exact native W3C command clocks before aborting.
+          const originalWorld = m201ServerOutput().slice(m320ServerOutputStart)
+            .split(/\r?\n/)
+            .filter(line => /^(M201_AUTH_(ACTION|BLOCK|PARRY|BREAK|HIT)|CORE8C_WORLD_CONTACT) /.test(line))
+            .slice(-18);
+          console.error("M194_NATIVE_WHEEL_TIMEOUT_FIRST_RED " + JSON.stringify({
+            scenario, attempt: attempt + 1,
+            attackerNetId: attackerReady.playerNetId,
+            defenderNetId: defenderReady.playerNetId,
+            nativeTiming: error.nativeTiming,
+            originalWorld,
+          }));
+        }
+        throw error;
       } finally {
         challenge.close();
         // If the trusted wheel or W3C release failed, terminate the still
