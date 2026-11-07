@@ -41,3 +41,17 @@ test("Alpha 0.2 adds four branded Google Chrome Stable W3C sessions for Source11
   assert.match(workflow, /timeout --signal=TERM --kill-after=5s 360s node tools\/art\/main0_v2_knights_combat_four_native\.mjs/);
   assert.match(workflow, /MYASO_LIVE_GESTURE_CHAT_C1: "1"/);
 });
+
+test("Mixed-browser Source11 lane remains a strict original-World position gate with bounded genuine W3C fine movement", () => {
+  assert.match(source,/const pulseFineLane=async\(a,vertical,horizontal\)=>/);
+  assert.match(source,/type:"key",id:"four-real-walk"/);
+  assert.match(source,/\{type:"keyDown",value:vertical\},\{type:"keyDown",value:horizontal\}/);
+  assert.match(source,/\{type:"pause",duration:0\}/);
+  assert.match(source,/\{type:"keyUp",value:vertical\},\{type:"keyUp",value:horizontal\}/);
+  assert.match(source,/if\(Math\.abs\(delta\)<=4\)return \{actorId,targetY,proof:p,attempts\}/);
+  assert.match(source,/const fine=Math\.abs\(delta\)<=10/);
+  assert.match(source,/await pulseFineLane\(actor,key,horizontal\)/);
+  assert.match(source,/const finalProof=await proof\(actor\)/);
+  assert.match(source,/Math\.abs\(targetY-finalActor\.y\)<=4/);
+  assert.doesNotMatch(source,/setActorPosition|setClientHp|syntheticMovement|dispatchEvent\(/);
+});

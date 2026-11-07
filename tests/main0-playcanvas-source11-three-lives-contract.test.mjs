@@ -49,6 +49,18 @@ test("Source11 requires original bound typed GRANT and new physical source0 afte
   assert.match(runner,/source11-three-lives-first-red\.json/);
 });
 
+test("Source11 third-renewal first-RED preserves bounded read-only World, reliable and typed chronology",()=>{
+  assert.match(runner,/const source11VictimTrace = \[\]/);
+  assert.match(runner,/ownSnapshotTick:own\?\.serverTick\?\?null/);
+  assert.match(runner,/if\(respawnMode&&s===sessions\[1\]\)/);
+  assert.match(runner,/source11VictimTrace\.push\(point\)/);
+  assert.match(runner,/source11VictimTrace\.length>120/);
+  assert.match(runner,/source11VictimTrace:respawnMode\?source11VictimTrace\.slice\(-120\):null/);
+  assert.match(runner,/v\.actor===b\.actor&&v\.hp===100/);
+  assert.match(runner,/v\.processedClientTick>grant\.processedClientTick/);
+  assert.doesNotMatch(runner,/setClientHp|forceRespawn|fakeInputAck|syntheticWorldSnapshot/);
+});
+
 test("nonrelease Source11 CI retains passive and four-PlayCanvas jobs with strict exact-head logs",()=>{
   assert.match(workflow,/two-playcanvas-source11-three-respawns:/);
   assert.match(workflow,/four-playcanvas-chrome-stable:/);

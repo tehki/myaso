@@ -33,6 +33,9 @@ if(fourMode||respawnMode){
     'opt-in PlayCanvas lifecycle qualification owns the complete physical Combat trial');
 }
 const children = [], sessions = [];
+// Nonrelease source11: bounded read-only first-RED chronology. Never sends
+// any World packet, changes any actor or owns an additional QUIC session.
+const source11VictimTrace = [];
 let rustStdout = '', rustStderr = '', viteLog = '', driverPort = 0;
 const loopback = /^https:\/\/127\.0\.0\.1:\d+\/game$/;
 const safeError = x => String(x?.message || x).slice(0,350);
@@ -305,10 +308,11 @@ async function physicalRustCombat(s, peer, {heavy = false, jump = false} = {}) {
 // root. Every strike comes from a trusted W3C pointer; no direct sendInput,
 // local HP write, synthetic ACK, forced respawn, or control protocol fork.
 async function source11Witness(s){
-  return ev(s,`const g=window.__MYASO_PLAYCANVAS__?.devRustSession,
+  const value=await ev(s,`const g=window.__MYASO_PLAYCANVAS__?.devRustSession,
     c=g?.client,p=window.__MYASO_LOCAL_GESTURE_PROOF__?.();
     const own=c?.state?.get(c?.playerNetId);
     return {actor:c?.playerNetId??null, hp:own?.hp??null,
+      ownSnapshotTick:own?.serverTick??null,
       x:own?.x??null,y:own?.y??null,
       action:own?.action??null,serverTick:c?.latestServerTick??0,
       snapshotSequence:c?.latestSnapshotSequence??null,
@@ -323,6 +327,21 @@ async function source11Witness(s){
       source11Events:p?.source11Events??[],
       acks:p?.acknowledged??[],nextSequence:p?.nextSequence??null,
       failed:p?.failed??null,leaseClosed:p?.closed??null};`);
+  // Read-only ring buffer: keep the original HP, snapshot age, and source0
+  // ACK chronology on the SAME accepted client/root. No timers or messages.
+  if(respawnMode&&s===sessions[1]){
+    const point={atEpochMs:Date.now(),actor:value.actor,hp:value.hp,action:value.action,
+      ownSnapshotTick:value.ownSnapshotTick,serverTick:value.serverTick,
+      snapshotSequence:value.snapshotSequence,
+      acknowledgedSnapshotSequence:value.acknowledgedSnapshotSequence,
+      reliableSnapshots:value.reliableSnapshots,typedGeneration:value.typedGeneration,
+      typedRenewalPending:value.typedRenewalPending,
+      processedClientTick:value.processedClientTick,ownedInputTick:value.ownedInputTick,
+      typedGranted:value.typedGranted,closed:value.closed,failed:value.failed};
+    source11VictimTrace.push(point);
+    if(source11VictimTrace.length>120)source11VictimTrace.shift();
+  }
+  return value;
 }
 async function trustedLightClick(s,{x=630,holdMs=75}={}){
   await ev(s,'document.querySelector("#application").focus();');
@@ -636,6 +655,8 @@ try {
   const firstRed={sha,chromeVersion,acceptanceStage,
     reason:respawnMode?String(error?.message??error).slice(0,3500):safeError(error),
     source11FirstRed,
+    // Bounded original World read-only trace retained in the CI artifact.
+    source11VictimTrace:respawnMode?source11VictimTrace.slice(-120):null,
     realBrowserSessionsStarted:sessions.length,
     expectedFourPlayCanvasSessions:fourMode?4:null,
     originalRustTail:rustStderr.slice(-800),localViteTail:viteLog.slice(-500),

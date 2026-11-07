@@ -171,6 +171,28 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
   });
  };
+ // A residual lane gap smaller than one normal W3C movement sample can
+ // oscillate across the exact original World coordinate (160 -> 172 around
+ // target 166). A genuine short two-axis key chord produces a distinct
+ // diagonal displacement in the unmodified, normalized Rust movement model.
+ // Keep the original strict <=4px measured-authority lane criterion; never
+ // synthesize input, set actor positions or substitute an inferred hit.
+ const pulseFineLane=async(a,vertical,horizontal)=>{
+  const focused=await evaluate(a.s,String.raw`
+   const c=document.querySelector('#arena');
+   if(!c)return false;
+   c.scrollIntoView({block:'center'});c.focus();
+   return document.activeElement===c;`);
+  assert.equal(focused,true,"fine W3C lane correction requires arena focus");
+  assert.ok(["s","w"].includes(vertical)&&["a","d"].includes(horizontal));
+  return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+   actions:[{type:"key",id:"four-real-walk",actions:[
+    {type:"keyDown",value:vertical},{type:"keyDown",value:horizontal},
+    {type:"pause",duration:0},
+    {type:"keyUp",value:vertical},{type:"keyUp",value:horizontal},
+   ]}]
+  });
+ };
  const nativeDispatches=[]; // bounded, read-only first-RED W3C command timing
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
@@ -224,10 +246,22 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.ok(f&&f.action===0,"only the actual recovered actor may move out of the swing lane");
    const delta=targetY-f.y;
    if(Math.abs(delta)<=4)return {actorId,targetY,proof:p,attempts};
-   const key=delta>0?"s":"w",durationMs=Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
-   await pulse(actor,key,durationMs);await sleeps(310);
+   const key=delta>0?"s":"w";
+   const fine=Math.abs(delta)<=10;
+   const horizontal=f.x<200?"d":"a";
+   const durationMs=fine?0:Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+   if(fine){
+    // Physical diagonal sub-step is real WASD in the SAME original browser,
+    // not a bypass of the <=4px World-lane gate below. The subsequent
+    // stagePair() also remeasures/restages X after this small lateral nudge.
+    await pulseFineLane(actor,key,horizontal);
+   }else{
+    await pulse(actor,key,durationMs);
+   }
+   await sleeps(310);
    const after=await proof(actor);
-   attempts.push({key,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y});
+   attempts.push({key,horizontal:fine?horizontal:null,fine,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y,
+    beforeX:f.x,afterX:own(after,actorId)?.x});
   }
   // The last genuine W3C movement may reach the original World lane on the
   // sixth (final) pulse. Apply the SAME strict <=4 World-position gate after
