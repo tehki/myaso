@@ -112,7 +112,31 @@ never created by a local JS/HP override; no actor identity is selected by
 the client. Each failure exits nonzero with exact-head
 `source11-three-lives-first-red.json`.
 
-**This mode is NOT qualified until exact-head real Google Chrome Stable
-CI passes.** Source contract tests alone are not browser proof; four
+**First genuine Chrome Source11 first-RED on `32818bb`:** two real
+PlayCanvas actors and Chat C1 passed; the original Rust reliable root
+issued `root-renew-hint`, but own replicated HP remained **0**, so the
+test correctly failed. [First-RED job](https://github.com/tehki/myaso/actions/runs/42358880463/job/128362811447).
+
+**Second Chrome first-RED at `63f28cb`:**
+[Job](https://github.com/tehki/myaso/actions/runs/42359824407/job/128365647604)
+confirmed the *new server-bound* typed `renew-lease-active` generation 1
+AND a genuine W3C wheel-back original v1 input with processed ACK, yet the
+PlayCanvas client still displayed HP0 and old knockback x4260. Neither a
+missing grant nor a missing physical input ACK alone explains this.
+
+The new **source-only original Rust checkpoint candidate** enqueues one
+**existing full reliable snapshot** after an actual authenticated new World
+incarnation, on the same bounded root stream, with current original World
+HP and coordinates. The successful real root-renew hint arms it; original
+queue backpressure keeps it pending, and kill-event priority remains ahead.
+The snapshot uses the existing u16::MAX full-baseline mechanism, no new
+packet types or client-authored HP, no client-issued rebaseline, no synthetic
+neutral input and no alternative server World authority. A new real Chrome
+test must prove actual HP100 snapshot replication followed by new physical
+source0 and Chat C1 on the same original QUIC root. This is **not a proven
+fix** until that exact-head live test passes.
+
+**This mode remains NOT qualified until exact-head real Google Chrome Stable
+CI passes.** Source contracts alone are not browser proof; four
 physically independent hosts, public access, M147 private receipts and
-release still require separate authority and acceptance.
+release require separate authority and acceptance.

@@ -1126,6 +1126,11 @@ async fn handle_connection(
     let mut typed_tasks = TypedTaskAbortGuard(Vec::new());
     let mut renewal_attempts = 0_usize;
     let mut notified_incarnation = 0_u64;
+    // A Source11 original-World incarnation change requires exactly one
+    // complete original reliable World baseline on this authenticated root.
+    // An idle realtime client may otherwise keep its stale HP0/knockback
+    // projection if DATAGRAM deltas refer to a pre-death acknowledged frame.
+    let mut pending_source11_rebaseline = false;
     let mut legacy_combat_seen = false;
     let mut ingress = StandardInputIngress::default();
     let mut snapshots = SnapshotSession::default();
@@ -1682,7 +1687,10 @@ async fn handle_connection(
                             match try_enqueue_reliable(&reliable_tx, || {
                                 ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
                             }) {
-                                Ok(true) => notified_incarnation = incarnation,
+                                Ok(true) => {
+                                    notified_incarnation = incarnation;
+                                    pending_source11_rebaseline = true;
+                                },
                                 Ok(false) => {},
                                 Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
                             }
@@ -1757,13 +1765,15 @@ async fn handle_connection(
                 // This carries World-authored joins/removals without a fake
                 // neutral input, a protocol extension, or an ACK forgery.
                 if !kill_event_queued
-                    && (!realtime_ready || should_enqueue_reliable_catchup(
-                        background_deadline_misses,
-                        omitted_due_to_budget,
-                        game.reliable_write_delay,
-                    ))
-                    && server_tick.wrapping_sub(last_reliable_background_tick)
-                        >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
+                    && (pending_source11_rebaseline || !realtime_ready
+                        || should_enqueue_reliable_catchup(
+                            background_deadline_misses,
+                            omitted_due_to_budget,
+                            game.reliable_write_delay,
+                        ))
+                    && (pending_source11_rebaseline
+                        || server_tick.wrapping_sub(last_reliable_background_tick)
+                            >= RELIABLE_BACKGROUND_COOLDOWN_TICKS)
                 {
                     if !game.reliable_write_delay.is_zero() {
                         println!(
@@ -1774,7 +1784,8 @@ async fn handle_connection(
                         );
                     }
                     let force_full_checkpoint =
-                        reliable_deltas_since_checkpoint >= RELIABLE_DELTA_CHECKPOINT_INTERVAL;
+                        pending_source11_rebaseline
+                        || reliable_deltas_since_checkpoint >= RELIABLE_DELTA_CHECKPOINT_INTERVAL;
                     let reliable_ack = if force_full_checkpoint {
                         u16::MAX
                     } else {
@@ -1802,6 +1813,12 @@ async fn handle_connection(
                             let (sequence, baseline_sequence, full, records, bytes) =
                                 built_reliable.expect("reserved reliable enqueue must build payload");
                             last_reliable_sequence = sequence;
+                            if pending_source11_rebaseline {
+                                if !full {
+                                    bail!("Source11 original World renewal must enqueue a full baseline");
+                                }
+                                pending_source11_rebaseline = false;
+                            }
                             if full {
                                 reliable_deltas_since_checkpoint = 0;
                             } else {
