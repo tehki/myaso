@@ -138,6 +138,23 @@ observed in Chrome remain mandatory blockers.
    actions to a failed guard-break exchange; neither the missing wheel nor
    simulated Block can satisfy acceptance. No release/up-input after timeout,
    no additional gameplay owner, no parry or server timing change.
+   At `3fba648`, first-attempt CI was 25/29; the original native M151
+   guard-break punish, M194 five-block, Source11 retired-generation and
+   Chrome four-browser JumpAttack review lanes were RED. All four failed-job
+   reruns later passed; this means 29/29 workflows eventually SUCCESS, but
+   does not prove repeatability or erase their original first-REDs. The
+   Chrome Jump review failure was especially actionable: trusted Space DOWN
+   reached Chromium approximately **529ms before trusted LMB DOWN** while
+   original Rust correctly accepted a plain Jump15 and rejected JumpAttack
+   16/17. Original server admission is bounded to 12 World ticks. The
+   native *test only* now pre-aims pointer separately and sends Space DOWN,
+   then LMB DOWN on the next zero-duration W3C tick, with actual LMB UP
+   before Space UP. The original authenticated action5, World16/17, stamina
+   and isTrusted requirements remain strictly mandatory. New failure-only
+   `combat4-jump-review-FIRST-RED.json` records the actual browser event
+   gap plus original Rust journal; no client-side gameplay simulation.
+   This change is source-only and requires fresh exact-head CI and native
+   evidence before it may be labeled a reliable fix.
 4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
    reconnect/no duplicate actors, server-owned positions and verified
    authoritative building/ground collision. Preserve M140 <=180ms and
