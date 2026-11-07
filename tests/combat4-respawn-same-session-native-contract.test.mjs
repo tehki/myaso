@@ -46,7 +46,7 @@ test("Mixed-browser Source11 lane remains a strict original-World position gate 
   assert.match(source,/const pulseFineLane=async\(a,vertical,horizontal\)=>/);
   assert.match(source,/type:"key",id:"four-real-walk"/);
   assert.match(source,/\{type:"keyDown",value:vertical\},\{type:"keyDown",value:horizontal\}/);
-  assert.match(source,/\{type:"pause",duration:0\}/);
+  assert.match(source,/\{type:"pause",duration:20\}/);
   assert.match(source,/\{type:"keyUp",value:vertical\},\{type:"keyUp",value:horizontal\}/);
   assert.match(source,/if\(Math\.abs\(delta\)<=4\)return \{actorId,targetY,proof:p,attempts\}/);
   assert.match(source,/const fine=Math\.abs\(delta\)<=10/);

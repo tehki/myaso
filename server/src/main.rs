@@ -1014,6 +1014,21 @@ fn m173_original_jump_spend_lines(world: &World, before: &BTreeMap<u32, (u8, f32
     lines
 }
 
+// Source11: a fresh authoritative World incarnation MUST NOT be announced
+// using a cached HP0 replication frame from the previous life. This selector
+// runs while the caller holds the same World lock as its incarnation check.
+// Normal 60Hz/50ms shared replication and every original wire rule remain.
+fn source11_replication_frame(state: &GameState, renewal_due: bool) -> Arc<ReplicationFrame> {
+    if renewal_due {
+        Arc::new(ReplicationFrame::from_fighters(
+            state.world.tick,
+            state.world.fighters(),
+        ))
+    } else {
+        Arc::clone(&state.replication_frame)
+    }
+}
+
 async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: bool) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -1654,21 +1669,16 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let (frame, pending_kill_event) = {
+                // Source11 first-RED: the former two World locks could capture
+                // a pre-respawn HP0 replication frame, then observe the *new*
+                // live incarnation and announce a renewal with a stale FULL
+                // HP0 baseline. Keep the incarnation, actor vitals and frame
+                // under ONE original authoritative World lock. For a newly
+                // observed life, take a fresh World-authored frame (without
+                // mutating World or normal cached replication cadence).
+                let (frame, pending_kill_event, incarnation) = {
                     let state = game.state.lock().await;
-                    (
-                        Arc::clone(&state.replication_frame),
-                        state.kill_event_for_cursor(next_kill_event_sequence),
-                    )
-                };
-                let server_tick = frame.server_tick();
-                // Original root reliable is only a notification plane. The
-                // current World incarnation is read under the same mutex used
-                // for typed admission. A dropped signal is retried (bounded
-                // by once per 50ms snapshot), never treated as a grant.
-                if v2_enabled {
-                    let incarnation = {
-                        let state = game.state.lock().await;
+                    let incarnation = if v2_enabled {
                         let active = current_typed_epoch.load(Ordering::Acquire);
                         state.gesture_sessions.get(&active).and_then(|path| {
                             state.world.fighter(player_id).and_then(|fighter| {
@@ -1681,19 +1691,33 @@ async fn handle_connection(
                                     .then_some(fighter.world_incarnation())
                             })
                         })
+                    } else {
+                        None
                     };
-                    if let Some(incarnation) = incarnation {
-                        if notified_incarnation != incarnation {
-                            match try_enqueue_reliable(&reliable_tx, || {
-                                ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
-                            }) {
-                                Ok(true) => {
-                                    notified_incarnation = incarnation;
-                                    pending_source11_rebaseline = true;
-                                },
-                                Ok(false) => {},
-                                Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
-                            }
+                    let renewal_due = incarnation
+                        .is_some_and(|life| life != notified_incarnation);
+                    let frame = source11_replication_frame(&state, renewal_due);
+                    (
+                        frame,
+                        state.kill_event_for_cursor(next_kill_event_sequence),
+                        incarnation,
+                    )
+                };
+                let server_tick = frame.server_tick();
+                // The original root reliable notification is not a typed
+                // grant. A full reliable baseline from the matching frame
+                // follows it with the unchanged backpressure/fail-closed gate.
+                if let Some(incarnation) = incarnation {
+                    if notified_incarnation != incarnation {
+                        match try_enqueue_reliable(&reliable_tx, || {
+                            ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
+                        }) {
+                            Ok(true) => {
+                                notified_incarnation = incarnation;
+                                pending_source11_rebaseline = true;
+                            },
+                            Ok(false) => {},
+                            Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
                         }
                     }
                 }
@@ -2788,6 +2812,28 @@ mod tests {
                 .sequence,
             u32::MAX - 1
         );
+    }
+
+    #[test]
+    fn source11_renewed_world_hp_uses_fresh_authoritative_frame_not_old_hp0_cache() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(1, 100.0, 100.0, 0.0));
+        let mut retired_fighter = state.world.fighters()[0].clone();
+        retired_fighter.hp = 0.0;
+        state.replication_frame = Arc::new(ReplicationFrame::from_fighters(0, &[retired_fighter]));
+        assert_eq!(state.replication_frame.get(1).unwrap().hp, 0);
+
+        let normal = source11_replication_frame(&state, false);
+        assert!(Arc::ptr_eq(&normal, &state.replication_frame));
+        assert_eq!(normal.get(1).unwrap().hp, 0);
+
+        state.world.step();
+        let renewed = source11_replication_frame(&state, true);
+        assert_eq!(renewed.server_tick(), state.world.tick);
+        assert_eq!(renewed.get(1).unwrap().hp, 100);
+        assert!(!Arc::ptr_eq(&renewed, &state.replication_frame));
+        // A fresh life never rewrites the cached previous-life frame.
+        assert_eq!(state.replication_frame.get(1).unwrap().hp, 0);
     }
 
     #[test]

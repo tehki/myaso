@@ -188,7 +188,10 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"key",id:"four-real-walk",actions:[
     {type:"keyDown",value:vertical},{type:"keyDown",value:horizontal},
-    {type:"pause",duration:0},
+    // Zero-duration W3C chords produced no original World movement under
+    // real Chrome or Firefox. Hold both physical keys for one bounded
+    // 20ms tick window and re-read the authoritative position afterward.
+    {type:"pause",duration:20},
     {type:"keyUp",value:vertical},{type:"keyUp",value:horizontal},
    ]}]
   });

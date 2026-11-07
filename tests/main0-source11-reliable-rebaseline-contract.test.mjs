@@ -37,3 +37,19 @@ test("Source11 checkpoint preserves bounded backpressure, kill-event priority an
   assert.match(native,/v\.processedClientTick>grant\.processedClientTick/);
   assert.match(native,/source11-three-lives-first-red\.json/);
 });
+
+test("Source11 renewal captures actor incarnation and a fresh HP baseline from ONE World lock",()=>{
+  const start=server.indexOf('_ = snapshot_interval.tick() => {');
+  const end=server.indexOf('let safe_input_ack = take_safe_input_ack',start);
+  assert.ok(start>=0&&end>start);
+  const section=server.slice(start,end);
+  assert.equal([...section.matchAll(/game\.state\.lock\(\)\.await/g)].length,1);
+  assert.match(section,/let \(frame, pending_kill_event, incarnation\) = \{/);
+  assert.match(section,/let renewal_due = incarnation/);
+  assert.match(section,/source11_replication_frame\(&state, renewal_due\)/);
+  assert.match(section,/if let Some\(incarnation\) = incarnation/);
+  assert.match(server,/fn source11_replication_frame\(state: &GameState, renewal_due: bool\)/);
+  assert.match(server,/Arc::new\(ReplicationFrame::from_fighters\(\s*state\.world\.tick,\s*state\.world\.fighters\(\)/);
+  assert.match(server,/fn source11_renewed_world_hp_uses_fresh_authoritative_frame_not_old_hp0_cache\(/);
+  assert.match(server,/if pending_source11_rebaseline \{\s*if !full/);
+});
