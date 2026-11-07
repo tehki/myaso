@@ -22,12 +22,22 @@ test("M159 genuine original four-client staging uses bounded native W3C to avoid
 test("M159 refuses edge-of-reach staging without a real trusted server-validated approach",()=>{
   assert.match(flight,/const originalLightReach=COMBAT\.attack\.reach\+COMBAT\.fighterRadius/);
   assert.match(flight,/const reachBefore=await stageM159ReachMargin\(\)/);
-  assert.match(flight,/await pulseMovementKeyBoundedW3c\(punisher,"s",45\)/);
+  assert.match(flight,/const reachStages=\[\]/);
+  assert.match(flight,/for\(let correction=0; correction<3/);
+  assert.match(flight,/const dx=reachAfter\.target\.x-reachAfter\.own\.x/);
+  assert.match(flight,/const dy=reachAfter\.target\.y-reachAfter\.own\.y/);
+  assert.match(flight,/const desiredDistance=originalLightReach-12/);
+  assert.match(flight,/if\(dy<=55 \|\| Math\.abs\(dx\)>=desiredDistance\)/);
+  assert.match(flight,/Math\.sqrt\(desiredDistance\*\*2-dx\*\*2\)/);
+  assert.match(flight,/Math\.min\(240,Math\.max\(45,Math\.ceil\(verticalAdvance\*1000\/COMBAT\.moveSpeed\)\)\)/);
+  assert.match(flight,/await pulseMovementKeyBoundedW3c\(punisher,"s",pulseMs\)/);
+  assert.match(flight,/await sleep\(100\)/);
+  assert.match(flight,/reachAfter=await stageM159ReachMargin\(\)/);
   assert.match(flight,/let reachAfter=reachBefore/);
   assert.match(flight,/if\(reachAfter\.distance > originalLightReach-7\)/);
   assert.match(flight,/M159 original World reach margin not demonstrated/);
   assert.match(flight,/M159_NATIVE_REACH_MARGIN_STAGE/);
-  assert.match(flight,/if\(reachBefore\.target\.y<=reachBefore\.own\.y\)/);
+  assert.match(flight,/const target = fighters\.find\(f => f\.netId === firstVictimId\)/);
   assert.match(flight,/const target = fighters\.find\(f => f\.netId === firstVictimId\)/);
   assert.match(flight,/await aimArenaForExclusiveAuthoritativeTarget\(/);
   assert.match(flight,/verifyM209DualKnockdownServerPunish\(m201ServerOutput\(\)/);

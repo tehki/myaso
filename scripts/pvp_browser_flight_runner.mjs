@@ -5555,23 +5555,53 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   const originalLightReach=COMBAT.attack.reach+COMBAT.fighterRadius;
   const reachBefore=await stageM159ReachMargin();
   let reachAfter=reachBefore;
-  if(reachBefore.distance > originalLightReach-9){
-    if(reachBefore.target.y<=reachBefore.own.y) {
+  const reachStages=[];
+  // A fixed 45ms press cannot close a genuine 130px source-to-target gap.
+  // Choose only bounded, trusted W3C movement from observed ORIGINAL World
+  // geometry; after each attempt wait for replication and re-measure. Neither
+  // the original 94px hit reach nor the real punish/roll clock is changed.
+  for(let correction=0; correction<3
+    && reachAfter.distance>originalLightReach-7; correction++){
+    const dx=reachAfter.target.x-reachAfter.own.x;
+    const dy=reachAfter.target.y-reachAfter.own.y;
+    const desiredDistance=originalLightReach-12;
+    // Do not move down into the roll corridor. If x alone prevents a safe
+    // 12px buffer, fail rather than moving another actor or inventing reach.
+    if(dy<=55 || Math.abs(dx)>=desiredDistance){
       throw new Error(milestone+" M159 cannot safely stage physical downward reach margin: "+
-        JSON.stringify(reachBefore));
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
     }
-    // A single bounded authentic W3C S pulse, never scripted movement.
-    await pulseMovementKeyBoundedW3c(punisher,"s",45);
+    const desiredDy=Math.sqrt(desiredDistance**2-dx**2);
+    const verticalAdvance=Math.min(dy-55,Math.max(0,dy-desiredDy));
+    // Even the minimum 45ms physical pulse must not be planned inside the
+    // 55px vertical exclusion corridor; the actual World may still deny it.
+    if(verticalAdvance<=0 || dy-Math.max(verticalAdvance,COMBAT.moveSpeed*0.045)<55){
+      throw new Error(milestone+" M159 lacks a safe physical approach vector: "+
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
+    }
+    const pulseMs=Math.min(240,Math.max(45,Math.ceil(verticalAdvance*1000/COMBAT.moveSpeed)));
+    const previous=reachAfter;
+    await pulseMovementKeyBoundedW3c(punisher,"s",pulseMs);
+    // The W3C action completing is NOT an original Rust snapshot ACK.
+    await sleep(100);
     reachAfter=await stageM159ReachMargin();
+    reachStages.push({correction,pulseMs,
+      before:previous.distance,after:reachAfter.distance,
+      actorBefore:{x:previous.own.x,y:previous.own.y},
+      actorAfter:{x:reachAfter.own.x,y:reachAfter.own.y}});
+    if(reachAfter.target.y-reachAfter.own.y<55){
+      throw new Error(milestone+" M159 original World staging entered unsafe roll corridor: "+
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
+    }
   }
   console.log("M159_NATIVE_REACH_MARGIN_STAGE "+JSON.stringify({
-    before:reachBefore.distance,after:reachAfter.distance,
+    before:reachBefore.distance,after:reachAfter.distance,reachStages,
     unchangedLightReach:originalLightReach,
     firstVictimId,punisherId,
   }));
   if(reachAfter.distance > originalLightReach-7){
     throw new Error(milestone+" M159 original World reach margin not demonstrated: "+
-      JSON.stringify({before:reachBefore,after:reachAfter,
+      JSON.stringify({before:reachBefore,after:reachAfter,reachStages,
         unchangedLightReach:originalLightReach}));
   }
   await aimArena(roller, rollerElementId, rollOffset);

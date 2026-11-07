@@ -44,6 +44,13 @@ observed in Chrome remain mandatory blockers.
 - PlayCanvas Editor project 1634867 / scene 2639984 must be independently
   inspected while its authenticated MCP service is connected before any edits.
 
+## Main0 M159 independent first-RED recovery — 2026-11-07
+
+- **Verified exact commit:** `0a32a2f1517e721e346c0c7f0b1ebbb3dfad0402`. Full [quality #42367802686](https://github.com/tehki/myaso/actions/runs/42367802686) SUCCESS, dedicated [M158 job](https://github.com/tehki/myaso/actions/runs/42367802697/job/128389453562) SUCCESS, but [M159 dedicated first-attempt job](https://github.com/tehki/myaso/actions/runs/42367802697/job/128389453845) FAILURE. The batch completed **26/30 workflows SUCCESS**: [M147 third-party](https://github.com/tehki/myaso/actions/runs/42367802807) lacked original Chrome player-ID admission, [M41 standard-path](https://github.com/tehki/myaso/actions/runs/42367802735) lacked a fresh actor-bound World cue, and [four-native original-game QA](https://github.com/tehki/myaso/actions/runs/42367802682) failed recovery-buffer admission. Preserve all first-REDs; a successful full quality run does not supersede independent failures.
+- **M159 actual first-RED:** Original Rust read attacker #4 at (144,18) and selected target #2 at (112,144): distance **130**, unchanged maximum reach **94**. Fixed W3C S pulse **45 ms** did not demonstrate an actual World position improvement before the reach assertion, and the test correctly stopped without a fake hit.
+- **New source-only staging candidate:** choose bounded (45–240 ms) authentic W3C S pulses from actual server-owned x/y; remeasure after each original snapshot; up to three attempts, keeping >=55 vertical separation from the roll corridor; retain strict **94 reach**, required >=7 margin, original M209 hit/overlap proof, and unchanged 260 ms knockdown. Fail closed with original before/after actor geometry and pulse chronology. This is a test-harness-only attempt, **not** a confirmed M159 fix or a new gameplay mechanic.
+- **Pending gates:** exact-head independent native M158/M159 first-attempt runs, full quality, four Chrome PlayCanvas real Rust, Source11 three lives, original-game M41/M147/recovery buffer and independent four physical Chrome hosts. Retain source-only draft / release HOLD. No CI pass should be claimed before GitHub confirms it.
+
 ## Independent native gate checkpoint — 2026-11-07
 
 - **Prior source SHA:** `2bbce942c1d6b1eb91f1dd2b9c482f09756e4e8f` on Draft #1169. The exact-head first-attempt batch finished **26 SUCCESS / 3 FAILURE**. This is not a release candidate PASS.
