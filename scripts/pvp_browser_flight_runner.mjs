@@ -5514,7 +5514,10 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       clusterAligned = plan;
       break;
     }
-    await pulseMovementKey(secondVictim, plan.key, plan.pulseMs);
+    // One genuine W3C keyDown/pause/keyUp transaction avoids an unbounded
+    // cross-driver key-held gap under CI load. The subsequent ORIGINAL
+    // authoritative snapshot still decides whether the cluster is aligned.
+    await pulseMovementKeyBoundedW3c(secondVictim, plan.key, plan.pulseMs);
     await sleep(90);
   }
   if (!clusterAligned) {
@@ -5532,6 +5535,45 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   console.log("M197_GENUINE_CLUSTER_STAGING " + JSON.stringify({
     milestone, rollRight, clusterPlans,
   }));
+  // M159 first-RED: selected #2 could be 94.021 units away from #4,
+  // outside the immutable 94 reach by only 0.021. Stage a small physical
+  // downward step BEFORE the roll, with actual server-owned positions, so
+  // W3C timing and geometry quantization cannot turn an edge aim into a
+  // false claim of a reachable HIT. Never change Combat reach or target arc.
+  const stageM159ReachMargin = async () => {
+    const evidence = await readUiEvidence(punisher);
+    const fighters = evidence.acceptance?.fighters ?? [];
+    const own = fighters.find(f => f.netId === punisherId);
+    const target = fighters.find(f => f.netId === firstVictimId);
+    if (![own?.x,own?.y,target?.x,target?.y].every(Number.isFinite)) {
+      throw new Error(milestone+" M159 missing original World reach-staging positions: "+
+        JSON.stringify({own,target}));
+    }
+    const distance = Math.hypot(target.x-own.x,target.y-own.y);
+    return {own,target,distance};
+  };
+  const originalLightReach=COMBAT.attack.reach+COMBAT.fighterRadius;
+  const reachBefore=await stageM159ReachMargin();
+  let reachAfter=reachBefore;
+  if(reachBefore.distance > originalLightReach-9){
+    if(reachBefore.target.y<=reachBefore.own.y) {
+      throw new Error(milestone+" M159 cannot safely stage physical downward reach margin: "+
+        JSON.stringify(reachBefore));
+    }
+    // A single bounded authentic W3C S pulse, never scripted movement.
+    await pulseMovementKeyBoundedW3c(punisher,"s",45);
+    reachAfter=await stageM159ReachMargin();
+  }
+  console.log("M159_NATIVE_REACH_MARGIN_STAGE "+JSON.stringify({
+    before:reachBefore.distance,after:reachAfter.distance,
+    unchangedLightReach:originalLightReach,
+    firstVictimId,punisherId,
+  }));
+  if(reachAfter.distance > originalLightReach-7){
+    throw new Error(milestone+" M159 original World reach margin not demonstrated: "+
+      JSON.stringify({before:reachBefore,after:reachAfter,
+        unchangedLightReach:originalLightReach}));
+  }
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
