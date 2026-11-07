@@ -102,6 +102,14 @@ observed in Chrome remain mandatory blockers.
    34, attacker/defender-only M147 receipt + present-before-ACK, no spectator
    receipt, all four native browser sessions. This is still one CI host, still
    developer-loopback opt-in, NOT public or independent-host qualification.
+   **VERIFIED FOUR-ACTOR PLAYCANVAS Chrome Stable integration:**
+   [exact-head CI 42357535014](https://github.com/tehki/myaso/actions/runs/42357535014)
+   PASS at `9c129fc271bcb990c68027538a4edf551e0a3982` with actual
+   Google Chrome 156 WebGL2, actors [1,2,3,4], original server-owned
+   Light34 damage 100→66, independent observers #3/#4 at victim 66
+   while own HP100, and Chat C1 receipt to all three peers. Four clients
+   share one CI host; no independent physical hosts or PlayCanvas respawn
+   continuity is implied.
    **NEW FOUR-ACTOR PLAYCANVAS Chrome Stable native source-only candidate:**
    `MYASO_CHROME_FOUR_P0=1` now requires *four real PlayCanvas WebGL2*
    renderer clients, all with independent original Rust World9 actors at
@@ -115,9 +123,20 @@ observed in Chrome remain mandatory blockers.
    isolated ephemeral loopback, no fake Combat authority, no private HIT claim.
    The separately named `four-playcanvas-chrome-stable` job in the existing
    nonrelease PlayCanvas CI enforces branded Google Chrome and preserves
-   fail-closed native evidence. **PENDING exact-head real browser CI**, not
-   claimed qualified merely because contract tests PASS. These are four
-   PlayCanvas sessions on one runner, not four physical hosts.
+   fail-closed native evidence. **Verified exact-head real Chrome 156 CI PASS
+   at 9c129fc**, not merely source contracts. These are four PlayCanvas
+   sessions on one runner, not four physical hosts.
+   **NEXT: actual PlayCanvas Source11 three-lives qualification:** new
+   `MYASO_CHROME_RESPAWN_P0=1` opt-in runner and distinct
+   `two-playcanvas-source11-three-respawns` nonrelease CI job. Requires
+   genuine two Chrome Stable WebGL2 original Rust sessions, real W3C
+   100→66→32→0 Light HP for three consecutive same-victim World lives,
+   automatic server-owned death/respawn, unchanged victim actor/QUIC root,
+   original source11 bound bidi GRANT with increased typedGeneration,
+   a fresh trusted post-respawn LMB ACCEPTED on the new generation,
+   and original Chat C1 ACK/peer delivery after each new life. No local
+   HP/death simulation or protocol fork. **PENDING real exact-head CI**
+   (not signed off by source contract tests).
    Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect signoff,
    independent-host private HIT stress, multiple-hit replay/incarnation and
    stamina, full Block/Kick/Dodge/focus acceptance. No client-created gameplay.

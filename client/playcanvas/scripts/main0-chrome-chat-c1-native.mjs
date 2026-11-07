@@ -22,12 +22,15 @@ const dirty = execFileSync('git', ['status','--porcelain'], {cwd:root,encoding:'
 assert.equal(dirty,'','real Chrome/Rust acceptance requires clean committed exact HEAD');
 const chromeVersion = execFileSync(chrome,['--version'],{encoding:'utf8'}).trim();
 const fourMode=process.env.MYASO_CHROME_FOUR_P0==='1';
-if(fourMode){
+const respawnMode=process.env.MYASO_CHROME_RESPAWN_P0==='1';
+assert.ok(!(fourMode&&respawnMode),
+  'Source11 respawn and four-PlayCanvas native qualifications are independent');
+if(fourMode||respawnMode){
   assert.match(chromeVersion,/^Google Chrome /,
-    'four-PlayCanvas release qualification requires branded Google Chrome Stable');
+    'real PlayCanvas release qualification requires branded Google Chrome Stable');
   assert.equal(['MYASO_CHROME_COMBAT_P0','MYASO_CHROME_HEAVY_P0',
     'MYASO_CHROME_JUMP_P0'].some(k=>process.env[k]==='1'),false,
-    'four-PlayCanvas native acceptance owns one independent Light34 trial');
+    'opt-in PlayCanvas lifecycle qualification owns the complete physical Combat trial');
 }
 const children = [], sessions = [];
 let rustStdout = '', rustStderr = '', viteLog = '', driverPort = 0;
@@ -297,6 +300,132 @@ async function physicalRustCombat(s, peer, {heavy = false, jump = false} = {}) {
       if(w){clearInterval(w.timer);delete window.__MAIN0_ORIGINAL_COMBAT_WITNESS__;}`);
   }
 }
+// PlayCanvas Source11 is a new opt-in acceptance path, not gameplay code.
+// Three genuine original Rust World lives must complete on one victim QUIC
+// root. Every strike comes from a trusted W3C pointer; no direct sendInput,
+// local HP write, synthetic ACK, forced respawn, or control protocol fork.
+async function source11Witness(s){
+  return ev(s,`const g=window.__MYASO_PLAYCANVAS__?.devRustSession,
+    c=g?.client,p=window.__MYASO_LOCAL_GESTURE_PROOF__?.();
+    const own=c?.state?.get(c?.playerNetId);
+    return {actor:c?.playerNetId??null, hp:own?.hp??null,
+      x:own?.x??null,y:own?.y??null,
+      action:own?.action??null,serverTick:c?.latestServerTick??0,
+      closed:c?.transport?.closed??true,kind:c?.transport?.kind??null,
+      typedGranted:g?.combatInput?.typedGranted===true,
+      typedGeneration:p?.typedGeneration??null,
+      typedRenewalPending:p?.typedRenewalPending??null,
+      source11Events:p?.source11Events??[],
+      acks:p?.acknowledged??[],nextSequence:p?.nextSequence??null,
+      failed:p?.failed??null,leaseClosed:p?.closed??null};`);
+}
+async function trustedLightClick(s,{x=630,holdMs=75}={}){
+  await ev(s,'document.querySelector("#application").focus();');
+  await wd('POST','/session/'+s+'/actions',{actions:[{
+    type:'pointer',id:'main0-source11-real-mouse',
+    parameters:{pointerType:'mouse'},actions:[
+      {type:'pointerMove',origin:'viewport',x,y:250,duration:0},
+      {type:'pointerDown',button:0},{type:'pause',duration:holdMs},
+      {type:'pointerUp',button:0}],
+  }]});
+}
+async function physicalThreeSameRootRespawns(attacker,victim){
+  const a=await source11Witness(attacker),b=await source11Witness(victim);
+  assert.ok(a.actor>0&&b.actor>0&&a.actor!==b.actor);
+  assert.equal(a.typedGranted,true);
+  assert.equal(b.typedGranted,true);
+  assert.equal(b.kind,'webtransport');
+  assert.equal(b.closed,false);
+  assert.ok(Number.isInteger(b.typedGeneration)&&b.typedGeneration>=0,
+    'original initial typed GRANT generation required (generation zero is valid)');
+  // A real physical D key moves the attacker into original World9 Light
+  // range; only Rust World validates and commits this movement.
+  await ev(attacker,'document.querySelector("#application").focus();');
+  await action(attacker,[{type:'keyDown',value:'d'},
+    {type:'pause',duration:235},{type:'keyUp',value:'d'}]);
+  const approach=await poll('real PlayCanvas movement before Source11 fight',
+    async()=>{const x=await source11Witness(attacker);
+      return {...x,ok:x.actor===a.actor&&x.x>a.x+4&&x.x<4206
+        &&Math.abs(x.y-4160)<4&&!x.closed};
+    },8_000);
+  const cycles=[];
+  let previousGeneration=b.typedGeneration;
+  for(let cycle=1;cycle<=3;cycle++){
+    const starting=await poll('Source11 original victim same-root full HP '+cycle,
+      async()=>{const v=await source11Witness(victim);
+        return {...v,ok:v.actor===b.actor&&v.hp===100&&v.typedGranted
+          &&!v.closed&&v.kind==='webtransport'&&!v.failed&&!v.leaseClosed};
+      },12_000);
+    const hits=[];
+    for(let hit=1;hit<=3;hit++){
+      // Preserve the authoritative 34HP Light transition 100→66→32→0.
+      // No attack is ever issued via JavaScript or a surrogate v1 owner.
+      const wanted=Math.max(0,100-34*hit);
+      await trustedLightClick(attacker);
+      const result=await poll('original physical Light34 victim HP cycle '+
+        cycle+' hit '+hit,async()=>{
+        const v=await source11Witness(victim);
+        return {...v,ok:v.actor===b.actor&&v.hp===wanted
+          &&v.serverTick>starting.serverTick&&!v.closed};
+      },8_000);
+      hits.push({hit,serverTick:result.serverTick,hp:result.hp});
+      if(hit<3)await delay(560); // do not miss original 1250ms Death phase
+    }
+    const died=await poll('original Rust Death state from three physical hits '+cycle,
+      async()=>{const v=await source11Witness(victim);
+        return {...v,ok:v.actor===b.actor&&v.hp===0
+          &&v.action===8&&!v.closed};
+      },2200);
+    const renewed=await poll('original Rust Source11 bound typed GRANT after respawn '+cycle,
+      async()=>{const v=await source11Witness(victim);
+        const hasRenew=v.source11Events.some(x=>x.stage==='renew-lease-active'
+          &&x.generation>previousGeneration);
+        return {...v,ok:v.actor===b.actor&&v.hp===100&&v.typedGranted
+          &&v.typedGeneration>previousGeneration&&hasRenew
+          &&v.typedRenewalPending===false&&!v.failed&&!v.leaseClosed
+          &&v.kind==='webtransport'&&!v.closed};
+      },9_000);
+    const oldGeneration=previousGeneration;
+    previousGeneration=renewed.typedGeneration;
+    // The renewed lease must process a NEW trusted LMB rather than
+    // reusing the retired source0 sequence from the previous World life.
+    const before=await source11Witness(victim);
+    await trustedLightClick(victim,{x:630,holdMs:65});
+    const regrantedAction=await poll('post-respawn real Source11 typed Combat '+cycle,
+      async()=>{const v=await source11Witness(victim);
+        const settled=v.acks.some(x=>x.transportSettled===true
+          &&x.action===1&&x.source===0
+          &&x.sequence>=before.nextSequence
+          &&x.serverTick>before.serverTick);
+        return {...v,ok:v.actor===b.actor&&!v.closed
+          &&v.typedGeneration===previousGeneration
+          &&v.nextSequence>before.nextSequence&&settled
+          &&!v.failed&&!v.leaseClosed};
+      },6500);
+    const chatText='Main0 Rust Source11 real life '+cycle+' '+b.actor;
+    const ack=await sendChat(victim,chatText);
+    const peer=await secondReceives(attacker,chatText,b.actor);
+    assert.ok(ack.ack.accepted.includes(chatText));
+    cycles.push({cycle,victimActor:b.actor,attackerActor:a.actor,
+      hits,deathTick:died.serverTick,respawnTick:renewed.serverTick,
+      oldGeneration,newGeneration:previousGeneration,
+      renewedRealSource0NextSequence:regrantedAction.nextSequence,
+      postRespawnChatServerAck:true,
+      postRespawnChatPeer:peer.messages.some(x=>x.text===chatText),
+      authoritativeAttackerApproachX:approach.x});
+    console.log('MAIN0_PLAYCANVAS_SOURCE11_RESPAWN_CYCLE_PASS',
+      JSON.stringify(cycles.at(-1)));
+  }
+  assert.equal(cycles.length,3);
+  assert.ok(cycles.every(x=>x.victimActor===b.actor
+    &&x.newGeneration>x.oldGeneration
+    &&x.hits.map(h=>h.hp).join(',')==='66,32,0'));
+  return {sha,chromeVersion,actors:[a.actor,b.actor],
+    originalVictimQuicRootRetained:true,
+    originalServerOwnedWorldLives:3,cycles,
+    trustedNativeInputOnly:true,localDamageOrRespawnSimulation:false,
+    originalRustAuthority:true,publicActivation:false};
+}
 let acceptanceStage='chat';
 try {
   const scrubbed=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('MYASO_')));
@@ -324,7 +453,8 @@ try {
       VITE_MYASO_DEV_QUIC_SHA256:world.pin}});
   vite.stdout.on('data',c=>viteLog+=c.toString());
   vite.stderr.on('data',c=>viteLog+=c.toString());
-  const url='http://127.0.0.1:'+webPort+'/?rust=1&combatInput=1&chatC1=1';
+  const url='http://127.0.0.1:'+webPort+
+    '/?rust=1&combatInput=1&chatC1=1'+(respawnMode?'&source11Renewal=1':'');
   await poll('local PlayCanvas Vite',async()=>({ok:(await fetch(url).catch(()=>null))?.ok===true}));
   driverPort=await port();
   const driver=track('chromedriver',['--port='+driverPort]);
@@ -394,6 +524,15 @@ try {
       escapeCancelledWithoutSend:true,screenshotSha256,
       gameplayTickUnchangedWhileTyping:true,transport:'original QUIC',
       simulatedServerAcks:false,publicActivation:false}));
+  if(respawnMode){
+    acceptanceStage='source11-respawn';
+    const proof=await physicalThreeSameRootRespawns(sessions[0],sessions[1]);
+    const evidenceDir=resolve('.artifacts/main0-chrome-chat-c1');
+    writeFileSync(resolve(evidenceDir,'main0-playcanvas-source11-three-lives.json'),
+      JSON.stringify(proof,null,2)+String.fromCharCode(10));
+    console.log('MAIN0_PLAYCANVAS_CHROME_SOURCE11_THREE_REAL_RESPAWNS_PASS',
+      JSON.stringify(proof));
+  }
   if(fourMode){
     acceptanceStage='four-combat';
     assert.equal(owned.length,4,'four real PlayCanvas browser sessions required');
@@ -470,12 +609,14 @@ try {
   const combatFailure=acceptanceStage.startsWith('combat')
     ||acceptanceStage==='four-combat';
   writeFileSync(resolve(evidenceDir,
-    fourMode?'four-playcanvas-first-red.json':
-      combatFailure?'combat-first-red.json':'first-red.json'),
+    respawnMode?'source11-three-lives-first-red.json':
+      fourMode?'four-playcanvas-first-red.json':
+        combatFailure?'combat-first-red.json':'first-red.json'),
     JSON.stringify(firstRed,null,2)+String.fromCharCode(10));
-  console.error(fourMode?'MAIN0_PLAYCANVAS_FOUR_CHROME_FIRST_RED':
-    combatFailure?'MAIN0_PLAYCANVAS_TWO_CHROME_COMBAT_FIRST_RED':
-      'MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
+  console.error(respawnMode?'MAIN0_PLAYCANVAS_SOURCE11_THREE_LIVES_FIRST_RED':
+    fourMode?'MAIN0_PLAYCANVAS_FOUR_CHROME_FIRST_RED':
+      combatFailure?'MAIN0_PLAYCANVAS_TWO_CHROME_COMBAT_FIRST_RED':
+        'MAIN0_PLAYCANVAS_TWO_CHROME_CHAT_FIRST_RED',JSON.stringify(firstRed));
   process.exitCode=1;
 } finally {
   for(const id of sessions.reverse()) await wd('DELETE','/session/'+id).catch(()=>{});

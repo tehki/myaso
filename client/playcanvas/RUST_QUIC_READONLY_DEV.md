@@ -89,5 +89,30 @@ production or publish PlayCanvas publicly.
 Source11 same-root typed lease renewal is the existing original preview path:
 `?rust=1&combatInput=1&source11Renewal=1`. Do not infer a renewed lease
 from a respawn UI event: the original Rust bidi channel must explicitly
-grant the new generation. Test three genuine respawns and stale-generation
-rejection before claiming PlayCanvas session continuity.
+grant the new generation. Historical same-session original-game Source11
+QA already proved this contract, but the actual PlayCanvas renderer/client
+has a **distinct pending** qualification.
+
+**New source-only native PlayCanvas Source11 candidate** runs
+`MYASO_CHROME_RESPAWN_P0=1` with explicit
+`MYASO_PLAYCANVAS_RUST_BIN=/absolute/path/to/myaso-server` and
+`CHROME_BIN=/usr/bin/google-chrome`, then
+`cd client/playcanvas && npm run smoke:chrome-chat-c1`.
+The separate `two-playcanvas-source11-three-respawns` nonrelease CI job
+requires two actual Chrome Stable PlayCanvas WebGL2 sessions, original
+Chat C1, Rust actor processed ACKs, trusted W3C physical D and LMB, three
+**server-owned** 100→66→32→0 HP deaths followed by original automatic
+respawns, and identical actor IDs on unchanged original QUIC roots.
+The old Source0 lease is **not** assumed valid on resurrection:
+the actual reliable root notice plus new original bound typed bidi GRANT
+must increase `typedGeneration`; a new trusted physical LMB PRESS must
+receive a fresh authenticated typed receipt, followed by genuine Chat C1
+ACK/delivery after each new life. Original World death and respawn are
+never created by a local JS/HP override; no actor identity is selected by
+the client. Each failure exits nonzero with exact-head
+`source11-three-lives-first-red.json`.
+
+**This mode is NOT qualified until exact-head real Google Chrome Stable
+CI passes.** Source contract tests alone are not browser proof; four
+physically independent hosts, public access, M147 private receipts and
+release still require separate authority and acceptance.

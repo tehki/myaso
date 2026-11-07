@@ -133,3 +133,61 @@ jobs:
             ${{ runner.temp }}/main0-four-playcanvas-chrome.log
           if-no-files-found: ignore
           retention-days: 5
+
+  two-playcanvas-source11-three-respawns:
+    # Separate, nonrelease, one-root PlayCanvas source0 continuity gate.
+    # Only real W3C physical hits cause World death; Source11 must re-GRANT.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+      MYASO_CHROME_RESPAWN_P0: "1"
+      MYASO_PLAYCANVAS_RUST_BIN: ${{ github.workspace }}/server/target/debug/myaso-server
+    steps:
+      - name: Checkout exact original Rust World candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prepare pinned PlayCanvas client
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Verify original branded Chrome + Source11 native contract
+        run: |
+          chrome_version="$(google-chrome --version)"
+          printf '%s\n' "$chrome_version"
+          case "$chrome_version" in
+            "Google Chrome "*) ;;
+            *) echo "Branded Google Chrome Stable required" >&2; exit 1 ;;
+          esac
+          chromedriver --version
+          node --test tests/main0-playcanvas-source11-three-lives-contract.test.mjs
+      - name: Build unchanged original Rust source and PlayCanvas
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          cd client/playcanvas
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Three real PlayCanvas Rust deaths and typed Source11 renewals
+        working-directory: client/playcanvas
+        run: |
+          timeout --signal=TERM --kill-after=5s 420s npm run smoke:chrome-chat-c1 \
+            > "$RUNNER_TEMP/main0-playcanvas-source11.log" 2>&1 || {
+              cat "$RUNNER_TEMP/main0-playcanvas-source11.log"
+              exit 1
+            }
+          grep 'MAIN0_PLAYCANVAS_CHROME_SOURCE11_THREE_REAL_RESPAWNS_PASS' \
+            "$RUNNER_TEMP/main0-playcanvas-source11.log"
+      - name: Preserve original server first-RED and Source11 acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-playcanvas-source11-${{ github.event.pull_request.head.sha }}
+          path: |
+            client/playcanvas/.artifacts/main0-chrome-chat-c1/
+            ${{ runner.temp }}/main0-playcanvas-source11.log
+          if-no-files-found: ignore
+          retention-days: 5
