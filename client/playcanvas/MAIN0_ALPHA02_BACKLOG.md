@@ -4,6 +4,25 @@
 **Release:** SOURCE-ONLY / DRAFT / HARD HOLD. No protected-main merge, production
 deploy, public PlayCanvas activation, security bypass or server mutation.
 
+## Current owner-approved hardware constraint — 2026-11-08
+
+**NO FOURTH PHYSICAL MACHINE.** Earlier four-physical-Chrome-host
+prerequisites in this historical backlog are superseded by the owner's
+three-machine acceptance plan. Preserve the earlier first-RED evidence rather
+than pretending a fourth host exists. Source-only preparation lives in
+[`MAIN0_ALPHA02_THREE_HOST_ACCEPTANCE.md`](./MAIN0_ALPHA02_THREE_HOST_ACCEPTANCE.md):
+four genuine Chrome Stable sessions across **X230i (2) + Windows Machine (2)**,
+plus a separately labeled three-physical-host Rust/QUIC network witness using
+**X230i Chrome + Windows Chrome + Serj Chromium**. Serj's Chromium is NOT a
+Chrome Stable product qualification, and 4 sessions are NOT 4 physical hosts.
+
+The existing draft #1169 exact head `0db881edf292e2c7a95bc9e443345a1c0a5e9769`
+passed 31/31 same-source GitHub workflows. Those are automated CI, not
+physical cross-machine acceptance. A read-only check found ChromeDriver major
+mismatch on X230i and Windows and no authorized private UDP/QUIC forwarding.
+No driver installation, server activation, networking change, deployment or
+release has been authorized or performed. **Release HOLD.**
+
 ## Alpha 0.2 browser support decision — 2026-11-04
 
 **Target browser: desktop Google Chrome Stable only.** Chrome is the
