@@ -41,6 +41,7 @@ import { planM225ThreatDistanceStaging } from "./m225-ffa-threat-distance.mjs";
 import { qualifyM150ParryGeometry } from "./m150-replicated-geometry.mjs";
 import { awaitM223HeavyWindup, planM223WheelDelay } from "./m223-server-heavy-windup.mjs";
 import { planM121DirectionalW3cActions } from "./m121-native-directional-gesture.mjs";
+import { summarizeM121NativeFirstRed } from "./m121-native-first-red.mjs";
 import { selectM121NativeRoles } from "./m121-native-direction-roles.mjs";
 import { planM147NativeFocusKeyActions } from "./m147-native-focus-stage.mjs";
 import { planM147CloserIdleGeometry } from "./m147-closer-idle-geometry.mjs";
@@ -49,7 +50,7 @@ import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
 import { createM227TrustedLightRegistry, waitForM227TrustedLead } from "./m227-trusted-light-pointer.mjs";
-import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
+import { planM197KnockdownClusterNudge, awaitM197SettledCluster } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
@@ -1836,6 +1837,13 @@ async function runOnlineUiDirectionalLightFlight(entries) {
   if (attackerResult.playerHp !== 100 || attackerResult.playerGuard !== 100
     || attackerResult.opponentHp !== 66
     || defenderResult.playerHp !== 66 || defenderResult.playerGuard !== 100) {
+    console.error("M121_NATIVE_PHYSICAL_LIGHT_FIRST_RED " + JSON.stringify(
+      summarizeM121NativeFirstRed({
+        actorId:attackerResult.playerNetId,
+        physicalPointers:attackerResult.pointers,
+        worldActions:attackerResult.acceptance?.ownActionTransitions ?? [],
+        senderSamples:attackerResult.acceptance?.m121SentSamples ?? [],
+      })));
     throw new Error(`M121 directional light did not resolve as one 34 HP hit: ${JSON.stringify(evidence)}`);
   }
   if (!attackerResult.events.includes("Opponent hit - 34 HP.")
@@ -4574,7 +4582,15 @@ async function runOnlineUiJumpAttackBufferFlight(entries) {
   );
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
-  await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+  // M137 first-RED #42488330558: two physically trusted inputs landed 1ms
+  // apart (Space first), yet original Rust received separate sender ticks
+  // and resolved a second Light34 rather than buffered JumpAttack42. The
+  // initial light already aimed the native pointer at attackOffset. Reuse
+  // M337's qualified pointer-first *single W3C tick* without an extra
+  // pointerMove/pause tick inside this recovery-critical chord. The original
+  // 90ms buffer, strict World phases, 42HP and one-chord evidence remain
+  // untouched; a failed server admission still fails M137.
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const completedSequence = (transitions = []) => {
     const lightRecoveryIndex = transitions.findIndex((entry) =>
@@ -5491,39 +5507,157 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       throw new Error(milestone + " M197 staging missing genuine authoritative victim positions: "
         + JSON.stringify({ first, second, fighters }));
     }
-    return { first, second };
+    return { first, second, serverTick: evidence.acceptance?.serverTick };
   };
   const clusterPlans = [];
   let clusterAligned = null;
-  for (let adjustment = 0; adjustment < 3; adjustment += 1) {
-    const { first, second } = await readM197Cluster();
+  // The authoritative World may still be draining a previously released
+  // keyboard gesture: do not compensate from a single delayed snapshot.
+  // Wait for consecutive fresh Rust ticks and stationary victim positions
+  // before EVERY bounded W3C nudge, including the initial correction.
+  for (let adjustment = 0; adjustment < 6; adjustment += 1) {
+    const { first, second, serverTick, observations } = await awaitM197SettledCluster({
+      read: readM197Cluster, sleep,
+    });
     const plan = planM197KnockdownClusterNudge({
       rollRight, firstX: first.x, secondX: second.x,
       moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
+      maxPulseMs: 90,
     });
-    clusterPlans.push({ adjustment, firstX: first.x, secondX: second.x, ...plan });
+    clusterPlans.push({
+      adjustment, serverTick, firstX: first.x, secondX: second.x,
+      stableSamples: observations.length, ...plan,
+    });
     if (plan.aligned) {
       clusterAligned = plan;
       break;
     }
-    await pulseMovementKey(secondVictim, plan.key, plan.pulseMs);
-    await sleep(90);
+    // Keep a short, genuine single-transaction W3C gesture; original World
+    // snapshots alone decide whether the next action is necessary. No fake
+    // movement or relaxed M197/M209/reach/target/damage assertions.
+    await pulseMovementKeyBoundedW3c(secondVictim, plan.key, plan.pulseMs);
   }
   if (!clusterAligned) {
-    const { first, second } = await readM197Cluster();
-    const plan = planM197KnockdownClusterNudge({
-      rollRight, firstX: first.x, secondX: second.x,
-      moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
-    });
-    clusterPlans.push({ adjustment: 3, firstX: first.x, secondX: second.x, ...plan });
-    if (!plan.aligned) {
-      throw new Error(milestone + " M197 could not stage genuine ordered roll contacts: "
-        + JSON.stringify(clusterPlans));
-    }
+    throw new Error(milestone + " M197 could not stage genuine ordered roll contacts: "
+      + JSON.stringify(clusterPlans));
   }
   console.log("M197_GENUINE_CLUSTER_STAGING " + JSON.stringify({
     milestone, rollRight, clusterPlans,
   }));
+  // M159 first-RED: selected #2 could be 94.021 units away from #4,
+  // outside the immutable 94 reach by only 0.021. Stage a small physical
+  // downward step BEFORE the roll, with actual server-owned positions, so
+  // W3C timing and geometry quantization cannot turn an edge aim into a
+  // false claim of a reachable HIT. Never change Combat reach or target arc.
+  const stageM159ReachMargin = async () => {
+    const evidence = await readUiEvidence(punisher);
+    const fighters = evidence.acceptance?.fighters ?? [];
+    const own = fighters.find(f => f.netId === punisherId);
+    const target = fighters.find(f => f.netId === firstVictimId);
+    if (![own?.x,own?.y,target?.x,target?.y].every(Number.isFinite)) {
+      throw new Error(milestone+" M159 missing original World reach-staging positions: "+
+        JSON.stringify({own,target}));
+    }
+    const distance = Math.hypot(target.x-own.x,target.y-own.y);
+    return {own,target,distance};
+  };
+  const originalLightReach=COMBAT.attack.reach+COMBAT.fighterRadius;
+  const reachBefore=await stageM159ReachMargin();
+  let reachAfter=reachBefore;
+  const reachStages=[];
+  // A fixed 45ms press cannot close a genuine 130px source-to-target gap.
+  // Choose only bounded, trusted W3C movement from observed ORIGINAL World
+  // geometry; after each attempt wait for replication and re-measure. Neither
+  // the original 94px hit reach nor the real punish/roll clock is changed.
+  for(let correction=0; correction<3
+    && reachAfter.distance>originalLightReach-7; correction++){
+    const dx=reachAfter.target.x-reachAfter.own.x;
+    const dy=reachAfter.target.y-reachAfter.own.y;
+    const desiredDistance=originalLightReach-12;
+    // Do not move down into the roll corridor. If x alone prevents a safe
+    // 12px buffer, fail rather than moving another actor or inventing reach.
+    if(dy<=55 || Math.abs(dx)>=desiredDistance){
+      throw new Error(milestone+" M159 cannot safely stage physical downward reach margin: "+
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
+    }
+    const desiredDy=Math.sqrt(desiredDistance**2-dx**2);
+    const verticalAdvance=Math.min(dy-55,Math.max(0,dy-desiredDy));
+    // Even the minimum 45ms physical pulse must not be planned inside the
+    // 55px vertical exclusion corridor; the actual World may still deny it.
+    if(verticalAdvance<=0 || dy-Math.max(verticalAdvance,COMBAT.moveSpeed*0.045)<55){
+      throw new Error(milestone+" M159 lacks a safe physical approach vector: "+
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
+    }
+    const pulseMs=Math.min(240,Math.max(45,Math.ceil(verticalAdvance*1000/COMBAT.moveSpeed)));
+    const previous=reachAfter;
+    await pulseMovementKeyBoundedW3c(punisher,"s",pulseMs);
+    // The W3C action completing is NOT an original Rust snapshot ACK.
+    await sleep(100);
+    reachAfter=await stageM159ReachMargin();
+    reachStages.push({correction,pulseMs,
+      before:previous.distance,after:reachAfter.distance,
+      actorBefore:{x:previous.own.x,y:previous.own.y},
+      actorAfter:{x:reachAfter.own.x,y:reachAfter.own.y}});
+    if(reachAfter.target.y-reachAfter.own.y<55){
+      throw new Error(milestone+" M159 original World staging entered unsafe roll corridor: "+
+        JSON.stringify({reachAfter,reachStages,unchangedLightReach:originalLightReach}));
+    }
+  }
+  console.log("M159_NATIVE_REACH_MARGIN_STAGE "+JSON.stringify({
+    before:reachBefore.distance,after:reachAfter.distance,reachStages,
+    unchangedLightReach:originalLightReach,
+    firstVictimId,punisherId,
+  }));
+  if(reachAfter.distance > originalLightReach-7){
+    throw new Error(milestone+" M159 original World reach margin not demonstrated: "+
+      JSON.stringify({before:reachBefore,after:reachAfter,reachStages,
+        unchangedLightReach:originalLightReach}));
+  }
+  // M159 original first-RED d4b9e3f: the authentic roll knocked the selected
+  // victim from x134 to x208; a pre-roll 78px center distance still left the
+  // punisher at (136,32) to (208,114), OUTSIDE unchanged 94px Light reach.
+  // M159 exact-head 7acf8ac: the prior +28/-68 lane allowed the
+  // authentic roller #1 to enter the same 94px Light arc as the selected
+  // knockdown #2; original World showed BOTH #1 and #2 lose 34HP.
+  // Keep #4 farther LEFT and ABOVE the roll's downstream sweep by staging
+  // near the first victim's x+12/y-78, BEFORE the physical wheel. This is
+  // only original W3C movement, not a prediction credited as a HIT. The
+  // existing strict first/second/roller HP and M209 server overlap gates
+  // below remain the ONLY authority for success.
+  const postRollLaneStages=[];
+  let postRollLane=reachAfter;
+  for(let adjustment=0;adjustment<3;adjustment++){
+    const wantedX=postRollLane.target.x+12;
+    const wantedY=postRollLane.target.y-78;
+    const dx=wantedX-postRollLane.own.x;
+    const dy=wantedY-postRollLane.own.y;
+    if(Math.abs(dx)<=10&&Math.abs(dy)<=10)break;
+    const moves=[];
+    for(const [delta,positive,negative] of [[dx,"d","a"],[dy,"s","w"]]){
+      if(Math.abs(delta)<=10)continue;
+      const pulseMs=Math.min(160,Math.max(45,
+        Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+      await pulseMovementKeyBoundedW3c(punisher,delta>0?positive:negative,pulseMs);
+      await sleep(100);
+      moves.push({key:delta>0?positive:negative,pulseMs});
+    }
+    const previous=postRollLane;
+    postRollLane=await stageM159ReachMargin();
+    postRollLaneStages.push({adjustment,moves,before:previous,after:postRollLane});
+  }
+  const laneDx=postRollLane.own.x-(postRollLane.target.x+12);
+  const laneDy=postRollLane.own.y-(postRollLane.target.y-78);
+  console.log("M159_POST_ROLL_CONTACT_LANE_STAGE "+JSON.stringify({
+    postRollLaneStages,actualWorld:postRollLane,
+    laneDx,laneDy,unchangedLightReach:originalLightReach,
+  }));
+  if(Math.abs(laneDx)>12||Math.abs(laneDy)>12
+    ||postRollLane.target.y-postRollLane.own.y<55
+    ||postRollLane.distance>originalLightReach-7){
+    throw new Error(milestone+" M159 physical post-roll contact lane not demonstrated: "+
+      JSON.stringify({postRollLaneStages,postRollLane,laneDx,laneDy,
+        unchangedLightReach:originalLightReach}));
+  }
   await aimArena(roller, rollerElementId, rollOffset);
   await sleep(50);
 
@@ -10340,6 +10474,24 @@ async function runOnlineUiGuardBreakFlight(entries, { onGuardBroken = null } = {
           sendAttackUp: () => setArenaAttackButton(attacker, false),
           sleep,
         });
+      } catch (error) {
+        if (error?.nativeTiming) {
+          // Failed M194 wheel is a first-RED: never synthesize a Block or
+          // replay the physical input. Preserve original World chronology
+          // and the exact native W3C command clocks before aborting.
+          const originalWorld = m201ServerOutput().slice(m320ServerOutputStart)
+            .split(/\r?\n/)
+            .filter(line => /^(M201_AUTH_(ACTION|BLOCK|PARRY|BREAK|HIT)|CORE8C_WORLD_CONTACT) /.test(line))
+            .slice(-18);
+          console.error("M194_NATIVE_WHEEL_TIMEOUT_FIRST_RED " + JSON.stringify({
+            scenario, attempt: attempt + 1,
+            attackerNetId: attackerReady.playerNetId,
+            defenderNetId: defenderReady.playerNetId,
+            nativeTiming: error.nativeTiming,
+            originalWorld,
+          }));
+        }
+        throw error;
       } finally {
         challenge.close();
         // If the trusted wheel or W3C release failed, terminate the still
@@ -11507,10 +11659,17 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // Keep every actual World phase/focus/vitals assertion unchanged.
   const jumpLifecycleObserveMs = COMBAT.jumpAttack.windupMs
     + COMBAT.jumpAttack.activeMs + COMBAT.jumpAttack.recoveryMs + 300;
-  await Promise.all([
-    performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
-    sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 8),
-  ]);
+  // M143 exact-head unified native retry #2 first-RED: while three
+  // WebDriver clients were being polled every 8ms, genuine Chrome pointerDown
+  // preceded the SAME W3C tick's Space keyDown by 172ms (strict limit 60ms).
+  // Preserve the one genuine pre-aimed chord and let its native action finish
+  // before issuing any read-only WebDriver polling. The already-installed
+  // MutationObserver and original World recorder continuously capture focus,
+  // recovery and authoritative action transitions during the physical chord.
+  // This changes only QA observation scheduling: no gameplay input, timing
+  // limit, acceptance predicate, or simulated state is modified.
+  await performArenaPreAimedJumpAttackChord(jumpAttacker, 90);
+  await sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 20);
 
   let evidence = await Promise.all(entries.map(readUiEvidence));
   let jumpState = evidence.find((entry) => entry.browser === jumpAttacker.name);

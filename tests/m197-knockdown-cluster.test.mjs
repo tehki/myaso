@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { planM197KnockdownClusterNudge } from "../scripts/m197-knockdown-cluster.mjs";
+import { planM197KnockdownClusterNudge, awaitM197SettledCluster } from "../scripts/m197-knockdown-cluster.mjs";
 
 const fixture = (overrides = {}) => ({
   rollRight: true, firstX: 200, secondX: 218, moveSpeed: 215,
@@ -60,4 +60,60 @@ test("M197 never needs to trigger a combat input or alter immutable state", () =
     "aligned", "errorPx", "key", "leadPx", "pulseMs", "targetLeadPx",
   ].sort());
   assert.equal(JSON.stringify(original), before);
+});
+
+test("M197 waits through delayed original World motion before a compensating W3C nudge", async () => {
+  // First-RED shape: misleading near-stationary sample followed by a genuine
+  // delayed crossing from lead +30 to -34. Never correct from the first sample.
+  const positions = [
+    [134, 166], [134, 166], [130, 160], [124, 90],
+    [124, 90], [124, 90], [124, 90], [124, 90],
+  ];
+  let clock = 0;
+  let reads = 0;
+  const settled = await awaitM197SettledCluster({
+    read: async () => {
+      const [firstX, secondX] = positions[Math.min(reads, positions.length - 1)];
+      reads++;
+      return {
+        first: { x: firstX, y: 102 },
+        second: { x: secondX, y: 165 },
+        serverTick: 1400 + reads,
+      };
+    },
+    sleep: async (ms) => { clock += ms; },
+    now: () => clock,
+    intervalMs: 100, timeoutMs: 2400, settleSamples: 4,
+  });
+  assert.equal(settled.first.x, 124);
+  assert.equal(settled.second.x, 90);
+  assert.ok(reads >= 8, "must not act on a transient stale World position");
+  const plan = planM197KnockdownClusterNudge(fixture({
+    firstX: settled.first.x, secondX: settled.second.x,
+    maxPulseMs: 90,
+  }));
+  assert.equal(plan.key, "d", "correct the final observed sign, not the stale one");
+  assert.ok(plan.pulseMs <= 90);
+});
+
+test("M197 refuses missing or stale Rust ticks and oscillating snapshots", async () => {
+  await assert.rejects(awaitM197SettledCluster({
+    read: async () => ({ first: { x: 1, y: 2 }, second: { x: 3, y: 4 } }),
+    sleep: async () => {},
+  }), /genuine Rust World positions and tick/);
+  let clock = 0;
+  let n = 0;
+  await assert.rejects(awaitM197SettledCluster({
+    read: async () => ({ first: { x: 124 + ((n++ % 2) ? 8 : -8), y: 102 },
+      second: { x: 90, y: 165 }, serverTick: 1400 + n }),
+    sleep: async (ms) => { clock += ms; },
+    now: () => clock, intervalMs: 100, timeoutMs: 650, settleSamples: 2,
+  }), /did not settle/);
+  clock = 0;
+  await assert.rejects(awaitM197SettledCluster({
+    read: async () => ({ first: { x: 124, y: 102 },
+      second: { x: 90, y: 165 }, serverTick: 1400 }),
+    sleep: async (ms) => { clock += ms; },
+    now: () => clock, intervalMs: 100, timeoutMs: 650, settleSamples: 2,
+  }), /did not settle/);
 });

@@ -136,6 +136,26 @@ const params = new URLSearchParams(window.location.search);
 const knightSprites = params.get("knights") === "1"
   ? createKnightSpriteRenderer({sourceArtVariant: params.get("knightArt") === "original" ? "original" : "relit"})
   : null;
+// World9 Phase A: an EXPLICIT local-only preview of an independently enabled
+// Rust Greyhaven server. Browser parameters NEVER grant zone/spawn/collision.
+// The original arena, QA scenarios and public servers retain their behavior.
+const greyhavenPreviewRequested = params.get("world") === "1"
+  && params.get("greyhaven") === "1"
+  && !params.has("scenario")
+  && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+  && (() => {
+    try { return ["localhost", "127.0.0.1", "[::1]"].includes(
+      new URL(params.get("server")).hostname); } catch { return false; }
+  })();
+let greyhavenPreview = null;
+if (greyhavenPreviewRequested) {
+  void Promise.all([
+    import("../src/browser/authored-world-renderer.mjs"),
+    import("../src/world/authored-maps.mjs"),
+  ]).then(([{createAuthoredWorldRenderer}, {MAP_IDS}]) => {
+    greyhavenPreview = {renderer:createAuthoredWorldRenderer(),mapId:MAP_IDS.overworld};
+  }).catch(() => { greyhavenPreview = null; });
+}
 const diagnosticsVisible = params.get("netstats") === "1";
 const renderGapTelemetry = diagnosticsVisible ? createRenderGapTelemetry() : null;
 const diagnosticsPanel = document.querySelector("#network-diagnostics");
@@ -257,6 +277,26 @@ const visualCameraPosition = { x: 0, y: 0 };
 const fixedStepMs = 1000 / NETWORK.clientPredictionHz;
 const frameBudget = createFrameBudget({ stepMs: fixedStepMs, maxFrameDeltaMs: 50, maxStepsPerFrame: 6 });
 let networkClient = null;
+// Loopback-only READ-ONLY native QA: original replicated Rust actor records,
+// not local predicted movement, synthetic actors or gameplay authority.
+if (greyhavenPreviewRequested) Object.defineProperty(window,
+  "__MYASO_WORLD9_ALPHA_REVIEW__", {
+    configurable:false,
+    get(){
+      if (!networkClient) return null;
+      const actors=[...networkClient.state.values()].map(a=>Object.freeze({
+        netId:a.netId,x:a.x,y:a.y,action:a.action,hp:a.hp
+      })).sort((a,b)=>a.netId-b.netId);
+      return Object.freeze({
+        source:"replicated-original-Rust-World",
+        serverTick:networkClient.latestServerTick,
+        ownNetId:networkClient.playerNetId,
+        camera:Object.freeze({x:visualCameraPosition.x,y:visualCameraPosition.y}),
+        actors:Object.freeze(actors),
+        worldDrawActive:Boolean(greyhavenPreview&&local.initialized),
+      });
+    }
+  });
 let experimentalGestureLab = null;
 let privateHitDeliveryLab = null;
 let animationFrameId = 0;
@@ -1412,6 +1452,20 @@ function render(nowMs = performance.now(), impact = combatImpact.sample(nowMs)) 
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(ARENA_VIEW_ZOOM, ARENA_VIEW_ZOOM);
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+  // Decorative authored roads, terrain, trees and World-owned building outlines
+  // One World9 projection: original reconciled server World camera/actor
+  // locations, 512-unit cached authored terrain and existing Silver Knights.
+  // Never replace server collision, player identity, input or Chat C1.
+  if (greyhavenPreview && local.initialized) {
+    try {
+      greyhavenPreview.renderer.draw(ctx, greyhavenPreview.mapId,
+        visualCameraPosition, canvas.width, canvas.height, ARENA_VIEW_ZOOM);
+    } catch {
+      // Missing or corrupt optional World tiles fail back to original arena.
+      greyhavenPreview = null;
+    }
+  }
 
   for (const entity of networkClient.state.values()) {
     if (entity.netId === ownId) continue;

@@ -11,6 +11,8 @@ import {setTimeout as delay} from "node:timers/promises";
 import {COMBAT} from "../../src/combat/model.mjs";
 import {runNativeRecoveryBuffer} from "../../scripts/native-recovery-buffer.mjs";
 import {runNativeJumpStamina} from "../../scripts/native-jump-stamina.mjs";
+import {planMain0NativeJumpReviewChord} from "./main0-jump-review-native-chord.mjs";
+import {requireUniqueSpaceCancel} from "./main0-space-cancel-ack-proof.mjs";
 import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -170,6 +172,32 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    actions:[{type:"key",id:"four-real-walk",actions:[{type:"keyDown",value:key},{type:"pause",duration:ms},{type:"keyUp",value:key}]}]
   });
  };
+ // A residual lane gap smaller than one normal W3C movement sample can
+ // oscillate across the exact original World coordinate (160 -> 172 around
+ // target 166). A genuine short two-axis key chord produces a distinct
+ // diagonal displacement in the unmodified, normalized Rust movement model.
+ // Keep the original strict <=4px measured-authority lane criterion; never
+ // synthesize input, set actor positions or substitute an inferred hit.
+ const pulseFineLane=async(a,vertical,horizontal,durationMs)=>{
+  const focused=await evaluate(a.s,String.raw`
+   const c=document.querySelector('#arena');
+   if(!c)return false;
+   c.scrollIntoView({block:'center'});c.focus();
+   return document.activeElement===c;`);
+  assert.equal(focused,true,"fine W3C lane correction requires arena focus");
+  assert.ok(["s","w"].includes(vertical)&&["a","d"].includes(horizontal));
+  return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
+   actions:[{type:"key",id:"four-real-walk",actions:[
+    {type:"keyDown",value:vertical},{type:"keyDown",value:horizontal},
+    // Source11 first-RED 42479266321: a fixed 20ms two-axis pulse
+    // delivered ZERO original World movement in three genuine Chrome
+    // attempts. Use a bounded 45–60ms physical hold estimated from
+    // actual delta and diagonal speed; re-read World before all decisions.
+    {type:"pause",duration:durationMs},
+    {type:"keyUp",value:vertical},{type:"keyUp",value:horizontal},
+   ]}]
+  });
+ };
  const nativeDispatches=[]; // bounded, read-only first-RED W3C command timing
  const expectedHp=new Map([[1,100],[2,100],[3,100],[4,100]]);
  const waitReplicas=()=>waitFor(async()=>{
@@ -223,10 +251,25 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    assert.ok(f&&f.action===0,"only the actual recovered actor may move out of the swing lane");
    const delta=targetY-f.y;
    if(Math.abs(delta)<=4)return {actorId,targetY,proof:p,attempts};
-   const key=delta>0?"s":"w",durationMs=Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
-   await pulse(actor,key,durationMs);await sleeps(310);
+   const key=delta>0?"s":"w";
+   const fine=Math.abs(delta)<=10;
+   const horizontal=f.x<200?"d":"a";
+   const durationMs=fine
+    ? Math.max(45,Math.min(60,Math.ceil(Math.abs(delta)*1000*Math.SQRT2/COMBAT.moveSpeed)))
+    : Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+   if(fine){
+    // Physical diagonal sub-step is real WASD in the SAME original browser,
+    // not a bypass of the <=4px World-lane gate below. The subsequent
+    // stagePair() also remeasures/restages X after this small lateral nudge.
+    // Duration records the actual trusted W3C hold, NEVER zero for real input.
+    await pulseFineLane(actor,key,horizontal,durationMs);
+   }else{
+    await pulse(actor,key,durationMs);
+   }
+   await sleeps(310);
    const after=await proof(actor);
-   attempts.push({key,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y});
+   attempts.push({key,horizontal:fine?horizontal:null,fine,durationMs,beforeY:f.y,afterY:own(after,actorId)?.y,
+    beforeX:f.x,afterX:own(after,actorId)?.x});
   }
   // The last genuine W3C movement may reach the original World lane on the
   // sixth (final) pulse. Apply the SAME strict <=4 World-position gate after
@@ -920,23 +963,25 @@ try{
  const prior=await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
  assert.equal(prior.transportState,"granted","real QUIC source0 lease required");
  const before=readAuthoritativeWorld().length;
- // One native WebDriver ticks request coordinates TWO real input sources.
- // Separate HTTP requests previously delayed physical LMB 2240ms after
- // Space: original World Jump(430ms) had already expired. Never change
- // World duration, deadlines or test assertions to conceal this W3C delay.
+ // Pre-position the real mouse while Space is UP. A first pointerMove in the
+ // same chord request can consume hundreds of milliseconds on a contended
+ // headless runner; the original 430ms World Jump then expires before LMB.
+ // Keep the physical Space+LMB chord itself in ONE multi-source W3C request,
+ // with no movement, and preserve the exact trusted event order below.
  await request(attacker.base,"POST","/session/"+attacker.id+"/actions",{
-  actions:[
-   {type:"key",id:"jump-review-space",actions:[
-    {type:"keyDown",value:" "},{type:"pause",duration:40},
-    {type:"pause",duration:30},{type:"keyUp",value:" "}
-   ]},
-   {type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
-    {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0},
-    {type:"pointerDown",button:0},{type:"pointerUp",button:0},
-    {type:"pause",duration:0}
-   ]}
-  ]
+  actions:[{type:"pointer",id:"jump-review-lmb",parameters:{pointerType:"mouse"},actions:[
+   {type:"pointerMove",origin:"viewport",x:coord.x,y:coord.y,duration:0}
+  ]}]
  });
+ // The prior native first-RED had genuine Space DOWN 529ms BEFORE LMB
+ // DOWN: the 30/40ms action ticks were delayed by headless runner load past
+ // Rust's unchanged jump-chord window, yielding plain Jump 15. Use one W3C
+ // command with only ONE zero-duration tick between trusted Space and LMB,
+ // release LMB first then Space. Preserve first-RED if this still stalls.
+ await request(attacker.base,"POST","/session/"+attacker.id+"/actions",
+  planMain0NativeJumpReviewChord({
+   keyboardId:"jump-review-space",pointerId:"jump-review-lmb",holdMs:90,
+  }));
  const result=await waitFor(async()=>{
   const log=readAuthoritativeWorld().slice(before),p=await evaluate(attacker,
    "return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null");
@@ -952,9 +997,22 @@ try{
      || !worldTransition(log,1,16,17))return false;
   return {log,p,worldJumpEntry};
  },12000).catch(async error=>{
-  const diag={error:String(error),world:readAuthoritativeWorld().slice(before),
+  const native=await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]")
+    .catch(e=>String(e));
+  const keyDown=Array.isArray(native)?native.find(e=>e.type==="keydown"&&e.code==="Space"):null;
+  const pointerDown=Array.isArray(native)?native.find(e=>e.type==="pointerdown"&&e.pointerId!==null):null;
+  const chordGapMs=Number.isFinite(keyDown?.at)&&Number.isFinite(pointerDown?.at)
+    ?Math.round((pointerDown.at-keyDown.at)*10)/10:null;
+  const diag={sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+    error:String(error),world:readAuthoritativeWorld().slice(before),
     browser:await evaluate(attacker,"return window.__MYASO_LOCAL_GESTURE_PROOF__?.()??null").catch(e=>String(e)),
-    native:await evaluate(attacker,"return window.__COMBAT4_JUMP_NATIVE__?.()??[]").catch(e=>String(e))};
+    native,observedSpaceToPointerDownMs:chordGapMs,
+    // Original authenticated JumpAttack admission expires after 12 World
+    // ticks. This browser-local measurement is diagnostic, not the server
+    // decision; the original World journal remains mandatory.
+    authoritativeWorldRequired:true,releaseHold:true};
+  await writeFile(join(output,"combat4-jump-review-FIRST-RED.json"),
+    JSON.stringify(diag,null,2)+"\n").catch(()=>{});
   console.error("COMBAT4_JUMP_NATIVE_FIRST_RED",JSON.stringify(diag));
   throw error;
  });
@@ -1145,13 +1203,21 @@ try{
   return newReceipts.some(e=>e.source===0&&e.action===4&&e.status===1)?p:false;
  },8000);
  const cancelled=cancelProof.acknowledged.slice(beforeCancelReceipts);
- const firstPress=cancelled.filter(e=>e.source===0&&e.action===1&&e.status===1);
- const terminals=cancelled.filter(e=>e.source===0&&(e.action===3||e.action===4));
- assert.equal(firstPress.length,1,"one real first-pressed source0 gesture");
- assert.deepEqual(terminals.map(e=>e.action),[4],
-  "Space after LMB must CANCEL without an extra typed RELEASE");
- assert.equal(firstPress[0].gestureId,terminals[0].gestureId,
-  "cancel belongs to original authenticated physical LMB gesture");
+ // A second authenticated ACK for the SAME already-settled sequence is not
+ // a second typed terminal. Native QA still rejects any RELEASE, a second
+ // first-settled CANCEL, a different gesture, or a different sequence.
+ // Preserve exact native receipts on failure; do not waive malformed edges.
+ let cancelUniqueness;
+ try { cancelUniqueness=requireUniqueSpaceCancel(cancelled); }
+ catch(error) {
+  console.error("COMBAT4_SPACE_CANCEL_ACK_FIRST_RED",JSON.stringify({
+   sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   error:String(error),cancelled,
+   physical:await edges().catch(e=>String(e)),
+   originalWorld:readAuthoritativeWorld().slice(beforeCancelWorld),
+  }));
+  throw error;
+ }
  assert.equal(cancelProof.failed,false,"late Space cancel must keep QUIC lease alive");
  assert.equal(cancelProof.closed,false,"late Space cancel must not disconnect player");
  const cancelWorld=readAuthoritativeWorld().slice(beforeCancelWorld);
@@ -1164,7 +1230,8 @@ try{
   physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
   ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
   normalWorld,normalPhysical,
-  midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
+  midHoldSpaceCancelReceipts:cancelled,midHoldSpaceCancelUniqueness:cancelUniqueness,
+  midHoldWorld:cancelWorld,
   nativePhysicalAll:await edges(),
   before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
   limitation:"NO actual v2 JumpAttack demonstrated or released"};

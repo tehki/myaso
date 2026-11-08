@@ -1,0 +1,193 @@
+name: Core8A passive PlayCanvas original QUIC Chrome Firefox (NONRELEASE)
+on:
+  pull_request:
+    paths:
+      - "server/src/main.rs"
+      - "client/playcanvas/**"
+      - ".github/workflows/core8a-playcanvas-passive-quic.yml"
+permissions:
+  contents: read
+
+jobs:
+  passive-original-quic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+    env:
+      MYASO_PLAYCANVAS_BROWSER: ${{ matrix.browser }}
+      MYASO_PLAYCANVAS_RUST_BIN: ${{ github.workspace }}/server/target/debug/myaso-server
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Check real browser drivers
+        run: |
+          google-chrome --version
+          chromedriver --version
+          firefox --version
+          geckodriver --version
+      - name: Install pinned client and validate read-only actor adapter
+        working-directory: client/playcanvas
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Check original Rust authority and pin
+        run: |
+          cargo fmt --manifest-path server/Cargo.toml --all -- --check
+          cargo test --locked --manifest-path server/Cargo.toml --test webtransport_smoke
+          cargo test --locked --manifest-path server/Cargo.toml --test m12_reliable_baseline
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+      - name: Real loopback original QUIC passive actor join removal and reconnect
+        working-directory: client/playcanvas
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            # True browser + WebGL2 under a private software X display.
+            # Headless Firefox CI has no WebGL2 context (first-RED retained).
+            MYASO_PLAYCANVAS_XVFB=1 LIBGL_ALWAYS_SOFTWARE=1               xvfb-run -a -s "-screen 0 1280x720x24"               timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          else
+            timeout --signal=TERM --kill-after=5s 180s npm run smoke:quic               > "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log" 2>&1 || {
+                cat "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+                exit 1
+              }
+          fi
+          grep 'PLAYCANVAS_REAL_RUST_QUIC_PASS' "$RUNNER_TEMP/core8a-passive-quic-${{ matrix.browser }}.log"
+      - name: Preserve first-RED and exact-head acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core8a-passive-playcanvas-${{ matrix.browser }}-${{ github.sha }}
+          path: ${{ runner.temp }}/core8a-passive-quic-${{ matrix.browser }}.log
+          if-no-files-found: ignore
+          retention-days: 5
+
+  four-playcanvas-chrome-stable:
+    # Four actual independently-rendered PlayCanvas clients, not the original
+    # Silver Knights native-game harness. Never touches public or staging.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+      MYASO_CHROME_FOUR_P0: "1"
+      MYASO_PLAYCANVAS_RUST_BIN: ${{ github.workspace }}/server/target/debug/myaso-server
+    steps:
+      - name: Checkout exact source-only candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prepare pinned PlayCanvas client
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Verify branded Google Chrome Stable, native W3C driver and contract
+        run: |
+          chrome_version="$(google-chrome --version)"
+          printf '%s\n' "$chrome_version"
+          case "$chrome_version" in
+            "Google Chrome "*) ;;
+            *) echo "Expected branded Google Chrome Stable, got: $chrome_version" >&2; exit 1 ;;
+          esac
+          chromedriver --version
+          node --test tests/main0-playcanvas-four-chrome-contract.test.mjs
+      - name: Build unchanged original Rust World and source client
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          cd client/playcanvas
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Four real PlayCanvas Chrome actors — original Rust Light34 and Chat C1
+        working-directory: client/playcanvas
+        run: |
+          timeout --signal=TERM --kill-after=5s 420s npm run smoke:chrome-chat-c1 \
+            > "$RUNNER_TEMP/main0-four-playcanvas-chrome.log" 2>&1 || {
+              cat "$RUNNER_TEMP/main0-four-playcanvas-chrome.log"
+              exit 1
+            }
+          grep 'MAIN0_PLAYCANVAS_FOUR_CHROME_RUST_CHAT_LIGHT34_PASS' \
+            "$RUNNER_TEMP/main0-four-playcanvas-chrome.log"
+      - name: Preserve four-client first-RED and exact-head browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-four-playcanvas-chrome-${{ github.event.pull_request.head.sha }}
+          path: |
+            client/playcanvas/.artifacts/main0-chrome-chat-c1/
+            ${{ runner.temp }}/main0-four-playcanvas-chrome.log
+          if-no-files-found: ignore
+          retention-days: 5
+
+  two-playcanvas-source11-three-respawns:
+    # Separate, nonrelease, one-root PlayCanvas source0 continuity gate.
+    # Only real W3C physical hits cause World death; Source11 must re-GRANT.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+      MYASO_CHROME_RESPAWN_P0: "1"
+      MYASO_PLAYCANVAS_RUST_BIN: ${{ github.workspace }}/server/target/debug/myaso-server
+    steps:
+      - name: Checkout exact original Rust World candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prepare pinned PlayCanvas client
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+          cache: npm
+          cache-dependency-path: client/playcanvas/package-lock.json
+      - name: Verify original branded Chrome + Source11 native contract
+        run: |
+          chrome_version="$(google-chrome --version)"
+          printf '%s\n' "$chrome_version"
+          case "$chrome_version" in
+            "Google Chrome "*) ;;
+            *) echo "Branded Google Chrome Stable required" >&2; exit 1 ;;
+          esac
+          chromedriver --version
+          node --test tests/main0-playcanvas-source11-three-lives-contract.test.mjs
+      - name: Build unchanged original Rust source and PlayCanvas
+        run: |
+          cargo build --locked --manifest-path server/Cargo.toml --bin myaso-server
+          cd client/playcanvas
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Three real PlayCanvas Rust deaths and typed Source11 renewals
+        working-directory: client/playcanvas
+        run: |
+          timeout --signal=TERM --kill-after=5s 420s npm run smoke:chrome-chat-c1 \
+            > "$RUNNER_TEMP/main0-playcanvas-source11.log" 2>&1 || {
+              cat "$RUNNER_TEMP/main0-playcanvas-source11.log"
+              exit 1
+            }
+          grep 'MAIN0_PLAYCANVAS_CHROME_SOURCE11_THREE_REAL_RESPAWNS_PASS' \
+            "$RUNNER_TEMP/main0-playcanvas-source11.log"
+      - name: Preserve original server first-RED and Source11 acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main0-playcanvas-source11-${{ github.event.pull_request.head.sha }}
+          path: |
+            client/playcanvas/.artifacts/main0-chrome-chat-c1/
+            ${{ runner.temp }}/main0-playcanvas-source11.log
+          if-no-files-found: ignore
+          retention-days: 5

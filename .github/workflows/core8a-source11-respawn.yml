@@ -47,11 +47,15 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - acceptance: fresh-incarnation-mixed
             mode: four-combat-respawn-same-session
             browsers: chrome,firefox,chrome,firefox
+          - acceptance: fresh-incarnation-four-chrome-stable
+            mode: four-combat-respawn-same-session
+            browsers: chrome,chrome,chrome,chrome
           - acceptance: retired-generation-negative
             mode: four-combat-lifecycle
             browsers: chrome,firefox,chrome,firefox
@@ -68,13 +72,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Confirm genuine Chrome Firefox drivers and source contract
+      - name: Confirm branded Google Chrome Stable and native driver contract
         run: |
-          google-chrome --version
-          firefox --version
+          chrome_version="$(google-chrome --version)"
+          printf '%s\n' "$chrome_version"
+          case "$chrome_version" in
+            "Google Chrome "*) ;;
+            *) echo "Expected branded Google Chrome Stable, got: $chrome_version" >&2; exit 1 ;;
+          esac
           chromedriver --version
-          geckodriver --version
           node --test tests/combat4-respawn-same-session-native-contract.test.mjs
+          if [[ "$MYASO_LIVE_GESTURE_NATIVE_BROWSERS" == *firefox* ]]; then
+            firefox --version
+            geckodriver --version
+          fi
       - name: Original 60 Hz Rust World with FOUR physical W3C clients and Chat C1
         run: timeout --signal=TERM --kill-after=5s 360s node tools/art/main0_v2_knights_combat_four_native.mjs
       - name: Preserve real first-red and native acceptance artifacts

@@ -1,3 +1,4 @@
+mod greyhaven_alpha;
 #[cfg(feature = "experimental-hit-delivery-lab")]
 mod private_hit_delivery_lab;
 
@@ -462,6 +463,16 @@ fn should_enqueue_reliable_catchup(
     background_deadline_misses > 0 || (!reliable_write_delay.is_zero() && omitted_due_to_budget > 0)
 }
 
+// Core 8C: the same explicit operator-owned World9 Alpha gate selects both
+// authored spawn admission and Physics6's original-World static collision
+// guard. No client parameter can activate this profile.
+fn configure_greyhaven_alpha_runtime(world: &mut World, enabled: bool) -> Result<()> {
+    if enabled && !world.enable_greyhaven_static_collisions() {
+        bail!("Greyhaven Alpha could not enable approved static collision geometry");
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let bind: SocketAddr = env::var("MYASO_BIND")
@@ -504,6 +515,20 @@ async fn main() -> Result<()> {
     }
     let gate = AdmissionGate::new(player_cap - flight.background_players);
     println!("myaso admission cap: {player_cap} concurrent players");
+    // World9 Alpha is a separate, explicit source trial on an isolated loopback
+    // QUIC server. Never allow a browser parameter to choose a server map.
+    let greyhaven_alpha = match env::var("MYASO_WORLD9_GREYHAVEN_ALPHA").as_deref() {
+        Ok("1") => true,
+        Ok("0") | Err(env::VarError::NotPresent) => false,
+        Ok(_) | Err(_) => bail!("MYASO_WORLD9_GREYHAVEN_ALPHA must be 0 or 1"),
+    };
+    if greyhaven_alpha
+        && (!bind.ip().is_loopback()
+            || player_cap > greyhaven_alpha::SPAWNS.len()
+            || flight.background_players != 0)
+    {
+        bail!("World9 Alpha requires loopback, no synthetic peers and a cap of 2..=4");
+    }
     // No account authentication service exists for this temporary arena.
     // The experiment is session-assigned, loopback-only, and default OFF.
     let v2_lab = match env::var("MYASO_EXPERIMENTAL_GESTURE_V2").as_deref() {
@@ -573,6 +598,10 @@ async fn main() -> Result<()> {
     #[cfg(not(feature = "experimental-hit-delivery-lab"))]
     let _ = hit_lab_enabled;
     let game = SharedGame::new(flight, boot_nonce, chat_radius, chat_enabled);
+    {
+        let mut state = game.state.lock().await;
+        configure_greyhaven_alpha_runtime(&mut state.world, greyhaven_alpha)?;
+    }
     #[cfg(feature = "experimental-hit-delivery-lab")]
     if hit_lab_enabled {
         let mut state = game.state.lock().await;
@@ -657,7 +686,13 @@ async fn main() -> Result<()> {
             };
             {
                 let mut state = game.state.lock().await;
-                if !state.world.add_player(player_id) {
+                let admitted = if greyhaven_alpha {
+                    greyhaven_alpha::free_spawn(&state.world)
+                        .is_some_and(|(x, y)| state.world.add_player_at(player_id, x, y, 0.0))
+                } else {
+                    state.world.add_player(player_id)
+                };
+                if !admitted {
                     eprintln!("failed to add allocated player {player_id}");
                     return;
                 }
@@ -979,6 +1014,21 @@ fn m173_original_jump_spend_lines(world: &World, before: &BTreeMap<u32, (u8, f32
     lines
 }
 
+// Source11: a fresh authoritative World incarnation MUST NOT be announced
+// using a cached HP0 replication frame from the previous life. This selector
+// runs while the caller holds the same World lock as its incarnation check.
+// Normal 60Hz/50ms shared replication and every original wire rule remain.
+fn source11_replication_frame(state: &GameState, renewal_due: bool) -> Arc<ReplicationFrame> {
+    if renewal_due {
+        Arc::new(ReplicationFrame::from_fighters(
+            state.world.tick,
+            state.world.fighters(),
+        ))
+    } else {
+        Arc::clone(&state.replication_frame)
+    }
+}
+
 async fn run_authoritative_clock(game: Arc<SharedGame>, flight_action_proof: bool) {
     let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 60.0));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -1091,6 +1141,11 @@ async fn handle_connection(
     let mut typed_tasks = TypedTaskAbortGuard(Vec::new());
     let mut renewal_attempts = 0_usize;
     let mut notified_incarnation = 0_u64;
+    // A Source11 original-World incarnation change requires exactly one
+    // complete original reliable World baseline on this authenticated root.
+    // An idle realtime client may otherwise keep its stale HP0/knockback
+    // projection if DATAGRAM deltas refer to a pre-death acknowledged frame.
+    let mut pending_source11_rebaseline = false;
     let mut legacy_combat_seen = false;
     let mut ingress = StandardInputIngress::default();
     let mut snapshots = SnapshotSession::default();
@@ -1614,21 +1669,16 @@ async fn handle_connection(
                 }
             }
             _ = snapshot_interval.tick() => {
-                let (frame, pending_kill_event) = {
+                // Source11 first-RED: the former two World locks could capture
+                // a pre-respawn HP0 replication frame, then observe the *new*
+                // live incarnation and announce a renewal with a stale FULL
+                // HP0 baseline. Keep the incarnation, actor vitals and frame
+                // under ONE original authoritative World lock. For a newly
+                // observed life, take a fresh World-authored frame (without
+                // mutating World or normal cached replication cadence).
+                let (frame, pending_kill_event, incarnation) = {
                     let state = game.state.lock().await;
-                    (
-                        Arc::clone(&state.replication_frame),
-                        state.kill_event_for_cursor(next_kill_event_sequence),
-                    )
-                };
-                let server_tick = frame.server_tick();
-                // Original root reliable is only a notification plane. The
-                // current World incarnation is read under the same mutex used
-                // for typed admission. A dropped signal is retried (bounded
-                // by once per 50ms snapshot), never treated as a grant.
-                if v2_enabled {
-                    let incarnation = {
-                        let state = game.state.lock().await;
+                    let incarnation = if v2_enabled {
                         let active = current_typed_epoch.load(Ordering::Acquire);
                         state.gesture_sessions.get(&active).and_then(|path| {
                             state.world.fighter(player_id).and_then(|fighter| {
@@ -1641,16 +1691,33 @@ async fn handle_connection(
                                     .then_some(fighter.world_incarnation())
                             })
                         })
+                    } else {
+                        None
                     };
-                    if let Some(incarnation) = incarnation {
-                        if notified_incarnation != incarnation {
-                            match try_enqueue_reliable(&reliable_tx, || {
-                                ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
-                            }) {
-                                Ok(true) => notified_incarnation = incarnation,
-                                Ok(false) => {},
-                                Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
-                            }
+                    let renewal_due = incarnation
+                        .is_some_and(|life| life != notified_incarnation);
+                    let frame = source11_replication_frame(&state, renewal_due);
+                    (
+                        frame,
+                        state.kill_event_for_cursor(next_kill_event_sequence),
+                        incarnation,
+                    )
+                };
+                let server_tick = frame.server_tick();
+                // The original root reliable notification is not a typed
+                // grant. A full reliable baseline from the matching frame
+                // follows it with the unchanged backpressure/fail-closed gate.
+                if let Some(incarnation) = incarnation {
+                    if notified_incarnation != incarnation {
+                        match try_enqueue_reliable(&reliable_tx, || {
+                            ReliablePayload::Bytes(V2_RESPAWN_RENEW_REQUIRED.to_vec())
+                        }) {
+                            Ok(true) => {
+                                notified_incarnation = incarnation;
+                                pending_source11_rebaseline = true;
+                            },
+                            Ok(false) => {},
+                            Err(ReliableQueueError::Closed) => bail!("original reliable writer retired"),
                         }
                     }
                 }
@@ -1715,12 +1782,22 @@ async fn handle_connection(
                         }
                     }
                 }
-                if !kill_event_queued && should_enqueue_reliable_catchup(
-                    background_deadline_misses,
-                    omitted_due_to_budget,
-                    game.reliable_write_delay,
-                ) && server_tick.wrapping_sub(last_reliable_background_tick)
-                    >= RELIABLE_BACKGROUND_COOLDOWN_TICKS
+                // No sampled input means no echoed baseline ACK, so realtime
+                // DATAGRAMs must remain gated. Still keep this admitted,
+                // passive QUIC root up to date over the EXISTING reliable
+                // snapshot stream, bounded to its normal 60-tick cooldown.
+                // This carries World-authored joins/removals without a fake
+                // neutral input, a protocol extension, or an ACK forgery.
+                if !kill_event_queued
+                    && (pending_source11_rebaseline || !realtime_ready
+                        || should_enqueue_reliable_catchup(
+                            background_deadline_misses,
+                            omitted_due_to_budget,
+                            game.reliable_write_delay,
+                        ))
+                    && (pending_source11_rebaseline
+                        || server_tick.wrapping_sub(last_reliable_background_tick)
+                            >= RELIABLE_BACKGROUND_COOLDOWN_TICKS)
                 {
                     if !game.reliable_write_delay.is_zero() {
                         println!(
@@ -1731,7 +1808,8 @@ async fn handle_connection(
                         );
                     }
                     let force_full_checkpoint =
-                        reliable_deltas_since_checkpoint >= RELIABLE_DELTA_CHECKPOINT_INTERVAL;
+                        pending_source11_rebaseline
+                        || reliable_deltas_since_checkpoint >= RELIABLE_DELTA_CHECKPOINT_INTERVAL;
                     let reliable_ack = if force_full_checkpoint {
                         u16::MAX
                     } else {
@@ -1759,6 +1837,12 @@ async fn handle_connection(
                             let (sequence, baseline_sequence, full, records, bytes) =
                                 built_reliable.expect("reserved reliable enqueue must build payload");
                             last_reliable_sequence = sequence;
+                            if pending_source11_rebaseline {
+                                if !full {
+                                    bail!("Source11 original World renewal must enqueue a full baseline");
+                                }
+                                pending_source11_rebaseline = false;
+                            }
                             if full {
                                 reliable_deltas_since_checkpoint = 0;
                             } else {
@@ -2268,6 +2352,34 @@ fn encode_input_ack(processed_client_tick: u32, server_tick: u32, player_net_id:
 mod tests {
     use super::*;
 
+    #[test]
+    fn greyhaven_static_collision_guard_uses_the_explicit_world9_server_gate() {
+        let mut default_world = World::new(8192.0, 8192.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut default_world, false).is_ok());
+        let mut guarded_world = World::new(8192.0, 8192.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut guarded_world, true).is_ok());
+
+        for world in [&mut default_world, &mut guarded_world] {
+            assert!(world.add_player_at(1, 3740.0, 4088.0, 0.0));
+            assert!(world.set_input(
+                1,
+                InputIntent {
+                    move_y: -1.0,
+                    ..InputIntent::default()
+                }
+            ));
+            for _ in 0..3 {
+                world.step_by(100.0);
+            }
+        }
+        assert!(default_world.fighter(1).unwrap().y < 4030.0);
+        assert!(guarded_world.fighter(1).unwrap().y >= 4030.0);
+
+        let mut wrong_sized_arena = World::new(800.0, 600.0);
+        assert!(configure_greyhaven_alpha_runtime(&mut wrong_sized_arena, false).is_ok());
+        assert!(configure_greyhaven_alpha_runtime(&mut wrong_sized_arena, true).is_err());
+    }
+
     #[tokio::test]
     async fn c1_optional_stream_registration_can_retry_after_contention_and_respawn() {
         let game = SharedGame::new(
@@ -2700,6 +2812,28 @@ mod tests {
                 .sequence,
             u32::MAX - 1
         );
+    }
+
+    #[test]
+    fn source11_renewed_world_hp_uses_fresh_authoritative_frame_not_old_hp0_cache() {
+        let mut state = GameState::new(0, 0);
+        assert!(state.world.add_player_at(1, 100.0, 100.0, 0.0));
+        let mut retired_fighter = state.world.fighters()[0].clone();
+        retired_fighter.hp = 0.0;
+        state.replication_frame = Arc::new(ReplicationFrame::from_fighters(0, &[retired_fighter]));
+        assert_eq!(state.replication_frame.get(1).unwrap().hp, 0);
+
+        let normal = source11_replication_frame(&state, false);
+        assert!(Arc::ptr_eq(&normal, &state.replication_frame));
+        assert_eq!(normal.get(1).unwrap().hp, 0);
+
+        state.world.step();
+        let renewed = source11_replication_frame(&state, true);
+        assert_eq!(renewed.server_tick(), state.world.tick);
+        assert_eq!(renewed.get(1).unwrap().hp, 100);
+        assert!(!Arc::ptr_eq(&renewed, &state.replication_frame));
+        // A fresh life never rewrites the cached previous-life frame.
+        assert_eq!(state.replication_frame.get(1).unwrap().hp, 0);
     }
 
     #[test]

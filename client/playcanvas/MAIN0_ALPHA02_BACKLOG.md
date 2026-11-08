@@ -1,0 +1,292 @@
+# MYASO.IO — Main0 unified Alpha 0.2 backlog
+
+**Owner:** Main0 only. All former departmental work is donor source/evidence, not active handoffs.
+**Release:** SOURCE-ONLY / DRAFT / HARD HOLD. No protected-main merge, production
+deploy, public PlayCanvas activation, security bypass or server mutation.
+
+## Alpha 0.2 browser support decision — 2026-11-04
+
+**Target browser: desktop Google Chrome Stable only.** Chrome is the
+product-supported browser for this playable Alpha. Do not spend Alpha 0.2
+implementation time on Firefox-specific compatibility, headless Gecko,
+GeckoDriver or Firefox renderer fixes. Firefox, Edge, Safari and mobile
+browsers are **not qualified for Alpha 0.2**. They may be reconsidered
+after Chrome gameplay is genuinely accepted.
+
+**Acceptance:** validate 2, then 4 **real Chrome browser sessions** against
+the original isolated Rust QUIC/WebTransport World. Record actual Chrome
+version, OS, separate clients/sessions, precise server source SHA, authoritative
+input ACK/NetID, HIT/HP/stamina, 3 same-session deaths/respawns, Chat C1,
+collision, reload/reconnect and real browser evidence. Chrome WebGL2 is the
+minimum; verify WebGPU/fallback only on available Chrome hardware and never
+claim unmeasured parity.
+
+**Evidence preservation:** historical Firefox CI jobs, first-RED artifacts and
+earlier cross-browser claims remain unchanged and accurately reported; they
+are not Chrome product-acceptance criteria. Do not disable, rewrite, weaken
+or falsely pass existing automated assertions or security gates. Mixed CI
+that still runs Firefox must report genuine failures; Main0 can later
+introduce independently measurable Chrome-only product acceptance without
+modifying the historical cross-browser tests. Rust/Combat/security regressions
+observed in Chrome remain mandatory blockers.
+
+## Current integration candidate
+
+- Branch: `main0/playcanvas-alpha-0.2-genuine-rust-20261104`.
+- Retains original Rust World as sole movement/identity/combat/HP/respawn authority.
+- Combined donor #1167 (World9 + Physics6 + Core8A passive QUIC + PlayCanvas
+  snapshot lifecycle) with #1168 (Combat4 read-only presentation + original
+  physical input bridge), retaining donor commits and test evidence.
+- First new Main0 fix: clear local Combat vitals when the original Rust actor
+  disappears, then populate only from the next authoritative owned snapshot.
+- Tests for adapter lifecycle are **mocked contracts**; no actual Chrome
+  interactive Combat acceptance is implied by their PASS.
+- PlayCanvas Editor project 1634867 / scene 2639984 must be independently
+  inspected while its authenticated MCP service is connected before any edits.
+
+## Main0 Source11 strict physical fine-lane recovery — 2026-11-08
+
+- **Exact GitHub commit `67fbe388795a7e0fb4c8a17b5688c45d7729f408`:** independent [M158/M159 #42479266186](https://github.com/tehki/myaso/actions/runs/42479266186) **both PASSED**. Original [M159 job #128727420209](https://github.com/tehki/myaso/actions/runs/42479266186/job/128727420209) proved roll+first knockdown tick1419, second knockdown1421, attack active+**selected 34HP HIT tick1431**, earliest recovery1435; roller #1, secondary #3 and attacker #4 each remained **100HP**, first #2 66HP. The actual before-roll staging already lay inside ±12, so this passing native run did **not** exercise extra physical lane pulses. [Unified mandatory Combat #42479266239](https://github.com/tehki/myaso/actions/runs/42479266239), [PlayCanvas four Chrome + three Source11 lives #42479266380](https://github.com/tehki/myaso/actions/runs/42479266380) and [Silver Knights original browser #42479266325](https://github.com/tehki/myaso/actions/runs/42479266325) PASSED. Full quality still pending at this capture; do not claim 30/30.
+- **Independent first-RED:** [Source11 native four-Chrome-stable job #128727420693](https://github.com/tehki/myaso/actions/runs/42479266321/job/128727420693) FAILED **before combat/respawn**: original Rust World actor #1 moved through y42→82→124→160, then **three genuine 20ms two-axis W3C corrections** produced **no movement** at target y166. The untouched **±4** World position gate failed, as required. Existing mixed Source11 and original reliable bidi contract passed.
+- **Source-only test-harness-only candidate:** use genuine physical two-axis W3C keyDown/pause/keyUp at **45–60ms** for residual y≤10, bounded by measured `abs(delta) * 1000 * sqrt(2)/COMBAT.moveSpeed`, and record actual W3C duration rather than misleading 0. After EACH physical attempt, read actual original Rust World position; preserve max six finite attempts, strict **±4** lane, real combat, unchanged 94 reach/34HP/respawn/ACK/Chat C1/security and no synthetic input or actor-position writes. This is not confirmed by browser until a NEW exact-head attempt passes.
+- **Four-host Chrome gate audit (read-only):** connected online X230i = Google Chrome Stable **155**, Machine = Chrome Stable **157**, Serj = Chromium **152** (NOT branded Chrome Stable). Three machines online, only two qualified Chrome Stable hosts; **four physically distinct Chrome machines cannot yet be signed off**. Do not substitute 4 sessions on one CI host or Chromium for Chrome product acceptance. No installation or activation performed.
+- **HARD RELEASE HOLD:** no merge, production deployment or public activation. Preserve all original first-RED artifacts and full quality/nonprod gates.
+
+## Main0 exact-head 29/30 native M159 first-RED recovery — 2026-11-08
+
+- **Exact SHA `7acf8ace65e10c6795608335a252479c90da79ed`:** 30-workflow batch completed **29 SUCCESS / 1 FAILURE**. [Full quality #42475002286](https://github.com/tehki/myaso/actions/runs/42475002286), [unified mandatory Combat #42475002314](https://github.com/tehki/myaso/actions/runs/42475002314) (both M143 original real Chrome Space+LMB attempts PASS), [PlayCanvas Chrome/3 Source11 lives #42475002216](https://github.com/tehki/myaso/actions/runs/42475002216), [native Source11 #42475002296](https://github.com/tehki/myaso/actions/runs/42475002296) and [first-party original Combat #42475002353](https://github.com/tehki/myaso/actions/runs/42475002353) all PASS. Native [M158 job #128714239115](https://github.com/tehki/myaso/actions/runs/42475002202/job/128714239115) PASS.
+- **One independent M159 FIRST-RED:** [original 4-browser M159 job #128714239171](https://github.com/tehki/myaso/actions/runs/42475002202/job/128714239171) showed genuine selected #2 **HP100→66**, **but also roller #1 HP100→66** on the same active Light34. After original knockdowns, #4 at **(166,36)**, selected #2 at **(170,102)** and roller #1 at **(222,134)**. The prior physical pre-roll `first.x+28,first.y-68` allowed both targets into 94px Light reach and the unchanged exclusive-victim gate correctly failed. This is not a permitted 30/30 success or a release pass.
+- **New source-only nonrelease staging candidate:** physically reposition #4 a little farther **left and above** before the unchanged original wheel, to `first.x+12,first.y-78`, using only bounded genuine W3C movement and actual Rust World snapshots. Strict ±12 lane, ≥55px roller separation, immutable Light94/Light34 and original M209 two-knockdown same-active proof remain intact. Added deterministic read-only geometry regressions from two retained wrong-target first-RED examples; **do not interpret numeric examples as browser acceptance**. No Combat, original World, client, wire, security, damage, timing, actor-set or fake browser input changes.
+- **RELEASE HARD HOLD:** independently repeat genuine M159 without damaging roller or secondary victim, real four-Chrome source-only security/collaboration/respawn gates, full quality at same HEAD, then four physically distinct authorized Chrome hosts. Do not merge, deploy or activate.
+
+## Main0 native Combat repeatability checkpoint — 2026-11-08
+
+- **Exact GitHub SHA `a15f1fbe251a043b13e81167eb2b479f57877385`:** all **30 workflows finished, 28 SUCCESS / 2 FAILURE**. [M158+M159 independent native #42379027204](https://github.com/tehki/myaso/actions/runs/42379027204) both passed; genuine [M159 job](https://github.com/tehki/myaso/actions/runs/42379027204/job/128422522398) recorded original **M209** server ticks **roll1496, first knockdown1496, second1498, Light active1512, selected HIT34/HP66 tick1512, earliest recovery1514**, with one trusted LMB down/up. [PlayCanvas Chrome + Source11 #42379027087](https://github.com/tehki/myaso/actions/runs/42379027087), [original Source11 #42379027033](https://github.com/tehki/myaso/actions/runs/42379027033) and [first-party original Combat #42379027161](https://github.com/tehki/myaso/actions/runs/42379027161) passed.
+- **Quality first-RED remains:** [quality #42379027147](https://github.com/tehki/myaso/actions/runs/42379027147) repeated authentic M159 under different scheduling: one run reached an overlapping **(166,18) punisher, (172,78) selected, (176,110) roller** where the unchanged Light94 arc could not exclude the roller; another run actually damaged the wrong fighter. Both properly failed original target-isolation/HP gates. A single successful independent M159 is **not** M159 repeatability or full quality signoff. Do not weaken original arc, 94 reach, Light34, knockdown260 or exclusive victim proof.
+- **Unified blocker first-RED:** [attempt-2 M143 job #128422522517](https://github.com/tehki/myaso/actions/runs/42379027136/job/128422522517) observed real Chrome pointerDown at epoch 1794059947056 and actual Space keyDown 1794059947227, **171ms apart** and outside strict **60ms**. The original Rust actually recorded JumpAttack **16→17→18→Idle**, with expected HUD recovery, but the physical simultaneity acceptance legitimately failed. Seven other mandatory native attempts passed.
+- **New source-only observation-scheduling candidate:** M143 still sends exactly one authentic pre-aimed W3C pointer-first Space+LMB chord. Finish that native action BEFORE starting competing cross-browser WebDriver polling; pre-installed DOM MutationObservers continue recording genuine phases, recovery, focus and physical input throughout. Keep strict <=60ms native physical onset, original World phase/HP/guard/Chat requirements and all security gates. No synthetic packets, local damage, fake DOM events or input timing expansion. New focused contract test ensures native delivery precedes polling. This is **not a browser-verified M143 fix** pending new exact-head CI.
+- **RELEASE HARD HOLD:** no merge/deploy/public activation; full quality M159 repeatability, M143 under contention and four physically distinct authorized Chrome hosts remain unqualified.
+
+## Main0 exact-head Chrome Source11 acceptance and next M159 first-RED — 2026-11-07
+
+- **Verified `d4b9e3f6329c19f060ad4de2432850ba1bd820be`:** completed **27 SUCCESS / 3 FAILURE** workflows. The formerly failing [PlayCanvas Chrome same-root Source11 job #128416011271](https://github.com/tehki/myaso/actions/runs/42376822061/job/128416011271) **PASSED** all three real lives; each had original Rust HP **100→66→32→0**, new World generations **0→1→2→3**, actual regranted physical source0 and Chat C1 server ACK+peer receipt, original Rust actor #2 and QUIC root retained. The [four-original-browser native Source11 workflow #42376821911](https://github.com/tehki/myaso/actions/runs/42376821911) also **PASSED**, including Chrome-only and historical mixed-engine lanes. Both are single-host Chrome session tests, **not four separate physical hosts**.
+- **Independent RED gates:** [quality #42376821861](https://github.com/tehki/myaso/actions/runs/42376821861) stopped on genuine **M34** guard-break hit instead of fully guarded exchange (must preserve 100 HP, actual original block/-38guard); [independent M159 #42376821871](https://github.com/tehki/myaso/actions/runs/42376821871) failed selected **34HP punish** despite [M158 independent job success](https://github.com/tehki/myaso/actions/runs/42376821871/job/128416010626); [first-party native Combat #42376822329](https://github.com/tehki/myaso/actions/runs/42376822329) failed **M59** secondary WINDUP/STRIKE visibility. Preserve these first-REDs without modifying reach, stun, active windows, guard, damage or assertions.
+- **M159 specifically observed:** after authentic roll, victim #2 reached original World position **(208,114)** while punisher #4 remained **(136,32)**; center distance **~109**, outside unchanged **94px reach**. Source-only nonrelease harness now physically stages #4 before roll toward original first-victim `x+28,y-68` via bounded W3C keys (45–160ms) and actual World snapshots; requires measured ±12 lane and ≥55 vertical roll separation, with strict unchanged Light34, only victim #2 hit, M209 server active-in-two-knockdowns, and original controls. This is an **unaccepted candidate** until new exact-head real browser CI passes. M34/M59 first-REDs remain separately unresolved.
+- **Release HOLD:** remaining product gates include clean full quality, repeatability, original combat/security blockers, four authorized physically independent Chrome hosts, Greyhaven collision, continuous sessions and secure reconnect. No merge, deployment, public activation.
+
+## Main0 Source11 authoritative HP0 rebaseline candidate — 2026-11-07
+
+- **Observed exact `f471055f7628e6d88da1bde9d0d48a16135df1f5` first-RED:** [two-PlayCanvas Chrome Source11 job #128412567499](https://github.com/tehki/myaso/actions/runs/42375651790/job/128412567499) passed full first death/respawn and renewed source0 + Chat C1, but in life 2 the original victim typed generation advanced **1→2**, reliable snapshot count increased to **4**, own actor returned **Dead8→Block6→Idle0** and World tick/actor tick increased **~1407→1980** while the client-replicated HP stayed **0**. It was **not** a dropped socket or a stalled render. Original three-lives acceptance remains RED, and the first-RED JSON now includes the bounded read-only 120-sample chronology.
+- **Specific server race:** old `snapshot_interval` cloned `state.replication_frame` under one World lock, then reacquired World lock to detect a *new* fighter incarnation. A respawn in between can pair an HP0 cached frame from the old life with a new-life reliable renewal hint, potentially producing the wrong mandatory FULL rebaseline.
+- **New candidate (not accepted until Chrome CI):** read frame, kill event and incarnation under a single existing World lock; on newly detected incarnation build an up-to-date `ReplicationFrame::from_fighters(world.tick,world.fighters())` as a read-only on-demand frame. Preserve normal cached 60Hz/50ms path, original reliable queue backpressure, forced full checkpoint and immutable packet protocol. New Rust test proves cached previous-life HP0 remains untouched and new-life replica reads actual World HP100. No client authority, forced respawn, fabricated ACK or gameplay tuning.
+- **Other independent `f471055f` failures retained:** [M158/M159 first-RED #42375651891](https://github.com/tehki/myaso/actions/runs/42375651891) (M158 no verified two-victim overlap; M159 real server attack-active missed dual-knockdown), [M172/M173 #42375651814](https://github.com/tehki/myaso/actions/runs/42375651814) (M173 jump spend), and [native original Source11 #42375651873](https://github.com/tehki/myaso/actions/runs/42375651873) (zero-duration fine W3C correction demonstrably did not move original actors). Fine physical diagonal correction now holds real WASD for 20 ms and still requires strict ±4 World position. Existing historical failures remain separate security/quality gates; no relaxed timing, reach, stamina or overlap threshold.
+- **HARD HOLD:** source-only, draft, no merge/deployment/release. Confirm Rust tests and exact-head new Chrome/Source11 CI before attributing any fix; four physically distinct Chrome hosts still untested.
+
+## Main0 Alpha 0.2 exact-head two-blocker recovery — 2026-11-07
+
+- **Verified previous HEAD:** `27fdaf3bfb1db69728b432a7a7cfbcae69b31736`. GitHub completed **28/30 workflows SUCCESS**. [Full quality #42370881609](https://github.com/tehki/myaso/actions/runs/42370881609), [M158+M159 original Rust native #42370881726](https://github.com/tehki/myaso/actions/runs/42370881726), [four real PlayCanvas Chrome sessions job](https://github.com/tehki/myaso/actions/runs/42370881891/job/128398571475), and [original World four-Chrome Source11 job](https://github.com/tehki/myaso/actions/runs/42370881634/job/128398570511) **PASSED** on this exact HEAD.
+- **Two retained first-REDs:** [two-PlayCanvas Source11 three-lives job](https://github.com/tehki/myaso/actions/runs/42370881891/job/128398571174) demonstrated cycle1/cycle2 (100→66→32→0 then new granted World life, real physical source0 and Chat C1), then failed after third original typed generation3 grant because the victim's client still read HP0 despite live QUIC and incoming reliable snapshots. **Not yet a proven networking fix**; retain original third-respawn RED and collect cross-plane chronology without forging a snapshot or resending fake input. [Mixed Chrome/Firefox Source11 native job](https://github.com/tehki/myaso/actions/runs/42370881634/job/128398570412) failed while genuinely staging attacker Y toward target166: accepted original World readings 160↔172 oscillated outside a strict ±4 lane, so later Combat was not reached. Four real Chrome-only native Source11 **passed** independently.
+- **This source-only candidate:** adapt *nonrelease original native harness* to a physical two-axis WASD fine correction where residual Y≤10, still requiring actual original World actor Y within ±4 and a subsequent independently staged X. For the two-PlayCanvas third renewal, add capped read-only HP, own-entity tick, reliable snapshot counter, baseline sequence, typed generation and processed input ACK history to first-RED artifacts. **No client/game/server authority logic, protocol, original damage/respawn timing or security assertions change.**
+- **Pending exact-HEAD rerun:** first-attempt fresh CI is the only source of acceptance truth for these changes. Four independent physical Chrome hosts, third PlayCanvas same-root three-lives, reconnect and all mandatory gates remain **RELEASE HOLD**. No merge or deployment.
+
+## Main0 M159 independent first-RED recovery — 2026-11-07
+
+- **Verified exact commit:** `0a32a2f1517e721e346c0c7f0b1ebbb3dfad0402`. Full [quality #42367802686](https://github.com/tehki/myaso/actions/runs/42367802686) SUCCESS, dedicated [M158 job](https://github.com/tehki/myaso/actions/runs/42367802697/job/128389453562) SUCCESS, but [M159 dedicated first-attempt job](https://github.com/tehki/myaso/actions/runs/42367802697/job/128389453845) FAILURE. The batch completed **26/30 workflows SUCCESS**: [M147 third-party](https://github.com/tehki/myaso/actions/runs/42367802807) lacked original Chrome player-ID admission, [M41 standard-path](https://github.com/tehki/myaso/actions/runs/42367802735) lacked a fresh actor-bound World cue, and [four-native original-game QA](https://github.com/tehki/myaso/actions/runs/42367802682) failed recovery-buffer admission. Preserve all first-REDs; a successful full quality run does not supersede independent failures.
+- **M159 actual first-RED:** Original Rust read attacker #4 at (144,18) and selected target #2 at (112,144): distance **130**, unchanged maximum reach **94**. Fixed W3C S pulse **45 ms** did not demonstrate an actual World position improvement before the reach assertion, and the test correctly stopped without a fake hit.
+- **New source-only staging candidate:** choose bounded (45–240 ms) authentic W3C S pulses from actual server-owned x/y; remeasure after each original snapshot; up to three attempts, keeping >=55 vertical separation from the roll corridor; retain strict **94 reach**, required >=7 margin, original M209 hit/overlap proof, and unchanged 260 ms knockdown. Fail closed with original before/after actor geometry and pulse chronology. This is a test-harness-only attempt, **not** a confirmed M159 fix or a new gameplay mechanic.
+- **Pending gates:** exact-head independent native M158/M159 first-attempt runs, full quality, four Chrome PlayCanvas real Rust, Source11 three lives, original-game M41/M147/recovery buffer and independent four physical Chrome hosts. Retain source-only draft / release HOLD. No CI pass should be claimed before GitHub confirms it.
+
+## Independent native gate checkpoint — 2026-11-07
+
+- **Prior source SHA:** `2bbce942c1d6b1eb91f1dd2b9c482f09756e4e8f` on Draft #1169. The exact-head first-attempt batch finished **26 SUCCESS / 3 FAILURE**. This is not a release candidate PASS.
+- **Quality first-RED:** [run 42364702894](https://github.com/tehki/myaso/actions/runs/42364702894) stopped on genuine M137 buffered Space+LMB after original Light34. Original Rust committed a second Light34 (defender 100→66→32), not mandatory JumpAttack42; untouched M137 assertion failed. This means the quality sequence did **not** reach M158 or M159: neither is verified at this SHA.
+- **Other first-REDs:** [original-game native browser QA 42364702931](https://github.com/tehki/myaso/actions/runs/42364702931) retained a real Chrome original actor in Jump action15 beyond the eight-second idle gate; [PlayCanvas QUIC 42364702964](https://github.com/tehki/myaso/actions/runs/42364702964) had a passive Firefox QUIC timeout, while four real PlayCanvas Chrome and Source11 three-lives native jobs **PASSED**. Firefox is historical regression evidence, **not** the Alpha 0.2 product target.
+- **New separate source-only lane:** `.github/workflows/main0-alpha02-m158-m159-independent-native.yml` gives M158 `uimultiknockdownffa` and M159 `uimultiknockdownffahit` independently scheduled **real original Rust + physical W3C driver** jobs, each retaining its own first-attempt run log artifact. Existing full quality, M137, reach94, roll-order and 260ms server World gates remain unmodified. The native QA lane uses the original legacy mixed browsers because those two *historical* scenarios require them; it does **not** claim Chrome-only PlayCanvas release qualification. A new source commit and exact-head runs are **PENDING** until verified.
+- **Local source checks for the new QA lane:** YAML parses two matrix jobs; M158 readability contracts 2/2 PASS, M159 staging and early-release contracts 4/4 PASS; original runner `node --check` and `git diff --check` PASS. These are not browser QA PASS.
+- **Release signoff remains blocked:** require independent M158 + M159 genuine first-attempt evidence, clean quality/M137 and Chrome Space-chord, source-only 4 PlayCanvas Chrome and three Source11 lives at **the same final SHA**, genuine four physically independent authorized Chrome hosts, original Rust server SHA, authenticated identity/ACK, Chat C1, collision/respawns/reconnect, hit isolation, stamina and preserved security gates. No merge/deploy/public activation.
+
+## Prioritized backlog — smallest playable increments first
+
+1. **P0 — Exact-head source health:** run Node client, Vite build, Rust locked
+   tests, strict Clippy, workflows and independent Combat QA. Preserve failed
+   quality evidence, including M158 and historical M140; never skip assertions.
+2. **P0 — Genuine isolated World9 QUIC:** reproduce original Rust startup
+   `MYASO_WORLD9_GREYHAVEN_ALPHA=1` only on loopback ephemeral nonproduction
+   service with pinned local certificate; prove server-owned map/spawns (4110,
+   4160), (4206,4160), (4110,4256), (4206,4256), 23 solids, actor membership
+   and removal. The snapshot wire has no trustworthy map ID; use server launch
+   proof rather than claiming the renderer selects Greyhaven.
+3. **P0 — Actual PlayCanvas physical Combat:** **two real Chromium 152**
+   PlayCanvas sessions locally proved distinct original QUIC+ACK+NetIDs,
+   server-granted typed source0, trusted W3C D movement, and original Rust
+   authoritative **Light34** (defender 100→66 HP, phases 1/2/3) and
+   **Heavy46** (defender 100→54 HP, phases 9/10/11) as separate isolated
+   fights. Heavy begins with a provisional Light windup 1, upgrades to Heavy
+   windup 9 on real held LMB, and does **not** land Light active 2. Strict
+   native `main0-chrome-chat-c1-native.mjs` modes are
+   `MYASO_CHROME_COMBAT_P0=1` (Light) and
+   `MYASO_CHROME_HEAVY_P0=1` (Heavy), both requiring defender-owned
+   exact HP and no simulated Combat. The non-moving initial identity probe
+   now uses real wheel-back Block/Parry and checks authentic World9 spawn
+   anchors; the native harness refuses dirty SHA attribution. Historical
+   high-load Light/Heavy first-REDs remain recorded. Not an M147 receipt.
+   New source-only `MYASO_CHROME_JUMP_P0=1` is a strict physical
+   Space+LMB original Rust JumpAttack42 is now **PASS on exact HEAD
+   30b741c6efef5c299fdc9173c831b2867433a649** in two real Chromium 152
+   sessions: original World actions 15→16→17→18 and defender HP 100→58,
+   exactly 42 damage; native W3C Space-first chord, no false Light/Heavy.
+   This is Chromium evidence, not branded Google Chrome Stable qualification.
+   **M147 private HIT loopback integration also PASS** at this exact HEAD
+   (CI 41868420133): four browser sessions (Chrome/Firefox/Chrome/Firefox),
+   one genuine physical Light34, original Rust HIT, contiguous sequence-0
+   private receipt delivered to attacker and defender, role-specific first-party
+   HUD presentation before application ACK, and no spectator receipt/credit.
+   The server feature is compiled only for this test and requires explicit
+   original-v2 + loopback gates; Cargo default features remain empty. Packet
+   types 5/6 remain proposal/private-lab only, not registered as public gameplay
+   packets; QUIC actor leases are not account authentication. This is one
+   host, not four independent human machines, and does not yet qualify
+   multi-hit/replay/reconnect on independent hosts or public activation.
+   **Source11 four branded Google Chrome Stable** original-game lifecycle
+   **PASS** at `abafa9142fbf3037b456c0687cbdc431f27b8a04` in
+   [CI 41911706564](https://github.com/tehki/myaso/actions/runs/41911706564):
+   four independent Chrome 156 browser sessions, real original Rust Combat,
+   three same-session deaths/respawns, renewed source0 and Chat C1; mixed
+   and stale-generation negative lanes also passed. This proves one CI host,
+   **not** four independent machines or four PlayCanvas renderer sessions.
+   Original feature-gated M147 four-native mixed-engine integration also
+   **PASS** at `abafa91` in CI 41911706689. The new independent four-branded
+   Google Chrome Stable **private HIT** lane **PASSED** at exact head
+   `2671f2aaf191910e51bb80efc4d7844673c7190b` in
+   [CI 42219272543](https://github.com/tehki/myaso/actions/runs/42219272543),
+   alongside the retained mixed-engine lane: original Rust authoritative Light
+   34, attacker/defender-only M147 receipt + present-before-ACK, no spectator
+   receipt, all four native browser sessions. This is still one CI host, still
+   developer-loopback opt-in, NOT public or independent-host qualification.
+   **VERIFIED FOUR-ACTOR PLAYCANVAS Chrome Stable integration:**
+   [exact-head CI 42357535014](https://github.com/tehki/myaso/actions/runs/42357535014)
+   PASS at `9c129fc271bcb990c68027538a4edf551e0a3982` with actual
+   Google Chrome 156 WebGL2, actors [1,2,3,4], original server-owned
+   Light34 damage 100→66, independent observers #3/#4 at victim 66
+   while own HP100, and Chat C1 receipt to all three peers. Four clients
+   share one CI host; no independent physical hosts or PlayCanvas respawn
+   continuity is implied.
+   **NEW FOUR-ACTOR PLAYCANVAS Chrome Stable native source-only candidate:**
+   `MYASO_CHROME_FOUR_P0=1` now requires *four real PlayCanvas WebGL2*
+   renderer clients, all with independent original Rust World9 actors at
+   (4110,4160), (4206,4160), (4110,4256), (4206,4256), all granted
+   original typed source0 + ACK and genuinely connected QUIC. Original
+   Chat C1 Player #1 must be ACKed by Rust and delivered to all three real
+   peers; local typing must suppress physical gameplay, Escape cancel must
+   not send. One real Chrome W3C LMB and original World Light34 must reduce
+   actor #2 100→66 HP, *and* third/fourth PlayCanvas actors must independently
+   replicate #2 at 66 while preserving their own original HP100. This is
+   isolated ephemeral loopback, no fake Combat authority, no private HIT claim.
+   The separately named `four-playcanvas-chrome-stable` job in the existing
+   nonrelease PlayCanvas CI enforces branded Google Chrome and preserves
+   fail-closed native evidence. **Verified exact-head real Chrome 156 CI PASS
+   at 9c129fc**, not merely source contracts. These are four PlayCanvas
+   sessions on one runner, not four physical hosts.
+   **NEXT: actual PlayCanvas Source11 three-lives qualification:** new
+   `MYASO_CHROME_RESPAWN_P0=1` opt-in runner and distinct
+   `two-playcanvas-source11-three-respawns` nonrelease CI job. Requires
+   genuine two Chrome Stable WebGL2 original Rust sessions, real W3C
+   100→66→32→0 Light HP for three consecutive same-victim World lives,
+   automatic server-owned death/respawn, unchanged victim actor/QUIC root,
+   original source11 bound bidi GRANT with increased typedGeneration,
+   a fresh trusted post-respawn LMB ACCEPTED on the new generation,
+   and original Chat C1 ACK/peer delivery after each new life. No local
+   HP/death simulation or protocol fork. **PENDING real exact-head CI**
+   (not signed off by source contract tests).
+   Remaining P0: four PlayCanvas Chrome Stable Combat/reconnect signoff,
+   independent-host private HIT stress, multiple-hit replay/incarnation and
+   stamina, full Block/Kick/Dodge/focus acceptance. No client-created gameplay.
+   Exact-head CI at 30b741c after failed-job reruns: quality passed and 27/28
+   workflows passed. The original two M27/renderer timeout reds were cleared
+   by retry; the remaining standard-path M35 first-RED is real: original Rust
+   World HIT at tick1121 precedes defender Block admission at tick1122, so the
+   attack lands for 34 HP. The same M35 result reproduced on retry. Preserve
+   this Combat timing blocker; do not change the 125ms parry window or waive it.
+   See runs 41868420936 and 41868420274. At `abafa91` CI was 26/28.
+   At `2671f2a`, first-attempt CI was 24/28: branded four-Chrome M147,
+   Source11, and all eight mandatory Combat jobs passed. Quality, M151
+   three-fighter guard-break, M121 directional Light, and M156 roll-punish
+   were RED. Targeted failed-job reruns subsequently passed M151, M121,
+   and M156; the quality job was still running at the latest check.
+   Historical first-REDs remain relevant despite those successful reruns.
+   M121 specifically had real W3C LMB down/up separated by ~239ms rather
+   than a native plan's 40ms; original World correctly committed Heavy
+   9→24→25→26 instead of directional Light34. Main0 adds a read-only
+   actor-bound `M121_NATIVE_PHYSICAL_LIGHT_FIRST_RED` diagnostic with unit
+   tests; the original 34 HP and directional presentation gates still fail.
+   Earlier M35 HIT-before-Block first-RED and fast-vs-slow W3C wheel
+   latency evidence remain preserved; no changes to Parry125 or World rules.
+   At `c9d948f`, CI first attempt passed 26/29. Both four-Chrome M147
+   and mixed-engine original HIT, Source11 four-Chrome lifecycle, M121
+   directional Light, all eight mandatory Combat/M35 lanes and standard M156
+   passed. Failures: native M151 missing genuine trusted Firefox wheel inside
+   strict 190ms; Firefox passive PlayCanvas QUIC startup timeout; quality
+   M140 failed to commit a genuine recovery-window Light. Targeted M151 and
+   passive Firefox QUIC reruns subsequently PASSED; quality rerun remained
+   in progress at the last verified checkpoint. All first-REDs preserved.
+   Review-only `M194_NATIVE_WHEEL_TIMEOUT_FIRST_RED` now attaches original
+   W3C dispatch/ACK/attestation clock evidence and bounded original World
+   actions to a failed guard-break exchange; neither the missing wheel nor
+   simulated Block can satisfy acceptance. No release/up-input after timeout,
+   no additional gameplay owner, no parry or server timing change.
+   At `3fba648`, first-attempt CI was 25/29; the original native M151
+   guard-break punish, M194 five-block, Source11 retired-generation and
+   Chrome four-browser JumpAttack review lanes were RED. All four failed-job
+   reruns later passed; this means 29/29 workflows eventually SUCCESS, but
+   does not prove repeatability or erase their original first-REDs. The
+   Chrome Jump review failure was especially actionable: trusted Space DOWN
+   reached Chromium approximately **529ms before trusted LMB DOWN** while
+   original Rust correctly accepted a plain Jump15 and rejected JumpAttack
+   16/17. Original server admission is bounded to 12 World ticks. The
+   native *test only* now pre-aims pointer separately and sends Space DOWN,
+   then LMB DOWN on the next zero-duration W3C tick, with actual LMB UP
+   before Space UP. The original authenticated action5, World16/17, stamina
+   and isTrusted requirements remain strictly mandatory. New failure-only
+   `combat4-jump-review-FIRST-RED.json` records the actual browser event
+   gap plus original Rust journal; no client-side gameplay simulation.
+   This change is source-only and requires fresh exact-head CI and native
+   evidence before it may be labeled a reliable fix.
+4. **P0 — Actor lifecycle and safety:** three true same-session deaths/respawns,
+   reconnect/no duplicate actors, server-owned positions and verified
+   authoritative building/ground collision. Preserve M140 <=180ms and
+   independent M158 combat QA; do not waive historical first-RED.
+5. **P0 — Original Chat C1 integration:** source-only PlayCanvas adapter now
+   reuses the exact original Chat C1 panel and reliable game QUIC bridge, with
+   Enter/Escape, server ACK, UTF-8 and Combat focus suspension. Node contracts
+   passed local mocked contract tests **and** a distinct real two-browser
+   Chromium 152 + original Rust WebTransport Chat C1 ACK/receipt test at
+   `67bb7eef`. An independent local 3x same-session Rust respawn proof passed
+   with a passive PlayCanvas spectator. Google Chrome Stable and four-player
+   PlayCanvas physical Combat/reconnect still require separate qualification.
+   **Historical first-RED:** under X230i load >20, client #2 remained
+   `connecting`. With load ~0.33, the **same strict native two-Chromium test**
+   passed on exact `31ade88`: real actor IDs 1/2, original Chat C1 ACK,
+   recipient `Player #1`, Escape cancellation, no typing→Combat packet.
+   First-RED stays preserved; resource sensitivity requires repeat/stress
+   evidence. See `CHAT_C1_ORIGINAL_RUST_DEV.md`.
+6. **P1 — Reusable human animations:** drive eight-way locomotion and
+   Idle/Walk/Sprint/Jump/Roll/action state exclusively from authoritative
+   snapshots. Keep Silver Knight optional until human animation is stable.
+7. **P1 — Greyhaven polish and browser acceptance:** reverify actual Editor
+   Red Lion/Blacksmith geometry, smoke and materials, measured Chrome Stable
+   WebGL2 and optional WebGPU fallback, four real players, accessibility/performance.
+8. **P2 — Expansions after playable:** NPCs/AI, magic, inventory/equipment,
+   sound, economy and persistence under original Rust authority.
+
+## Donor source / evidence preserved
+
+- Main0 #1152/#1151; Core8A #1155/#1165; Core8C #1150/#1159/#1167;
+  World9 #1148/#1160; Physics6 #1147/#1156/#1158;
+  UI10 #1157; Combat4 #1161/#1168; Graphics #1142/#1143/#1146 and
+  #1162/#1163/#1164/#1166; P0 release #1138/#1140.
+- Never close or rewrite historical first-RED or donor tests simply because
+  newer unified code compiles. Every independent QA claim needs exact SHA,
+  run URL, browser/runner, original Rust server proof and reproducible command.
+
+**Milestone accepted only when genuine gameplay passes on the combined exact HEAD.
+Source build, mocked contracts and donor CI are evidence, not multiplayer GO.**
