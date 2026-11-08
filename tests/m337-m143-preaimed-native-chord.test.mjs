@@ -24,6 +24,17 @@ test("M337 M143 uses real pre-aim and pointer-first Space+LMB with no W3C reposi
   assert.match(chord, /type: "keyUp", value: " "/);
 });
 
+test("M143 native W3C dispatch completes before cross-client polling, keeping original 60ms gate", () => {
+  const chordCall = flight.indexOf("await performArenaPreAimedJumpAttackChord(jumpAttacker, 90);");
+  const pollCall = flight.indexOf("await sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 20);");
+  assert.ok(chordCall > 0 && pollCall > chordCall, "one native chord finishes before polling");
+  assert.doesNotMatch(flight,/await Promise\.all\(\[\s*performArenaPreAimedJumpAttackChord\(jumpAttacker/);
+  assert.match(runner,/new MutationObserver\(recordFocus\)/);
+  assert.match(flight,/Math\.abs\(spaceDowns\[0\]\.epochMs - attackDowns\[0\]\.epochMs\) > 60/);
+  assert.match(flight,/m201ServerOutput\(\)\.slice\(jumpServerLogOffset\)/);
+  assert.doesNotMatch(flight,/dispatchEvent\(|new KeyboardEvent\(|new PointerEvent\(/);
+});
+
 test("M337 preserves strict real event/chord, server jump lifecycle and focus/vitals assertions", () => {
   assert.match(flight, /Math\.abs\(spaceDowns\[0\]\.epochMs - attackDowns\[0\]\.epochMs\) > 60/);
   assert.match(flight, /jumpState\.acceptance\?\.scenario !== "uijumprecoveryffa"/);

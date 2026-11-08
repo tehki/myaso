@@ -11646,10 +11646,17 @@ async function runOnlineUiJumpRecoveryFfaFocusFlight(entries) {
   // Keep every actual World phase/focus/vitals assertion unchanged.
   const jumpLifecycleObserveMs = COMBAT.jumpAttack.windupMs
     + COMBAT.jumpAttack.activeMs + COMBAT.jumpAttack.recoveryMs + 300;
-  await Promise.all([
-    performArenaPreAimedJumpAttackChord(jumpAttacker, 90),
-    sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 8),
-  ]);
+  // M143 exact-head unified native retry #2 first-RED: while three
+  // WebDriver clients were being polled every 8ms, genuine Chrome pointerDown
+  // preceded the SAME W3C tick's Space keyDown by 172ms (strict limit 60ms).
+  // Preserve the one genuine pre-aimed chord and let its native action finish
+  // before issuing any read-only WebDriver polling. The already-installed
+  // MutationObserver and original World recorder continuously capture focus,
+  // recovery and authoritative action transitions during the physical chord.
+  // This changes only QA observation scheduling: no gameplay input, timing
+  // limit, acceptance predicate, or simulated state is modified.
+  await performArenaPreAimedJumpAttackChord(jumpAttacker, 90);
+  await sampleUiEvidenceWhileActive(entries, jumpLifecycleObserveMs, 20);
 
   let evidence = await Promise.all(entries.map(readUiEvidence));
   let jumpState = evidence.find((entry) => entry.browser === jumpAttacker.name);
