@@ -50,7 +50,7 @@ import { createM221TrustedWheelRegistry } from "./m221-trusted-wheel-attestation
 import { attachM325TrustedWheelSocket } from "./m325-trusted-wheel-socket.mjs";
 import { requiresM338GuardBreakWheelSocket } from "./m338-guard-break-wheel-scenarios.mjs";
 import { createM227TrustedLightRegistry, waitForM227TrustedLead } from "./m227-trusted-light-pointer.mjs";
-import { planM197KnockdownClusterNudge } from "./m197-knockdown-cluster.mjs";
+import { planM197KnockdownClusterNudge, awaitM197SettledCluster } from "./m197-knockdown-cluster.mjs";
 import { isTickNewer32 } from "../src/browser/reconciliation.mjs";
 import { requireM188NativeHeldLmb } from "./m188-native-heavy-control.mjs";
 import { dispatchM41ObservedParry, m41NativeAsyncCueScript } from "./m41-native-observed-parry.mjs";
@@ -5499,38 +5499,39 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
       throw new Error(milestone + " M197 staging missing genuine authoritative victim positions: "
         + JSON.stringify({ first, second, fighters }));
     }
-    return { first, second };
+    return { first, second, serverTick: evidence.acceptance?.serverTick };
   };
   const clusterPlans = [];
   let clusterAligned = null;
-  for (let adjustment = 0; adjustment < 3; adjustment += 1) {
-    const { first, second } = await readM197Cluster();
+  // The authoritative World may still be draining a previously released
+  // keyboard gesture: do not compensate from a single delayed snapshot.
+  // Wait for consecutive fresh Rust ticks and stationary victim positions
+  // before EVERY bounded W3C nudge, including the initial correction.
+  for (let adjustment = 0; adjustment < 6; adjustment += 1) {
+    const { first, second, serverTick, observations } = await awaitM197SettledCluster({
+      read: readM197Cluster, sleep,
+    });
     const plan = planM197KnockdownClusterNudge({
       rollRight, firstX: first.x, secondX: second.x,
       moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
+      maxPulseMs: 90,
     });
-    clusterPlans.push({ adjustment, firstX: first.x, secondX: second.x, ...plan });
+    clusterPlans.push({
+      adjustment, serverTick, firstX: first.x, secondX: second.x,
+      stableSamples: observations.length, ...plan,
+    });
     if (plan.aligned) {
       clusterAligned = plan;
       break;
     }
-    // One genuine W3C keyDown/pause/keyUp transaction avoids an unbounded
-    // cross-driver key-held gap under CI load. The subsequent ORIGINAL
-    // authoritative snapshot still decides whether the cluster is aligned.
+    // Keep a short, genuine single-transaction W3C gesture; original World
+    // snapshots alone decide whether the next action is necessary. No fake
+    // movement or relaxed M197/M209/reach/target/damage assertions.
     await pulseMovementKeyBoundedW3c(secondVictim, plan.key, plan.pulseMs);
-    await sleep(90);
   }
   if (!clusterAligned) {
-    const { first, second } = await readM197Cluster();
-    const plan = planM197KnockdownClusterNudge({
-      rollRight, firstX: first.x, secondX: second.x,
-      moveSpeed: COMBAT.moveSpeed, targetLeadPx: 18, tolerancePx: 8,
-    });
-    clusterPlans.push({ adjustment: 3, firstX: first.x, secondX: second.x, ...plan });
-    if (!plan.aligned) {
-      throw new Error(milestone + " M197 could not stage genuine ordered roll contacts: "
-        + JSON.stringify(clusterPlans));
-    }
+    throw new Error(milestone + " M197 could not stage genuine ordered roll contacts: "
+      + JSON.stringify(clusterPlans));
   }
   console.log("M197_GENUINE_CLUSTER_STAGING " + JSON.stringify({
     milestone, rollRight, clusterPlans,
