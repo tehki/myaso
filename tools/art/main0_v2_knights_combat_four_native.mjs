@@ -12,6 +12,7 @@ import {COMBAT} from "../../src/combat/model.mjs";
 import {runNativeRecoveryBuffer} from "../../scripts/native-recovery-buffer.mjs";
 import {runNativeJumpStamina} from "../../scripts/native-jump-stamina.mjs";
 import {planMain0NativeJumpReviewChord} from "./main0-jump-review-native-chord.mjs";
+import {requireUniqueSpaceCancel} from "./main0-space-cancel-ack-proof.mjs";
 import {hasOriginalWorldActionTransition as worldTransition, classifyOriginalWorldJumpAttackEntry} from "../../src/combat/original-world-action-trace.mjs";
 
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -1202,13 +1203,21 @@ try{
   return newReceipts.some(e=>e.source===0&&e.action===4&&e.status===1)?p:false;
  },8000);
  const cancelled=cancelProof.acknowledged.slice(beforeCancelReceipts);
- const firstPress=cancelled.filter(e=>e.source===0&&e.action===1&&e.status===1);
- const terminals=cancelled.filter(e=>e.source===0&&(e.action===3||e.action===4));
- assert.equal(firstPress.length,1,"one real first-pressed source0 gesture");
- assert.deepEqual(terminals.map(e=>e.action),[4],
-  "Space after LMB must CANCEL without an extra typed RELEASE");
- assert.equal(firstPress[0].gestureId,terminals[0].gestureId,
-  "cancel belongs to original authenticated physical LMB gesture");
+ // A second authenticated ACK for the SAME already-settled sequence is not
+ // a second typed terminal. Native QA still rejects any RELEASE, a second
+ // first-settled CANCEL, a different gesture, or a different sequence.
+ // Preserve exact native receipts on failure; do not waive malformed edges.
+ let cancelUniqueness;
+ try { cancelUniqueness=requireUniqueSpaceCancel(cancelled); }
+ catch(error) {
+  console.error("COMBAT4_SPACE_CANCEL_ACK_FIRST_RED",JSON.stringify({
+   sourceCommit:process.env.MYASO_LIVE_GESTURE_SOURCE_SHA||"local",
+   error:String(error),cancelled,
+   physical:await edges().catch(e=>String(e)),
+   originalWorld:readAuthoritativeWorld().slice(beforeCancelWorld),
+  }));
+  throw error;
+ }
  assert.equal(cancelProof.failed,false,"late Space cancel must keep QUIC lease alive");
  assert.equal(cancelProof.closed,false,"late Space cancel must not disconnect player");
  const cancelWorld=readAuthoritativeWorld().slice(beforeCancelWorld);
@@ -1221,7 +1230,8 @@ try{
   physicalSpaceAndLmb:witnessed,spaceChordReceipts:noLightReceipts,
   ordinaryAfterSpaceReceipts:normal,worldAfterSpace:firstWorld,
   normalWorld,normalPhysical,
-  midHoldSpaceCancelReceipts:cancelled,midHoldWorld:cancelWorld,
+  midHoldSpaceCancelReceipts:cancelled,midHoldSpaceCancelUniqueness:cancelUniqueness,
+  midHoldWorld:cancelWorld,
   nativePhysicalAll:await edges(),
   before:baseline,afterSpace,afterNormal,afterCancel:cancelProof,
   limitation:"NO actual v2 JumpAttack demonstrated or released"};

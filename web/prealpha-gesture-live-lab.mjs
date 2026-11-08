@@ -283,6 +283,9 @@ async function activateNegotiatedLmb({
           sequence:receipt.sequence,gestureId:receipt.gestureId,
           source:receipt.source,action:receipt.action,status:receipt.status,
           serverTick:receipt.serverTick,transportSettled:receipt.transportSettled,
+          // Transport may reply again to a retried already-settled sequence;
+          // preserve this read-only distinction for strict native QA.
+          alreadySettled:receipt.alreadySettled === true,
         }));
         if (receipts.length > 16) receipts.shift();
       },
