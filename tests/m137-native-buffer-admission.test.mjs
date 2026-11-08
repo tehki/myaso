@@ -17,7 +17,19 @@ test("M137 late-recovery native chord is targeted INSIDE unchanged World buffer"
   assert.ok(targetedMs >= 0);
   assert.ok(remainingMs > 0 && remainingMs < COMBAT.inputBuffer.jumpAttackWindowMs);
   assert.equal(remainingMs, 70);
-  assert.match(flight, /await performArenaJumpAttackChord\(attacker, attackerElementId, attackOffset, 90\)/);
+  // The original pointer is positioned by the genuine setup light; reuse
+  // M337's already-qualified first-tick pointer-first physical chord.
+  assert.match(flight, /await performArenaPreAimedJumpAttackChord\(attacker, 90\)/);
+  assert.doesNotMatch(flight, /await performArenaJumpAttackChord\(attacker, attackerElementId/);
+  const chordStart = runner.indexOf("async function performArenaPreAimedJumpAttackChord(");
+  const chordEnd = runner.indexOf("\nasync function ", chordStart + 36);
+  const chord = runner.slice(chordStart, chordEnd);
+  assert.ok(chordStart >= 0 && chordEnd > chordStart);
+  assert.ok(chord.indexOf('type: "pointer"') < chord.indexOf('type: "key"'));
+  assert.match(chord, /type: "pointerDown", button: 0/);
+  assert.match(chord, /type: "keyDown", value: " "/);
+  assert.doesNotMatch(chord, /type: "pointerMove"|dispatchEvent\(/);
+  assert.match(flight, /await performArenaAttack\(attacker, attackerElementId, attackOffset\)/);
 });
 
 test("M137 still rejects extra Lights, plain jumps, missing World phases and fabricated contact", () => {

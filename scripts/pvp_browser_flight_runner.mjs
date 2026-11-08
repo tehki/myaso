@@ -4582,7 +4582,15 @@ async function runOnlineUiJumpAttackBufferFlight(entries) {
   );
   const waitMs = Math.max(0, recoveryStart.epochMs + targetOffsetMs - Date.now());
   if (waitMs > 0) await sleep(waitMs);
-  await performArenaJumpAttackChord(attacker, attackerElementId, attackOffset, 90);
+  // M137 first-RED #42488330558: two physically trusted inputs landed 1ms
+  // apart (Space first), yet original Rust received separate sender ticks
+  // and resolved a second Light34 rather than buffered JumpAttack42. The
+  // initial light already aimed the native pointer at attackOffset. Reuse
+  // M337's qualified pointer-first *single W3C tick* without an extra
+  // pointerMove/pause tick inside this recovery-critical chord. The original
+  // 90ms buffer, strict World phases, 42HP and one-chord evidence remain
+  // untouched; a failed server admission still fails M137.
+  await performArenaPreAimedJumpAttackChord(attacker, 90);
 
   const completedSequence = (transitions = []) => {
     const lightRecoveryIndex = transitions.findIndex((entry) =>
