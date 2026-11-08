@@ -177,7 +177,7 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
  // diagonal displacement in the unmodified, normalized Rust movement model.
  // Keep the original strict <=4px measured-authority lane criterion; never
  // synthesize input, set actor positions or substitute an inferred hit.
- const pulseFineLane=async(a,vertical,horizontal)=>{
+ const pulseFineLane=async(a,vertical,horizontal,durationMs)=>{
   const focused=await evaluate(a.s,String.raw`
    const c=document.querySelector('#arena');
    if(!c)return false;
@@ -188,10 +188,11 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
   return request(a.s.base,"POST","/session/"+a.s.id+"/actions",{
    actions:[{type:"key",id:"four-real-walk",actions:[
     {type:"keyDown",value:vertical},{type:"keyDown",value:horizontal},
-    // Zero-duration W3C chords produced no original World movement under
-    // real Chrome or Firefox. Hold both physical keys for one bounded
-    // 20ms tick window and re-read the authoritative position afterward.
-    {type:"pause",duration:20},
+    // Source11 first-RED 42479266321: a fixed 20ms two-axis pulse
+    // delivered ZERO original World movement in three genuine Chrome
+    // attempts. Use a bounded 45–60ms physical hold estimated from
+    // actual delta and diagonal speed; re-read World before all decisions.
+    {type:"pause",duration:durationMs},
     {type:"keyUp",value:vertical},{type:"keyUp",value:horizontal},
    ]}]
   });
@@ -252,12 +253,15 @@ async function runFourCombatLifecycle(actors,{rustUrl,cert,host,readAuthoritativ
    const key=delta>0?"s":"w";
    const fine=Math.abs(delta)<=10;
    const horizontal=f.x<200?"d":"a";
-   const durationMs=fine?0:Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
+   const durationMs=fine
+    ? Math.max(45,Math.min(60,Math.ceil(Math.abs(delta)*1000*Math.SQRT2/COMBAT.moveSpeed)))
+    : Math.max(20,Math.min(180,Math.ceil(Math.abs(delta)*1000/COMBAT.moveSpeed)));
    if(fine){
     // Physical diagonal sub-step is real WASD in the SAME original browser,
     // not a bypass of the <=4px World-lane gate below. The subsequent
     // stagePair() also remeasures/restages X after this small lateral nudge.
-    await pulseFineLane(actor,key,horizontal);
+    // Duration records the actual trusted W3C hold, NEVER zero for real input.
+    await pulseFineLane(actor,key,horizontal,durationMs);
    }else{
     await pulse(actor,key,durationMs);
    }
