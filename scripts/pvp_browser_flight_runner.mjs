@@ -5607,15 +5607,19 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
   // M159 original first-RED d4b9e3f: the authentic roll knocked the selected
   // victim from x134 to x208; a pre-roll 78px center distance still left the
   // punisher at (136,32) to (208,114), OUTSIDE unchanged 94px Light reach.
-  // Stage #4 to a safer lateral/downward contact lane BEFORE the real roll.
-  // This is only original W3C movement, not a prediction credited as a HIT.
-  // The existing strict first/second/roller HP and M209 server overlap gates
+  // M159 exact-head 7acf8ac: the prior +28/-68 lane allowed the
+  // authentic roller #1 to enter the same 94px Light arc as the selected
+  // knockdown #2; original World showed BOTH #1 and #2 lose 34HP.
+  // Keep #4 farther LEFT and ABOVE the roll's downstream sweep by staging
+  // near the first victim's x+12/y-78, BEFORE the physical wheel. This is
+  // only original W3C movement, not a prediction credited as a HIT. The
+  // existing strict first/second/roller HP and M209 server overlap gates
   // below remain the ONLY authority for success.
   const postRollLaneStages=[];
   let postRollLane=reachAfter;
   for(let adjustment=0;adjustment<3;adjustment++){
-    const wantedX=postRollLane.target.x+28;
-    const wantedY=postRollLane.target.y-68;
+    const wantedX=postRollLane.target.x+12;
+    const wantedY=postRollLane.target.y-78;
     const dx=wantedX-postRollLane.own.x;
     const dy=wantedY-postRollLane.own.y;
     if(Math.abs(dx)<=10&&Math.abs(dy)<=10)break;
@@ -5632,8 +5636,8 @@ async function runOnlineUiMultiKnockdownFfaHitFlight(entries) {
     postRollLane=await stageM159ReachMargin();
     postRollLaneStages.push({adjustment,moves,before:previous,after:postRollLane});
   }
-  const laneDx=postRollLane.own.x-(postRollLane.target.x+28);
-  const laneDy=postRollLane.own.y-(postRollLane.target.y-68);
+  const laneDx=postRollLane.own.x-(postRollLane.target.x+12);
+  const laneDy=postRollLane.own.y-(postRollLane.target.y-78);
   console.log("M159_POST_ROLL_CONTACT_LANE_STAGE "+JSON.stringify({
     postRollLaneStages,actualWorld:postRollLane,
     laneDx,laneDy,unchangedLightReach:originalLightReach,

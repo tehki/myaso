@@ -48,8 +48,8 @@ test("M159 refuses edge-of-reach staging without a real trusted server-validated
 
 test("M159 stages genuine post-knockback contact geometry BEFORE the original roll without inflating reach",()=>{
   assert.match(flight,/const postRollLaneStages=\[\]/);
-  assert.match(flight,/const wantedX=postRollLane\.target\.x\+28/);
-  assert.match(flight,/const wantedY=postRollLane\.target\.y-68/);
+  assert.match(flight,/const wantedX=postRollLane\.target\.x\+12/);
+  assert.match(flight,/const wantedY=postRollLane\.target\.y-78/);
   assert.match(flight,/await pulseMovementKeyBoundedW3c\(punisher,delta>0\?positive:negative,pulseMs\)/);
   assert.match(flight,/postRollLane=await stageM159ReachMargin\(\)/);
   assert.match(flight,/M159_POST_ROLL_CONTACT_LANE_STAGE/);
@@ -61,6 +61,26 @@ test("M159 stages genuine post-knockback contact geometry BEFORE the original ro
     flight.indexOf("await scrollArenaWheel(roller"));
   assert.doesNotMatch(flight,/COMBAT\.attack\.reach\s*=|COMBAT\.dodge\.collisionKnockdownMs\s*=/);
 });
+test("M159 left-upper physical lane has a distinct 94px roller exclusion margin in the two retained first-RED geometries",()=>{
+  // All positions are read-only original Rust snapshots from the retained
+  // first-REDs. These numerical checks are planning evidence, NEVER a
+  // replacement for post-roll hit / miss authority in live Chrome CI.
+  const cases=[
+    {preVictim:{x:136,y:102},postVictim:{x:170,y:102},postRoller:{x:222,y:134}},
+    {preVictim:{x:138,y:96},postVictim:{x:172,y:78},postRoller:{x:176,y:110}},
+  ];
+  const reach=94;
+  for(const {preVictim,postVictim,postRoller} of cases){
+    const own={x:preVictim.x+12,y:Math.max(18,preVictim.y-78)};
+    assert.ok(Math.hypot(postVictim.x-own.x,postVictim.y-own.y)<reach,
+      "selected first victim remains within immutable genuine Light reach");
+    assert.ok(Math.hypot(postRoller.x-own.x,postRoller.y-own.y)>reach,
+      "retained first-RED roller lies beyond immutable genuine Light reach");
+  }
+  assert.match(flight,/const laneDx=postRollLane\.own\.x-\(postRollLane\.target\.x\+12\)/);
+  assert.match(flight,/const laneDy=postRollLane\.own\.y-\(postRollLane\.target\.y-78\)/);
+});
+
 test("M159 physical staging happens before original wheel and never changes gameplay timing or hit admission",()=>{
   const stage=flight.indexOf("M159_NATIVE_REACH_MARGIN_STAGE");
   const roll=flight.indexOf("await scrollArenaWheel(roller");
