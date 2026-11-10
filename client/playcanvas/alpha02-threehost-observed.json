@@ -1,0 +1,34 @@
+{
+  "capturedDate": "2026-11-08",
+  "candidateHead": "0db881edf292e2c7a95bc9e443345a1c0a5e9769",
+  "scope": "READ_ONLY_INSTALLED_BROWSER_PREFLIGHT_NOT_GAMEPLAY_EVIDENCE",
+  "hosts": [
+    {
+      "alias": "x230i",
+      "browser": { "name": "google-chrome-stable", "version": "155.0.8059.79", "major": 155 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "152.0.7977.82", "major": 152 },
+      "driverVerified": true,
+      "chromeSeats": 2,
+      "networkSeat": true
+    },
+    {
+      "alias": "machine",
+      "browser": { "name": "google-chrome-stable", "version": "157.0.8103.38", "major": 157 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "156.0.8078.80", "major": 156 },
+      "driverVerified": false,
+      "chromeSeats": 2,
+      "networkSeat": true
+    },
+    {
+      "alias": "serj",
+      "browser": { "name": "chromium", "version": "152.0.7977.82", "major": 152 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "152.0.7977.82", "major": 152 },
+      "driverVerified": true,
+      "chromeSeats": 0,
+      "networkSeat": true
+    }
+  ]
+}

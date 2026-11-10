@@ -4,6 +4,66 @@
 **Release:** SOURCE-ONLY / DRAFT / HARD HOLD. No protected-main merge, production
 deploy, public PlayCanvas activation, security bypass or server mutation.
 
+## 2026-11-10 three-machine readiness — portable Chrome drivers and real local seats
+
+**Owner constraint remains no fourth physical machine, source-only, DRAFT,
+RELEASE HARD HOLD.** Two compatible Google official portable ChromeDrivers
+were verified as user-local QA assets (no system-wide driver/browser or
+production changes): X230i Chrome Stable 155.0.8059.79 + Driver155.0.8059.84;
+Windows Machine Chrome Stable 157.0.8103.39 + Driver157.0.8103.50. Serj
+Chromium 152 and Driver152 already match, but it is not a Chrome Stable seat.
+Executable and archive SHA-256 digests are preserved in
+[`alpha02-threehost-observed-20261110.json`](./alpha02-threehost-observed-20261110.json).
+
+**Actual browser-only native QA PASS:** independently on each host, the new
+`scripts/main0-local-chrome-two-seat-smoke.mjs` launched **two genuine
+Chrome Stable browser sessions with distinct ephemeral profiles**, confirmed
+browser version from real ChromeDriver capabilities and one trusted W3C keydown
+per session. X230i 2/2; Windows 2/2. Each test used only a `data:` document
+and loopback ChromeDriver; tests were run separately, not four simultaneous
+Rust World players. A total of four local W3C Chrome seats were verified
+across the two physical machines. No production server/QUIC bridge activated.
+Read-only new matrix should now state `topologyReady=true` for **local
+prerequisites only**; all real Rust/Chat/Combat/3-machine QUIC acceptance
+fields remain `NOT_RUN` and release `HOLD`.
+
+**Earlier [child PR #1170](https://github.com/tehki/myaso/pull/1170)**
+at `588a75733be377e07d7e27d37b75432bbf53d18f` has
+[quality #42496739610](https://github.com/tehki/myaso/actions/runs/42496739610)
+PASS on **attempt 2**, with all 5/5 exact-head workflows successful.
+The retained first-attempt M137 genuine original World Jump15 instead of
+JumpAttack16/17/18 is **not resolved**, and a hypothesis involving original
+held-LMB source0 frame sampling was not accepted as a game patch: it conflicted
+with protected R1 charge semantics, so the experimental candidate was fully
+reverted, leaving original source unchanged. Keep the exact first-RED.
+
+**Next substantive gate:** independently authorized private **UDP/QUIC-aware
+loopback transport** preserving genuine Rust World/TLS pin and input authority;
+four simultaneously authenticated Chrome clients across X230i+Windows;
+Serj's distinct-physical-host Chromium witness; exact server snapshots,
+HIT/HP, three respawns, genuine input, Chat C1, reconnect, and signed independent
+QA. Neither a browser-only seat PASS nor the five green workflows can replace
+this release gate. No merge/deployment/public activation.
+
+## Current owner-approved hardware constraint — 2026-11-08
+
+**NO FOURTH PHYSICAL MACHINE.** Earlier four-physical-Chrome-host
+prerequisites in this historical backlog are superseded by the owner's
+three-machine acceptance plan. Preserve the earlier first-RED evidence rather
+than pretending a fourth host exists. Source-only preparation lives in
+[`MAIN0_ALPHA02_THREE_HOST_ACCEPTANCE.md`](./MAIN0_ALPHA02_THREE_HOST_ACCEPTANCE.md):
+four genuine Chrome Stable sessions across **X230i (2) + Windows Machine (2)**,
+plus a separately labeled three-physical-host Rust/QUIC network witness using
+**X230i Chrome + Windows Chrome + Serj Chromium**. Serj's Chromium is NOT a
+Chrome Stable product qualification, and 4 sessions are NOT 4 physical hosts.
+
+The existing draft #1169 exact head `0db881edf292e2c7a95bc9e443345a1c0a5e9769`
+passed 31/31 same-source GitHub workflows. Those are automated CI, not
+physical cross-machine acceptance. A read-only check found ChromeDriver major
+mismatch on X230i and Windows and no authorized private UDP/QUIC forwarding.
+No driver installation, server activation, networking change, deployment or
+release has been authorized or performed. **Release HOLD.**
+
 ## Alpha 0.2 browser support decision — 2026-11-04
 
 **Target browser: desktop Google Chrome Stable only.** Chrome is the
