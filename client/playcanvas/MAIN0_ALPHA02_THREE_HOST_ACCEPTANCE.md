@@ -29,7 +29,74 @@ The old four-physical-Chrome-host requirement is replaced by these two tracks.
 Keep their evidence distinct; never combine runs, sources, browsers or actors
 to fabricate the missing fourth physical machine.
 
-## Current read-only preflight: blockers, not new gameplay regressions
+## 2026-11-10 portable-driver and two-seat browser-only first acceptance — PASS
+
+The owner-approved **two available Chrome machines** are now capable of
+launching two local Chrome Stable browser sessions each with Google-sourced
+portable ChromeDriver binaries. These were placed in user-local non-system
+QA caches. Chrome installations and system-wide driver/PATH were not changed.
+
+- X230i actual Google Chrome Stable `155.0.8059.79` with portable
+  ChromeDriver `155.0.8059.84` in
+  `$HOME/.cache/myaso/qa-drivers/155.0.8059.84/chromedriver-linux64/chromedriver`.
+  Executable SHA-256:
+  `404dd1be5119d3c00b01251d0532fc3d8df1762b6e6835e2bf387b613577494e`.
+  Official archive SHA-256:
+  `4fe2433044363e5233d642e70fa50278b471bda08032d922402c8bd7c6d743fd`.
+- Windows Machine actual Chrome Stable `157.0.8103.39` with portable
+  ChromeDriver `157.0.8103.50` under
+  `$env:LOCALAPPDATA\myaso\qa-drivers\157.0.8103.50\chromedriver-win64\chromedriver.exe`.
+  Executable SHA-256:
+  `92f358cb5460b447044fcc2dfd6c7d87ff56f91b00c57ed303b18d0cd8d4b1b3`.
+  Official archive SHA-256:
+  `408d7da374064d0b01f1918d898b983029294f49be8bb0c23729920390e61376`.
+- Google source of both archives:
+  [Chrome for Testing latest patch per build](https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json).
+  Installed browser-to-driver `MAJOR.MINOR.BUILD` matched on each host.
+- Serj remains Chromium `152.0.7977.82` with ChromeDriver `152.0.7977.82`;
+  it is the third-machine network witness, **not** a Chrome Stable product seat.
+
+**Real nonrelease browser-only execution** via
+`scripts/main0-local-chrome-two-seat-smoke.mjs`:
+
+| Physical host | Chrome versions returned by W3C capabilities | Unique temporary profiles | Real trusted W3C keydown each | Result |
+| --- | --- | --- | --- | --- |
+| X230i | 155.0.8059.79; 155.0.8059.79 | 2 | YES, both | PASS |
+| Windows Machine | 157.0.8103.39; 157.0.8103.39 | 2 | YES, both | PASS |
+
+All four browser sessions launched on actual owner machines, but **the
+two-machine runs were performed separately**, not as four simultaneous players
+against one Rust World. The only page was an isolated `data:text/html`
+browser smoke; ChromeDriver bound to loopback. Each browser used its own
+temporary profile which was cleaned up. The runner does not alter production,
+use Chrome user profiles, connect WebTransport, spawn a game server, claim
+four humans or declare real multiplayer acceptance.
+
+Reproduce locally after reviewing the source:
+
+```sh
+CHROME_BIN=/usr/bin/google-chrome-stable \
+MYASO_CHROMEDRIVER_BIN="$HOME/.cache/myaso/qa-drivers/155.0.8059.84/chromedriver-linux64/chromedriver" \
+node scripts/main0-local-chrome-two-seat-smoke.mjs x230i 155
+
+MYASO_CHROMEDRIVER_BIN="$HOME/.cache/myaso/qa-drivers/155.0.8059.84/chromedriver-linux64/chromedriver" \
+node scripts/main0-threehost-readiness.mjs --self x230i
+
+node scripts/main0-threehost-readiness.mjs --matrix client/playcanvas/alpha02-threehost-observed-20261110.json
+node --test tests/main0-local-chrome-two-seat-smoke.test.mjs
+```
+
+The Windows run uses `CHROME_BIN` pointing to the existing Google Chrome
+`chrome.exe`, `MYASO_CHROMEDRIVER_BIN` pointing to the portable driver and
+`node scripts/main0-local-chrome-two-seat-smoke.mjs machine 157` from a
+reviewed copy of this script. No global PATH edits.
+
+**Driver compatibility: PASS. Two local Chrome seats on each Chrome host:
+PASS. Combined four-physical-host and four-player authoritative Rust World:
+NOT RUN. Cross-machine private UDP/QUIC forwarding/TLS pinned stage:
+NOT AUTHORIZED/NOT RUN. RELEASE HOLD.**
+
+## Historical 2026-11-08 read-only preflight: first-RED and blockers (superseded where noted)
 
 1. X230i Chrome 155, executable ChromeDriver 152: mismatched major versions.
 2. Windows Machine Chrome 157; only ChromeDriver 156 found in a Selenium

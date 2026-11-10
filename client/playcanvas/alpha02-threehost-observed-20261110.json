@@ -1,0 +1,58 @@
+{
+  "capturedUtc": "2026-11-10T14:29:25Z",
+  "sourceCandidateBase": "0db881edf292e2c7a95bc9e443345a1c0a5e9769",
+  "scope": "NONRELEASE_TWO_SEPARATE_LOCAL_BROWSER_ONLY_SEAT_SMOKES",
+  "hosts": [
+    {
+      "alias": "x230i",
+      "browser": { "name": "google-chrome-stable", "version": "155.0.8059.79", "major": 155 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "155.0.8059.84", "major": 155 },
+      "driverVerified": true,
+      "portableDriverSha256": "404dd1be5119d3c00b01251d0532fc3d8df1762b6e6835e2bf387b613577494e",
+      "portableArchiveSha256": "4fe2433044363e5233d642e70fa50278b471bda08032d922402c8bd7c6d743fd",
+      "chromeSeats": 2,
+      "networkSeat": true,
+      "localBrowserOnlySmoke": "PASS",
+      "observedDistinctBrowserSessions": 2,
+      "observedDistinctTemporaryProfiles": 2,
+      "trustedW3cKeyboard": true
+    },
+    {
+      "alias": "machine",
+      "browser": { "name": "google-chrome-stable", "version": "157.0.8103.39", "major": 157 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "157.0.8103.50", "major": 157 },
+      "driverVerified": true,
+      "portableDriverSha256": "92f358cb5460b447044fcc2dfd6c7d87ff56f91b00c57ed303b18d0cd8d4b1b3",
+      "portableArchiveSha256": "408d7da374064d0b01f1918d898b983029294f49be8bb0c23729920390e61376",
+      "chromeSeats": 2,
+      "networkSeat": true,
+      "localBrowserOnlySmoke": "PASS",
+      "observedDistinctBrowserSessions": 2,
+      "observedDistinctTemporaryProfiles": 2,
+      "trustedW3cKeyboard": true
+    },
+    {
+      "alias": "serj",
+      "browser": { "name": "chromium", "version": "152.0.7977.82", "major": 152 },
+      "browserVerified": true,
+      "driver": { "name": "chromedriver", "version": "152.0.7977.82", "major": 152 },
+      "driverVerified": true,
+      "chromeSeats": 0,
+      "networkSeat": true,
+      "localBrowserOnlySmoke": "NOT_RUN",
+      "trustedW3cKeyboard": false
+    }
+  ],
+  "claimsNotProven": [
+    "four simultaneous cross-machine Rust World player sessions",
+    "three physical hosts in one authenticated WebTransport session set",
+    "four independent physical machines",
+    "four human-operated players",
+    "Greyhaven movement, combat, Chat C1 or death/respawn across hardware",
+    "nonproduction UDP/QUIC/TLS pin stage readiness",
+    "release acceptance"
+  ],
+  "release": "HOLD"
+}
